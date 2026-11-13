@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Device Art Card · Gallery</title>
+<meta name="description" content="Browse every drawing in the Device Art Card for Home Assistant, try colors and menus, and copy the card YAML.">
+<style>
+:root {
+  --text: #f3efff; --faint: #8982ad; --accent: #8b5cf6; --accent-2: #a78bfa; --ok: #34d399;
+  --surface: rgba(32, 20, 80, .52); --surface-2: rgba(255, 255, 255, .055); --hover: rgba(255, 255, 255, .075);
+  --line: rgba(255, 255, 255, .1); --t2: rgba(234, 226, 255, .76); --acc-soft: rgba(167, 139, 250, .2); --acc-text: #dacfff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; min-height: 100vh;
+  background: #140b3a radial-gradient(1200px 700px at 70% 110%, #3a1d6e 0%, #1d1145 45%, #0b0820 100%) fixed; }
+button, input, select { font: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; padding: 0; }
+:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+a { color: var(--accent-2); }
+.top { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 16px;
+  background: rgba(20, 11, 58, .92); border-bottom: 1px solid var(--line); }
+.top h1 { margin: 0; font-size: 17px; font-weight: 650; }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 2px; }
+.seg button { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12.5px; color: var(--t2); }
+.seg button[aria-pressed="true"] { background: var(--acc-soft); color: var(--acc-text); }
+.hint { font-size: 11px; color: var(--faint); margin-right: 4px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+.tg { display: inline-flex; align-items: center; }
+.counts { font-size: 12px; color: var(--t2); }
+input.q { height: 30px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--line); padding: 0 10px; width: 200px; }
+.wrap { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 54px); }
+.side { position: sticky; top: 54px; align-self: start; max-height: calc(100vh - 54px); overflow: auto; padding: 12px 8px 40px 12px; border-right: 1px solid var(--line); }
+.side button.cat { width: 100%; display: flex; justify-content: space-between; gap: 6px; padding: 7px 8px; border-radius: 8px; color: var(--text); font-size: 13.5px; font-weight: 600; text-align: left; }
+.side button.cat:hover { background: var(--hover); }
+.side button.cat small, .side a small { color: var(--faint); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.side .subs { padding: 0 0 6px 10px; }
+.side a { display: flex; justify-content: space-between; gap: 6px; padding: 5px 8px; border-radius: 8px; color: var(--t2); text-decoration: none; font-size: 13px; }
+.side a:hover { background: var(--hover); color: var(--text); }
+.side a.on { background: var(--acc-soft); color: var(--acc-text); }
+.main { padding: 16px 20px 80px; min-width: 0; }
+.intro { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; color: var(--t2); font-size: 13px; }
+.intro b { color: var(--text); }
+.intro code { background: rgba(0,0,0,.3); padding: 1px 5px; border-radius: 5px; }
+.sect h2 { margin: 4px 0 10px; font-size: 16px; font-weight: 650; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.sect h2 small { font-size: 12px; color: var(--faint); font-weight: 500; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.tile { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.art { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; overflow: hidden; background: rgba(0, 0, 0, .18); }
+.art svg { width: 100%; height: 100%; display: block; position: relative; z-index: 1; }
+.art .glow { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.nm { font-weight: 600; font-size: 13px; min-height: 18px; }
+.key { font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, Consolas, monospace; }
+.ctl { display: flex; align-items: center; gap: 8px; }
+.pw { width: 38px; height: 22px; border-radius: 999px; background: rgba(255,255,255,.14); position: relative; flex: none; }
+.pw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.pw[aria-pressed="true"] { background: var(--accent); }
+.pw[aria-pressed="true"]::after { left: 19px; }
+.lv { display: flex; flex-direction: column; flex: 1; font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.lv input { width: 100%; accent-color: var(--accent-2); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.row .cl { flex-basis: 100%; font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); }
+.dot[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--accent-2); }
+.row input[type=color] { width: 22px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer; }
+.chip { height: 22px; padding: 0 8px; border-radius: 7px; font-size: 11px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); color: var(--t2); }
+.chip[aria-pressed="true"] { background: var(--acc-soft); color: var(--acc-text); border-color: rgba(179,157,255,.5); }
+.opt { font-size: 11px; color: var(--t2); display: inline-flex; gap: 4px; align-items: center; }
+.opt select { font-size: 11px; height: 22px; max-width: 150px; border-radius: 7px; background: #1d1145; color: var(--text); border: 1px solid var(--line); }
+.copy { width: 100%; height: 28px; border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--surface-2); border: 1px solid var(--line); color: var(--t2); margin-top: 2px; }
+.copy:hover { background: var(--hover); color: var(--text); }
+.copy.done { border-color: var(--ok); color: #a7f3d0; }
+.empty { color: var(--faint); font-size: 13px; padding: 20px; }
+.solo { max-width: 560px; margin: 0 auto; }
+.solo .tile { padding: 16px; }
+.solo .nm { font-size: 16px; }
+.hda-nobg .hda-bg { display: none; }
+@media (max-width: 760px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 12px; }
+  .side button.cat { width: auto; background: var(--surface-2); border: 1px solid var(--line); padding: 4px 9px; font-size: 12.5px; }
+  .side button.cat[aria-expanded="true"] { background: var(--acc-soft); color: var(--acc-text); }
+  .side .subs { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0; order: 99; }
+  .side a { background: var(--surface-2); padding: 3px 8px; font-size: 12px; }
+  .top { gap: 6px 10px; } input.q { width: 100%; order: 9; }
+  .main { padding: 12px 10px 60px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+}
+html, body { overflow-x: hidden; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+.sheetmode .top, .sheetmode #side, .sheetmode #intro { display: none !important; }
+body.sheetmode { background: #140b3a !important; }
+.sheetmode #wrapEl { grid-template-columns: 1fr !important; }
+.sheet h2 { margin: 6px 4px 12px; font-size: 22px; }
+.sgrid { display: grid; grid-template-columns: repeat(var(--scols, 6), 1fr); gap: 10px; }
+.stile { background: rgba(32,20,80,.52); border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 8px; text-align: center; }
+.stile .art { aspect-ratio: 1/1; border-radius: 10px; overflow: hidden; }
+.stile .art svg { width: 100%; height: 100%; display: block; }
+.stile span { display: block; font-size: 12px; margin-top: 4px; color: rgba(234,226,255,.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="top" id="top">
+  <h1>Device Art Card</h1>
+  <span class="tg"><span class="hint">Power</span><span class="seg" id="f-on"></span></span>
+  <span class="tg"><span class="hint">Scenery</span><span class="seg" id="f-scene"></span></span>
+  <input class="q" id="q" type="search" placeholder="Search all names…" aria-label="Search drawing names">
+  <span class="counts" id="counts"></span>
+</div>
+<div class="wrap" id="wrapEl">
+  <nav class="side" id="side" aria-label="Categories"></nav>
+  <main class="main">
+    <div class="intro" id="intro">
+      <b>Every drawing in the card.</b> Pick a category on the left, try the power switch, slider, colors and menus, then press <b>Copy YAML</b> and paste it into a
+      manual card in your dashboard. Install the card with HACS (or add <code>ha-device-art.js</code> as a dashboard resource), then set <code>entity</code> to your own device.
+    </div>
+    <div id="body"></div>
+  </main>
+</div>
+<script src="../dist/ha-device-art.js"></script>
+<script>
+(function () {
+  "use strict";
+  const DA = window.DeviceArt;
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  if (!DA) { $("#body").innerHTML = `<div class="empty">Could not load ../dist/ha-device-art.js. Run <code>node tools/build.mjs</code> first.</div>`; return; }
+  const RM = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const P = new URLSearchParams(location.search);
+  const view = { on: P.get("on") !== "0", scene: P.get("scene") !== "0", cat: P.get("cat") || "", sub: P.get("sub") || "", q: "" };
+  const LVL = { light: "Brightness", fan: "Speed", plant: "Water" };
+  const tiles = new Map(); /* key -> per-tile state */
+  let uidN = 0;
+
+  /* ----- per drawing state ----- */
+  function stateOf(k) {
+    if (!tiles.has(k)) tiles.set(k, {});
+    const t = tiles.get(k), it = DA.items[k], ic = it.ic;
+    if (it.builder) return { on: t.on == null ? view.on : t.on, level: t.level == null ? 80 : t.level, plant: t.plant, pot: t.pot, pot_color: t.pot_color || null, color: t.color || null };
+    const on = t.on == null ? view.on : t.on;
+    const opt = {}; (ic.options || []).forEach((op) => { opt[op.id] = (t.opt && t.opt[op.id]) || op.values[0][0]; });
+    (ic.options || []).forEach((op) => { if (op.when && [].concat(op.when.is).indexOf(opt[op.when.opt]) < 0) opt[op.id] = op.values[0][0]; });
+    const parts = {}; (ic.parts || []).forEach((p) => { parts[p.id] = t.parts && t.parts[p.id] != null ? t.parts[p.id] : on; });
+    return { on, opt, parts, level: t.level == null ? 80 : t.level,
+      color: t.color || (ic.colors && ic.colors[0]) || "#ffd8a8", color2: t.color2 || (ic.colors2 && ic.colors2[0]) || "#e8e2d6" };
+  }
+  function artHTML(k, c) {
+    const it = DA.items[k];
+    const svg = DA.render(k, Object.assign({}, c, { anim: !RM, level: Math.max(.05, c.level / 100), bg: view.scene }));
+    let glow = "";
+    const g = it.ic && it.ic.glow;
+    if (g && c.on) { const H = window.HDAH; glow = `<div class="glow" style="background:radial-gradient(circle at ${g.x * 100}% ${g.y * 100}%, ${H.rgba(c.color, .35 * (.3 + .7 * c.level / 100))}, ${H.rgba(c.color, 0)} ${Math.round(48 * (g.r || 1))}%)"></div>`; }
+    return glow + (svg || `<div class="empty">No drawing</div>`);
+  }
+  function yaml(k) {
+    const it = DA.items[k], c = stateOf(k), q = (v) => JSON.stringify(String(v));
+    const L = ["type: custom:device-art-card", `art: ${k.split("#")[0]}`];
+    const dom = it.set && it.set.kind === "light" ? "light" : "switch";
+    L.push(`entity: ${it.builder ? "sensor.your_soil_moisture" : dom + ".your_" + (dom === "light" ? "light" : "device")}`);
+    if (it.builder) {
+      if (c.plant) L.push(`plant: ${c.plant}`); if (c.pot) L.push(`pot: ${c.pot}`); if (c.pot_color) L.push(`pot_color: ${q(c.pot_color)}`); if (c.color) L.push(`color: ${q(c.color)}`);
+    } else {
+      const ic = it.ic;
+      if (c.color && (!ic.colors || c.color.toLowerCase() !== String(ic.colors[0]).toLowerCase())) L.push(`color: ${q(c.color)}`);
+      if ((ic.colors2 || ic.picker2) && c.color2 && (!ic.colors2 || c.color2.toLowerCase() !== String(ic.colors2[0]).toLowerCase())) L.push(`color2: ${q(c.color2)}`);
+      const ch = (ic.options || []).filter((op) => c.opt[op.id] !== op.values[0][0]);
+      if (ch.length) { L.push("options:"); ch.forEach((op) => L.push(`  ${op.id}: ${c.opt[op.id]}`)); }
+    }
+    if (!view.scene) L.push("scenery: false");
+    return L.join("\n") + "\n";
+  }
+  function controls(k) {
+    const it = DA.items[k], c = stateOf(k);
+    let h = `<div class="ctl"><button type="button" class="pw" data-pw aria-pressed="${c.on}" aria-label="Power"></button>`
+      + `<label class="lv">${esc((it.set && (it.set.levelLabel || LVL[it.set.kind])) || "Level")} <input type="range" min="5" max="100" value="${c.level}" data-lv></label></div>`;
+    const dots = (list, cur, attr) => (list || []).map((x) => `<button type="button" class="dot" ${attr}="${x}" aria-pressed="${!!cur && x.toLowerCase() === String(cur).toLowerCase()}" style="background:${x}" aria-label="Color ${x}"></button>`).join("");
+    if (it.builder) {
+      const K = it.builder.catalog(), pl = K.P[c.plant] || K.plants[0];
+      h += `<div class="row"><label class="opt">${esc(it.builder.id === "treebuilder" ? "Tree" : "Plant")} <select data-bp="plant">${K.plants.map((p) => `<option value="${esc(p.id)}"${pl && p.id === pl.id ? " selected" : ""}>${esc(p.name || (p.ic && p.ic.name) || p.id)}</option>`).join("")}</select></label>`
+        + `<label class="opt">Pot <select data-bp="pot"><option value="">Its own</option>${K.pots.map((p) => `<option value="${esc(p.id)}"${p.id === c.pot ? " selected" : ""}>${esc(p.name || p.id)}</option>`).join("")}</select></label></div>`
+        + `<div class="row"><span class="cl">Pot color</span><input type="color" data-bpc value="${esc(c.pot_color || "#c87850")}" aria-label="Pot color"></div>`;
+      if (pl && pl.colored) h += `<div class="row"><span class="cl">Flower color</span><input type="color" data-bfc value="${esc(c.color || pl.ic.colors[0])}" aria-label="Flower color"></div>`;
+    } else {
+      const ic = it.ic;
+      if ((ic.colors && ic.colors.length) || ic.picker) h += `<div class="row"><span class="cl">${esc(ic.colorLabel || "Color")}</span>${dots(ic.colors, c.color, "data-col")}${ic.picker ? `<input type="color" data-pick value="${esc(c.color)}" aria-label="Pick a color">` : ""}</div>`;
+      if ((ic.colors2 && ic.colors2.length) || ic.picker2) h += `<div class="row"><span class="cl">${esc(ic.colorLabel2 || "Second color")}</span>${dots(ic.colors2, c.color2, "data-col2")}${ic.picker2 ? `<input type="color" data-pick2 value="${esc(c.color2)}" aria-label="Pick a second color">` : ""}</div>`;
+      const ps = (ic.parts || []).filter((p) => !p.when || [].concat(p.when.is).indexOf(c.opt[p.when.opt]) >= 0);
+      if (ps.length) h += `<div class="row">${ps.map((p) => `<button type="button" class="chip" data-part="${esc(p.id)}" aria-pressed="${c.parts[p.id]}">${esc(p.name)}</button>`).join("")}</div>`;
+      const os = (ic.options || []).filter((op) => !op.when || [].concat(op.when.is).indexOf(c.opt[op.when.opt]) >= 0);
+      if (os.length) h += `<div class="row">${os.map((op) => `<label class="opt">${esc(op.name)} <select data-opt="${esc(op.id)}">${op.values.map((v) => `<option value="${esc(v[0])}"${v[0] === c.opt[op.id] ? " selected" : ""}>${esc(v[1])}</option>`).join("")}</select></label>`).join("")}</div>`;
+    }
+    return h + `<button type="button" class="copy" data-copy>Copy YAML</button>`;
+  }
+  function tileHTML(k) {
+    const it = DA.items[k];
+    return `<div class="tile" data-k="${esc(k)}"><div class="art ${view.scene ? "" : "hda-nobg"} ${RM ? "" : "hda-anim"}">${artHTML(k, stateOf(k))}</div>`
+      + `<div class="nm">${esc(it.name)}</div><div class="key">${esc(k.split("#")[0])}</div><div class="ctls">${controls(k)}</div></div>`;
+  }
+  /* inject each set's CSS once */
+  const injected = new Set();
+  function injectCss(keys) {
+    keys.forEach((k) => { const it = DA.items[k]; const id = it.builder ? it.builder.id : it.set.id; if (injected.has(id)) return; injected.add(id);
+      const el = document.createElement("style"); el.textContent = DA.css(k); document.head.appendChild(el); });
+  }
+  /* ----- layout ----- */
+  const catOf = (id) => DA.catalog.filter((c) => c.id === id)[0];
+  const itemsOf = (sub) => sub.items.filter((k) => DA.items[k]);
+  function renderSide() {
+    $("#side").innerHTML = DA.catalog.map((c) => {
+      const n = c.subs.reduce((a, s) => a + itemsOf(s).length, 0), open = c.id === view.cat;
+      return `<button type="button" class="cat" data-cat="${esc(c.id)}" aria-expanded="${open}">${esc(c.name)} <small>${n}</small></button>`
+        + (open ? `<div class="subs">${c.subs.map((s) => `<a href="?cat=${encodeURIComponent(c.id)}&sub=${encodeURIComponent(s.id)}" data-sub="${esc(s.id)}" class="${s.id === view.sub ? "on" : ""}">${esc(s.name)} <small>${itemsOf(s).length}</small></a>`).join("")}</div>` : "");
+    }).join("");
+  }
+  function renderSegs() {
+    $("#f-on").innerHTML = [["1", "On"], ["0", "Off"]].map(([v, l]) => `<button type="button" data-on="${v}" aria-pressed="${(v === "1") === view.on}">${l}</button>`).join("");
+    $("#f-scene").innerHTML = [["1", "Show"], ["0", "Hide"]].map(([v, l]) => `<button type="button" data-scene="${v}" aria-pressed="${(v === "1") === view.scene}">${l}</button>`).join("");
+  }
+  function renderBody() {
+    let keys = [], title = "", sub = "";
+    const card = P.get("card"), show = P.get("showcase");
+    if (card) { const k = DA.resolve(card); if (k) { injectCss([k]); $("#body").innerHTML = `<div class="solo">${tileHTML(k)}</div>`; return; } }
+    if (show) return renderShowcase(show);
+    if (P.get("sheet") || P.get("pick")) return renderSheet(P.get("sheet") || "", +(P.get("n") || 2));
+    if (view.q) { const q = view.q.toLowerCase(); keys = DA.order.filter((k) => (DA.items[k].name + " " + k).toLowerCase().indexOf(q) >= 0); title = `Search: ${view.q}`; sub = `${keys.length} drawings`; }
+    else {
+      const c = catOf(view.cat) || DA.catalog[0]; view.cat = c.id;
+      const s = c.subs.filter((x) => x.id === view.sub)[0] || c.subs[0]; view.sub = s.id;
+      keys = itemsOf(s); title = `${c.name} · ${s.name}`; sub = `${keys.length} drawings`;
+    }
+    injectCss(keys);
+    $("#body").innerHTML = `<section class="sect"><h2>${esc(title)} <small>${esc(sub)}</small></h2>${keys.length ? `<div class="grid">${keys.map(tileHTML).join("")}</div>` : `<div class="empty">Nothing found.</div>`}</section>`;
+    $("#counts").innerHTML = `<b>${DA.order.length}</b> drawings`;
+  }
+  /* a picture sheet for the README: a few drawings from every subcategory of one category, art and name only */
+  function renderSheet(catId, n) {
+    const c = catOf(catId) || { name: P.get("title") || "", subs: [] };
+    const keys = (P.get("pick") || "").split(",").filter(Boolean).map((x) => DA.resolve(x)).filter(Boolean); c.subs.forEach((s) => { const it = itemsOf(s).filter((k) => !DA.items[k].builder); const step = Math.max(1, Math.floor(it.length / n)); for (let i = 0; i < n && i * step < it.length; i++) keys.push(it[i * step]); });
+    injectCss(keys);
+    $("#body").innerHTML = `<section class="sheet"><h2>${esc(c.name)}</h2><div class="sgrid">${keys.map((k) => `<div class="stile"><div class="art ${view.scene ? "" : "hda-nobg"} ${RM ? "" : "hda-anim"}">${artHTML(k, stateOf(k))}</div><span>${esc(DA.items[k].name)}</span></div>`).join("")}</div></section>`;
+  }
+  /* a grid of different menu and color combinations of one drawing */
+  function renderShowcase(art) {
+    const k = DA.resolve(art); if (!k) { $("#body").innerHTML = `<div class="empty">Unknown drawing.</div>`; return; }
+    injectCss([k]);
+    const it = DA.items[k], ic = it.ic, combos = [];
+    if (it.builder) { const K = it.builder.catalog(); K.plants.slice(0, 12).forEach((p, i) => combos.push({ plant: p.id, pot: K.pots[(i * 5) % K.pots.length].id })); }
+    else {
+      const opts = ic.options || [], cols = ic.colors || ["#ffd8a8"];
+      for (let i = 0; i < 12; i++) { const opt = {}; opts.forEach((op, j) => { opt[op.id] = op.values[(i + j * 2) % op.values.length][0]; }); combos.push({ opt, color: cols[i % cols.length], color2: ic.colors2 ? ic.colors2[(i + 1) % ic.colors2.length] : null }); }
+    }
+    const seen = new Set(); const uniq = combos.filter((c) => { const s = JSON.stringify(c); if (seen.has(s)) return false; seen.add(s); return true; }).slice(0, 12);
+    if (P.get("clean")) {
+      document.body.classList.add("sheetmode");
+      const lbl = (c) => it.builder ? [c.plant, c.pot].filter(Boolean).join(" · ") : (ic.options || []).map((op) => { const v = op.values.find((x) => x[0] === (c.opt || {})[op.id]); return v ? v[1] : ""; }).filter((x) => x && !/^(none|no)$/i.test(x)).slice(0, 2).join(" · ");
+      $("#body").innerHTML = `<section class="sheet"><h2>${esc(P.get("title") || it.name)}</h2><div class="sgrid">${uniq.map((c, i) => { const k2 = k + "#" + i; tiles.set(k2, Object.assign({}, c)); DA.items[k2] = it;
+        return `<div class="stile"><div class="art ${view.scene ? "" : "hda-nobg"} ${RM ? "" : "hda-anim"}">${artHTML(k2, stateOf(k2))}</div><span>${esc(lbl(c) || "look " + (i + 1))}</span></div>`; }).join("")}</div></section>`;
+      return;
+    }
+    $("#body").innerHTML = `<section class="sect"><h2>${esc(it.name)} <small>${uniq.length} looks</small></h2><div class="grid">${uniq.map((c, i) => {
+      const k2 = k + "#" + i; tiles.set(k2, Object.assign({}, c)); DA.items[k2] = it; const h = tileHTML(k2); return h; }).join("")}</div></section>`;
+  }
+  function refreshTile(el) { const k = el.dataset.k; el.outerHTML = tileHTML(k); }
+  /* ----- events ----- */
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("button,a"); if (!t) return;
+    if (t.dataset.cat) { view.cat = view.cat === t.dataset.cat ? "" : t.dataset.cat; if (view.cat) { view.sub = catOf(view.cat).subs[0].id; view.q = ""; $("#q").value = ""; } renderSide(); if (view.cat) renderBody(); return; }
+    if (t.dataset.sub) { e.preventDefault(); view.sub = t.dataset.sub; view.q = ""; $("#q").value = ""; history.replaceState(null, "", `?cat=${view.cat}&sub=${view.sub}`); renderSide(); renderBody(); window.scrollTo(0, 0); return; }
+    if (t.dataset.on) { view.on = t.dataset.on === "1"; tiles.forEach((s) => { delete s.on; delete s.parts; }); renderSegs(); renderBody(); return; }
+    if (t.dataset.scene) { view.scene = t.dataset.scene === "1"; renderSegs(); renderBody(); return; }
+    const tile = t.closest(".tile"); if (!tile) return;
+    const k = tile.dataset.k, s = tiles.get(k) || {}; tiles.set(k, s); const c = stateOf(k);
+    if (t.hasAttribute("data-pw")) { s.on = !c.on; delete s.parts; }
+    else if (t.dataset.col) s.color = t.dataset.col;
+    else if (t.dataset.col2) s.color2 = t.dataset.col2;
+    else if (t.dataset.part) { s.parts = Object.assign({}, c.parts); s.parts[t.dataset.part] = !c.parts[t.dataset.part]; }
+    else if (t.hasAttribute("data-copy")) { copy(yaml(k), t); return; }
+    else return;
+    refreshTile(tile);
+  });
+  document.addEventListener("input", (e) => {
+    const t = e.target, tile = t.closest(".tile");
+    if (t.id === "q") { view.q = t.value.trim(); if (view.q) { view.cat = ""; renderSide(); } renderBody(); return; }
+    if (!tile) return;
+    const k = tile.dataset.k, s = tiles.get(k) || {}; tiles.set(k, s);
+    if (t.hasAttribute("data-lv")) { s.level = +t.value; const c = stateOf(k); tile.querySelector(".art").innerHTML = artHTML(k, c); return; }
+    if (t.hasAttribute("data-pick")) s.color = t.value; else if (t.hasAttribute("data-pick2")) s.color2 = t.value;
+    else if (t.hasAttribute("data-bpc")) s.pot_color = t.value; else if (t.hasAttribute("data-bfc")) s.color = t.value; else return;
+    tile.querySelector(".art").innerHTML = artHTML(k, stateOf(k));
+  });
+  document.addEventListener("change", (e) => {
+    const t = e.target, tile = t.closest(".tile"); if (!tile) return;
+    const k = tile.dataset.k, s = tiles.get(k) || {}; tiles.set(k, s);
+    if (t.dataset.opt) { s.opt = Object.assign({}, stateOf(k).opt); s.opt[t.dataset.opt] = t.value; }
+    else if (t.dataset.bp === "plant") { s.plant = t.value; s.pot = null; s.color = null; }
+    else if (t.dataset.bp === "pot") s.pot = t.value || null;
+    else return;
+    refreshTile(tile);
+  });
+  function copy(yamlText, btn) {
+    const done = () => { btn.textContent = "Copied"; btn.classList.add("done"); setTimeout(() => { btn.textContent = "Copy YAML"; btn.classList.remove("done"); }, 1400); };
+    const fallback = () => { const ta = document.createElement("textarea"); ta.value = yamlText; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(); } catch (e) { window.prompt("Copy this YAML:", yamlText); } ta.remove(); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(yamlText).then(done, fallback); else fallback();
+  }
+  /* ----- start ----- */
+  if (P.get("sheet") || P.get("pick")) { document.body.classList.add("sheetmode"); if (P.get("cols")) document.documentElement.style.setProperty("--scols", P.get("cols")); }
+  if (P.get("card")) { $("#side").hidden = true; $("#intro").hidden = true; $("#wrapEl").style.gridTemplateColumns = "1fr"; }
+  if (!view.cat && !P.get("showcase") && !P.get("card")) view.cat = DA.catalog[0].id;
+  if (view.cat && !view.sub) { const c = catOf(view.cat); if (c) view.sub = c.subs[0].id; }
+  renderSegs(); renderSide(); renderBody();
+})();
+</script>
+</body>
+</html>

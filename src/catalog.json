@@ -1,0 +1,2184 @@
+[
+ {
+  "id": "lighting",
+  "name": "Lighting",
+  "subs": [
+   {
+    "id": "ceiling",
+    "name": "Ceiling lights",
+    "items": [
+     "ceilinglight/dome",
+     "ceilinglight/drum",
+     "ceilinglight/bowl",
+     "ceilinglight/school",
+     "ceilinglight/wafer",
+     "ceilinglight/can",
+     "ceilinglight/cans",
+     "ceilinglight/gimbal",
+     "ceilinglight/track",
+     "ceilinglight/monorail",
+     "ceilinglight/panel",
+     "ceilinglight/shop",
+     "ceilinglight/ring",
+     "ceilinglight/stars",
+     "ceilinglight/cove",
+     "ceilinglight/crystal",
+     "ceilinglight/cage",
+     "ceilinglight/moroccan",
+     "ceilinglight/vent",
+     "ceilinglight/skylight"
+    ]
+   },
+   {
+    "id": "pendants",
+    "name": "Pendants",
+    "items": [
+     "pendant/globe",
+     "pendant/seeded",
+     "pendant/dome",
+     "pendant/bell",
+     "pendant/mushroom",
+     "pendant/rattan",
+     "pendant/drum",
+     "pendant/cage",
+     "pendant/prism",
+     "pendant/rings",
+     "pendant/lantern",
+     "pendant/trio",
+     "pendant/linear",
+     "pendant/concrete",
+     "pendant/smoked",
+     "pendant/ceramic",
+     "pendant/beehive",
+     "pendant/box",
+     "pendant/island",
+     "pendant/artichoke",
+     "lights2/globe3",
+     "lights2/edison5",
+     "bulbs/cord"
+    ]
+   },
+   {
+    "id": "chandeliers",
+    "name": "Chandeliers",
+    "items": [
+     "chandelier/crystal",
+     "chandelier/candle",
+     "chandelier/wagon",
+     "chandelier/farmhouse",
+     "chandelier/sputnik",
+     "chandelier/linear",
+     "chandelier/empire",
+     "chandelier/halo",
+     "chandelier/rings",
+     "chandelier/drum",
+     "chandelier/beads",
+     "chandelier/branch",
+     "chandelier/orb",
+     "chandelier/bubble",
+     "chandelier/raindrop",
+     "chandelier/spanish",
+     "chandelier/midcentury",
+     "chandelier/edison",
+     "chandelier/capiz",
+     "chandelier/venetian"
+    ]
+   },
+   {
+    "id": "wall",
+    "name": "Wall lights & sconces",
+    "items": [
+     "wall/updown",
+     "wall/halfmoon",
+     "wall/candle",
+     "wall/swingarm",
+     "wall/picture",
+     "wall/globe",
+     "wall/edison",
+     "wall/shell",
+     "wall/alabaster",
+     "wall/rattan",
+     "wall/gooseneck",
+     "wall/coach",
+     "wall/cube",
+     "wall/jar",
+     "wall/flood",
+     "wall/step",
+     "wall/reading",
+     "wall/deco",
+     "wall/candelabra",
+     "wall/hexagon"
+    ]
+   },
+   {
+    "id": "spots",
+    "name": "Spot & picture lights",
+    "items": [
+     "spotlights/track",
+     "spotlights/monorail",
+     "spotlights/runner",
+     "spotlights/plugin",
+     "spotlights/cylinder",
+     "spotlights/gimbal",
+     "spotlights/washer",
+     "spotlights/wafer",
+     "spotlights/colorspot",
+     "spotlights/brasspic",
+     "spotlights/ledbar",
+     "spotlights/battery",
+     "spotlights/museum",
+     "spotlights/mirror",
+     "spotlights/shelfpuck",
+     "spotlights/upcan",
+     "spotlights/sconcepair",
+     "spotlights/spotbar",
+     "spotlights/tripod"
+    ]
+   },
+   {
+    "id": "bulbs",
+    "name": "Bulbs",
+    "items": [
+     "bulbs/a19",
+     "bulbs/a21",
+     "bulbs/br30",
+     "bulbs/par38",
+     "bulbs/gu10",
+     "bulbs/mr16",
+     "bulbs/st64",
+     "bulbs/g25",
+     "bulbs/g40",
+     "bulbs/b11",
+     "bulbs/t30",
+     "lights2/g40",
+     "lights2/t45",
+     "lights2/candlefil"
+    ]
+   },
+   {
+    "id": "mirror",
+    "name": "Mirror & vanity lights",
+    "items": [
+     "mirror/hollywood",
+     "mirror/halo",
+     "mirror/rect",
+     "mirror/band",
+     "mirror/capsule",
+     "mirror/arch",
+     "mirror/bar3",
+     "mirror/edison",
+     "mirror/linear",
+     "mirror/flank",
+     "mirror/swing",
+     "mirror/trifold",
+     "mirror/tabletop",
+     "mirror/cabinet",
+     "mirror/picture",
+     "mirror/ring",
+     "mirror/globebar",
+     "mirror/pendants",
+     "mirror/antifog",
+     "mirror/floor"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "lamps",
+  "name": "Lamps & accent lights",
+  "subs": [
+   {
+    "id": "floor",
+    "name": "Floor lamps",
+    "items": [
+     "floor/arc",
+     "floor/torchiere",
+     "floor/tripod-drum",
+     "floor/wood-tripod",
+     "floor/tree",
+     "floor/paper",
+     "floor/corner-bar",
+     "floor/mid-century",
+     "floor/gooseneck",
+     "floor/globe",
+     "floor/pharmacy",
+     "floor/shelf",
+     "floor/mushroom",
+     "floor/linen-drum",
+     "floor/pipe",
+     "floor/rattan",
+     "floor/ring",
+     "floor/spotlight",
+     "floor/orbs",
+     "floor/pleated"
+    ]
+   },
+   {
+    "id": "desk",
+    "name": "Desk lamps",
+    "items": [
+     "desk/architect",
+     "desk/banker",
+     "desk/monitor-bar",
+     "desk/gooseneck",
+     "desk/clamp-task",
+     "desk/charger",
+     "desk/copper-pipe",
+     "desk/piano",
+     "desk/ring-light",
+     "desk/magnifier",
+     "desk/arc-slab",
+     "desk/mushroom",
+     "desk/lantern",
+     "desk/robot",
+     "desk/clip-on",
+     "desk/bauhaus",
+     "desk/daylight",
+     "desk/shelf-bar",
+     "desk/rgb-bars",
+     "desk/cube"
+    ]
+   },
+   {
+    "id": "nightstand",
+    "name": "Nightstand lamps",
+    "items": [
+     "nightstand/gourd",
+     "nightstand/candlestick",
+     "nightstand/glass-jug",
+     "nightstand/mushroom",
+     "nightstand/crystal",
+     "nightstand/edison",
+     "nightstand/tripod",
+     "nightstand/rattan",
+     "nightstand/paper",
+     "nightstand/tulip",
+     "nightstand/tiffany",
+     "nightstand/salt",
+     "nightstand/sunrise",
+     "nightstand/smart-globe",
+     "nightstand/moon",
+     "nightstand/usb",
+     "nightstand/swing-arm",
+     "nightstand/cordless",
+     "nightstand/lava",
+     "nightstand/clamp",
+     "speakers2/kids-glow-lamp"
+    ]
+   },
+   {
+    "id": "strips",
+    "name": "LED strips & panels",
+    "items": [
+     "ledstrips/toekick",
+     "ledstrips/abovecab",
+     "ledstrips/tray",
+     "ledstrips/crown",
+     "ledstrips/stairs",
+     "ledstrips/handrail",
+     "ledstrips/underbed",
+     "ledstrips/headboard",
+     "ledstrips/deskedge",
+     "ledstrips/mirror",
+     "ledstrips/closet",
+     "ledstrips/bookcase",
+     "ledstrips/panel",
+     "ledstrips/garage",
+     "ledstrips/eave",
+     "ledstrips/deck",
+     "ledstrips/pergola",
+     "ledstrips/rgbic",
+     "ledstrips/cob",
+     "ledstrips/smd",
+     "bulbs/undercab",
+     "bulbs/tvback",
+     "bulbs/neon",
+     "bulbs/bars",
+     "bulbs/hex",
+     "bulbs/tri",
+     "bulbs/shelf",
+     "bulbs/orb"
+    ]
+   },
+   {
+    "id": "neon",
+    "name": "Neon signs",
+    "items": [
+     "neon/open",
+     "neon/bar",
+     "neon/gameroom",
+     "neon/gameon",
+     "neon/coffee",
+     "neon/home",
+     "neon/vibes",
+     "neon/hello",
+     "neon/party",
+     "neon/mancave",
+     "neon/player",
+     "neon/heart",
+     "neon/bolt",
+     "neon/palm",
+     "neon/cactus",
+     "neon/beer",
+     "neon/cocktail",
+     "neon/pizza",
+     "neon/rainbow",
+     "neon/pixel"
+    ]
+   },
+   {
+    "id": "holiday",
+    "name": "Holiday trees",
+    "items": [
+     "lights2/flocked",
+     "lights2/tabletop",
+     "lights2/pencil",
+     "extras/xmastree"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "fans",
+  "name": "Fans",
+  "subs": [
+   {
+    "id": "ceiling",
+    "name": "Ceiling fans",
+    "items": [
+     "ceilingfan/classic",
+     "ceilingfan/nickel",
+     "ceilingfan/ledblack",
+     "ceilingfan/hugger",
+     "ceilingfan/industrial",
+     "ceilingfan/palm",
+     "ceilingfan/rattan",
+     "ceilingfan/windmill",
+     "ceilingfan/propeller",
+     "ceilingfan/retract",
+     "ceilingfan/orb",
+     "ceilingfan/bowl",
+     "ceilingfan/twin",
+     "ceilingfan/outdoor",
+     "ceilingfan/drum",
+     "ceilingfan/minimal",
+     "ceilingfan/crystal",
+     "ceilingfan/airplane",
+     "ceilingfan/vintage"
+    ]
+   },
+   {
+    "id": "box",
+    "name": "Box & table fans",
+    "items": [
+     "boxfan/classic",
+     "boxfan/handle",
+     "boxfan/drum",
+     "boxfan/tilt",
+     "boxfan/circulator",
+     "boxfan/desk",
+     "boxfan/clip",
+     "boxfan/usb",
+     "boxfan/deco",
+     "boxfan/brass",
+     "boxfan/table",
+     "boxfan/slim",
+     "boxfan/shop",
+     "boxfan/bladeless",
+     "boxfan/remote",
+     "boxfan/wood",
+     "boxfan/cube",
+     "boxfan/mist",
+     "boxfan/camping",
+     "boxfan/pullcord"
+    ]
+   },
+   {
+    "id": "stand",
+    "name": "Stand fans",
+    "items": [
+     "standfan/classic",
+     "standfan/remote",
+     "standfan/cross",
+     "standfan/chrome",
+     "standfan/vintage",
+     "standfan/dc7",
+     "standfan/bladeless",
+     "standfan/misting",
+     "standfan/industrial",
+     "standfan/circulator",
+     "standfan/double",
+     "standfan/telescope",
+     "standfan/smart",
+     "standfan/minimal",
+     "standfan/kids",
+     "standfan/swivel",
+     "standfan/deco",
+     "standfan/cordless",
+     "standfan/hidden"
+    ]
+   },
+   {
+    "id": "tower",
+    "name": "Tower fans",
+    "items": [
+     "towerfan/classic",
+     "towerfan/display",
+     "towerfan/slim",
+     "towerfan/woodgrain",
+     "towerfan/pedestal",
+     "towerfan/handle",
+     "towerfan/wave",
+     "towerfan/cylinder",
+     "towerfan/slot",
+     "towerfan/mini",
+     "towerfan/mist",
+     "towerfan/smart",
+     "towerfan/ceramic",
+     "towerfan/twin",
+     "towerfan/tall",
+     "towerfan/kids",
+     "towerfan/aqring",
+     "towerfan/retro",
+     "towerfan/budget",
+     "towerfan/nightlight"
+    ]
+   },
+   {
+    "id": "window",
+    "name": "Window & wall fans",
+    "items": [
+     "windowfan/twin",
+     "windowfan/slim",
+     "windowfan/triple",
+     "windowfan/casement",
+     "windowfan/boxsash",
+     "windowfan/rainguard",
+     "windowfan/smart",
+     "windowfan/basement",
+     "windowfan/autolock",
+     "windowfan/wallosc"
+    ]
+   },
+   {
+    "id": "exhaust",
+    "name": "Exhaust, attic & whole-house fans",
+    "items": [
+     "windowfan/bath",
+     "windowfan/kitchen",
+     "windowfan/roundvent",
+     "windowfan/shutter",
+     "windowfan/shop",
+     "windowfan/greenhouse",
+     "windowfan/rvvent",
+     "windowfan/gable",
+     "windowfan/solar",
+     "windowfan/wholehouse",
+     "evap/gable",
+     "evap/solargable",
+     "evap/powervent",
+     "evap/solar",
+     "evap/turbine",
+     "evap/wholehouse",
+     "evap/ducted",
+     "evap/controller"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "climate",
+  "name": "Heating & cooling",
+  "subs": [
+   {
+    "id": "thermostats",
+    "name": "Thermostats & controls",
+    "items": [
+     "thermostat/learning",
+     "thermostat/square",
+     "thermostat/dial",
+     "thermostat/programmable",
+     "thermostat/touchscreen",
+     "thermostat/pill",
+     "thermostat/withsensor",
+     "thermostat/baseboard",
+     "thermostat/splitwall",
+     "thermostat/remote",
+     "thermostat/ptac",
+     "thermostat/radiant",
+     "thermostat/humidistat",
+     "thermostat/vent",
+     "thermostat/puck",
+     "thermostat/zone",
+     "thermostat/mercury",
+     "thermostat/boiler",
+     "thermostat/atticfan",
+     "thermostat/colorring",
+     "speakers/round-learning-thermostat",
+     "speakers/frosted-thermostat"
+    ]
+   },
+   {
+    "id": "ac",
+    "name": "Air conditioners",
+    "items": [
+     "ac/window",
+     "ac/ushape",
+     "ac/saddle",
+     "ac/portable",
+     "ac/dualhose",
+     "ac/minisplit",
+     "ac/condenser",
+     "ac/cassette",
+     "ac/console",
+     "ac/ptac",
+     "ac/wall",
+     "ac/central",
+     "ac/remote",
+     "ac/rv",
+     "ac/desk",
+     "ac/heatpump",
+     "ac/smart",
+     "ac/attic",
+     "air2/boxy-wall-split",
+     "air2/faceted-wall-split",
+     "air2/mirror-glass-wall-split"
+    ]
+   },
+   {
+    "id": "evap",
+    "name": "Evaporative coolers",
+    "items": [
+     "evap/window",
+     "evap/thruwall",
+     "evap/downdraft",
+     "evap/sidedraft",
+     "evap/grille",
+     "evap/tower",
+     "evap/shop",
+     "evap/desk",
+     "evap/blower",
+     "ac/swamp"
+    ]
+   },
+   {
+    "id": "heaters",
+    "name": "Space & diesel heaters",
+    "items": [
+     "heater/oil",
+     "heater/cube",
+     "heater/tower",
+     "heater/dish",
+     "heater/quartz",
+     "heater/utility",
+     "heater/mica",
+     "heater/vintage",
+     "heater/panel",
+     "heater/baseboard",
+     "heater/loop",
+     "heater/smart",
+     "heating/diesel",
+     "air2/capsule-diesel-heater",
+     "air2/ribbed-top-diesel-heater",
+     "air2/portable-box-diesel-heater"
+    ]
+   },
+   {
+    "id": "fireplaces",
+    "name": "Fireplaces, stoves & fire pits",
+    "items": [
+     "fireplace/wall",
+     "fireplace/insert",
+     "fireplace/linear",
+     "fireplace/tvstand",
+     "fireplace/estove",
+     "fireplace/gasstove",
+     "fireplace/pittable",
+     "fireplace/firebowl",
+     "fireplace/woodhearth",
+     "heater/insert",
+     "heater/linear",
+     "heater/stove",
+     "heater/bowl",
+     "heater/patio",
+     "home2/black-pellet-stove",
+     "home2/compact-pellet-stove",
+     "home2/budget-pellet-stove",
+     "home2/cast-iron-wood-stove",
+     "home2/steel-wood-stove",
+     "heating/pelletstove",
+     "heating/woodstove"
+    ]
+   },
+   {
+    "id": "radiators",
+    "name": "Radiators & towel warmers",
+    "items": [
+     "heating/panelrad",
+     "heating/columnrad",
+     "air2/castiron",
+     "air2/vertical",
+     "heating/towelrail",
+     "heater/towel",
+     "air2/curved-bar-towel-ladder",
+     "air2/freestand"
+    ]
+   },
+   {
+    "id": "boilers",
+    "name": "Boilers & heat pumps",
+    "items": [
+     "heating/combi",
+     "heating/floorboiler",
+     "utility2/wall-combi-boiler",
+     "utility2/compact-condensing-boiler",
+     "heating/pelletboiler",
+     "utility2/hopper-pellet-boiler",
+     "utility2/tall-pellet-boiler",
+     "utility2/compact-pellet-boiler",
+     "heating/gshp",
+     "utility2/geothermal-heat-pump",
+     "utility2/ground-loop-heat-pump",
+     "utility2/slim-geothermal-unit"
+    ]
+   },
+   {
+    "id": "hydronic",
+    "name": "Underfloor, pumps & tanks",
+    "items": [
+     "heating/ufh",
+     "air2/pumpstation",
+     "air2/elecmat",
+     "air2/pexloops",
+     "heating/circ",
+     "utility2/smart-circulator",
+     "utility2/classic-circulator",
+     "utility2/large-smart-circulator",
+     "heating/buffer",
+     "utility2/buffer50",
+     "utility2/wallbuffer",
+     "utility2/stratified",
+     "heating/freshwater",
+     "utility2/fwswall",
+     "utility2/fwscompact",
+     "utility2/fwscabinet"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "air",
+  "name": "Air quality",
+  "subs": [
+   {
+    "id": "purifiers",
+    "name": "Air purifiers",
+    "items": [
+     "purifier/cylinder",
+     "purifier/sleeve",
+     "purifier/loop",
+     "purifier/ringpanel",
+     "purifier/woodcube",
+     "purifier/wallpanel",
+     "purifier/room",
+     "purifier/desk",
+     "purifier/planter",
+     "purifier/sidetable",
+     "purifier/carmini",
+     "purifier/lightbar",
+     "purifier/pet",
+     "purifier/egg",
+     "purifier/display",
+     "purifier/retro",
+     "purifier/ceiling",
+     "purifier/column",
+     "purifier/window",
+     "purifier/cone",
+     "air2/loop-purifier-heater",
+     "air2/big-dome-purifier"
+    ]
+   },
+   {
+    "id": "humidifiers",
+    "name": "Humidifiers",
+    "items": [
+     "humidifier/cleartank",
+     "humidifier/teardrop",
+     "humidifier/woodbase",
+     "humidifier/evaporative",
+     "humidifier/warmmist",
+     "humidifier/tower",
+     "humidifier/turnnozzle",
+     "humidifier/usbcup",
+     "humidifier/flame",
+     "humidifier/cloud",
+     "humidifier/ledring",
+     "humidifier/console",
+     "humidifier/plantpot",
+     "humidifier/cordless",
+     "humidifier/dual",
+     "humidifier/smartring",
+     "humidifier/vaporizer",
+     "humidifier/glasstank",
+     "humidifier/fabricband",
+     "humidifier/desksquare"
+    ]
+   },
+   {
+    "id": "dehumidifiers",
+    "name": "Dehumidifiers",
+    "items": [
+     "dehumidifier/upright",
+     "dehumidifier/compact",
+     "dehumidifier/small",
+     "dehumidifier/basement",
+     "dehumidifier/crawl",
+     "dehumidifier/whole",
+     "dehumidifier/desiccant",
+     "dehumidifier/cube",
+     "dehumidifier/pod",
+     "dehumidifier/bag",
+     "dehumidifier/pump",
+     "dehumidifier/ring",
+     "dehumidifier/tower",
+     "dehumidifier/combo",
+     "dehumidifier/rugged",
+     "dehumidifier/wall",
+     "dehumidifier/laundry",
+     "dehumidifier/rv",
+     "dehumidifier/drum",
+     "dehumidifier/retro"
+    ]
+   },
+   {
+    "id": "diffusers",
+    "name": "Aroma diffusers",
+    "items": [
+     "diffuser/woodcone",
+     "diffuser/speckled",
+     "diffuser/glassdome",
+     "diffuser/marble",
+     "diffuser/nebulizer",
+     "diffuser/reed",
+     "diffuser/plugin",
+     "diffuser/autospray",
+     "diffuser/scentpod",
+     "diffuser/candlewarmer",
+     "diffuser/waxmelt",
+     "diffuser/carvent",
+     "diffuser/usbmini",
+     "diffuser/saltlamp",
+     "diffuser/flame",
+     "diffuser/backflow",
+     "diffuser/incense",
+     "diffuser/bamboo",
+     "diffuser/cloud",
+     "diffuser/cabinet"
+    ]
+   },
+   {
+    "id": "sensors",
+    "name": "Air-quality sensors",
+    "items": [
+     "airsensors/light-bar-box-sensor",
+     "airsensors/upright-lcd-air-monitor",
+     "airsensors/oval-led-dot-co2-clock",
+     "airsensors/round-dot-display-sensor",
+     "airsensors/radonpuck",
+     "airsensors/radonbar",
+     "airsensors/woodface",
+     "airsensors/roundedmonitor",
+     "airsensors/roomcube",
+     "airsensors/einkco2",
+     "airsensors/minisquare",
+     "airsensors/lcdmeter",
+     "airsensors/hygrometer",
+     "airsensors/walleink",
+     "airsensors/weatherstation",
+     "airsensors/round-egg",
+     "sensor/air"
+    ]
+   },
+   {
+    "id": "ventilation",
+    "name": "Ventilation & HRV",
+    "items": [
+     "air2/upright-hrv-dark-panel",
+     "air2/hanging-gray-hrv",
+     "air2/ceiling-erv-two-ducts",
+     "air2/registers"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "kitchen",
+  "name": "Kitchen",
+  "subs": [
+   {
+    "id": "fridges",
+    "name": "Fridges",
+    "items": [
+     "fridgecfg/steel",
+     "fridgecfg/glasspanel",
+     "fridgecfg/probuilt",
+     "fridgecfg/classic",
+     "fridge/4-door-flex-with-screen",
+     "fridge/4-door-flex-panels",
+     "fridge/3-door-panel-fridge",
+     "fridge/side-by-side-with-screen",
+     "fridge/panel-bottom-freezer",
+     "fridge/panel-column-pair",
+     "fridge/knock-glass-french-door",
+     "fridge/round-ice-4-door",
+     "fridge/door-within-door-side-by",
+     "fridge/color-glow-french-door",
+     "fridge/steel-top-freezer",
+     "fridge/gefrench",
+     "fridge/classictop",
+     "fridge/bottomfr",
+     "fridge/basicsbs",
+     "fridge/counterdepth",
+     "fridge/compact",
+     "fridge/builtincol",
+     "fridge/builtinfd",
+     "fridge/color-panel-glass-door"
+    ]
+   },
+   {
+    "id": "freezers",
+    "name": "Freezers",
+    "items": [
+     "kitchen2/7-cu-ft-chest-freezer",
+     "kitchen2/5-cu-ft-chest-freezer",
+     "kitchen2/3-5-cu-ft-chest-freezer",
+     "extras/chestfreezer",
+     "kitchen2/13-cu-ft-upright-freezer",
+     "kitchen2/garage-ready-upright",
+     "kitchen2/compact-upright-freezer",
+     "extras/uprightfreezer"
+    ]
+   },
+   {
+    "id": "minifridge",
+    "name": "Mini fridges, wine & kegs",
+    "items": [
+     "minifridge/white-cube-fridge",
+     "minifridge/3-1-cu-ft-mini",
+     "minifridge/retro-mini-fridge",
+     "minifridge/2-door-dorm-fridge",
+     "minifridge/panel-cube-fridge",
+     "minifridge/15-inch-under-counter",
+     "minifridge/beverage-center",
+     "minifridge/countertop-cooler",
+     "minifridge/dual-zone-beverage",
+     "minifridge/outdoor-fridge",
+     "minifridge/12-bottle-wine-cooler",
+     "minifridge/18-bottle-wine-cooler",
+     "minifridge/46-bottle-dual-zone",
+     "minifridge/wine-column",
+     "minifridge/skincare",
+     "minifridge/gamer",
+     "kitchen2/single-tap-kegerator",
+     "kitchen2/dual-tap-kegerator",
+     "kitchen2/keg-backbar",
+     "extras/kegerator"
+    ]
+   },
+   {
+    "id": "ranges",
+    "name": "Ranges & cooktops",
+    "items": [
+     "rangecfg/cfg-classic",
+     "rangecfg/cfg-otrglass",
+     "range/pro48",
+     "range/retro",
+     "range/gastop",
+     "range/woodstove",
+     "range/pizza",
+     "range/dome"
+    ]
+   },
+   {
+    "id": "ovens",
+    "name": "Ovens & microwaves",
+    "items": [
+     "range/wall",
+     "range/wall2",
+     "range/combo",
+     "range/steam",
+     "ovens/classic-otr",
+     "ovens/black-glass-otr",
+     "ovens/flush-wall-oven",
+     "ovens/pro-double-oven",
+     "ovens/combo-wall-pro",
+     "ovens/speed-oven",
+     "ovens/steam-oven",
+     "ovens/microwave-drawer",
+     "microwave/counter",
+     "microwave/drawer",
+     "microwave/compact",
+     "microwave/combo",
+     "microwave/smart",
+     "countertop/flip-up-air-fry-oven",
+     "countertop/large-air-fry-oven",
+     "countertop/stacked-double-oven",
+     "countertop/brushed-steel-air-fry-oven",
+     "countertop/smart-steel-oven",
+     "countertop/steel-air-fry-toaster-oven",
+     "countertop/budget-4-slice-oven",
+     "countertop/steam-combi-oven",
+     "countertop/french-door-oven",
+     "countertop/black-air-fry-oven",
+     "smallkitchen/toasteroven"
+    ]
+   },
+   {
+    "id": "hoods",
+    "name": "Range hoods",
+    "items": [
+     "microwave/pyramid",
+     "microwave/glass",
+     "microwave/island",
+     "microwave/undercab",
+     "microwave/mantel",
+     "microwave/plaster",
+     "microwave/downdraft",
+     "microwave/ceiling",
+     "microwave/angled",
+     "microwave/copper"
+    ]
+   },
+   {
+    "id": "dishwashers",
+    "name": "Dishwashers",
+    "items": [
+     "dishwasher/front",
+     "dishwasher/hidden",
+     "dishwasher/projection",
+     "dishwasher/panel",
+     "dishwasher/drawer1",
+     "dishwasher/drawer2",
+     "dishwasher/slim",
+     "dishwasher/countertop",
+     "dishwasher/portable",
+     "dishwasher/glass",
+     "dishwasher/retro",
+     "dishwasher/smart",
+     "dishwasher/third",
+     "dishwasher/quiet",
+     "dishwasher/autoopen",
+     "dishwasher/opendrawer",
+     "dishwasher/dial",
+     "dishwasher/commercial"
+    ]
+   },
+   {
+    "id": "coffee",
+    "name": "Coffee & kettles",
+    "items": [
+     "smallkitchen/drip",
+     "kitchen2/12-cup-drip-maker",
+     "kitchen2/steel-drip-maker",
+     "kitchen2/copper-element-drip-brewer",
+     "smallkitchen/pod",
+     "kitchen2/classic-pod-brewer",
+     "kitchen2/mini-pod-brewer",
+     "kitchen2/capsule-coffee-machine",
+     "smallkitchen/espresso",
+     "smallkitchen/bean",
+     "kitchen3/espresso-with-grinder",
+     "kitchen3/slim-espresso-machine",
+     "smallkitchen/goose",
+     "smallkitchen/glasskettle",
+     "smallkitchen/retrokettle"
+    ]
+   },
+   {
+    "id": "small",
+    "name": "Small appliances",
+    "items": [
+     "smallkitchen/toaster2",
+     "smallkitchen/toaster4",
+     "kitchen3/steel-2-slice-toaster",
+     "smallkitchen/airfryer",
+     "smallkitchen/dualfryer",
+     "kitchen3/square-basket-air-fryer",
+     "kitchen3/round-basket-air-fryer",
+     "smallkitchen/multicooker",
+     "kitchen3/electric-pressure-cooker",
+     "kitchen3/pressure-crisp-cooker",
+     "smallkitchen/slowcooker",
+     "smallkitchen/rice",
+     "kitchen3/pressure-rice-cooker",
+     "smallkitchen/mixer",
+     "smallkitchen/blender",
+     "smallkitchen/bullet",
+     "smallkitchen/bread",
+     "smallkitchen/waffle"
+    ]
+   },
+   {
+    "id": "popcorn",
+    "name": "Popcorn & food warmers",
+    "items": [
+     "popcorn/theater",
+     "popcorn/tabletop",
+     "popcorn/carnival",
+     "popcorn/hotair",
+     "popcorn/stovetop",
+     "popcorn/electric",
+     "popcorn/silicone",
+     "popcorn/retro",
+     "popcorn/lobby",
+     "popcorn/snackcart",
+     "countertop/vevor4",
+     "countertop/warmer2",
+     "countertop/buffet",
+     "countertop/drawer",
+     "countertop/heatlamp"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "cleaning",
+  "name": "Laundry & cleaning",
+  "subs": [
+   {
+    "id": "laundry",
+    "name": "Washers & dryers",
+    "items": [
+     "laundrycfg/cfgscreen",
+     "laundrycfg/cfgtop",
+     "laundrycfg/cfgcombo"
+    ]
+   },
+   {
+    "id": "robots",
+    "name": "Robot vacuums",
+    "items": [
+     "vacuum/lidar",
+     "vacuum/topcam",
+     "vacuum/dshape",
+     "vacuum/square",
+     "vacuum/slim",
+     "vacuum/selfempty",
+     "vacuum/allinone",
+     "vacuum/spinmop",
+     "vacuum/combo",
+     "vacuum/obstacle",
+     "vacuum/pethair",
+     "vacuum/mini",
+     "vacuum/dock",
+     "vacuum/stuck",
+     "vacuum/window"
+    ]
+   },
+   {
+    "id": "vacuums",
+    "name": "Stick & upright vacuums",
+    "items": [
+     "vacuum/stick",
+     "vacuum/handheld",
+     "floorcare/laser-stick-vacuum",
+     "floorcare/cordless-handheld",
+     "floorcare/mini-handheld",
+     "floorcare/ball-upright-vacuum",
+     "floorcare/bagless-upright",
+     "floorcare/powered-lift-away",
+     "floorcare/classic-upright-vacuum",
+     "floorcare/bagged-canister",
+     "floorcare/shop-vac-5-gal"
+    ]
+   },
+   {
+    "id": "washers",
+    "name": "Floor washers & carpet cleaners",
+    "items": [
+     "vacuum/washer",
+     "floorcare/stick-wet-cleaner",
+     "floorcare/wet-dry-stick",
+     "floorcare/smart-floor-washer",
+     "floorcare/multi-surface-washer",
+     "floorcare/upright-carpet-cleaner",
+     "floorcare/spot-carpet-cleaner",
+     "floorcare/rental-carpet-cleaner"
+    ]
+   },
+   {
+    "id": "irons",
+    "name": "Irons",
+    "items": [
+     "extras/iron",
+     "home3/steam-iron",
+     "home3/iron_station",
+     "home3/iron_travel"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "entertainment",
+  "name": "Entertainment",
+  "subs": [
+   {
+    "id": "tv",
+    "name": "TVs & projectors",
+    "items": [
+     "media/wall-tv",
+     "media/console-tv",
+     "media/art-tv",
+     "media/curved-tv",
+     "media/outdoor-tv",
+     "media/projector",
+     "media/ust"
+    ]
+   },
+   {
+    "id": "speakers",
+    "name": "Smart speakers",
+    "items": [
+     "speakers2/tall-cylinder-speaker",
+     "speakers2/fabric-puck-speaker",
+     "speakers2/small-ball-speaker",
+     "speakers2/ball-speaker-with-clock",
+     "speakers2/large-ball-speaker",
+     "speakers2/half-ball-speaker",
+     "speakers2/studio-speaker-drum",
+     "speakers2/plug-in-mini-speaker",
+     "speakers2/car-voice-puck",
+     "speakers2/earbuds-case",
+     "speakers/vase-speaker",
+     "speakers/fabric-mini-speaker",
+     "speakers/mini-speaker-wall-hook",
+     "speakers/fabric-smart-speaker",
+     "speakers/large-fabric-speaker",
+     "speakers/round-smart-speaker",
+     "media/cylinder",
+     "media/sphere",
+     "media/puck"
+    ]
+   },
+   {
+    "id": "displays",
+    "name": "Smart displays",
+    "items": [
+     "speakers2/round-alarm-display",
+     "speakers2/5-inch-smart-display",
+     "speakers2/8-inch-smart-display",
+     "speakers2/8-inch-photo-display",
+     "speakers2/swivel-smart-display",
+     "speakers2/15-inch-wall-display",
+     "speakers2/21-inch-wall-display",
+     "speakers2/wall-control-panel",
+     "speakers/7-inch-smart-display",
+     "speakers/10-inch-smart-display",
+     "media/display"
+    ]
+   },
+   {
+    "id": "audio",
+    "name": "Audio & streaming",
+    "items": [
+     "media/soundbar-tv",
+     "media/soundbar-sub",
+     "media/bookshelf",
+     "media/tower",
+     "media/turntable",
+     "media/receiver",
+     "avr/black-receiver-wide-display",
+     "avr/porthole-display-receiver",
+     "avr/big-dial-receiver",
+     "avr/two-knob-receiver",
+     "avr/gloss-black-receiver",
+     "avr/slim-silver-receiver",
+     "avr/minimal-black-amp",
+     "avr/compact",
+     "avr/bluemeter",
+     "avr/vintage",
+     "avr/streamer",
+     "avr/separates",
+     "media/box",
+     "media/stick",
+     "speakers2/streaming-stick-remote",
+     "speakers/pebble-tv-streamer",
+     "speakers/streaming-dongle-remote"
+    ]
+   },
+   {
+    "id": "consoles",
+    "name": "Game consoles",
+    "items": [
+     "consoles/big-black-box-console",
+     "consoles/glossy-curved-console",
+     "consoles/white-slim-console",
+     "consoles/black-slim-console",
+     "consoles/small-white-console",
+     "consoles/black-tower-console",
+     "consoles/16-bit-black-console",
+     "consoles/white-128-bit-console",
+     "consoles2/gray-disc-console",
+     "consoles2/mini-round-console",
+     "consoles2/black-ridged-console",
+     "consoles2/slim-black-console",
+     "consoles2/curved-gloss-console",
+     "consoles2/top-loader-console",
+     "consoles2/wedge-console",
+     "consoles2/three-layer-wedge",
+     "consoles2/tower-console-white-wings",
+     "consoles2/striped-wing-console",
+     "consoles3/8-bit-gray-console",
+     "consoles3/16-bit-gray-console",
+     "consoles3/64-bit-console",
+     "consoles3/cube-console",
+     "consoles3/slim-white-motion-console",
+     "consoles3/tablet-controller-console",
+     "consoles3/handheld-hybrid-console",
+     "consoles3/hybrid-console-oled",
+     "consoles3/handheld-only-console",
+     "consoles3/hybrid-console-2nd-gen",
+     "media/console"
+    ]
+   },
+   {
+    "id": "arcade",
+    "name": "Arcade & pinball",
+    "items": [
+     "arcade/racing",
+     "arcade/deluxe",
+     "arcade/gun",
+     "arcade/fighter",
+     "arcade/golf",
+     "arcade/maze",
+     "arcade/space",
+     "arcade/brawler",
+     "arcade/tall",
+     "arcade/retro",
+     "arcade/party",
+     "arcade/countertop-cabinet",
+     "arcade/wall",
+     "arcade/cocktail",
+     "arcade/pinem",
+     "arcade/pindmd",
+     "arcade/pinwide",
+     "arcade/pindigital",
+     "arcade/pinmini"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "computers",
+  "name": "Computers & network",
+  "subs": [
+   {
+    "id": "pcs",
+    "name": "Computers & laptops",
+    "items": [
+     "office/gaming",
+     "office/office",
+     "office/sff",
+     "office/mini",
+     "office/square",
+     "office/aio",
+     "office/ultra-thin-laptop",
+     "office/business",
+     "office/gaminglap",
+     "office/tent",
+     "office/budget-laptop"
+    ]
+   },
+   {
+    "id": "monitors",
+    "name": "Monitors",
+    "items": [
+     "home4/27-inch-office-monitor",
+     "home4/34-inch-curved-monitor",
+     "home4/49-inch-super-wide",
+     "home4/aluminum-27-inch-display",
+     "home4/portable",
+     "extras/monitor"
+    ]
+   },
+   {
+    "id": "printers",
+    "name": "Printers",
+    "items": [
+     "printers/aio",
+     "printers/slim",
+     "printers/tank",
+     "printers/photo6",
+     "printers/dyesub",
+     "printers/a3",
+     "printers/mono-ink",
+     "printers/mono-laser",
+     "printers/laser-aio",
+     "printers/color-laser",
+     "printers/color-mfp",
+     "printers/label",
+     "printers/receipt"
+    ]
+   },
+   {
+    "id": "printers3d",
+    "name": "3D printers",
+    "items": [
+     "printers/enclosed-3d-printer",
+     "printers/boxy-enclosed-printer",
+     "printers/bed-slinger-3d-printer",
+     "printers/mini-3d-printer",
+     "printers3d/box-lidar",
+     "printers3d/box-solid",
+     "printers3d/pro-two",
+     "printers3d/large-two",
+     "printers3d/large-rack",
+     "printers3d/changer9",
+     "printers3d/slinger-side",
+     "printers3d/slinger-mini",
+     "printers3d/slinger-orange",
+     "printers3d/corexy-orange",
+     "printers3d/toolchanger",
+     "printers3d/bigbox-hub",
+     "printers3d/slinger-gray",
+     "printers3d/box-dark",
+     "printers3d/resin-smoke",
+     "printers3d/resin-orange",
+     "printers3d/kit-corexy",
+     "printers/resin",
+     "printers/delta",
+     "printers/largeformat"
+    ]
+   },
+   {
+    "id": "network",
+    "name": "Racks, NAS & network",
+    "items": [
+     "home4/8u-open-frame",
+     "home4/open25u",
+     "home4/wall12u",
+     "home4/cab42u",
+     "home4/desktop-mini-rack",
+     "extras/rack",
+     "home4/nas4",
+     "home4/nas8",
+     "home4/gw1u",
+     "home4/nvr2u",
+     "home4/desksw8",
+     "extras/router",
+     "extras/mesh",
+     "speakers/mesh-router",
+     "speakers/mesh-point-speaker",
+     "speakers/plug-in-hub"
+    ]
+   },
+   {
+    "id": "ups",
+    "name": "UPS & shredders",
+    "items": [
+     "office/upssmall",
+     "office/upslcd",
+     "office/upsrack",
+     "office/upsbrick",
+     "office/binshred",
+     "office/personal"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "security",
+  "name": "Security & access",
+  "subs": [
+   {
+    "id": "cameras",
+    "name": "Cameras",
+    "items": [
+     "security/bullet",
+     "security/dome",
+     "security/turret",
+     "security/cube",
+     "security/pantilt",
+     "security/flood",
+     "security/spot",
+     "security/battery",
+     "security/solar",
+     "security/baby",
+     "security/ptz",
+     "security/dual",
+     "speakers/indoor-cam-wired",
+     "speakers/battery-cam"
+    ]
+   },
+   {
+    "id": "doorbells",
+    "name": "Doorbells & chimes",
+    "items": [
+     "doorbell/tall",
+     "doorbell/square",
+     "doorbell/wedge",
+     "doorbell/package",
+     "doorbell/brass",
+     "doorbell/lighted",
+     "doorbell/intercom",
+     "doorbell/gatepost",
+     "doorbell/peephole",
+     "doorbell/plugin",
+     "doorbell/tubes",
+     "doorbell/smartchime",
+     "doorbell/school",
+     "doorbell/twist",
+     "doorbell/shopbell",
+     "doorbell/knocker",
+     "doorbell/monitor",
+     "speakers/battery-video-doorbell"
+    ]
+   },
+   {
+    "id": "locks",
+    "name": "Smart locks",
+    "items": [
+     "lock/keypad",
+     "lock/touch",
+     "lock/retrofit",
+     "lock/fingerprint",
+     "lock/handleset",
+     "lock/mortise",
+     "lock/video",
+     "lock/btpadlock",
+     "lock/garage",
+     "lock/gate",
+     "lock/sliding",
+     "lock/office",
+     "lock/cylinder",
+     "lock/euro",
+     "lock/cabinet",
+     "lock/safe",
+     "lock/shed",
+     "lock/strike",
+     "lock/card",
+     "speakers/touch-deadbolt"
+    ]
+   },
+   {
+    "id": "deadbolts",
+    "name": "Smart deadbolts",
+    "items": [
+     "deadbolts/arched-push-button",
+     "deadbolts/round-push-button",
+     "deadbolts/arched-wi-fi-touch",
+     "deadbolts/slim-wi-fi-touch",
+     "deadbolts/arched-keypad-lever",
+     "deadbolts/arched-touch-lever",
+     "deadbolts/slim-touch-lever",
+     "lock2/glass-touchscreen",
+     "lock2/push-button-keypad",
+     "lock2/a2kftouch",
+     "lock2/slim-touchscreen",
+     "lock2/levertouch",
+     "lock2/leverkeypad",
+     "lock2/smart-lock-black",
+     "lock2/entrance-handle-lock"
+    ]
+   },
+   {
+    "id": "alarms",
+    "name": "Alarm panels & sirens",
+    "items": [
+     "safety/slim-white-keypad",
+     "safety/round-edge-keypad",
+     "safety/classic-alpha-keypad",
+     "safety/7-inch-touch-panel",
+     "safety/large-touch-panel",
+     "safety/camera-hub-panel",
+     "safety/command-touchscreen",
+     "safety/smart-alarm-panel",
+     "safety/wireless-keypad",
+     "safety/classic-lcd-keypad",
+     "security/keypad",
+     "security/touch",
+     "security/hub",
+     "security/panic",
+     "security/fob",
+     "security/indoorsiren",
+     "security/outsiren",
+     "security/garagesiren"
+    ]
+   },
+   {
+    "id": "smoke",
+    "name": "Smoke & CO alarms",
+    "items": [
+     "safety/round-smoke-alarm",
+     "safety/combo-smoke-and-co",
+     "safety/hardwired-smoke-alarm",
+     "safety/smart-smoke-co",
+     "safety/smoke-listener",
+     "safety/nighthawk",
+     "safety/heat",
+     "speakers/smoke-and-co-alarm",
+     "sensor/smoke",
+     "sensor/co"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "controls",
+  "name": "Sensors & switches",
+  "subs": [
+   {
+    "id": "sensors",
+    "name": "Sensors",
+    "items": [
+     "sensor/pir",
+     "sensor/ceiling",
+     "sensor/radar",
+     "sensor/door",
+     "sensor/window",
+     "sensor/garage",
+     "sensor/glass",
+     "sensor/leak",
+     "sensor/freezer",
+     "sensor/temp",
+     "sensor/outdoor",
+     "sensor/lux",
+     "sensor/washer",
+     "sensor/bed",
+     "sensor/soil",
+     "sensor/button"
+    ]
+   },
+   {
+    "id": "switches",
+    "name": "Switches & dimmers",
+    "items": [
+     "switch/toggle",
+     "switch/paddle-rocker",
+     "switch/red-bar-dimmer",
+     "switch/dimmer",
+     "switch/rotary",
+     "switch/slide",
+     "switch/twogang",
+     "switch/blue-bar-2-in-1",
+     "switch/fan",
+     "switch/scene",
+     "switch/glass",
+     "switch/vintage",
+     "switch/remote",
+     "switch/display",
+     "switch/timer",
+     "switch/outlet",
+     "switch/lighted",
+     "switch/nightlight",
+     "switch/button",
+     "switch/industrial"
+    ]
+   },
+   {
+    "id": "outlets",
+    "name": "Outlets",
+    "items": [
+     "outlets/hidden-plug-outlet",
+     "outlets/hidden-plug-light-ring",
+     "outlets/hidden-plug-usb-c",
+     "outlets/hidden-plug-usb-c-ring",
+     "outlets/duplex",
+     "outlets/rocker-style-outlet",
+     "outlets/usb",
+     "outlets/gfci",
+     "outlets/smart",
+     "outlets/tamper",
+     "outlets/tslot",
+     "outlets/night",
+     "outlets/dryer",
+     "outlets/weather",
+     "outlets/popup",
+     "outlets/floor",
+     "outlets/tvbox"
+    ]
+   },
+   {
+    "id": "plugs",
+    "name": "Smart plugs & strips",
+    "items": [
+     "plug/mini",
+     "plug/round",
+     "plug/side",
+     "plug/energy",
+     "plug/outdoor",
+     "plug/inwall",
+     "plug/usbc",
+     "plug/dimmer",
+     "plug/night",
+     "plug/lamp",
+     "plug/string",
+     "plug/heavy",
+     "plug/strip",
+     "plug/surge",
+     "plug/tower",
+     "plug/reel",
+     "plug/floorbox",
+     "plug/popup",
+     "plug/undercab"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "energy",
+  "name": "Power & energy",
+  "subs": [
+   {
+    "id": "ev",
+    "name": "EV chargers",
+    "items": [
+     "energy/round",
+     "energy/slim",
+     "energy/pedestal",
+     "energy/cord",
+     "energy/car",
+     "plug/ev"
+    ]
+   },
+   {
+    "id": "solar",
+    "name": "Solar",
+    "items": [
+     "energy/roof",
+     "energy/ground",
+     "utility3/tracker",
+     "utility3/carport",
+     "utility3/balcony",
+     "energy/inverter"
+    ]
+   },
+   {
+    "id": "batteries",
+    "name": "Home batteries & backup",
+    "items": [
+     "energy/slab",
+     "energy/stack",
+     "utility3/flat-wall-battery",
+     "utility3/modular-battery",
+     "utility3/tall-battery-cabinet",
+     "energy/station",
+     "energy/generator"
+    ]
+   },
+   {
+    "id": "meters",
+    "name": "Energy meters",
+    "items": [
+     "utility3/smartmeter",
+     "utility3/in-panel-monitor",
+     "utility3/clip-on-energy-monitor",
+     "heating/ctmeter"
+    ]
+   },
+   {
+    "id": "chargers",
+    "name": "Battery chargers",
+    "items": [
+     "chargers/aa4",
+     "chargers/aalcd",
+     "chargers/wall2",
+     "chargers/univ",
+     "chargers/li",
+     "chargers/usbc",
+     "chargers/camera",
+     "chargers/drone",
+     "chargers/ebike",
+     "chargers/p12",
+     "chargers/p18",
+     "chargers/rapid",
+     "chargers/dual",
+     "chargers/six",
+     "chargers/rack",
+     "chargers/stem",
+     "chargers/radio"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "water",
+  "name": "Water & plumbing",
+  "subs": [
+   {
+    "id": "heaters",
+    "name": "Water heaters",
+    "items": [
+     "water/gastank",
+     "water/elec",
+     "water/tankless",
+     "water/heatpump",
+     "heating/solarthermal",
+     "utility3/flatplate",
+     "utility3/tubeground",
+     "utility3/thermosiphon"
+    ]
+   },
+   {
+    "id": "valves",
+    "name": "Valves, filters & leak alarms",
+    "items": [
+     "water/ball",
+     "water/main",
+     "water/gas",
+     "water/softener",
+     "water/filter",
+     "water/alarm"
+    ]
+   },
+   {
+    "id": "sump",
+    "name": "Sump pumps",
+    "items": [
+     "water/sump",
+     "water/pedestal",
+     "water/sealed",
+     "water/backup",
+     "water/waterpow"
+    ]
+   },
+   {
+    "id": "pumps",
+    "name": "Well & utility pumps",
+    "items": [
+     "water/well",
+     "heating/jetpump",
+     "yard2/jetpump",
+     "yard2/booster",
+     "heating/centrifugal",
+     "yard2/endsuction",
+     "yard2/inline",
+     "yard2/diaphragm"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "outdoor",
+  "name": "Outdoor, pool & yard",
+  "subs": [
+   {
+    "id": "lights",
+    "name": "Outdoor lights",
+    "items": [
+     "outdoor/coach",
+     "outdoor/gooseneck",
+     "outdoor/flush",
+     "outdoor/post",
+     "outdoor/pagoda",
+     "outdoor/mushroom",
+     "outdoor/treespot",
+     "outdoor/flood",
+     "outdoor/bistro",
+     "outdoor/deckstep",
+     "outdoor/bollard",
+     "outdoor/solar",
+     "outdoor/updown",
+     "outdoor/globe",
+     "outdoor/pillar",
+     "outdoor/well",
+     "outdoor/slot",
+     "outdoor/hanging",
+     "outdoor/eave",
+     "outdoor/icicle",
+     "outdoor2/brassspike",
+     "outdoor2/floodstake"
+    ]
+   },
+   {
+    "id": "garage",
+    "name": "Garage doors & openers",
+    "items": [
+     "garage/raised",
+     "garage/double",
+     "garage/carriage",
+     "garage/glass",
+     "garage/flush",
+     "garage/longpanel",
+     "garage/plank",
+     "garage/rollup",
+     "garage/tiltup",
+     "garage/pair",
+     "garage/opener",
+     "garage/keypad",
+     "garage/button"
+    ]
+   },
+   {
+    "id": "gates",
+    "name": "Gates & barriers",
+    "items": [
+     "garage/swing",
+     "garage/garden",
+     "garage/ranch",
+     "garage/privacy",
+     "garage/iron",
+     "garage/slat",
+     "garage/slide",
+     "outdoor2/slatgate",
+     "outdoor2/chainlink",
+     "outdoor2/irongate",
+     "outdoor2/foldarm",
+     "outdoor2/ledarm",
+     "outdoor2/skirtarm",
+     "extras/boom"
+    ]
+   },
+   {
+    "id": "mailboxes",
+    "name": "Mailboxes & parcel boxes",
+    "items": [
+     "doorbell/mailbox",
+     "outdoor2/postbox",
+     "outdoor2/castbox",
+     "outdoor2/parcel",
+     "lock/parcel",
+     "sensor/mailbox",
+     "outdoor2/brassslot",
+     "outdoor2/chute",
+     "outdoor2/steelplate",
+     "extras/mailbox"
+    ]
+   },
+   {
+    "id": "sprinklers",
+    "name": "Sprinklers & irrigation",
+    "items": [
+     "sprinklers/controller",
+     "sprinklers/hose",
+     "sprinklers/popup",
+     "sprinklers/smart",
+     "sprinklers/dial",
+     "sprinklers/touch",
+     "sprinklers/outdoor",
+     "sprinklers/modular",
+     "sprinklers/basic4",
+     "sprinklers/hdial",
+     "sprinklers/hdual",
+     "sprinklers/hhub",
+     "sprinklers/valve",
+     "sprinklers/rotor",
+     "sprinklers/impact",
+     "sprinklers/osc",
+     "sprinklers/drip",
+     "sprinklers/vbox",
+     "sprinklers/rain",
+     "sprinklers/flowsens"
+    ]
+   },
+   {
+    "id": "mowers",
+    "name": "Robot mowers",
+    "items": [
+     "vacuum/mower",
+     "yard2/robot-mower-gray",
+     "yard2/robot-mower-orange",
+     "yard2/wire-free-robot-mower"
+    ]
+   },
+   {
+    "id": "grills",
+    "name": "Grills & smokers",
+    "items": [
+     "grill/gas3",
+     "grill/gas4",
+     "grill/island",
+     "grill/kettle",
+     "grill/kamado",
+     "grill/portable",
+     "grill/griddle36",
+     "grill/griddle22",
+     "grill/builtgrid",
+     "grill/pellet",
+     "grill/vpellet",
+     "grill/offset",
+     "grill/bullet",
+     "grill/electric",
+     "grill/drum",
+     "grill/gravity",
+     "grill/infrared",
+     "grill/rotisserie",
+     "grill/santamaria",
+     "grill/hibachi"
+    ]
+   },
+   {
+    "id": "pool",
+    "name": "Pools & pool equipment",
+    "items": [
+     "pool/inground",
+     "pool/above",
+     "pool/falls",
+     "pool/cover",
+     "pool/panel",
+     "pool/heater",
+     "pool/salt",
+     "yard2/variable-speed-pool-pump",
+     "yard2/above-ground-filter-pump"
+    ]
+   },
+   {
+    "id": "poolrobots",
+    "name": "Pool robots",
+    "items": [
+     "pool/robot",
+     "vacuum/pool",
+     "yard2/brushed-pool-robot",
+     "yard2/pressure-side-pool-cleaner"
+    ]
+   },
+   {
+    "id": "spa",
+    "name": "Hot tubs & saunas",
+    "items": [
+     "pool/hottub",
+     "yard2/square-acrylic-spa",
+     "yard2/inflatable-spa",
+     "yard2/cedartub",
+     "home2/finnish",
+     "home2/cube",
+     "heating/barrel",
+     "heating/cabin"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "plants",
+  "name": "Plants",
+  "subs": [
+   {
+    "id": "houseplants",
+    "name": "Houseplants",
+    "items": [
+     "builder:plantbuilder",
+     "plants/monstera",
+     "plants/snake",
+     "plants/pothos",
+     "plants/zz",
+     "plants/lily",
+     "plants/rubber",
+     "plants/pearls",
+     "plants/aloe",
+     "plants/jade",
+     "plants/succulents",
+     "plants/cactus",
+     "plants/calathea",
+     "plants/fern",
+     "plants/spider",
+     "plants/philodendron",
+     "plants/bird",
+     "plants/pilea",
+     "plants/herbs",
+     "plants/airplant",
+     "plants/hoya"
+    ]
+   },
+   {
+    "id": "flowers",
+    "name": "Flowering plants",
+    "items": [
+     "flowers/orchid",
+     "flowers/poinsettia",
+     "flowers/violet",
+     "flowers/anthurium",
+     "flowers/hibiscus",
+     "flowers/geranium",
+     "flowers/begonia",
+     "flowers/kalanchoe",
+     "flowers/bromeliad",
+     "flowers/tulips",
+     "flowers/hydrangea",
+     "flowers/rose",
+     "flowers/gerbera",
+     "flowers/cyclamen",
+     "flowers/lavender",
+     "flowers/petunia",
+     "flowers/mum",
+     "flowers/azalea",
+     "flowers/amaryllis",
+     "flowers/bougainvillea"
+    ]
+   },
+   {
+    "id": "trees",
+    "name": "Trees",
+    "items": [
+     "builder:treebuilder",
+     "trees/fiddle",
+     "trees/olive",
+     "trees/kentia",
+     "trees/ficus",
+     "trees/money",
+     "trees/lemon",
+     "trees/bonsai",
+     "trees/dracaena",
+     "trees/norfolk",
+     "trees/jmaple",
+     "trees/oak",
+     "trees/fallmaple",
+     "trees/birch",
+     "trees/spruce",
+     "trees/cherry",
+     "trees/palm",
+     "trees/willow",
+     "trees/apple",
+     "trees/aspen",
+     "trees/magnolia"
+    ]
+   },
+   {
+    "id": "garden",
+    "name": "Garden beds & soil",
+    "items": [
+     "builder:moisture",
+     "yard2/cedarbed",
+     "yard2/galvbed",
+     "yard2/elevated",
+     "extras/gardenbed"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "home",
+  "name": "Home, pets & fitness",
+  "subs": [
+   {
+    "id": "blinds",
+    "name": "Blinds & curtains",
+    "items": [
+     "shades/roller",
+     "shades/blackout",
+     "shades/cellular",
+     "shades/tdbu",
+     "shades/roman",
+     "shades/wood",
+     "shades/mini",
+     "shades/vertical",
+     "shades/zebra",
+     "shades/drapes",
+     "shades/sheer",
+     "shades/layered",
+     "shades/cafe",
+     "shades/shutters",
+     "shades/skylight",
+     "shades/solar",
+     "shades/awning",
+     "shades/panels",
+     "shades/arched",
+     "shades/bay",
+     "home2/fauxwood",
+     "home2/smart-faux-wood-blinds"
+    ]
+   },
+   {
+    "id": "shutters",
+    "name": "Exterior shutters",
+    "items": [
+     "extras/rollershutter",
+     "home2/alubox",
+     "home2/motorized-roller",
+     "home2/hurricane",
+     "extras/swingshutters",
+     "home2/boardbatten",
+     "home2/louvered",
+     "home2/raisedpanel"
+    ]
+   },
+   {
+    "id": "bath",
+    "name": "Hair dryers & scales",
+    "items": [
+     "extras/hairdryer",
+     "home3/round-head-hair-dryer",
+     "home3/hot-air-brush",
+     "home3/hotel_dryer",
+     "extras/scale",
+     "home3/smart-glass-scale",
+     "home3/slim-smart-scale",
+     "home3/dial_scale"
+    ]
+   },
+   {
+    "id": "pests",
+    "name": "Mouse traps",
+    "items": [
+     "extras/mousetrap",
+     "extras/snapsensor",
+     "extras/multicatch",
+     "extras/clamptrap",
+     "home3/electronic-mouse-trap",
+     "home3/live_trap"
+    ]
+   },
+   {
+    "id": "petfood",
+    "name": "Pet feeders & fountains",
+    "items": [
+     "pets/feeder",
+     "home3/tall-pet-feeder",
+     "home3/wide-pet-feeder",
+     "home3/gravity_feeder",
+     "pets/fountain",
+     "home3/flower-pet-fountain",
+     "home3/tiered-pet-fountain",
+     "home3/clear-tank-pet-fountain"
+    ]
+   },
+   {
+    "id": "aquariums",
+    "name": "Aquariums",
+    "items": [
+     "pets/aquarium",
+     "home3/rimless20",
+     "home3/curved-nano-aquarium",
+     "home3/tank55"
+    ]
+   },
+   {
+    "id": "petcare",
+    "name": "Pet care & tech",
+    "items": [
+     "pets/litter",
+     "pets/door",
+     "pets/treatcam",
+     "pets/birdcam",
+     "pets/launcher",
+     "pets/bed",
+     "pets/collar"
+    ]
+   },
+   {
+    "id": "cardio",
+    "name": "Cardio machines",
+    "items": [
+     "fitness/folding-treadmill",
+     "fitness/walkpad",
+     "fitness/curve",
+     "fitness/swivel-screen-bike",
+     "fitness/recumbent",
+     "fitness/screen-rower",
+     "fitness/air-rower",
+     "fitness/elliptical",
+     "fitness/stair-climber"
+    ]
+   },
+   {
+    "id": "strength",
+    "name": "Strength & recovery",
+    "items": [
+     "fitness/wall-strength-trainer",
+     "fitness/cable-gym-station",
+     "fitness/mirror",
+     "fitness/vibe"
+    ]
+   }
+  ]
+ }
+]
