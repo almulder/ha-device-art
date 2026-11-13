@@ -1945,6 +1945,26 @@
      "heating/barrel",
      "heating/cabin"
     ]
+   },
+   {
+    "id": "coops",
+    "name": "Chicken coops",
+    "items": [
+     "coops/backyard",
+     "coops/walkin",
+     "coops/tractor",
+     "coops/raised",
+     "coops/plastic",
+     "coops/fenced",
+     "coops/quail",
+     "coops/duckhouse",
+     "coops/autodoor",
+     "coops/heatwaterer",
+     "coops/nipple",
+     "coops/feeder",
+     "coops/heatpanel",
+     "coops/sensor"
+    ]
    }
   ]
  },
@@ -2177,6 +2197,73 @@
      "fitness/cable-gym-station",
      "fitness/mirror",
      "fitness/vibe"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "people",
+  "name": "People & pets",
+  "subs": [
+   {
+    "id": "people",
+    "name": "People",
+    "items": [
+     "people/man",
+     "people/woman",
+     "people/oldman",
+     "people/oldwoman",
+     "people/teenboy",
+     "people/teengirl",
+     "people/boy",
+     "people/girl",
+     "people/toddler",
+     "people/baby"
+    ]
+   },
+   {
+    "id": "dogscats",
+    "name": "Dogs & cats",
+    "items": [
+     "petsfig/labrador",
+     "petsfig/golden",
+     "petsfig/shepherd",
+     "petsfig/frenchie",
+     "petsfig/beagle",
+     "petsfig/dachshund",
+     "petsfig/husky",
+     "petsfig/corgi",
+     "petsfig/collie",
+     "petsfig/poodle",
+     "petsfig/tabby",
+     "petsfig/blackcat",
+     "petsfig/siamese",
+     "petsfig/orangecat"
+    ]
+   },
+   {
+    "id": "habitats",
+    "name": "Reptile & pet habitats",
+    "items": [
+     "habitats/frontglass",
+     "habitats/tallviv",
+     "habitats/meshcham",
+     "habitats/pvcpython",
+     "habitats/pvcdragon",
+     "habitats/bioactive",
+     "habitats/paludarium",
+     "habitats/tortoise",
+     "habitats/rack",
+     "habitats/leotank",
+     "habitats/turtle",
+     "habitats/hermit",
+     "habitats/tarantula",
+     "habitats/axolotl",
+     "habitats/birdcage",
+     "habitats/hamster",
+     "habitats/rabbitpen",
+     "habitats/incubator",
+     "habitats/brooder"
     ]
    }
   ]

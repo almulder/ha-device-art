@@ -1,12 +1,42 @@
 # Device Art Card
 
-**Animated, realistic device drawings for your Home Assistant dashboard.** **1,471 drawings** in **16 categories** and 102 groups:
+**Animated, realistic device drawings for your Home Assistant dashboard.** **1,528 drawings** in **17 categories** and 106 groups:
 lights, fans, appliances, locks, sensors, plants and more. Builder cards and plant/tree builders add thousands more combinations. Each one comes alive with your device's state: lamps glow in the bulb's color, fans spin with their speed, washers
 show their cycle and doors open.
 
 ![Fans](docs/images/anim-fans.gif)
 ![Lights and glow](docs/images/anim-lights.gif)
 ![Things that move](docs/images/anim-home.gif)
+
+## What's new
+
+**Update 2: people, pets and habitats** (57 new drawings, now **1,528** in all)
+
+![People](docs/images/new-people.png)
+
+- **People:** adult, older, teen, young boy and girl, toddler and baby. Pick the outfit (casual, business,
+  business casual, formal, workout, nightwear, outdoor, hoodie, work uniform and more), hair style and color, facial hair,
+  glasses, height, build, skin tone, mobility (cane, walker, wheelchair) and view (face, portrait, half body, full body).
+  Each person follows a `person` entity: home, away or a zone.
+- **Dogs & cats:** 10 dog breeds and 4 cats with a GPS collar and battery level. Pick the activity (resting, sleeping,
+  walking, playing, eating), the zone, and the coat and collar colors.
+- **Reptile & pet habitats:** 19 enclosures (gecko, chameleon, python, bearded dragon, bioactive, frog, tortoise, turtle,
+  axolotl, tarantula, birds, hamsters, rabbits, incubator and brooder). Each shows temperature and humidity that turn
+  amber or red outside the animal's safe range. Heat lamp, UVB, mister and more each switch on their own.
+- **Chicken coops:** 14 coops and pieces of gear, showing the water level and coop temperature, with an auto door,
+  heat lamp, light and waterer heater.
+
+![One person, many looks](docs/images/options-people-man.png)
+![Dogs and cats](docs/images/anim-pets.gif)
+![Habitats and coops](docs/images/anim-habitats.gif)
+
+**How many looks?** The menus alone make **over 59 million** combinations (most of them from the people). Counting the
+preset color dots too, that's **over 4 billion**, and every drawing with a color picker takes any color on top of that. The
+plant and tree builders add 1,620 more plant-and-pot combinations.
+
+**Update 1:** the first release, with 1,471 drawings in 16 categories.
+
+---
 
 **[Browse the full gallery →](https://almulder.github.io/ha-device-art/)** It has every drawing, live, with all its options.
 Pick a look, then press **Copy YAML** to get a card ready to paste.
@@ -141,7 +171,7 @@ Some cards are builders: pick the style, layout and extras from menus, and the d
 
 ## Every category
 
-A sample from each category, 1,471 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
+A sample from each category, 1,528 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
 
 | | |
 |---|---|
@@ -153,6 +183,7 @@ A sample from each category, 1,471 drawings in all. The [gallery](https://almuld
 | ![Sensors & switches](docs/images/cat-controls.png) | ![Power & energy](docs/images/cat-energy.png) |
 | ![Water & plumbing](docs/images/cat-water.png) | ![Outdoor, pool & yard](docs/images/cat-outdoor.png) |
 | ![Plants](docs/images/cat-plants.png) | ![Home, pets & fitness](docs/images/cat-home.png) |
+| ![People & pets](docs/images/cat-people.png) | |
 
 ---
 

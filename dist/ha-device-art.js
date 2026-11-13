@@ -9145,6 +9145,396 @@ ${DEF.join("")}</defs>`;
   });
 })();
 
+
+(function () {
+  const P = "hda-coops-";
+  const H = () => window.HDAH;
+  const n1 = (v) => (+v).toFixed(1);
+  const GREEN = "#34d399", RED = "#ff5257", ORNG = "#ff9a4a", CYAN = "#7dd3fc", AMB = "#ffb547";
+  const CU = ["#4f2410", "#b8693a", "#ffd2ae"], PVC = ["#7f868e", "#e4e7ea", "#ffffff"], IRON = ["#08090b", "#34373d", "#8d939b"],
+    GALV = ["#4b5158", "#a9b0b7", "#eef1f3"], HOSE = ["#123d1a", "#2f8a3e", "#9be3a6"], BLKP = ["#050608", "#24272c", "#6f757d"];
+  const dur = (o, a, b) => n1(Math.max(.25, a - b * o.level));
+
+  function pal(c) {
+    const h = H(), x = h.hx(c), lt = (x[0] * .3 + x[1] * .59 + x[2] * .11) / 255 > .7;
+    return { l: h.shade(c, lt ? .6 : .38), m: c, d: h.shade(c, lt ? -.16 : -.32), k: h.shade(c, lt ? -.36 : -.58), lt };
+  }
+  const st = (a) => a.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] != null ? ` stop-opacity="${s[2]}"` : ""}/>`).join("");
+  const lg = (id, v, a) => `<linearGradient id="${id}" ${v ? 'x1="0" y1="0" x2="0" y2="1"' : 'x1="0" x2="1"'}>${st(a)}</linearGradient>`;
+  const rg = (id, a, at) => `<radialGradient id="${id}" ${at || ""}>${st(a)}</radialGradient>`;
+  const halo = (id, c) => rg(id, [[0, c, .85], [.45, c, .28], [1, c, 0]]);
+
+  function defs(o, extra) {
+    const u = o.uid, p = pal(o.color);
+    return `<defs>
+${lg(u + "-v", 1, [[0, p.l], [.5, p.m], [1, p.d]])}${lg(u + "-c", 0, [[0, p.k], [.2, p.m], [.4, p.l], [.62, p.m], [1, p.k]])}
+${lg(u + "-tp", 0, [[0, p.d], [.4, p.l], [1, p.d]])}${lg(u + "-sd", 0, [[0, p.d], [1, p.k]])}
+${lg(u + "-fx", 0, [[0, "#fff", .2], [.14, "#fff", 0], [.84, "#000", 0], [1, "#000", .3]])}
+<linearGradient id="${u}-g" x1="0" y1="0" x2="1" y2="1">${st([[0, "#fff", .5], [.42, "#fff", 0]])}</linearGradient>
+${lg(u + "-wall", 1, [[0, "#fff", .085], [1, "#fff", .035]])}${lg(u + "-flr", 1, [[0, "#a3a8ae", .34], [1, "#5d6369", .2]])}
+${lg(u + "-mt", 0, [[0, "#525960"], [.35, "#eef0f2"], [.6, "#b9bfc6"], [1, "#454b52"]])}${lg(u + "-mtv", 1, [[0, "#f2f4f6"], [.5, "#a2a9b1"], [1, "#545a61"]])}
+${lg(u + "-bs", 0, [[0, "#5e3f10"], [.35, "#f6d886"], [.6, "#c9973a"], [1, "#4e340c"]])}${lg(u + "-bsv", 1, [[0, "#f9e09a"], [.5, "#c18f34"], [1, "#5e3f10"]])}
+${lg(u + "-bk", 1, [[0, "#41464e"], [.5, "#1b1e23"], [1, "#08090c"]])}${lg(u + "-bkh", 0, [[0, "#08090c"], [.38, "#454a52"], [1, "#0b0d10"]])}
+${lg(u + "-lcd", 1, [[0, "#081014"], [1, "#16242b"]])}${lg(u + "-lcdg", 1, [[0, "#b9d7a3"], [1, "#8fb37c"]])}
+${lg(u + "-wt", 1, [[0, "#86d4f6", .8], [.3, "#3d8fd0", .85], [1, "#123f7a", .95]])}
+${lg(u + "-soil", 1, [[0, "#5b4431"], [1, "#2a1e14"]])}${lg(u + "-grass", 1, [[0, "#2f6a2a"], [1, "#48923c"]])}
+${lg(u + "-sky", 1, [[0, "#0d1a2e", 0], [1, "#3a5a7a", .35]])}${lg(u + "-hedge", 1, [[0, "#2e5a2a"], [1, "#16301a"]])}
+${lg(u + "-pvc", 0, [[0, "#80878f"], [.35, "#ffffff"], [.7, "#d9dde1"], [1, "#7a8189"]])}
+${rg(u + "-sh", [[0, "#000", .6], [1, "#000", 0]])}
+${halo(u + "-hg", GREEN)}${halo(u + "-hr", RED)}${halo(u + "-ho", ORNG)}${halo(u + "-hb", CYAN)}
+${rg(u + "-fl", [[0, "#f2fbff"], [.3, "#7ab8ff"], [.75, "#2a5cff", .85], [1, "#1b3fd6", 0]], 'cx=".5" cy=".85" r=".8"')}
+${rg(u + "-warm", [[0, "#ffb35c", .8], [.5, "#ff8a3c", .3], [1, "#ff7a2a", 0]])}
+${rg(u + "-dial", [[0, "#ffffff"], [.8, "#e9ecef"], [1, "#9aa1a9"]], 'cx=".4" cy=".35" r=".75"')}
+${rg(u + "-mist", [[0, "#dff4ff", .5], [1, "#dff4ff", 0]])}
+<pattern id="${u}-blk" width="40" height="20" patternUnits="userSpaceOnUse"><path d="M0 .5H40M0 10.5H40M.5 0V10.5M20.5 10.5V20" stroke="#000" stroke-opacity=".32" fill="none"/><path d="M0 1.5H40M0 11.5H40" stroke="#fff" stroke-opacity=".06" fill="none"/></pattern>
+<pattern id="${u}-brk" width="24" height="10" patternUnits="userSpaceOnUse"><rect width="24" height="10" fill="#9a4a32" fill-opacity=".55"/><rect x="1" y="1" width="22" height="3.6" fill="#b85d40" fill-opacity=".45"/><path d="M0 .5H24M0 5.5H24M.5 0V5.5M12.5 5.5V10" stroke="#d8cfc4" stroke-opacity=".45" fill="none"/></pattern>
+<pattern id="${u}-sid" width="40" height="11" patternUnits="userSpaceOnUse"><rect width="40" height="11" fill="#c9cfd4" fill-opacity=".16"/><path d="M0 10.5H40" stroke="#000" stroke-opacity=".35"/><path d="M0 9H40" stroke="#fff" stroke-opacity=".1" stroke-width="2"/></pattern>
+<pattern id="${u}-bld" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M1 9L2 3M4 9L5.5 1.5M7 9L6.5 4" stroke="#7fc56e" stroke-opacity=".5" stroke-width=".8" fill="none"/><path d="M2.5 9L3.5 5" stroke="#16361a" stroke-opacity=".6" stroke-width=".8"/></pattern>
+<pattern id="${u}-plt" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M2.5 0V5" stroke="#000" stroke-opacity=".18"/></pattern>
+${extra || ""}</defs>`;
+  }
+  const svg = (o, body, extra) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(o, `<clipPath id="${o.uid}-all"><rect width="200" height="200" rx="6"/></clipPath>` + (extra || ""))}<g clip-path="url(#${o.uid}-all)">${body}</g></svg>`;
+  const sh = (o, cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry || 5}" fill="url(#${o.uid}-sh)"/>`;
+  const rr = (x, y, w, h, r) => `M${n1(x + r)} ${n1(y)}H${n1(x + w - r)}A${r} ${r} 0 0 1 ${n1(x + w)} ${n1(y + r)}V${n1(y + h - r)}A${r} ${r} 0 0 1 ${n1(x + w - r)} ${n1(y + h)}H${n1(x + r)}A${r} ${r} 0 0 1 ${n1(x)} ${n1(y + h - r)}V${n1(y + r)}A${r} ${r} 0 0 1 ${n1(x + r)} ${n1(y)}Z`;
+  const hl = (x1, y1, x2, y2, w, op) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#fff" stroke-opacity="${op || .4}" stroke-width="${w || 2}" stroke-linecap="round"/>`;
+
+  
+  const tube = (d, w, c, cap) => `<path d="${d}" fill="none" stroke="${c[0]}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="${cap || "butt"}"/>` +
+    `<path d="${d}" fill="none" stroke="${c[1]}" stroke-width="${n1(w * .66)}" stroke-linejoin="round" stroke-linecap="${cap || "butt"}"/>` +
+    `<path d="${d}" fill="none" stroke="${c[2]}" stroke-opacity=".7" stroke-width="${n1(w * .2)}" stroke-linejoin="round" transform="translate(${n1(-w * .17)} ${n1(-w * .17)})"/>`;
+  
+  const band = (x, y, w, h, c) => `<rect x="${n1(x - w / 2)}" y="${n1(y - h / 2)}" width="${w}" height="${h}" rx="1.2" fill="${c[1]}" stroke="${c[0]}" stroke-width=".8"/><rect x="${n1(x - w / 2 + 1)}" y="${n1(y - h / 2 + 1)}" width="${n1(w * .3)}" height="${n1(h - 2)}" rx=".8" fill="${c[2]}" opacity=".5"/>`;
+  
+  const flow = (o, d, w, col, a, b) => o.on ? `<path class="${P}flow" d="${d}" fill="none" stroke="${col || "#bfeaff"}" stroke-opacity=".75" stroke-width="${w || 2.4}" stroke-linecap="round" stroke-dasharray="2.5 7" style="animation-duration:${dur(o, a || 1.2, b || .85)}s"/>` : "";
+  const led = (o, x, y, r, on, col, hid) => (on ? `<circle cx="${x}" cy="${y}" r="${r * 4.5}" fill="url(#${o.uid}-${hid})"/>` : "") +
+    `<circle cx="${x}" cy="${y}" r="${r}" fill="${on ? col : "#353a41"}"/><circle cx="${n1(x - r * .3)}" cy="${n1(y - r * .35)}" r="${n1(r * .4)}" fill="#fff" opacity="${on ? .8 : .3}"/>`;
+  const state = (o, x, y, r) => led(o, x, y, r, true, o.on ? GREEN : RED, o.on ? "hg" : "hr");
+  const screw = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r || 1.6}" fill="#8b929a"/><path d="M${n1(x - (r || 1.6) * .7)} ${y}H${n1(x + (r || 1.6) * .7)}" stroke="#3a3f46" stroke-width=".6"/>`;
+
+  
+  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgecd", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+  function digits(str, x, y, s, col, dim) {
+    const w = s * .52, t = Math.max(.7, s * .14); let out = "", X = x;
+    String(str).split("").forEach((ch) => {
+      if (ch === ".") { out += `<circle cx="${n1(X - t * .4)}" cy="${n1(y + s)}" r="${n1(t * .55)}" fill="${col}"/>`; X += t * .9; return; }
+      const sg = { a: [X + t * .6, y, X + w - t * .6, y], b: [X + w, y + t * .6, X + w, y + s / 2 - t * .5], c: [X + w, y + s / 2 + t * .5, X + w, y + s - t * .6],
+        d: [X + t * .6, y + s, X + w - t * .6, y + s], e: [X, y + s / 2 + t * .5, X, y + s - t * .6], f: [X, y + t * .6, X, y + s / 2 - t * .5], g: [X + t * .6, y + s / 2, X + w - t * .6, y + s / 2] };
+      const on = SEG[ch] || "";
+      for (const k in sg) { const q = sg[k], lit = on.indexOf(k) >= 0; if (!lit && !dim) continue;
+        out += `<path d="M${n1(q[0])} ${n1(q[1])}L${n1(q[2])} ${n1(q[3])}" stroke="${lit ? col : dim}" stroke-width="${n1(t)}" stroke-linecap="round"/>`; }
+      X += w + t * 2.2;
+    });
+    return out;
+  }
+  const lcd = (o, x, y, w, h, str, s, col) => `<path d="${rr(x, y, w, h, 2)}" fill="url(#${o.uid}-lcd)" stroke="#000" stroke-opacity=".5"/>` +
+    (o.on ? `<path d="${rr(x, y, w, h, 2)}" fill="${col}" fill-opacity=".08"/>` : "") +
+    digits(str, x + (w - str.replace(".", "").length * s * .82) / 2 + s * .1, y + (h - s) / 2, s, o.on ? col : "#2b3a40", o.on ? H().rgba(col, .1) : null) +
+    `<path d="M${x + 1.5} ${y + 1.5}H${x + w * .6}" stroke="#fff" stroke-opacity=".12"/>`;
+
+  
+  const room = (o, fy, wall) => `<g class="hda-bg">${room0(o, fy, wall)}</g>`;
+  function room0(o, fy, wall) {
+    const u = o.uid;
+    let s = `<rect width="200" height="${fy}" fill="url(#${u}-wall)"/>`;
+    if (wall === "block") s += `<rect width="200" height="${fy}" fill="url(#${u}-blk)"/>`;
+    if (wall === "brick") s += `<rect width="200" height="${fy}" fill="url(#${u}-brk)"/>`;
+    if (wall === "siding") s += `<rect width="200" height="${fy}" fill="url(#${u}-sid)"/>`;
+    if (wall === "board") s += `<rect x="18" y="8" width="164" height="${fy - 28}" fill="#c9a77a" fill-opacity=".16" stroke="#000" stroke-opacity=".3"/>` + [20, 34, 52, 75, 96, 118, 136].map((y, i) => `<path d="M18 ${y}C60 ${y + (i % 2 ? 3 : -3)} 120 ${y + (i % 2 ? -2 : 3)} 182 ${y}" fill="none" stroke="#6a4a2a" stroke-opacity=".22" stroke-width=".8"/>`).join("") + [40, 80, 120, 160].map((x) => `<circle cx="${x}" cy="${fy / 2}" r=".9" fill="#000" fill-opacity=".4"/>`).join("");
+    if (wall === "grass") return s + `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-grass)"/><path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-bld)"/>`;
+    s += `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-flr)"/><path d="M0 ${fy}H200" stroke="#000" stroke-opacity=".35"/><path d="M0 ${fy + 1}H200" stroke="#fff" stroke-opacity=".08"/>`;
+    [[30, .3], [72, .62], [128, .4], [164, .78], [100, .88], [14, .72]].forEach((p) => { s += `<circle cx="${p[0]}" cy="${n1(fy + (200 - fy) * p[1])}" r=".8" fill="#fff" fill-opacity=".14"/>`; });
+    return s;
+  }
+  
+  const face = (o, d, g) => `<path d="${d}" fill="url(#${o.uid}-${g || "v"})"/><path d="${d}" fill="url(#${o.uid}-fx)"/><path d="${d}" fill="url(#${o.uid}-g)" opacity=".28"/>`;
+  
+  function tank(o, x, y, w, b, g) {
+    const u = o.uid, r = w / 2, d = `M${x} ${y + 8}Q${x} ${y - 4} ${x + r} ${y - 5}Q${x + w} ${y - 4} ${x + w} ${y + 8}V${b - 4}Q${x + w} ${b} ${x + w - 4} ${b}H${x + 4}Q${x} ${b} ${x} ${b - 4}Z`;
+    return `<path d="${d}" fill="url(#${u}-${g || "c"})"/><path d="${d}" fill="url(#${u}-g)" opacity=".2"/>` +
+      `<path d="M${x} ${y + 8}Q${x + r} ${y + 13} ${x + w} ${y + 8}" fill="none" stroke="#000" stroke-opacity=".25"/>` +
+      `<path d="M${x + w * .3} ${y + 14}V${b - 8}" stroke="#fff" stroke-opacity=".22" stroke-width="${n1(w * .05)}" stroke-linecap="round"/>`;
+  }
+  
+  function flames(o, cx, by, w, n) {
+    if (!o.on) return "";
+    const u = o.uid, s = .6 + .55 * o.level; let f = `<ellipse cx="${cx}" cy="${by - 3}" rx="${n1(w * .8)}" ry="${n1(9 * s)}" fill="url(#${u}-warm)" opacity=".55"/>`;
+    for (let i = 0; i < n; i++) {
+      const x = cx - w / 2 + (i + .5) * w / n, h = (i % 2 ? 7 : 10) * s;
+      f += `<path class="${P}flk" style="animation-delay:-${n1(i * .17)}s" d="M${n1(x - 2.6)} ${by}Q${n1(x - 2.4)} ${n1(by - h * .55)} ${n1(x)} ${n1(by - h)}Q${n1(x + 2.4)} ${n1(by - h * .55)} ${n1(x + 2.6)} ${by}Z" fill="url(#${u}-fl)"/>`;
+    }
+    return f;
+  }
+  
+  function gauge(o, x, y, r, v) {
+    const a = (-130 + 260 * v) * Math.PI / 180, nx = x + Math.sin(a) * r * .72, ny = y - Math.cos(a) * r * .72;
+    let t = "";
+    for (let i = 0; i <= 8; i++) { const b = (-130 + 32.5 * i) * Math.PI / 180; t += `<path d="M${n1(x + Math.sin(b) * r * .62)} ${n1(y - Math.cos(b) * r * .62)}L${n1(x + Math.sin(b) * r * .8)} ${n1(y - Math.cos(b) * r * .8)}" stroke="#2a2f36" stroke-width=".6"/>`; }
+    return `<circle cx="${x}" cy="${y}" r="${r + 1.6}" fill="url(#${o.uid}-mtv)"/><circle cx="${x}" cy="${y}" r="${r}" fill="url(#${o.uid}-dial)"/>${t}` +
+      `<path d="M${x} ${y}L${n1(nx)} ${n1(ny)}" stroke="#d12f2f" stroke-width="1.1" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="1.3" fill="#222"/>` +
+      `<path d="M${n1(x - r * .7)} ${n1(y - r * .45)}A${r} ${r} 0 0 1 ${n1(x + r * .2)} ${n1(y - r * .85)}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1"/>`;
+  }
+  
+  const ballValve = (o, cx, cy, s) => { const u = o.uid; s = s || 1;
+    const hx = (x) => `<path d="M${n1(x - 5 * s)} ${n1(cy - 9 * s)}H${n1(x + 5 * s)}L${n1(x + 6 * s)} ${cy}L${n1(x + 5 * s)} ${n1(cy + 9 * s)}H${n1(x - 5 * s)}L${n1(x - 6 * s)} ${cy}Z" fill="url(#${u}-bsv)" stroke="#5e3f10" stroke-width=".7"/><path d="M${n1(x - 6 * s)} ${cy}H${n1(x + 6 * s)}" stroke="#5e3f10" stroke-opacity=".5" stroke-width=".6"/>`;
+    return hx(cx - 16 * s) + hx(cx + 16 * s) + `<path d="${rr(cx - 11 * s, cy - 11 * s, 22 * s, 22 * s, 7 * s)}" fill="url(#${u}-bsv)" stroke="#5e3f10" stroke-width=".7"/>` +
+      `<ellipse cx="${n1(cx - 3 * s)}" cy="${n1(cy - 5 * s)}" rx="${n1(5 * s)}" ry="${n1(2.5 * s)}" fill="#fff" opacity=".45"/>`; };
+
+  const css = `
+.hda-coops-flow{stroke-dashoffset:0}
+.hda-anim .hda-coops-flow{animation:hda-coops-flow 1s linear infinite}
+@keyframes hda-coops-flow{to{stroke-dashoffset:-18}}
+.hda-coops-flk{transform-box:fill-box;transform-origin:50% 100%}
+.hda-anim .hda-coops-flk{animation:hda-coops-flk .5s ease-in-out infinite alternate}
+@keyframes hda-coops-flk{0%{transform:scale(1,1)}50%{transform:scale(.9,.78)}100%{transform:scale(1.06,1.08)}}
+.hda-coops-spin{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-coops-spin{animation:hda-coops-spin 1s linear infinite}
+@keyframes hda-coops-spin{to{transform:rotate(360deg)}}
+.hda-anim .hda-coops-blink{animation:hda-coops-blink 1.2s steps(1,end) infinite}
+@keyframes hda-coops-blink{0%,59%{opacity:1}60%,100%{opacity:.2}}
+.hda-coops-chase{opacity:.18}
+.hda-anim .hda-coops-chase{animation:hda-coops-chase 4s linear infinite}
+@keyframes hda-coops-chase{0%,100%{opacity:.18}6%{opacity:1}24%{opacity:1}30%{opacity:.18}}
+.hda-coops-bub{opacity:0;transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-coops-bub{animation:hda-coops-bub 2s ease-in infinite}
+@keyframes hda-coops-bub{0%{transform:translate(0,0);opacity:0}15%{opacity:.9}100%{transform:translate(0,-26px);opacity:0}}
+.hda-coops-rip{transform-box:fill-box;transform-origin:center;opacity:0}
+.hda-anim .hda-coops-rip{animation:hda-coops-rip 2.2s ease-out infinite}
+@keyframes hda-coops-rip{0%{transform:scale(.3);opacity:.8}100%{transform:scale(1.4);opacity:0}}
+.hda-coops-mist{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-coops-mist{animation:hda-coops-mist 1.6s ease-in-out infinite}
+@keyframes hda-coops-mist{50%{opacity:.45;transform:scale(1.08)}}
+.hda-coops-heat{opacity:0}
+.hda-anim .hda-coops-heat{animation:hda-coops-heat 2.6s ease-out infinite}
+.hda-anim .hda-coops-hum{animation:hda-coops-hum .16s linear infinite}
+@keyframes hda-coops-hum{0%,100%{transform:translate(0,0)}50%{transform:translate(.5px,-.3px)}}
+.hda-anim .hda-coops-bob{animation:hda-coops-bob 1.6s ease-in-out infinite}
+@keyframes hda-coops-bob{50%{transform:translate(0,-2px)}}
+@keyframes hda-coops-heat{0%{transform:translate(0,4px);opacity:0}35%{opacity:.6}100%{transform:translate(0,-16px);opacity:0}}
+.hda-coops-heat.hda-coops-still{opacity:.4}
+.hda-anim .hda-coops-heat.hda-coops-still{opacity:0}
+`;
+  
+  const heat = (o, xs, y, col) => o.on ? xs.map((x, i) => `<path class="${P}heat${o.anim ? "" : " " + P + "still"}" style="animation-delay:-${n1(i * .8)}s" d="M${x} ${y}q-3 -5 0 -10t0 -10" fill="none" stroke="${col || "#ffc58a"}" stroke-width="1.3" stroke-linecap="round"/>`).join("") : "";
+  const bubbles = (o, pts, col) => o.on ? pts.map((p, i) => `<circle class="${P}bub" style="animation-delay:-${n1(i * .45)}s;animation-duration:${dur(o, 2.6, 1.4)}s" cx="${p[0]}" cy="${p[1]}" r="${p[2] || 1.3}" fill="none" stroke="${col || "#e6f7ff"}" stroke-width=".7"/>`).join("") : "";
+
+  const css2 = css + `
+.hda-coops-peck{transform-box:fill-box;transform-origin:20% 90%}
+.hda-anim .hda-coops-peck{animation:hda-coops-peck 2.6s ease-in-out infinite}
+@keyframes hda-coops-peck{0%,55%,100%{transform:rotate(0deg)}65%,80%{transform:rotate(38deg)}}
+.hda-anim .hda-coops-walk{animation:hda-coops-walk 9s ease-in-out infinite alternate}
+@keyframes hda-coops-walk{0%{transform:translate(-8px,0)}100%{transform:translate(8px,0)}}
+.hda-coops-drip{opacity:0}
+.hda-anim .hda-coops-drip{animation:hda-coops-drip 1.8s ease-in infinite}
+@keyframes hda-coops-drip{0%{transform:translate(0,0);opacity:0}20%{opacity:.9}100%{transform:translate(0,10px);opacity:0}}
+`;
+  const BG = (s) => `<g class="hda-bg">${s}</g>`;
+  const RED_B = "#a8322c", WHT = "#ecebe6", GRY = "#8a9096", WOOD = "#b07a4a", GRN = "#5a7a4a";
+  const part = (o, id) => Object.assign({}, o, { on: !!(o.parts && o.parts[id] != null ? o.parts[id] : o.on) });
+  const TEMPS = [["40", "40°F"], ["20", "20°F"], ["60", "60°F"], ["80", "80°F"], ["95", "95°F"]];
+  const OPTS = [{ id: "temp", name: "Temperature", values: TEMPS }];
+  const tval = (o) => +((o.opt && o.opt.temp) || 40);
+
+  function cextra(o) {
+    const u = o.uid;
+    return lg(u + "-day", 1, [[0, "#6fa8dc", .55], [1, "#bcd8ee", .25]]) + lg(u + "-dusk", 1, [[0, "#2a2a5a", .8], [.7, "#a85a6a", .5], [1, "#f0a060", .4]]) +
+      lg(u + "-wd", 1, [[0, "#c08a58"], [1, "#7a4c28"]]) + lg(u + "-roof", 1, [[0, "#5a5f66"], [1, "#2e3238"]]) + lg(u + "-gal", 0, [[0, "#7a828a"], [.4, "#e6e9ec"], [.7, "#aab1b8"], [1, "#6a7178"]]) +
+      lg(u + "-wat", 1, [[0, "#9fdcff", .9], [1, "#2f7fc4", .95]]) + rg(u + "-heat", [[0, "#ff8a3a", .7], [.5, "#ff5a1a", .25], [1, "#ff4a1a", 0]]) +
+      `<pattern id="${u}-mesh" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 0L6 6M6 0L0 6" stroke="#c9ced4" stroke-opacity=".55" stroke-width=".5"/></pattern>` +
+      `<pattern id="${u}-sidp" width="40" height="7" patternUnits="userSpaceOnUse"><path d="M0 6.5H40" stroke="#000" stroke-opacity=".28"/><path d="M0 5.5H40" stroke="#fff" stroke-opacity=".1"/></pattern>` +
+      `<pattern id="${u}-shg" width="10" height="6" patternUnits="userSpaceOnUse"><path d="M0 5.5H10M5 0V5.5" stroke="#000" stroke-opacity=".35" stroke-width=".6"/></pattern>`;
+  }
+  const svgC = (o, body) => svg(o, body, cextra(o));
+  
+  const yard = (o, gy, dusk) => { const u = o.uid; return BG(`<rect width="200" height="${gy}" fill="url(#${u}-${dusk ? "dusk" : "day"})"/>` + (dusk ? `<circle cx="160" cy="24" r="7" fill="#f4ecd0" opacity=".85"/>` : "") +
+    `<path d="M0 ${gy - 18}Q24 ${gy - 34} 50 ${gy - 22}Q80 ${gy - 38} 110 ${gy - 22}Q140 ${gy - 36} 170 ${gy - 22}Q186 ${gy - 30} 200 ${gy - 22}V${gy + 2}H0Z" fill="url(#${u}-hedge)"/>` +
+    `<path d="M0 ${gy}H200V200H0Z" fill="url(#${u}-grass)"/><path d="M0 ${gy}H200V200H0Z" fill="url(#${u}-bld)"/>` + (dusk ? `<rect width="200" height="200" fill="#0a0a2a" opacity=".25"/>` : "")); };
+
+  
+  function hen(x, y, s, breed, peck, flip) {
+    const C = { buff: ["#e0b060", "#c08a3a"], black: ["#1e2024", "#3a5a4a"], speck: ["#7a3a1e", "#5a2a14"], duck: ["#f4f2ec", "#d9d5cc"], quail: ["#8a6a4a", "#5a4430"] }[breed] || ["#e0b060", "#c08a3a"];
+    const tr = flip ? `transform="translate(${2 * x} 0) scale(-1 1)"` : "";
+    let b = `<g ${tr}><g class="hda-coops-walk">`;
+    if (breed === "duck") b += `<path d="M${x - 12 * s} ${y - 6 * s}Q${x - 10 * s} ${y - 14 * s} ${x + 2 * s} ${y - 13 * s}Q${x + 10 * s} ${y - 11 * s} ${x + 10 * s} ${y - 5 * s}Q${x + 2 * s} ${y} ${x - 8 * s} ${y - 2 * s}Z" fill="${C[0]}"/><path d="M${x - 12 * s} ${y - 6 * s}l${-4 * s} ${-3 * s}l${2 * s} ${4 * s}Z" fill="${C[1]}"/>` +
+      `<g class="${peck ? "hda-coops-peck" : ""}"><path d="M${x + 6 * s} ${y - 11 * s}Q${x + 6 * s} ${y - 22 * s} ${x + 10 * s} ${y - 22 * s}Q${x + 14 * s} ${y - 22 * s} ${x + 13 * s} ${y - 17 * s}L${x + 10 * s} ${y - 11 * s}Z" fill="${C[0]}"/><path d="M${x + 13 * s} ${y - 19 * s}l${5 * s} ${1 * s}l${-5 * s} ${1.4 * s}Z" fill="#f0a030"/><circle cx="${x + 11 * s}" cy="${y - 19.5 * s}" r="${.8 * s}" fill="#111"/></g>` +
+      `<path d="M${x - 2 * s} ${y - 1 * s}v${2 * s}M${x + 3 * s} ${y - 1 * s}v${2 * s}" stroke="#f0a030" stroke-width="${1.6 * s}"/>`;
+    else if (breed === "quail") b += `<ellipse cx="${x}" cy="${y - 4 * s}" rx="${7 * s}" ry="${4.6 * s}" fill="${C[0]}"/><circle cx="${x + 6 * s}" cy="${y - 8 * s}" r="${2.6 * s}" fill="${C[1]}"/>` + [[-3, -5], [0, -3], [3, -5], [-1, -6]].map((q) => `<circle cx="${x + q[0] * s}" cy="${y + q[1] * s}" r="${.6 * s}" fill="#f4ecd8"/>`).join("") + `<path d="M${x + 8 * s} ${y - 8 * s}l${1.6 * s} ${.6 * s}" stroke="#333" stroke-width="${s}"/>`;
+    else {
+      b += `<path d="M${x - 12 * s} ${y - 8 * s}Q${x - 18 * s} ${y - 20 * s} ${x - 12 * s} ${y - 22 * s}Q${x - 8 * s} ${y - 16 * s} ${x - 6 * s} ${y - 12 * s}Z" fill="${C[1]}"/>` +
+        `<path d="M${x - 13 * s} ${y - 8 * s}Q${x - 12 * s} ${y - 17 * s} ${x - 2 * s} ${y - 16 * s}Q${x + 8 * s} ${y - 15 * s} ${x + 9 * s} ${y - 9 * s}Q${x + 6 * s} ${y - 1 * s} ${x - 4 * s} ${y - 1 * s}Q${x - 12 * s} ${y - 2 * s} ${x - 13 * s} ${y - 8 * s}Z" fill="${C[0]}"/>` +
+        `<path d="M${x - 9 * s} ${y - 9 * s}Q${x - 2 * s} ${y - 13 * s} ${x + 4 * s} ${y - 8 * s}" fill="none" stroke="${C[1]}" stroke-width="${1.6 * s}"/>`;
+      if (breed === "speck") b += [[-8, -8], [-4, -11], [0, -7], [3, -11], [-6, -4], [2, -4], [-10, -12]].map((q) => `<circle cx="${x + q[0] * s}" cy="${y + q[1] * s}" r="${.8 * s}" fill="#f4ecd8"/>`).join("");
+      if (breed === "black") b += `<path d="M${x - 14 * s} ${y - 12 * s}Q${x - 14 * s} ${y - 18 * s} ${x - 11 * s} ${y - 20 * s}" stroke="#4a8a6a" stroke-width="${s}" fill="none" opacity=".7"/>`;
+      b += `<g class="${peck ? "hda-coops-peck" : ""}"><path d="M${x + 4 * s} ${y - 13 * s}Q${x + 5 * s} ${y - 22 * s} ${x + 9 * s} ${y - 22 * s}Q${x + 13 * s} ${y - 22 * s} ${x + 12 * s} ${y - 16 * s}L${x + 9 * s} ${y - 11 * s}Z" fill="${C[0]}"/>` +
+        `<path d="M${x + 6 * s} ${y - 22 * s}q${1 * s} ${-3 * s} ${2 * s} 0q${1 * s} ${-3 * s} ${2 * s} 0q${1.4 * s} ${-2 * s} ${2 * s} ${1 * s}Z" fill="#d9302a"/><path d="M${x + 11 * s} ${y - 16 * s}q${1 * s} ${3 * s} ${-1 * s} ${3 * s}" fill="#d9302a"/>` +
+        `<path d="M${x + 12 * s} ${y - 19 * s}l${3 * s} ${1 * s}l${-3 * s} ${1 * s}Z" fill="#e8b030"/><circle cx="${x + 10 * s}" cy="${y - 19 * s}" r="${.8 * s}" fill="#111"/></g>` +
+        `<path d="M${x - 3 * s} ${y - 1 * s}v${3 * s}l${-2 * s} ${1 * s}M${x + 2 * s} ${y - 1 * s}v${3 * s}l${2 * s} ${1 * s}" stroke="#e0a030" stroke-width="${1.2 * s}" fill="none"/>`;
+    }
+    return b + `</g></g>`;
+  }
+  
+  function fount(o, x, y, s) {
+    const lv = o.level, h = 24 * s, w = 16 * s, wl = lv < .05 ? 0 : lv, col = lv < .05 ? RED : lv < .25 ? AMB : null;
+    return `<ellipse cx="${x}" cy="${y}" rx="${w * .9}" ry="${3 * s}" fill="#000" opacity=".3"/><path d="M${x - w * .8} ${y}L${x - w * .7} ${y - 4 * s}H${x + w * .7}L${x + w * .8} ${y}Z" fill="#c8323a"/>` +
+      `<path d="M${x - w / 2} ${y - 4 * s}V${y - h + 4 * s}Q${x - w / 2} ${y - h} ${x} ${y - h}Q${x + w / 2} ${y - h} ${x + w / 2} ${y - h + 4 * s}V${y - 4 * s}Z" fill="#eef0f1"/>` +
+      `<path d="M${x - w / 2} ${y - 4 * s}V${y - h + 4 * s}Q${x - w / 2} ${y - h} ${x} ${y - h}Q${x + w / 2} ${y - h} ${x + w / 2} ${y - h + 4 * s}V${y - 4 * s}Z" fill="url(#${o.uid}-fx)"/>` +
+      `<rect x="${n1(x - 1.6 * s)}" y="${n1(y - h + 5 * s)}" width="${n1(3.2 * s)}" height="${n1(h - 10 * s)}" rx="${s}" fill="#1a2a3a" opacity=".5"/>` +
+      `<rect x="${n1(x - 1.6 * s)}" y="${n1(y - 5 * s - (h - 10 * s) * wl)}" width="${n1(3.2 * s)}" height="${n1((h - 10 * s) * wl)}" rx="${s}" fill="${col || "#5ab4ec"}"/>` +
+      (col ? `<rect x="${n1(x - 2.6 * s)}" y="${n1(y - h + 4 * s)}" width="${n1(5.2 * s)}" height="${n1(h - 8 * s)}" rx="${s}" fill="none" stroke="${col}" stroke-width=".8"${lv < .05 ? ` class="${P}blink"` : ""}/>` : "");
+  }
+  
+  function ctemp(o, x, y) {
+    const t = tval(o), col = t <= 32 ? "#6fb8ff" : t >= 90 ? RED : "#7ee08a";
+    return `<path d="${rr(x, y, 30, 15, 2)}" fill="#e9ecef"/><path d="${rr(x + 2, y + 2, 26, 11, 1.5)}" fill="#0a0d10"/>` + digits(String(t), x + 6, y + 4.4, 6.4, col, "rgba(255,255,255,.05)") +
+      `<circle cx="${x + 19.4}" cy="${y + 4.8}" r=".9" fill="none" stroke="${col}" stroke-width=".6"/><path d="M${x + 21.4} ${y + 4.4}v6.2M${x + 21.4} ${y + 4.4}h3M${x + 21.4} ${y + 7.4}h2.4" stroke="${col}" stroke-width=".8"/>`;
+  }
+  
+  function house(o, x, y, w, h, roofH, opt) {
+    const u = o.uid, p = pal(o.color); opt = opt || {};
+    let s = `<path d="M${x} ${y}H${x + w}V${y + h}H${x}Z" fill="url(#${u}-v)"/><path d="M${x} ${y}H${x + w}V${y + h}H${x}Z" fill="url(#${u}-sidp)"/><path d="M${x} ${y}H${x + w}V${y + h}H${x}Z" fill="url(#${u}-fx)"/>` +
+      `<path d="M${x - 5} ${y + 2}L${x + w / 2} ${y - roofH}L${x + w + 5} ${y + 2}Z" fill="url(#${u}-roof)"/><path d="M${x - 5} ${y + 2}L${x + w / 2} ${y - roofH}L${x + w + 5} ${y + 2}Z" fill="url(#${u}-shg)"/>` +
+      `<path d="M${x - 5} ${y + 2}L${x + w / 2} ${y - roofH}L${x + w + 5} ${y + 2}" fill="none" stroke="#1e2226" stroke-width="1.6"/>` +
+      `<path d="M${x} ${y}V${y + h}M${x + w} ${y}V${y + h}M${x} ${y + h}H${x + w}" stroke="${opt.trim || "#f2f0ea"}" stroke-width="2"/>`;
+    if (opt.vent) s += `<path d="${rr(x + w / 2 - 6, y + 4, 12, 6, 1)}" fill="url(#${u}-mesh)" stroke="#f2f0ea"/>`;
+    return s;
+  }
+  
+  function popdoor(o, x, y, w, h, open, auto) {
+    let s = `<path d="M${x} ${y}H${x + w}V${y + h}H${x}Z" fill="#14100c"/>`;
+    s += open ? `<rect x="${x}" y="${y - h + 2}" width="${w}" height="${h - 2}" fill="url(#${o.uid}-gal)"/>` : `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${o.uid}-gal)"/><path d="M${x + 2} ${y + h / 2}H${x + w - 2}" stroke="#000" stroke-opacity=".2"/>`;
+    s += `<path d="M${x - 2} ${y - h}V${y + h}M${x + w + 2} ${y - h}V${y + h}" stroke="#5a6068" stroke-width="1.6"/>`;
+    if (auto) s += `<path d="${rr(x - 3, y - h - 9, w + 6, 9, 1.5)}" fill="#2a2e34"/>` + led(o, x + w - 1, y - h - 4.5, 1.1, true, open ? GREEN : AMB, open ? "hg" : "ho");
+    return s;
+  }
+  const ramp = (x1, y1, x2, y2) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#8a5a34" stroke-width="5" stroke-linecap="round"/>` + [.2, .4, .6, .8].map((t) => `<path d="M${n1(x1 + (x2 - x1) * t - 2)} ${n1(y1 + (y2 - y1) * t - 1)}l4 1" stroke="#5a3a1e" stroke-width="1.4"/>`).join("");
+  const runBox = (o, x, y, w, h, roof) => `<path d="M${x} ${y}H${x + w}V${y + h}H${x}Z" fill="url(#${o.uid}-mesh)"/><path d="M${x} ${y}H${x + w}V${y + h}H${x}Z" fill="none" stroke="url(#${o.uid}-wd)" stroke-width="3"/>` +
+    `<path d="M${x + w / 2} ${y}V${y + h}" stroke="url(#${o.uid}-wd)" stroke-width="2.4"/>` + (roof ? `<path d="M${x - 3} ${y}L${x + 6} ${y - 8}H${x + w - 6}L${x + w + 3} ${y}Z" fill="url(#${o.uid}-roof)"/>` : "");
+  const lampGlow = (o, x, y) => o.on ? `<circle cx="${x}" cy="${y}" r="22" fill="url(#${o.uid}-heat)"/><circle cx="${x}" cy="${y}" r="3" fill="#ff6a2a"/>` : `<circle cx="${x}" cy="${y}" r="3" fill="#5a2a1a"/>`;
+  const winLight = (o, x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${o.on ? "#ffe2a0" : "#2a2e34"}"/>` + (o.on ? `<rect x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" fill="#ffe2a0" opacity=".25"/>` : "") + `<path d="M${x + w / 2} ${y}V${y + h}M${x} ${y + h / 2}H${x + w}" stroke="#f2f0ea" stroke-width="1"/>`;
+
+  const ic = (id, name, colors, parts, render) => ({ id, name, colors, picker: true, colorLabel: "Paint", parts: parts.length ? parts.map((p) => ({ id: p[0], name: p[1] })) : undefined, options: OPTS, render });
+  const DOOR = ["door", "Auto door"], LIGHT = ["light", "Light"], HEAT = ["heat", "Heat lamp"], WHEAT = ["wheat", "Waterer heater"];
+
+  const icons = [
+    
+    ic("backyard", "Coop with run", [RED_B, WHT, GRY, WOOD, GRN], [DOOR, LIGHT], (o) => { const od = part(o, "door"), ol = part(o, "light"), open = od.on;
+      return svgC(o, yard(o, 120, !open) + sh(o, 104, 172, 90, 5) +
+        `<path d="M24 120V160M86 120V160" stroke="url(#${o.uid}-wd)" stroke-width="5"/>` + house(o, 20, 74, 70, 46, 24, { vent: true }) + winLight(ol, 34, 88, 14, 12) +
+        `<path d="M90 92H104V120H90Z" fill="url(#${o.uid}-v)"/><path d="M88 92L106 86V92Z" fill="url(#${o.uid}-roof)"/>` + popdoor(od, 60, 104, 12, 14, open, true) + ramp(66, 120, 94, 162) +
+        runBox(o, 88, 112, 98, 52, true) + (open ? hen(130, 160, .9, "buff", true) + hen(160, 158, .8, "speck", false, true) + hen(112, 162, .7, "black", true) : "") + fount(o, 176, 162, .8) +
+        `<path d="M86 164H188" stroke="url(#${o.uid}-wd)" stroke-width="3"/>` + ctemp(o, 22, 128)); }),
+
+    
+    ic("walkin", "Walk-in shed coop", [RED_B, WHT, GRY, WOOD, GRN], [DOOR, LIGHT, HEAT], (o) => { const u = o.uid, od = part(o, "door"), ol = part(o, "light"), oh = part(o, "heat"), open = od.on;
+      return svgC(o, yard(o, 130, !open) + sh(o, 100, 172, 80, 5) +
+        `<path d="M34 170V96L50 70H150L166 96V170Z" fill="url(#${u}-v)"/><path d="M34 170V96L50 70H150L166 96V170Z" fill="url(#${u}-sidp)"/>` +
+        `<path d="M30 98L48 66H152L170 98" fill="none" stroke="url(#${u}-roof)" stroke-width="7"/><path d="M34 96L50 70H150L166 96" fill="none" stroke="#f2f0ea" stroke-width="2"/>` +
+        `<path d="${rr(76, 112, 48, 58, 1)}" fill="url(#${u}-v)" stroke="#f2f0ea" stroke-width="2.4"/><path d="M76 112L124 170M124 112L76 170M100 112V170" stroke="#f2f0ea" stroke-width="2"/>` +
+        winLight(ol, 92, 82, 16, 12) + (oh.on ? `<circle cx="100" cy="88" r="10" fill="url(#${u}-heat)"/>` : "") + popdoor(od, 140, 152, 14, 16, open, true) + ramp(147, 168, 166, 178) +
+        (open ? hen(48, 180, .8, "buff", true) + hen(184, 182, .75, "black", false, true) + hen(70, 186, .7, "speck", true) : "") + fount(o, 26, 184, .75) + ctemp(o, 40, 100)); }),
+
+    
+    ic("tractor", "A-frame tractor", [WOOD, GRN, WHT, RED_B, GRY], [], (o) => { const u = o.uid, open = o.on;
+      return svgC(o, yard(o, 110, !open) + sh(o, 100, 170, 84, 5) +
+        `<path d="M22 166L100 74L178 166Z" fill="url(#${u}-mesh)"/>` + (open ? hen(76, 162, .85, "buff", true) + hen(118, 164, .8, "speck", true, true) : "") + fount(o, 150, 164, .7) +
+        `<path d="M100 74L60 120H140Z" fill="url(#${u}-v)"/><path d="M100 74L60 120H140Z" fill="url(#${u}-sidp)"/><path d="M84 106H96V120H84Z" fill="#14100c"/>` +
+        `<path d="M22 166L100 74L178 166" fill="none" stroke="url(#${u}-wd)" stroke-width="4"/><path d="M18 166H182" stroke="url(#${u}-wd)" stroke-width="5"/>` +
+        [36, 164].map((x) => `<circle cx="${x}" cy="168" r="9" fill="#1a1c20"/><circle cx="${x}" cy="168" r="3.6" fill="#8a9096"/>`).join("") + `<path d="M182 160L196 150" stroke="url(#${u}-wd)" stroke-width="4" stroke-linecap="round"/>` + ctemp(o, 85, 128)); }),
+
+    
+    ic("raised", "Raised coop & ramp", [WHT, RED_B, GRY, WOOD, GRN], [DOOR], (o) => { const u = o.uid, od = part(o, "door"), open = od.on;
+      return svgC(o, yard(o, 130, !open) + sh(o, 96, 176, 60, 5) + `<path d="M56 116V176M136 116V176" stroke="url(#${u}-wd)" stroke-width="6"/>` +
+        house(o, 50, 70, 92, 50, 28, { vent: true }) + `<path d="M142 84H164V112H142Z" fill="url(#${u}-v)"/><path d="M140 84L166 76V84Z" fill="url(#${u}-roof)"/><path d="M142 94H164" stroke="#000" stroke-opacity=".25"/>` +
+        popdoor(od, 64, 102, 14, 16, open, true) + ramp(71, 120, 40, 172) + (open ? hen(30, 176, .8, "black", true) + hen(110, 182, .85, "buff", true, true) : "") + fount(o, 160, 180, .8) + ctemp(o, 92, 84)); }),
+
+    
+    ic("plastic", "Plastic coop", [GRN, WHT, GRY, "#c8323a", "#4a6aa8"], [DOOR], (o) => { const u = o.uid, od = part(o, "door"), open = od.on;
+      return svgC(o, yard(o, 118, !open) + sh(o, 104, 172, 90, 5) + `<path d="M24 120V166M84 120V166" stroke="#3a3f46" stroke-width="4"/>` +
+        `<path d="M18 120Q16 76 54 72Q92 76 90 120Z" fill="url(#${u}-c)"/><path d="M18 120Q16 76 54 72Q92 76 90 120Z" fill="url(#${u}-g)" opacity=".35"/>` + [84, 96, 108].map((y) => `<path d="M22 ${y}Q54 ${y - 6} 86 ${y}" fill="none" stroke="#000" stroke-opacity=".18"/>`).join("") +
+        popdoor(od, 84, 108, 10, 12, open, false) + `<path d="M90 120H186V166H90Z" fill="url(#${u}-mesh)"/><path d="M90 120H186V166H90Z" fill="none" stroke="#3a3f46" stroke-width="2"/>` +
+        `<path d="M90 120Q138 100 186 120" fill="none" stroke="#3a3f46" stroke-width="2"/>` + (open ? hen(128, 162, .85, "speck", true) + hen(160, 160, .8, "buff", false, true) : "") + fount(o, 104, 164, .7) +
+        [30, 78].map((x) => `<circle cx="${x}" cy="168" r="6" fill="#1a1c20"/>`).join("") + ctemp(o, 38, 96)); }),
+
+    
+    ic("fenced", "Coop & fenced run", [RED_B, WHT, GRY, WOOD, GRN], [DOOR, LIGHT], (o) => { const u = o.uid, od = part(o, "door"), ol = part(o, "light"), open = od.on;
+      let fence = ""; for (let i = 0; i < 9; i++) fence += `<path d="M${10 + i * 23} 118V174" stroke="url(#${u}-wd)" stroke-width="3"/>`;
+      return svgC(o, yard(o, 110, !open) + sh(o, 60, 132, 46, 4) + house(o, 30, 92, 56, 38, 20) + winLight(ol, 42, 102, 10, 9) + popdoor(od, 66, 116, 10, 12, open, true) +
+        `<path d="M8 130H196V174H8Z" fill="url(#${u}-mesh)"/>` + fence + `<path d="M8 130H196M8 174H196" stroke="url(#${u}-wd)" stroke-width="2.4"/><path d="M150 132H172V172H150Z" fill="none" stroke="url(#${u}-wd)" stroke-width="2"/><path d="M150 132L172 172M172 132L150 172" stroke="url(#${u}-wd)" stroke-width="1.4"/>` +
+        (open ? hen(60, 168, .8, "buff", true) + hen(100, 170, .85, "black", false, true) + hen(130, 166, .75, "speck", true) : "") + fount(o, 186, 168, .7) + ctemp(o, 96, 92)); }),
+
+    
+    ic("quail", "Quail hutch", [WOOD, WHT, GRY, RED_B], [LIGHT, HEAT], (o) => { const u = o.uid, ol = part(o, "light"), oh = part(o, "heat");
+      return svgC(o, yard(o, 120, !o.on) + sh(o, 100, 176, 76, 5) + `<path d="M36 140V176M164 140V176" stroke="url(#${u}-wd)" stroke-width="5"/>` +
+        `<path d="M28 80H172V142H28Z" fill="url(#${u}-v)"/><path d="M22 82L36 66H164L178 82Z" fill="url(#${u}-roof)"/>` +
+        `<path d="M36 88H118V136H36Z" fill="#2a2018"/>` + (ol.on ? `<path d="M36 88H118V136H36Z" fill="#ffe2a0" opacity=".25"/>` : "") + (oh.on ? `<circle cx="60" cy="92" r="18" fill="url(#${u}-heat)"/>` : "") +
+        hen(56, 134, .9, "quail") + hen(80, 134, .8, "quail", false, true) + hen(100, 134, .85, "quail") + fount(o, 110, 134, .5) +
+        `<path d="M36 88H118V136H36Z" fill="url(#${u}-mesh)"/><path d="M36 88H118V136H36Z" fill="none" stroke="#f2f0ea" stroke-width="2"/>` +
+        `<path d="M124 88H164V136H124Z" fill="url(#${u}-v)" stroke="#000" stroke-opacity=".3"/><circle cx="158" cy="112" r="2" fill="#9aa1a9"/>` + ctemp(o, 128, 94)); }),
+
+    
+    ic("duckhouse", "Duck house", [WOOD, WHT, GRN, GRY, RED_B], [DOOR], (o) => { const u = o.uid, od = part(o, "door"), open = od.on;
+      return svgC(o, yard(o, 112, !open) + BG(`<ellipse cx="148" cy="166" rx="50" ry="16" fill="url(#${u}-wat)" opacity=".85"/><ellipse cx="140" cy="162" rx="24" ry="4" fill="#fff" opacity=".2"/>`) + sh(o, 64, 158, 48, 4) +
+        house(o, 26, 112, 76, 44, 26, { vent: true }) + popdoor(od, 54, 136, 18, 20, open, true) + ramp(62, 156, 70, 170) +
+        (open ? hen(150, 168, .9, "duck") + hen(176, 164, .8, "duck", true, true) + hen(110, 176, .85, "duck", true) : "") + fount(o, 22, 176, .7) + ctemp(o, 30, 120)); }),
+
+    
+    ic("autodoor", "Automatic coop door", [GRY, WHT, RED_B, WOOD], [DOOR], (o) => { const u = o.uid, od = part(o, "door"), open = od.on;
+      return svgC(o, BG(`<rect width="200" height="200" fill="url(#${u}-v)"/><rect width="200" height="200" fill="url(#${u}-sidp)"/>`) + sh(o, 100, 170, 60, 4) +
+        `<path d="M64 168V58M136 168V58" stroke="url(#${u}-gal)" stroke-width="6"/><path d="M70 110H130V168H70Z" fill="#14100c"/>` +
+        `<rect x="70" y="${open ? 52 : 110}" width="60" height="58" fill="url(#${u}-gal)"/><path d="M74 ${open ? 80 : 138}H126" stroke="#000" stroke-opacity=".2"/>` +
+        `<path d="${rr(58, 38, 84, 18, 3)}" fill="#2a2e34"/><path d="${rr(64, 42, 30, 10, 1.5)}" fill="#0a0d10"/>` + digits(open ? "6.30" : "8.15", 66, 44, 6, open ? "#7ee08a" : AMB) + led(o, 132, 47, 1.6, true, open ? GREEN : AMB, open ? "hg" : "ho") +
+        `<path d="M150 20L190 30L184 54L144 44Z" fill="#1a2a4a"/><path d="M150 20L190 30L184 54L144 44Z" fill="url(#${u}-mesh)" opacity=".5"/><path d="M164 50V72H142" stroke="#2a2e34" stroke-width="2" fill="none"/>` +
+        (open ? hen(100, 182, .9, "speck", true) : "") + ctemp(o, 22, 60) + fount(o, 26, 180, .7)); }),
+
+    
+    ic("heatwaterer", "Heated waterer", [WHT, GRY, RED_B], [WHEAT], (o) => { const u = o.uid, oh = part(o, "wheat"), lv = o.level, t = tval(o), ice = t <= 32 && !oh.on;
+      const col = lv < .05 ? RED : lv < .25 ? AMB : null, wl = lv < .05 ? 0 : lv;
+      return svgC(o, yard(o, 130, false) + sh(o, 100, 176, 60, 6) + `<path d="M48 174L56 156H144L152 174Z" fill="#c8323a"/><path d="M48 174H152V178H48Z" fill="#8a1e1a"/>` +
+        `<ellipse cx="100" cy="158" rx="42" ry="5" fill="${ice ? "#e6f6ff" : "url(#" + u + "-wat)"}"/>` + (oh.on ? `<ellipse cx="100" cy="170" rx="54" ry="8" fill="url(#${u}-heat)" opacity=".7"/>` : "") +
+        `<path d="M64 156V64Q64 46 100 46Q136 46 136 64V156Z" fill="url(#${u}-c)"/><path d="M64 156V64Q64 46 100 46Q136 46 136 64V156Z" fill="url(#${u}-g)" opacity=".3"/>` +
+        `<path d="${rr(92, 66, 16, 84, 4)}" fill="#1a2a3a" opacity=".55"/><path d="${rr(92, 150 - 84 * wl, 16, Math.max(.1, 84 * wl), 4)}" fill="${col || "#5ab4ec"}"/>` +
+        (col ? `<path d="${rr(89, 63, 22, 90, 5)}" fill="none" stroke="${col}" stroke-width="1.6"${lv < .05 ? ` class="${P}blink"` : ""}/>` : "") + [80, 108, 136].map((y) => `<path d="M94 ${y - 14}H100" stroke="#fff" stroke-opacity=".5"/>`).join("") +
+        `<path d="M86 46Q100 36 114 46" fill="none" stroke="#3a3f46" stroke-width="4"/>` + tube("M152 172C170 172 176 180 204 182", 3, BLKP) + led(o, 138, 168, 1.4, oh.on, ORNG, "ho") + ctemp(o, 150, 60)); }),
+
+    
+    ic("nipple", "Nipple waterer bucket", [WHT, GRY, RED_B], [WHEAT], (o) => { const u = o.uid, oh = part(o, "wheat"), lv = o.level, col = lv < .05 ? RED : lv < .25 ? AMB : null, wl = lv < .05 ? 0 : lv;
+      return svgC(o, yard(o, 130, false) + `<path d="M100 4V34" stroke="#555" stroke-width="2"/><path d="M70 50Q100 24 130 50" fill="none" stroke="#5a6068" stroke-width="2"/>` +
+        `<path d="M66 48H134L128 130H72Z" fill="#f2f2ee" fill-opacity=".85"/><path d="M66 48H134L128 130H72Z" fill="url(#${u}-fx)"/>` +
+        `<path d="M${n1(72 + 6 * (1 - wl))} ${n1(130 - 80 * wl)}H${n1(128 - 6 * (1 - wl))}L128 130H72Z" fill="${col || "#5ab4ec"}" opacity=".55"/>` + (col ? `<path d="M66 48H134L128 130H72Z" fill="none" stroke="${col}" stroke-width="1.6"${lv < .05 ? ` class="${P}blink"` : ""}/>` : "") +
+        `<path d="M64 46H136V52H64Z" fill="url(#${u}-c)"/>` + [80, 100, 120].map((x, i) => `<rect x="${x - 2.4}" y="130" width="4.8" height="7" fill="#c8323a"/>` + (lv > .05 ? `<circle class="${P}drip" style="animation-delay:-${i * .5}s" cx="${x}" cy="139" r="1.4" fill="#9fdcff"/>` : "")).join("") +
+        (oh.on ? `<path d="${rr(90, 110, 20, 10, 2)}" fill="#ff7a2a" opacity=".7"/>` : "") + hen(70, 180, .9, "buff", true, true) + hen(124, 182, .85, "black", true) + ctemp(o, 150, 60)); }),
+
+    
+    ic("feeder", "Gravity feeder", [GRY, RED_B, WHT], [], (o) => { const u = o.uid;
+      return svgC(o, yard(o, 130, false) + `<path d="M100 4V30" stroke="#555" stroke-width="2"/><path d="M80 30H120L124 40H76Z" fill="url(#${u}-gal)"/>` +
+        `<path d="M78 40H122V128H78Z" fill="url(#${u}-gal)"/><path d="M78 60H122M78 100H122" stroke="#000" stroke-opacity=".18"/>` +
+        `<path d="M58 140Q100 152 142 140L134 128H66Z" fill="url(#${u}-gal)"/><ellipse cx="100" cy="132" rx="34" ry="5" fill="#c8a050"/>` + [-20, -8, 4, 16].map((d) => `<circle cx="${100 + d}" cy="131" r="1.2" fill="#8a6a2a"/>`).join("") +
+        hen(48, 176, .9, "speck", true) + hen(130, 180, .85, "buff", true, true) + fount(o, 172, 178, .9) + ctemp(o, 150, 60)); }),
+
+    
+    ic("heatpanel", "Coop heat panel", [WOOD, WHT, GRY, RED_B], [HEAT, LIGHT], (o) => { const u = o.uid, oh = part(o, "heat"), ol = part(o, "light");
+      return svgC(o, BG(`<rect width="200" height="200" fill="url(#${u}-v)"/><rect width="200" height="200" fill="url(#${u}-sidp)"/><path d="M0 170H200V200H0Z" fill="#c9b48a" opacity=".6"/>`) +
+        (ol.on ? `<rect width="200" height="200" fill="#ffe2a0" opacity=".12"/>` : "") +
+        `<path d="${rr(40, 40, 70, 46, 3)}" fill="#e9ecef"/><path d="${rr(44, 44, 62, 38, 2)}" fill="${oh.on ? "#ff8a4a" : "#c9ced4"}" opacity="${oh.on ? .55 : 1}"/>` + (oh.on ? `<path d="${rr(30, 30, 90, 66, 8)}" fill="url(#${u}-heat)" opacity=".6"/>` : "") +
+        `<path d="M150 20V50" stroke="#555" stroke-width="2"/><path d="M138 50Q150 40 162 50L166 62H134Z" fill="#c9ced4"/>` + lampGlow(oh, 150, 64) +
+        `<path d="M20 132H180" stroke="url(#${u}-wd)" stroke-width="6"/>` + hen(60, 132, .9, "buff") + hen(96, 132, .9, "black", false, true) + hen(132, 132, .85, "speck") +
+        fount(o, 40, 186, .8) + ctemp(o, 150, 150)); }),
+
+    
+    ic("sensor", "Coop sensor", [WHT, GRY, WOOD], [], (o) => { const u = o.uid, t = tval(o), col = t <= 32 ? "#6fb8ff" : t >= 90 ? RED : "#7ee08a";
+      return svgC(o, BG(`<rect width="200" height="200" fill="url(#${u}-v)"/><rect width="200" height="200" fill="url(#${u}-sidp)"/>`) + sh(o, 100, 152, 40, 4) +
+        `<path d="${rr(56, 50, 88, 100, 10)}" fill="#f4f5f6"/><path d="${rr(56, 50, 88, 100, 10)}" fill="url(#${u}-fx)"/><path d="${rr(64, 60, 72, 50, 4)}" fill="#0a0d10"/>` +
+        digits(String(t), 72, 68, 22, col, "rgba(255,255,255,.05)") + `<circle cx="${t >= 100 ? 132 : 120}" cy="70" r="2.6" fill="none" stroke="${col}" stroke-width="1.4"/>` +
+        `<path d="${rr(64, 116, 72, 22, 3)}" fill="#0a0d10"/>` + fount(o, 80, 136, .5) + digits(String(Math.round(o.level * 99)), 98, 122, 10, CYAN) + `<path d="M126 124l-4 10M120 125h1M127 133h1" stroke="${CYAN}" stroke-width="1.2"/>` +
+        led(o, 136, 56, 1.4, true, o.on ? GREEN : "#5a636d", "hg") + `<circle cx="100" cy="46" r="3" fill="#9aa1a9"/>`); }),
+  ];
+
+  (window.HDA = window.HDA || []).push({
+    id: "coops", tab: "Chicken coops", group: "Outdoor", kind: "device", levelLabel: "Water", onWord: "Open", offWord: "Closed",
+    intro: "Fourteen chicken coops and coop gear. The slider is the waterer level, shown in each waterer's window (amber below 25%, red and blinking when empty). The Temperature menu sets the coop temp readout: blue when freezing, red when too hot. Auto door up = hens out pecking in the daylight; door down = hens inside and dusk. Heat lamps glow, lights warm the windows, and waterer heaters keep the water from icing over.",
+    css: css2, icons,
+  });
+})();
+
 (function () {
   const P = "hda-countertop-";
   const H = () => window.HDAH;
@@ -18019,6 +18409,482 @@ ${extra || ""}</defs>`;
     intro: "Twenty outdoor grills, griddles and smokers on patios, decks and lawns. When running, lids open on gas grills (blue-orange burner flames, food with grill marks), charcoal glows, griddles sizzle and steam, smokers puff smoke from the chimney, and smart controllers show the pit temperature in segment digits (the slider sets the heat: 225° smoke, 450° grill at 80%).",
     
     css, icons,
+  });
+})();
+
+
+(function () {
+  const P = "hda-habitats-";
+  const H = () => window.HDAH;
+  const n1 = (v) => (+v).toFixed(1);
+  const GREEN = "#34d399", RED = "#ff5257", ORNG = "#ff9a4a", CYAN = "#7dd3fc", AMB = "#ffb547";
+  const CU = ["#4f2410", "#b8693a", "#ffd2ae"], PVC = ["#7f868e", "#e4e7ea", "#ffffff"], IRON = ["#08090b", "#34373d", "#8d939b"],
+    GALV = ["#4b5158", "#a9b0b7", "#eef1f3"], HOSE = ["#123d1a", "#2f8a3e", "#9be3a6"], BLKP = ["#050608", "#24272c", "#6f757d"];
+  const dur = (o, a, b) => n1(Math.max(.25, a - b * o.level));
+
+  function pal(c) {
+    const h = H(), x = h.hx(c), lt = (x[0] * .3 + x[1] * .59 + x[2] * .11) / 255 > .7;
+    return { l: h.shade(c, lt ? .6 : .38), m: c, d: h.shade(c, lt ? -.16 : -.32), k: h.shade(c, lt ? -.36 : -.58), lt };
+  }
+  const st = (a) => a.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] != null ? ` stop-opacity="${s[2]}"` : ""}/>`).join("");
+  const lg = (id, v, a) => `<linearGradient id="${id}" ${v ? 'x1="0" y1="0" x2="0" y2="1"' : 'x1="0" x2="1"'}>${st(a)}</linearGradient>`;
+  const rg = (id, a, at) => `<radialGradient id="${id}" ${at || ""}>${st(a)}</radialGradient>`;
+  const halo = (id, c) => rg(id, [[0, c, .85], [.45, c, .28], [1, c, 0]]);
+
+  function defs(o, extra) {
+    const u = o.uid, p = pal(o.color);
+    return `<defs>
+${lg(u + "-v", 1, [[0, p.l], [.5, p.m], [1, p.d]])}${lg(u + "-c", 0, [[0, p.k], [.2, p.m], [.4, p.l], [.62, p.m], [1, p.k]])}
+${lg(u + "-tp", 0, [[0, p.d], [.4, p.l], [1, p.d]])}${lg(u + "-sd", 0, [[0, p.d], [1, p.k]])}
+${lg(u + "-fx", 0, [[0, "#fff", .2], [.14, "#fff", 0], [.84, "#000", 0], [1, "#000", .3]])}
+<linearGradient id="${u}-g" x1="0" y1="0" x2="1" y2="1">${st([[0, "#fff", .5], [.42, "#fff", 0]])}</linearGradient>
+${lg(u + "-wall", 1, [[0, "#fff", .085], [1, "#fff", .035]])}${lg(u + "-flr", 1, [[0, "#a3a8ae", .34], [1, "#5d6369", .2]])}
+${lg(u + "-mt", 0, [[0, "#525960"], [.35, "#eef0f2"], [.6, "#b9bfc6"], [1, "#454b52"]])}${lg(u + "-mtv", 1, [[0, "#f2f4f6"], [.5, "#a2a9b1"], [1, "#545a61"]])}
+${lg(u + "-bs", 0, [[0, "#5e3f10"], [.35, "#f6d886"], [.6, "#c9973a"], [1, "#4e340c"]])}${lg(u + "-bsv", 1, [[0, "#f9e09a"], [.5, "#c18f34"], [1, "#5e3f10"]])}
+${lg(u + "-bk", 1, [[0, "#41464e"], [.5, "#1b1e23"], [1, "#08090c"]])}${lg(u + "-bkh", 0, [[0, "#08090c"], [.38, "#454a52"], [1, "#0b0d10"]])}
+${lg(u + "-lcd", 1, [[0, "#081014"], [1, "#16242b"]])}${lg(u + "-lcdg", 1, [[0, "#b9d7a3"], [1, "#8fb37c"]])}
+${lg(u + "-wt", 1, [[0, "#86d4f6", .8], [.3, "#3d8fd0", .85], [1, "#123f7a", .95]])}
+${lg(u + "-soil", 1, [[0, "#5b4431"], [1, "#2a1e14"]])}${lg(u + "-grass", 1, [[0, "#2f6a2a"], [1, "#48923c"]])}
+${lg(u + "-sky", 1, [[0, "#0d1a2e", 0], [1, "#3a5a7a", .35]])}${lg(u + "-hedge", 1, [[0, "#2e5a2a"], [1, "#16301a"]])}
+${lg(u + "-pvc", 0, [[0, "#80878f"], [.35, "#ffffff"], [.7, "#d9dde1"], [1, "#7a8189"]])}
+${rg(u + "-sh", [[0, "#000", .6], [1, "#000", 0]])}
+${halo(u + "-hg", GREEN)}${halo(u + "-hr", RED)}${halo(u + "-ho", ORNG)}${halo(u + "-hb", CYAN)}
+${rg(u + "-fl", [[0, "#f2fbff"], [.3, "#7ab8ff"], [.75, "#2a5cff", .85], [1, "#1b3fd6", 0]], 'cx=".5" cy=".85" r=".8"')}
+${rg(u + "-warm", [[0, "#ffb35c", .8], [.5, "#ff8a3c", .3], [1, "#ff7a2a", 0]])}
+${rg(u + "-dial", [[0, "#ffffff"], [.8, "#e9ecef"], [1, "#9aa1a9"]], 'cx=".4" cy=".35" r=".75"')}
+${rg(u + "-mist", [[0, "#dff4ff", .5], [1, "#dff4ff", 0]])}
+<pattern id="${u}-blk" width="40" height="20" patternUnits="userSpaceOnUse"><path d="M0 .5H40M0 10.5H40M.5 0V10.5M20.5 10.5V20" stroke="#000" stroke-opacity=".32" fill="none"/><path d="M0 1.5H40M0 11.5H40" stroke="#fff" stroke-opacity=".06" fill="none"/></pattern>
+<pattern id="${u}-brk" width="24" height="10" patternUnits="userSpaceOnUse"><rect width="24" height="10" fill="#9a4a32" fill-opacity=".55"/><rect x="1" y="1" width="22" height="3.6" fill="#b85d40" fill-opacity=".45"/><path d="M0 .5H24M0 5.5H24M.5 0V5.5M12.5 5.5V10" stroke="#d8cfc4" stroke-opacity=".45" fill="none"/></pattern>
+<pattern id="${u}-sid" width="40" height="11" patternUnits="userSpaceOnUse"><rect width="40" height="11" fill="#c9cfd4" fill-opacity=".16"/><path d="M0 10.5H40" stroke="#000" stroke-opacity=".35"/><path d="M0 9H40" stroke="#fff" stroke-opacity=".1" stroke-width="2"/></pattern>
+<pattern id="${u}-bld" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M1 9L2 3M4 9L5.5 1.5M7 9L6.5 4" stroke="#7fc56e" stroke-opacity=".5" stroke-width=".8" fill="none"/><path d="M2.5 9L3.5 5" stroke="#16361a" stroke-opacity=".6" stroke-width=".8"/></pattern>
+<pattern id="${u}-plt" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M2.5 0V5" stroke="#000" stroke-opacity=".18"/></pattern>
+${extra || ""}</defs>`;
+  }
+  const svg = (o, body, extra) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(o, `<clipPath id="${o.uid}-all"><rect width="200" height="200" rx="6"/></clipPath>` + (extra || ""))}<g clip-path="url(#${o.uid}-all)">${body}</g></svg>`;
+  const sh = (o, cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry || 5}" fill="url(#${o.uid}-sh)"/>`;
+  const rr = (x, y, w, h, r) => `M${n1(x + r)} ${n1(y)}H${n1(x + w - r)}A${r} ${r} 0 0 1 ${n1(x + w)} ${n1(y + r)}V${n1(y + h - r)}A${r} ${r} 0 0 1 ${n1(x + w - r)} ${n1(y + h)}H${n1(x + r)}A${r} ${r} 0 0 1 ${n1(x)} ${n1(y + h - r)}V${n1(y + r)}A${r} ${r} 0 0 1 ${n1(x + r)} ${n1(y)}Z`;
+  const hl = (x1, y1, x2, y2, w, op) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#fff" stroke-opacity="${op || .4}" stroke-width="${w || 2}" stroke-linecap="round"/>`;
+
+  
+  const tube = (d, w, c, cap) => `<path d="${d}" fill="none" stroke="${c[0]}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="${cap || "butt"}"/>` +
+    `<path d="${d}" fill="none" stroke="${c[1]}" stroke-width="${n1(w * .66)}" stroke-linejoin="round" stroke-linecap="${cap || "butt"}"/>` +
+    `<path d="${d}" fill="none" stroke="${c[2]}" stroke-opacity=".7" stroke-width="${n1(w * .2)}" stroke-linejoin="round" transform="translate(${n1(-w * .17)} ${n1(-w * .17)})"/>`;
+  
+  const band = (x, y, w, h, c) => `<rect x="${n1(x - w / 2)}" y="${n1(y - h / 2)}" width="${w}" height="${h}" rx="1.2" fill="${c[1]}" stroke="${c[0]}" stroke-width=".8"/><rect x="${n1(x - w / 2 + 1)}" y="${n1(y - h / 2 + 1)}" width="${n1(w * .3)}" height="${n1(h - 2)}" rx=".8" fill="${c[2]}" opacity=".5"/>`;
+  
+  const flow = (o, d, w, col, a, b) => o.on ? `<path class="${P}flow" d="${d}" fill="none" stroke="${col || "#bfeaff"}" stroke-opacity=".75" stroke-width="${w || 2.4}" stroke-linecap="round" stroke-dasharray="2.5 7" style="animation-duration:${dur(o, a || 1.2, b || .85)}s"/>` : "";
+  const led = (o, x, y, r, on, col, hid) => (on ? `<circle cx="${x}" cy="${y}" r="${r * 4.5}" fill="url(#${o.uid}-${hid})"/>` : "") +
+    `<circle cx="${x}" cy="${y}" r="${r}" fill="${on ? col : "#353a41"}"/><circle cx="${n1(x - r * .3)}" cy="${n1(y - r * .35)}" r="${n1(r * .4)}" fill="#fff" opacity="${on ? .8 : .3}"/>`;
+  const state = (o, x, y, r) => led(o, x, y, r, true, o.on ? GREEN : RED, o.on ? "hg" : "hr");
+  const screw = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r || 1.6}" fill="#8b929a"/><path d="M${n1(x - (r || 1.6) * .7)} ${y}H${n1(x + (r || 1.6) * .7)}" stroke="#3a3f46" stroke-width=".6"/>`;
+
+  
+  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgecd", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+  function digits(str, x, y, s, col, dim) {
+    const w = s * .52, t = Math.max(.7, s * .14); let out = "", X = x;
+    String(str).split("").forEach((ch) => {
+      if (ch === ".") { out += `<circle cx="${n1(X - t * .4)}" cy="${n1(y + s)}" r="${n1(t * .55)}" fill="${col}"/>`; X += t * .9; return; }
+      const sg = { a: [X + t * .6, y, X + w - t * .6, y], b: [X + w, y + t * .6, X + w, y + s / 2 - t * .5], c: [X + w, y + s / 2 + t * .5, X + w, y + s - t * .6],
+        d: [X + t * .6, y + s, X + w - t * .6, y + s], e: [X, y + s / 2 + t * .5, X, y + s - t * .6], f: [X, y + t * .6, X, y + s / 2 - t * .5], g: [X + t * .6, y + s / 2, X + w - t * .6, y + s / 2] };
+      const on = SEG[ch] || "";
+      for (const k in sg) { const q = sg[k], lit = on.indexOf(k) >= 0; if (!lit && !dim) continue;
+        out += `<path d="M${n1(q[0])} ${n1(q[1])}L${n1(q[2])} ${n1(q[3])}" stroke="${lit ? col : dim}" stroke-width="${n1(t)}" stroke-linecap="round"/>`; }
+      X += w + t * 2.2;
+    });
+    return out;
+  }
+  const lcd = (o, x, y, w, h, str, s, col) => `<path d="${rr(x, y, w, h, 2)}" fill="url(#${o.uid}-lcd)" stroke="#000" stroke-opacity=".5"/>` +
+    (o.on ? `<path d="${rr(x, y, w, h, 2)}" fill="${col}" fill-opacity=".08"/>` : "") +
+    digits(str, x + (w - str.replace(".", "").length * s * .82) / 2 + s * .1, y + (h - s) / 2, s, o.on ? col : "#2b3a40", o.on ? H().rgba(col, .1) : null) +
+    `<path d="M${x + 1.5} ${y + 1.5}H${x + w * .6}" stroke="#fff" stroke-opacity=".12"/>`;
+
+  
+  const room = (o, fy, wall) => `<g class="hda-bg">${room0(o, fy, wall)}</g>`;
+  function room0(o, fy, wall) {
+    const u = o.uid;
+    let s = `<rect width="200" height="${fy}" fill="url(#${u}-wall)"/>`;
+    if (wall === "block") s += `<rect width="200" height="${fy}" fill="url(#${u}-blk)"/>`;
+    if (wall === "brick") s += `<rect width="200" height="${fy}" fill="url(#${u}-brk)"/>`;
+    if (wall === "siding") s += `<rect width="200" height="${fy}" fill="url(#${u}-sid)"/>`;
+    if (wall === "board") s += `<rect x="18" y="8" width="164" height="${fy - 28}" fill="#c9a77a" fill-opacity=".16" stroke="#000" stroke-opacity=".3"/>` + [20, 34, 52, 75, 96, 118, 136].map((y, i) => `<path d="M18 ${y}C60 ${y + (i % 2 ? 3 : -3)} 120 ${y + (i % 2 ? -2 : 3)} 182 ${y}" fill="none" stroke="#6a4a2a" stroke-opacity=".22" stroke-width=".8"/>`).join("") + [40, 80, 120, 160].map((x) => `<circle cx="${x}" cy="${fy / 2}" r=".9" fill="#000" fill-opacity=".4"/>`).join("");
+    if (wall === "grass") return s + `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-grass)"/><path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-bld)"/>`;
+    s += `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-flr)"/><path d="M0 ${fy}H200" stroke="#000" stroke-opacity=".35"/><path d="M0 ${fy + 1}H200" stroke="#fff" stroke-opacity=".08"/>`;
+    [[30, .3], [72, .62], [128, .4], [164, .78], [100, .88], [14, .72]].forEach((p) => { s += `<circle cx="${p[0]}" cy="${n1(fy + (200 - fy) * p[1])}" r=".8" fill="#fff" fill-opacity=".14"/>`; });
+    return s;
+  }
+  
+  const face = (o, d, g) => `<path d="${d}" fill="url(#${o.uid}-${g || "v"})"/><path d="${d}" fill="url(#${o.uid}-fx)"/><path d="${d}" fill="url(#${o.uid}-g)" opacity=".28"/>`;
+  
+  function tank(o, x, y, w, b, g) {
+    const u = o.uid, r = w / 2, d = `M${x} ${y + 8}Q${x} ${y - 4} ${x + r} ${y - 5}Q${x + w} ${y - 4} ${x + w} ${y + 8}V${b - 4}Q${x + w} ${b} ${x + w - 4} ${b}H${x + 4}Q${x} ${b} ${x} ${b - 4}Z`;
+    return `<path d="${d}" fill="url(#${u}-${g || "c"})"/><path d="${d}" fill="url(#${u}-g)" opacity=".2"/>` +
+      `<path d="M${x} ${y + 8}Q${x + r} ${y + 13} ${x + w} ${y + 8}" fill="none" stroke="#000" stroke-opacity=".25"/>` +
+      `<path d="M${x + w * .3} ${y + 14}V${b - 8}" stroke="#fff" stroke-opacity=".22" stroke-width="${n1(w * .05)}" stroke-linecap="round"/>`;
+  }
+  
+  function flames(o, cx, by, w, n) {
+    if (!o.on) return "";
+    const u = o.uid, s = .6 + .55 * o.level; let f = `<ellipse cx="${cx}" cy="${by - 3}" rx="${n1(w * .8)}" ry="${n1(9 * s)}" fill="url(#${u}-warm)" opacity=".55"/>`;
+    for (let i = 0; i < n; i++) {
+      const x = cx - w / 2 + (i + .5) * w / n, h = (i % 2 ? 7 : 10) * s;
+      f += `<path class="${P}flk" style="animation-delay:-${n1(i * .17)}s" d="M${n1(x - 2.6)} ${by}Q${n1(x - 2.4)} ${n1(by - h * .55)} ${n1(x)} ${n1(by - h)}Q${n1(x + 2.4)} ${n1(by - h * .55)} ${n1(x + 2.6)} ${by}Z" fill="url(#${u}-fl)"/>`;
+    }
+    return f;
+  }
+  
+  function gauge(o, x, y, r, v) {
+    const a = (-130 + 260 * v) * Math.PI / 180, nx = x + Math.sin(a) * r * .72, ny = y - Math.cos(a) * r * .72;
+    let t = "";
+    for (let i = 0; i <= 8; i++) { const b = (-130 + 32.5 * i) * Math.PI / 180; t += `<path d="M${n1(x + Math.sin(b) * r * .62)} ${n1(y - Math.cos(b) * r * .62)}L${n1(x + Math.sin(b) * r * .8)} ${n1(y - Math.cos(b) * r * .8)}" stroke="#2a2f36" stroke-width=".6"/>`; }
+    return `<circle cx="${x}" cy="${y}" r="${r + 1.6}" fill="url(#${o.uid}-mtv)"/><circle cx="${x}" cy="${y}" r="${r}" fill="url(#${o.uid}-dial)"/>${t}` +
+      `<path d="M${x} ${y}L${n1(nx)} ${n1(ny)}" stroke="#d12f2f" stroke-width="1.1" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="1.3" fill="#222"/>` +
+      `<path d="M${n1(x - r * .7)} ${n1(y - r * .45)}A${r} ${r} 0 0 1 ${n1(x + r * .2)} ${n1(y - r * .85)}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1"/>`;
+  }
+  
+  const ballValve = (o, cx, cy, s) => { const u = o.uid; s = s || 1;
+    const hx = (x) => `<path d="M${n1(x - 5 * s)} ${n1(cy - 9 * s)}H${n1(x + 5 * s)}L${n1(x + 6 * s)} ${cy}L${n1(x + 5 * s)} ${n1(cy + 9 * s)}H${n1(x - 5 * s)}L${n1(x - 6 * s)} ${cy}Z" fill="url(#${u}-bsv)" stroke="#5e3f10" stroke-width=".7"/><path d="M${n1(x - 6 * s)} ${cy}H${n1(x + 6 * s)}" stroke="#5e3f10" stroke-opacity=".5" stroke-width=".6"/>`;
+    return hx(cx - 16 * s) + hx(cx + 16 * s) + `<path d="${rr(cx - 11 * s, cy - 11 * s, 22 * s, 22 * s, 7 * s)}" fill="url(#${u}-bsv)" stroke="#5e3f10" stroke-width=".7"/>` +
+      `<ellipse cx="${n1(cx - 3 * s)}" cy="${n1(cy - 5 * s)}" rx="${n1(5 * s)}" ry="${n1(2.5 * s)}" fill="#fff" opacity=".45"/>`; };
+
+  const css = `
+.hda-habitats-flow{stroke-dashoffset:0}
+.hda-anim .hda-habitats-flow{animation:hda-habitats-flow 1s linear infinite}
+@keyframes hda-habitats-flow{to{stroke-dashoffset:-18}}
+.hda-habitats-flk{transform-box:fill-box;transform-origin:50% 100%}
+.hda-anim .hda-habitats-flk{animation:hda-habitats-flk .5s ease-in-out infinite alternate}
+@keyframes hda-habitats-flk{0%{transform:scale(1,1)}50%{transform:scale(.9,.78)}100%{transform:scale(1.06,1.08)}}
+.hda-habitats-spin{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-habitats-spin{animation:hda-habitats-spin 1s linear infinite}
+@keyframes hda-habitats-spin{to{transform:rotate(360deg)}}
+.hda-anim .hda-habitats-blink{animation:hda-habitats-blink 1.2s steps(1,end) infinite}
+@keyframes hda-habitats-blink{0%,59%{opacity:1}60%,100%{opacity:.2}}
+.hda-habitats-chase{opacity:.18}
+.hda-anim .hda-habitats-chase{animation:hda-habitats-chase 4s linear infinite}
+@keyframes hda-habitats-chase{0%,100%{opacity:.18}6%{opacity:1}24%{opacity:1}30%{opacity:.18}}
+.hda-habitats-bub{opacity:0;transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-habitats-bub{animation:hda-habitats-bub 2s ease-in infinite}
+@keyframes hda-habitats-bub{0%{transform:translate(0,0);opacity:0}15%{opacity:.9}100%{transform:translate(0,-26px);opacity:0}}
+.hda-habitats-rip{transform-box:fill-box;transform-origin:center;opacity:0}
+.hda-anim .hda-habitats-rip{animation:hda-habitats-rip 2.2s ease-out infinite}
+@keyframes hda-habitats-rip{0%{transform:scale(.3);opacity:.8}100%{transform:scale(1.4);opacity:0}}
+.hda-habitats-mist{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-habitats-mist{animation:hda-habitats-mist 1.6s ease-in-out infinite}
+@keyframes hda-habitats-mist{50%{opacity:.45;transform:scale(1.08)}}
+.hda-habitats-heat{opacity:0}
+.hda-anim .hda-habitats-heat{animation:hda-habitats-heat 2.6s ease-out infinite}
+.hda-anim .hda-habitats-hum{animation:hda-habitats-hum .16s linear infinite}
+@keyframes hda-habitats-hum{0%,100%{transform:translate(0,0)}50%{transform:translate(.5px,-.3px)}}
+.hda-anim .hda-habitats-bob{animation:hda-habitats-bob 1.6s ease-in-out infinite}
+@keyframes hda-habitats-bob{50%{transform:translate(0,-2px)}}
+@keyframes hda-habitats-heat{0%{transform:translate(0,4px);opacity:0}35%{opacity:.6}100%{transform:translate(0,-16px);opacity:0}}
+.hda-habitats-heat.hda-habitats-still{opacity:.4}
+.hda-anim .hda-habitats-heat.hda-habitats-still{opacity:0}
+`;
+  
+  const heat = (o, xs, y, col) => o.on ? xs.map((x, i) => `<path class="${P}heat${o.anim ? "" : " " + P + "still"}" style="animation-delay:-${n1(i * .8)}s" d="M${x} ${y}q-3 -5 0 -10t0 -10" fill="none" stroke="${col || "#ffc58a"}" stroke-width="1.3" stroke-linecap="round"/>`).join("") : "";
+  const bubbles = (o, pts, col) => o.on ? pts.map((p, i) => `<circle class="${P}bub" style="animation-delay:-${n1(i * .45)}s;animation-duration:${dur(o, 2.6, 1.4)}s" cx="${p[0]}" cy="${p[1]}" r="${p[2] || 1.3}" fill="none" stroke="${col || "#e6f7ff"}" stroke-width=".7"/>`).join("") : "";
+
+  const css2 = css + `
+.hda-habitats-fog{opacity:.55}
+.hda-anim .hda-habitats-fog{animation:hda-habitats-fog 6s ease-in-out infinite alternate}
+@keyframes hda-habitats-fog{0%{transform:translate(-10px,0);opacity:.35}100%{transform:translate(10px,-3px);opacity:.75}}
+.hda-habitats-drop{opacity:0}
+.hda-anim .hda-habitats-drop{animation:hda-habitats-drop 1.3s ease-in infinite}
+@keyframes hda-habitats-drop{0%{transform:translate(0,0);opacity:0}15%{opacity:.9}100%{transform:translate(4px,22px);opacity:0}}
+.hda-habitats-br{transform-box:fill-box;transform-origin:50% 100%}
+.hda-anim .hda-habitats-br{animation:hda-habitats-br 3s ease-in-out infinite}
+@keyframes hda-habitats-br{50%{transform:scale(1.03,.97)}}
+.hda-anim .hda-habitats-swim{animation:hda-habitats-swim 7s ease-in-out infinite alternate}
+@keyframes hda-habitats-swim{0%{transform:translate(-12px,2px)}100%{transform:translate(12px,-2px)}}
+.hda-anim .hda-habitats-hop{animation:hda-habitats-hop 2.4s ease-in-out infinite}
+@keyframes hda-habitats-hop{0%,70%,100%{transform:translate(0,0)}80%{transform:translate(0,-4px)}}
+.hda-anim .hda-habitats-caus{animation:hda-habitats-caus 4s ease-in-out infinite alternate}
+@keyframes hda-habitats-caus{to{transform:translate(9px,3px)}}
+.hda-habitats-sway{transform-box:fill-box;transform-origin:0% 50%}
+.hda-anim .hda-habitats-sway{animation:hda-habitats-sway 2.6s ease-in-out infinite alternate}
+@keyframes hda-habitats-sway{0%{transform:rotate(-6deg)}100%{transform:rotate(6deg)}}
+`;
+  const BG = (s) => `<g class="hda-bg">${s}</g>`;
+  const part = (o, id) => Object.assign({}, o, { on: !!(o.parts && o.parts[id] != null ? o.parts[id] : o.on) });
+  const WD = "#9a6a40", BLK = "#26282c", WHT = "#eceef0", GRY = "#7d858d";
+  const HUM = [["20", "20%"], ["40", "40%"], ["60", "60%"], ["80", "80%"], ["95", "95%"]];
+  const humOpt = (d) => [{ id: "hum", name: "Humidity", values: HUM.filter((x) => x[0] === d).concat(HUM.filter((x) => x[0] !== d)) }];
+  const tempF = (o) => Math.round(60 + 45 * o.level);
+
+  function hextra(o) {
+    const u = o.uid;
+    return `<pattern id="${u}-msh" width="3" height="3" patternUnits="userSpaceOnUse"><path d="M0 .5H3M.5 0V3" stroke="#000" stroke-opacity=".55" stroke-width=".5"/></pattern>` +
+      `<pattern id="${u}-wav" width="40" height="14" patternUnits="userSpaceOnUse"><path d="M0 7C6 3 12 3 18 7S30 11 40 7" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1"/></pattern>` +
+      `<pattern id="${u}-wire" width="5" height="40" patternUnits="userSpaceOnUse"><path d="M2.5 0V40" stroke="#c9ced4" stroke-width=".8"/></pattern>` +
+      `<pattern id="${u}-cork" width="14" height="10" patternUnits="userSpaceOnUse"><rect width="14" height="10" fill="#6b4a2e"/><circle cx="3" cy="3" r="1.6" fill="#4a321e"/><circle cx="10" cy="7" r="2" fill="#7e5a38"/><circle cx="8" cy="2" r="1" fill="#3e2a18"/></pattern>` +
+      lg(u + "-sub", 1, [[0, "#8a6440"], [1, "#4a321e"]]) + lg(u + "-sand", 1, [[0, "#e6cf9a"], [1, "#b8995e"]]) + lg(u + "-aq", 1, [[0, "#6fc4dc", .75], [1, "#1f5f86", .9]]) +
+      lg(u + "-uvb", 1, [[0, "#e6f2ff", .55], [1, "#bcd6ff", 0]]) + rg(u + "-heat", [[0, "#ffb05a", .75], [.5, "#ff7a2a", .3], [1, "#ff6a1a", 0]]) +
+      lg(u + "-day", 1, [[0, "#fff8e6", .35], [1, "#fff8e6", .05]]) + lg(u + "-gl2", 0, [[0, "#fff", .14], [.3, "#fff", .02], [.6, "#fff", 0], [1, "#fff", .08]]) +
+      lg(u + "-rock", 1, [[0, "#8d8a84"], [1, "#4f4c47"]]) + lg(u + "-leaf", 1, [[0, "#6fc45a"], [1, "#2f7a2e"]]) + lg(u + "-wdg", 1, [[0, "#c08a58"], [1, "#7a4c28"]]);
+  }
+  const svgH = (o, body) => svg(o, body, hextra(o));
+
+  
+  const A = {
+    gecko: (x, y, s, c) => `<g class="hda-habitats-br"><path d="M${x - 14 * s} ${y}Q${x - 6 * s} ${y - 5 * s} ${x + 6 * s} ${y - 4 * s}Q${x + 13 * s} ${y - 4 * s} ${x + 15 * s} ${y - 1 * s}Q${x + 10 * s} ${y + 1 * s} ${x + 4 * s} ${y}Z" fill="${c || "#e8c25a"}"/>` +
+      `<path d="M${x - 13 * s} ${y - 3.4 * s}Q${x - 20 * s} ${y - 4 * s} ${x - 25 * s} ${y - 1 * s}Q${x - 20 * s} ${y + 1.4 * s} ${x - 13 * s} ${y + .4 * s}Z" fill="${c || "#e8c25a"}"/>` +
+      [[-6, -3], [-1, -4], [4, -3]].map((q) => `<circle cx="${n1(x + q[0] * s)}" cy="${n1(y + q[1] * s)}" r="${n1(1 * s)}" fill="#5a3a1a"/>`).join("") + `<circle cx="${n1(x + 12 * s)}" cy="${n1(y - 3 * s)}" r="${n1(.9 * s)}" fill="#111"/>` +
+      `<path d="M${x - 8 * s} ${y}l-2 ${2 * s}M${x + 6 * s} ${y - 1}l2 ${2.4 * s}" stroke="${c || "#e8c25a"}" stroke-width="${1.6 * s}"/></g>`,
+    dragon: (x, y, s) => `<g class="hda-habitats-br"><path d="M${x - 16 * s} ${y}Q${x - 4 * s} ${y - 10 * s} ${x + 10 * s} ${y - 8 * s}Q${x + 18 * s} ${y - 7 * s} ${x + 19 * s} ${y - 3 * s}Q${x + 12 * s} ${y + 1} ${x} ${y}Z" fill="#c9a060"/>` +
+      `<path d="M${x - 16 * s} ${y}Q${x - 30 * s} ${y} ${x - 34 * s} ${y - 2 * s}" stroke="#b08850" stroke-width="${3 * s}" fill="none" stroke-linecap="round"/><path d="M${x + 10 * s} ${y - 2 * s}l3 ${3 * s}l3 ${-2 * s}" fill="#8a6a3a"/>` +
+      [-8, -3, 2].map((d) => `<path d="M${x + d * s} ${y - 8 * s}l1.5 ${-2.5 * s}l1.5 ${2.5 * s}" fill="#a07840"/>`).join("") + `<circle cx="${n1(x + 15 * s)}" cy="${n1(y - 6 * s)}" r="${n1(1 * s)}" fill="#111"/></g>`,
+    python: (x, y, s) => `<g class="hda-habitats-br"><ellipse cx="${x}" cy="${n1(y - 3 * s)}" rx="${n1(18 * s)}" ry="${n1(6 * s)}" fill="#6a4a26"/><ellipse cx="${x}" cy="${n1(y - 7 * s)}" rx="${n1(13 * s)}" ry="${n1(4.6 * s)}" fill="#7a5630"/><ellipse cx="${n1(x - 2 * s)}" cy="${n1(y - 10 * s)}" rx="${n1(8 * s)}" ry="${n1(3.4 * s)}" fill="#6a4a26"/>` +
+      [[-10, -3], [6, -4], [-2, -7], [9, -8], [-6, -10]].map((q) => `<ellipse cx="${n1(x + q[0] * s)}" cy="${n1(y + q[1] * s)}" rx="${n1(2.6 * s)}" ry="${n1(1.3 * s)}" fill="#d9b06a"/>`).join("") +
+      `<path d="M${n1(x + 4 * s)} ${n1(y - 11 * s)}q${n1(6 * s)} ${n1(-3 * s)} ${n1(10 * s)} ${n1(-1 * s)}" stroke="#5a3a1a" stroke-width="${n1(3.4 * s)}" stroke-linecap="round" fill="none"/></g>`,
+    frog: (x, y, s, c) => `<g class="hda-habitats-hop"><ellipse cx="${x}" cy="${n1(y - 4 * s)}" rx="${n1(7 * s)}" ry="${n1(4.6 * s)}" fill="${c || "#2f8fd6"}"/>` +
+      [[-4, -7], [4, -7]].map((q) => `<circle cx="${n1(x + q[0] * s)}" cy="${n1(y + q[1] * s)}" r="${n1(2 * s)}" fill="${c || "#2f8fd6"}"/><circle cx="${n1(x + q[0] * s)}" cy="${n1(y + q[1] * s)}" r="${n1(1 * s)}" fill="#111"/>`).join("") +
+      `<circle cx="${n1(x - 2 * s)}" cy="${n1(y - 4 * s)}" r="${n1(1.2 * s)}" fill="#111"/><circle cx="${n1(x + 3 * s)}" cy="${n1(y - 3 * s)}" r="${n1(1 * s)}" fill="#111"/><path d="M${n1(x - 7 * s)} ${y}l${n1(-3 * s)} 1M${n1(x + 7 * s)} ${y}l${n1(3 * s)} 1" stroke="${c || "#2f8fd6"}" stroke-width="${n1(1.6 * s)}"/></g>`,
+    tortoise: (x, y, s) => `<g class="hda-habitats-br"><path d="M${n1(x - 14 * s)} ${y}Q${n1(x - 13 * s)} ${n1(y - 14 * s)} ${x} ${n1(y - 14 * s)}Q${n1(x + 13 * s)} ${n1(y - 14 * s)} ${n1(x + 14 * s)} ${y}Z" fill="#8a6a3a"/>` +
+      [[-7, -6], [0, -9], [7, -6], [-3, -3], [4, -3]].map((q) => `<path d="M${n1(x + q[0] * s - 3 * s)} ${n1(y + q[1] * s)}l${n1(3 * s)} ${n1(-2.4 * s)}l${n1(3 * s)} ${n1(2.4 * s)}l${n1(-3 * s)} ${n1(2.4 * s)}Z" fill="#c9a060" opacity=".8"/>`).join("") +
+      `<ellipse cx="${n1(x + 17 * s)}" cy="${n1(y - 3 * s)}" rx="${n1(4 * s)}" ry="${n1(3 * s)}" fill="#9a8a5a"/><circle cx="${n1(x + 18.5 * s)}" cy="${n1(y - 4 * s)}" r="${n1(.8 * s)}" fill="#111"/>` +
+      `<path d="M${n1(x - 10 * s)} ${y}v${n1(2 * s)}M${n1(x + 10 * s)} ${y}v${n1(2 * s)}" stroke="#9a8a5a" stroke-width="${n1(3 * s)}" stroke-linecap="round"/></g>`,
+    cham: (x, y, s) => `<g class="hda-habitats-br"><path d="M${x} ${y}Q${n1(x + 4 * s)} ${n1(y - 12 * s)} ${n1(x + 16 * s)} ${n1(y - 10 * s)}Q${n1(x + 22 * s)} ${n1(y - 8 * s)} ${n1(x + 20 * s)} ${n1(y - 2 * s)}Q${n1(x + 12 * s)} ${y} ${x} ${y}Z" fill="#4cae4a"/>` +
+      `<path d="M${x} ${y}q${n1(-8 * s)} ${n1(2 * s)} ${n1(-8 * s)} ${n1(8 * s)}q0 ${n1(4 * s)} ${n1(4 * s)} ${n1(3 * s)}q${n1(2 * s)} ${n1(-2 * s)} 0 ${n1(-3 * s)}" stroke="#4cae4a" stroke-width="${n1(2.4 * s)}" fill="none"/>` +
+      `<path d="M${n1(x + 13 * s)} ${n1(y - 10 * s)}L${n1(x + 17 * s)} ${n1(y - 17 * s)}L${n1(x + 21 * s)} ${n1(y - 8 * s)}Z" fill="#3f9a3f"/><circle cx="${n1(x + 17 * s)}" cy="${n1(y - 6 * s)}" r="${n1(1.8 * s)}" fill="#f2d24a"/><circle cx="${n1(x + 17 * s)}" cy="${n1(y - 6 * s)}" r="${n1(.8 * s)}" fill="#111"/>` +
+      `<path d="M${n1(x + 6 * s)} ${n1(y - 6 * s)}h${n1(8 * s)}" stroke="#e8e04a" stroke-width="${n1(1.2 * s)}" opacity=".7"/></g>`,
+    turtle: (x, y, s) => `<g class="hda-habitats-br"><ellipse cx="${x}" cy="${n1(y - 4 * s)}" rx="${n1(12 * s)}" ry="${n1(5 * s)}" fill="#3e5a2a"/><ellipse cx="${x}" cy="${n1(y - 5 * s)}" rx="${n1(9 * s)}" ry="${n1(3.4 * s)}" fill="#5a7a3a"/>` +
+      `<ellipse cx="${n1(x + 14 * s)}" cy="${n1(y - 4 * s)}" rx="${n1(3.6 * s)}" ry="${n1(2.6 * s)}" fill="#6a8a4a"/><path d="M${n1(x + 12 * s)} ${n1(y - 5 * s)}h${n1(4 * s)}" stroke="#d9362b" stroke-width="${n1(1 * s)}"/></g>`,
+    axo: (x, y, s) => `<g class="hda-habitats-swim"><path d="M${n1(x - 14 * s)} ${y}Q${x} ${n1(y - 6 * s)} ${n1(x + 10 * s)} ${n1(y - 3 * s)}Q${n1(x + 14 * s)} ${n1(y - 1 * s)} ${n1(x + 10 * s)} ${n1(y + 2 * s)}Q${x} ${n1(y + 3 * s)} ${n1(x - 14 * s)} ${y}Z" fill="#f2b6c2"/>` +
+      [-4, 0, 4].map((d) => `<path d="M${n1(x + 8 * s)} ${n1(y - 4 * s)}l${n1(d * .6 * s)} ${n1(-5 * s)}" stroke="#e86a8a" stroke-width="${n1(1.4 * s)}" stroke-linecap="round"/>`).join("") +
+      `<circle cx="${n1(x + 10 * s)}" cy="${n1(y - 1 * s)}" r="${n1(.8 * s)}" fill="#222"/><path d="M${n1(x - 14 * s)} ${y}q${n1(-6 * s)} ${n1(-3 * s)} ${n1(-10 * s)} 0" stroke="#f2b6c2" stroke-width="${n1(2.6 * s)}" fill="none"/></g>`,
+    tarantula: (x, y, s) => `<g class="hda-habitats-br">` + [-1, 1].map((k) => [0, 1, 2, 3].map((i) => `<path d="M${x} ${n1(y - 4 * s)}l${n1(k * (6 + i * 1.5) * s)} ${n1((-4 + i * 2.4) * s)}l${n1(k * 3 * s)} ${n1(4 * s)}" stroke="#2a1e18" stroke-width="${n1(1.6 * s)}" fill="none" stroke-linecap="round"/>`).join("")).join("") +
+      `<ellipse cx="${n1(x - 5 * s)}" cy="${n1(y - 4 * s)}" rx="${n1(5 * s)}" ry="${n1(4 * s)}" fill="#3a2a22"/><ellipse cx="${n1(x + 3 * s)}" cy="${n1(y - 4 * s)}" rx="${n1(3.6 * s)}" ry="${n1(3 * s)}" fill="#4a3a2e"/><ellipse cx="${n1(x - 5 * s)}" cy="${n1(y - 5 * s)}" rx="${n1(2 * s)}" ry="${n1(1.4 * s)}" fill="#c8662a" opacity=".7"/></g>`,
+    crab: (x, y, s) => `<g class="hda-habitats-br"><path d="M${n1(x - 8 * s)} ${y}Q${n1(x - 9 * s)} ${n1(y - 14 * s)} ${n1(x + 2 * s)} ${n1(y - 13 * s)}Q${n1(x + 10 * s)} ${n1(y - 10 * s)} ${n1(x + 6 * s)} ${y}Z" fill="#d9a46a"/><path d="M${n1(x - 4 * s)} ${n1(y - 9 * s)}q${n1(4 * s)} ${n1(-3 * s)} ${n1(7 * s)} 0" stroke="#a8743e" fill="none"/>` +
+      `<ellipse cx="${n1(x + 9 * s)}" cy="${n1(y - 2 * s)}" rx="${n1(3 * s)}" ry="${n1(2.4 * s)}" fill="#c84a2a"/><path d="M${n1(x + 10 * s)} ${n1(y - 4 * s)}v${n1(-3 * s)}M${n1(x + 12 * s)} ${n1(y - 4 * s)}v${n1(-3 * s)}" stroke="#222" stroke-width=".8"/></g>`,
+    bird: (x, y, s) => `<g class="hda-habitats-hop"><ellipse cx="${x}" cy="${n1(y - 7 * s)}" rx="${n1(5 * s)}" ry="${n1(7 * s)}" fill="#6fc45a" transform="rotate(-15 ${x} ${n1(y - 7 * s)})"/><circle cx="${n1(x + 3 * s)}" cy="${n1(y - 14 * s)}" r="${n1(3.6 * s)}" fill="#f2e24a"/>` +
+      `<path d="M${n1(x + 6 * s)} ${n1(y - 14 * s)}l${n1(2 * s)} ${n1(1.4 * s)}l${n1(-2 * s)} ${n1(.6 * s)}" fill="#e8a040"/><circle cx="${n1(x + 4 * s)}" cy="${n1(y - 15 * s)}" r="${n1(.7 * s)}" fill="#111"/><path d="M${n1(x - 3 * s)} ${n1(y - 2 * s)}l${n1(-4 * s)} ${n1(8 * s)}" stroke="#3a7a8a" stroke-width="${n1(2 * s)}"/></g>`,
+    hamster: (x, y, s) => `<g class="hda-habitats-br"><ellipse cx="${x}" cy="${n1(y - 5 * s)}" rx="${n1(9 * s)}" ry="${n1(6 * s)}" fill="#e0a560"/><ellipse cx="${n1(x + 1 * s)}" cy="${n1(y - 3 * s)}" rx="${n1(6 * s)}" ry="${n1(3.4 * s)}" fill="#f6e2c4"/>` +
+      `<circle cx="${n1(x + 6 * s)}" cy="${n1(y - 10 * s)}" r="${n1(2 * s)}" fill="#e0a560"/><circle cx="${n1(x + 7 * s)}" cy="${n1(y - 6 * s)}" r="${n1(.9 * s)}" fill="#111"/><circle cx="${n1(x + 9.5 * s)}" cy="${n1(y - 4.6 * s)}" r="${n1(.7 * s)}" fill="#d97a8a"/></g>`,
+    rabbit: (x, y, s) => `<g class="hda-habitats-br"><ellipse cx="${x}" cy="${n1(y - 7 * s)}" rx="${n1(12 * s)}" ry="${n1(8 * s)}" fill="#9a9590"/><circle cx="${n1(x + 11 * s)}" cy="${n1(y - 12 * s)}" r="${n1(5.4 * s)}" fill="#a8a39e"/>` +
+      `<ellipse cx="${n1(x + 9 * s)}" cy="${n1(y - 22 * s)}" rx="${n1(1.8 * s)}" ry="${n1(6 * s)}" fill="#a8a39e"/><ellipse cx="${n1(x + 13 * s)}" cy="${n1(y - 21 * s)}" rx="${n1(1.8 * s)}" ry="${n1(6 * s)}" fill="#a8a39e" transform="rotate(14 ${n1(x + 13 * s)} ${n1(y - 21 * s)})"/>` +
+      `<circle cx="${n1(x + 13 * s)}" cy="${n1(y - 13 * s)}" r="${n1(1 * s)}" fill="#111"/><circle cx="${n1(x - 12 * s)}" cy="${n1(y - 8 * s)}" r="${n1(3 * s)}" fill="#f4f2ee"/></g>`,
+    chick: (x, y, s) => `<g class="hda-habitats-hop"><ellipse cx="${x}" cy="${n1(y - 4 * s)}" rx="${n1(5 * s)}" ry="${n1(4 * s)}" fill="#f6d84a"/><circle cx="${n1(x + 4 * s)}" cy="${n1(y - 8 * s)}" r="${n1(3 * s)}" fill="#f8e06a"/><path d="M${n1(x + 7 * s)} ${n1(y - 8 * s)}l${n1(2 * s)} ${n1(.8 * s)}l${n1(-2 * s)} ${n1(.8 * s)}" fill="#e88a2a"/><circle cx="${n1(x + 5 * s)}" cy="${n1(y - 9 * s)}" r="${n1(.6 * s)}" fill="#111"/></g>`,
+  };
+  
+  const leafy = (x, y, s, c) => [[-8, -10], [-3, -16], [3, -14], [8, -9], [0, -6]].map((q) => `<path d="M${x} ${y}Q${n1(x + q[0] * s * .4)} ${n1(y + q[1] * s * .6)} ${n1(x + q[0] * s)} ${n1(y + q[1] * s)}Q${n1(x + q[0] * s * .7)} ${n1(y + q[1] * s * .3)} ${x} ${y}Z" fill="${c || "url(#" + "U-leaf)"}"/>`).join("");
+  const rock = (o, x, y, w, h) => `<path d="M${x} ${y}Q${n1(x + w * .1)} ${n1(y - h)} ${n1(x + w * .5)} ${n1(y - h)}Q${n1(x + w * .9)} ${n1(y - h * .9)} ${x + w} ${y}Z" fill="url(#${o.uid}-rock)"/><path d="M${n1(x + w * .2)} ${n1(y - h * .6)}q${n1(w * .2)} ${n1(-h * .3)} ${n1(w * .4)} ${n1(-h * .2)}" stroke="#fff" stroke-opacity=".2" fill="none"/>`;
+  const hide = (o, x, y, w, h) => `<path d="M${x} ${y}V${n1(y - h * .5)}Q${x} ${y - h} ${n1(x + w * .5)} ${y - h}Q${x + w} ${y - h} ${x + w} ${n1(y - h * .5)}V${y}Z" fill="url(#${o.uid}-wdg)"/><path d="M${n1(x + w * .3)} ${y}V${n1(y - h * .45)}Q${n1(x + w * .5)} ${n1(y - h * .7)} ${n1(x + w * .7)} ${n1(y - h * .45)}V${y}Z" fill="#1a120a"/>`;
+  const branch = (x1, y1, x2, y2) => `<path d="M${x1} ${y1}Q${(x1 + x2) / 2} ${Math.min(y1, y2) - 8} ${x2} ${y2}" stroke="#6a4a2a" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M${x1} ${y1}Q${(x1 + x2) / 2} ${Math.min(y1, y2) - 8} ${x2} ${y2}" stroke="#a07a50" stroke-width="1.2" fill="none" transform="translate(0 -1)"/>`;
+
+  
+  function meter(o, x, y, safe) {
+    const t = tempF(o), h = +((o.opt && o.opt.hum) || 60);
+    const dt = t < safe[0] ? safe[0] - t : t > safe[1] ? t - safe[1] : 0, dh = h < safe[2] ? safe[2] - h : h > safe[3] ? h - safe[3] : 0;
+    const bad = dt > 5 || dh > 10 ? 2 : dt > 0 || dh > 0 ? 1 : 0, col = ["#7ee08a", AMB, RED][bad];
+    const lit = o.on || true;
+    return `<path d="${rr(x, y, 34, 18, 2.5)}" fill="#e9ecef"/><path d="${rr(x + 2, y + 2, 30, 14, 1.5)}" fill="#0a0d10"/>` +
+      digits(String(t), x + 4, y + 5, 7, col, "rgba(255,255,255,.05)") + `<circle cx="${x + 16.4}" cy="${y + 5.4}" r=".9" fill="none" stroke="${col}" stroke-width=".6"/>` +
+      digits(String(Math.min(99, h)), x + 19, y + 5, 7, CYAN, "rgba(255,255,255,.05)") + `<path d="M${x + 31.6} ${y + 6}l-1.6 4" stroke="${CYAN}" stroke-width=".6"/><circle cx="${x + 30.2}" cy="${y + 6.2}" r=".5" fill="${CYAN}"/><circle cx="${x + 31.6}" cy="${y + 10}" r=".5" fill="${CYAN}"/>` +
+      (bad ? `<circle cx="${x + 32}" cy="${y + 1.5}" r="2" fill="${col}"${bad === 2 && lit ? ` class="${P}blink"` : ""}/>` : "");
+  }
+
+  
+  function enclosure(o, sp, inner, lights) {
+    const u = o.uid, { x, y, w, h } = sp, d = sp.d == null ? 10 : sp.d, dy = d * .6, ix = x + 4, iy = y + 4, iw = w - 8, ih = h - 8, id = `${u}-in${x}${y}`, din = rr(ix, iy, iw, ih, 1);
+    let s = sh(o, x + w / 2 + d / 2, y + h + 2, w * .6, 5);
+    if (sp.stand) s += `<path d="M${x - 2} ${y + h}H${x + w + 2}V${y + h + 6}H${x - 2}Z" fill="url(#${u}-v)"/><path d="M${x + 2} ${y + h + 6}V${y + h + 34}M${x + w - 2} ${y + h + 6}V${y + h + 34}" stroke="${pal(o.color).d}" stroke-width="5"/><path d="M${x + 2} ${y + h + 26}H${x + w - 2}" stroke="${pal(o.color).d}" stroke-width="3"/>`;
+    s += `<path d="M${x} ${y}L${x + d} ${y - dy}H${x + w + d}L${x + w} ${y}Z" fill="${sp.kind === "pvc" ? `url(#${u}-tp)` : "#20242a"}"/>` + (sp.kind !== "pvc" ? `<path d="M${x + 3} ${y - 1}L${x + d + 2} ${y - dy + 1}H${x + w + d - 3}L${x + w - 2} ${y - 1}Z" fill="url(#${u}-msh)"/>` : "") +
+      `<path d="M${x + w} ${y}L${x + w + d} ${y - dy}V${y + h - dy}L${x + w} ${y + h}Z" fill="${sp.kind === "pvc" ? `url(#${u}-sd)` : "#1a1e24"}" opacity="${sp.kind === "pvc" ? 1 : .55}"/>`;
+    s += `<clipPath id="${id}"><path d="${din}"/></clipPath><g clip-path="url(#${id})"><rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="${sp.back || "#1e2428"}"/>` +
+      (sp.cork ? `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="url(#${u}-cork)" opacity=".85"/>` : "") + inner(ix, iy, iw, ih) +
+      lights(ix, iy, iw, ih) + (o.on ? "" : `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="#000" opacity=".5"/>`) + `</g>`;
+    if (sp.kind === "mesh") s += `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="url(#${u}-msh)" opacity=".6"/>`;
+    else s += `<path d="${din}" fill="url(#${u}-gl2)"/><path d="M${n1(ix + iw * .62)} ${iy}L${n1(ix + iw * .44)} ${iy + ih}H${n1(ix + iw * .5)}L${n1(ix + iw * .68)} ${iy}Z" fill="#fff" fill-opacity=".05"/>`;
+    
+    const fc = sp.kind === "pvc" ? `url(#${u}-v)` : `url(#${u}-v)`, t = sp.kind === "pvc" ? 6 : 3;
+    s += `<path d="M${x} ${y}H${x + w}V${y + h}H${x}Z M${x + t} ${y + t}V${y + h - t}H${x + w - t}V${y + t}Z" fill="${fc}" fill-rule="evenodd"/>`;
+    if (sp.kind === "pvc") s += `<path d="M${x} ${y}H${x + w}V${y + 12}H${x}Z" fill="url(#${u}-v)"/><rect x="${x + 10}" y="${y + 4}" width="${w - 20}" height="4" fill="url(#${u}-msh)"/>` +
+      `<path d="M${x + w / 2} ${y + 12}V${y + h - 6}" stroke="${pal(o.color).k}" stroke-width="1.6"/><path d="M${x + 6} ${y + h - 10}H${x + w - 6}" stroke="${pal(o.color).d}" stroke-width="3"/>`;
+    if (sp.doors === "front2") s += `<path d="M${x + w / 2} ${y + 3}V${y + h - 3}" stroke="${pal(o.color).d}" stroke-width="2.4"/><rect x="${x + w / 2 - 5}" y="${y + h * .45}" width="2" height="10" rx="1" fill="#9aa1a9"/><rect x="${x + w / 2 + 3}" y="${y + h * .45}" width="2" height="10" rx="1" fill="#9aa1a9"/>` +
+      `<path d="M${x + 3} ${y + h - 16}H${x + w - 3}" stroke="${pal(o.color).d}" stroke-width="3"/><rect x="${x + 8}" y="${y + h - 14}" width="${w - 16}" height="4" fill="url(#${u}-msh)"/>`;
+    if (sp.kind === "mesh") s += [.33, .66].map((k) => `<path d="M${n1(x + w * k)} ${y}V${y + h}" stroke="${pal(o.color).d}" stroke-width="2"/>`).join("") + `<path d="M${x} ${y + h * .55}H${x + w}" stroke="${pal(o.color).d}" stroke-width="2"/><rect x="${x + w - 12}" y="${y + h * .35}" width="3" height="12" rx="1" fill="#9aa1a9"/>`;
+    return s;
+  }
+  
+  const FX = {
+    heat: (o, cx, iy, ih) => o.on ? `<ellipse cx="${cx}" cy="${iy + 4}" rx="${n1(ih * .55)}" ry="${n1(ih * .7)}" fill="url(#${o.uid}-heat)" opacity="${n1(.5 + .5 * o.level)}"/><ellipse cx="${cx}" cy="${iy + ih - 6}" rx="22" ry="5" fill="#ffb05a" opacity=".35"/>` : "",
+    uvb: (o, ix, iy, iw, ih) => o.on ? `<rect x="${ix}" y="${iy}" width="${iw}" height="${n1(ih * .8)}" fill="url(#${o.uid}-uvb)"/>` : "",
+    day: (o, ix, iy, iw, ih) => o.on ? `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="url(#${o.uid}-day)"/>` : "",
+    mist: (o, x, y) => o.on ? `<ellipse class="${P}mist" cx="${x + 18}" cy="${y + 18}" rx="26" ry="16" fill="url(#${o.uid}-mist)"/>` + [0, 1, 2, 3, 4, 5].map((i) => `<circle class="${P}drop" style="animation-delay:-${n1(i * .22)}s" cx="${x + 2 + i * 5}" cy="${y + 4}" r="1" fill="#dff4ff"/>`).join("") : "",
+    fog: (o, ix, by, iw) => o.on ? [0, 1, 2].map((i) => `<ellipse class="${P}fog" style="animation-delay:-${i * 2}s" cx="${n1(ix + iw * (.25 + i * .25))}" cy="${by - 6 - (i % 2) * 4}" rx="${n1(iw * .3)}" ry="7" fill="url(#${o.uid}-mist)"/>`).join("") : "",
+    mat: (o, x, by, w) => o.on ? `<rect x="${x}" y="${by - 5}" width="${w}" height="5" fill="#ff6a2a" opacity=".55"/><rect x="${x}" y="${by - 14}" width="${w}" height="10" fill="#ff8a3a" opacity=".12"/>` + heat(o, [x + w * .3, x + w * .7], by - 8) : "",
+  };
+  const lampDome = (o, x, y, on) => `<path d="M${x - 9} ${y}Q${x - 9} ${y - 10} ${x} ${y - 10}Q${x + 9} ${y - 10} ${x + 9} ${y}Z" fill="#2a2e34"/><path d="M${x - 9} ${y}H${x + 9}" stroke="#555" stroke-width="1.4"/>` + (on ? `<ellipse cx="${x}" cy="${y + 1}" rx="6" ry="2" fill="#ffb05a"/><ellipse cx="${x}" cy="${y + 2}" rx="12" ry="4" fill="url(#${o.uid}-heat)"/>` : "");
+  const uvbBar = (o, x, y, w, on) => `<rect x="${x}" y="${y - 5}" width="${w}" height="5" rx="1.5" fill="#d9dde2"/><rect x="${x + 3}" y="${y - 1.5}" width="${w - 6}" height="2" rx="1" fill="${on ? "#e6f2ff" : "#7a8590"}"/>` + (on ? `<rect x="${x}" y="${y}" width="${w}" height="3" fill="#bcd6ff" opacity=".5"/>` : "");
+  const pcs = (list) => list.map((p) => ({ id: p[0], name: p[1] }));
+  const ic = (id, name, colors, safe, hum, parts, render) => ({ id, name, colors, picker: true, colorLabel: "Frame", parts: parts.length ? pcs(parts) : undefined, options: humOpt(hum), safe, render });
+  const scene = (o, fy, wall) => room(o, fy, wall || "board");
+
+  const icons = [
+    
+    ic("frontglass", "Front-opening terrarium", [BLK, WHT, GRY], [75, 88, 60, 80], "60", [["heat", "Heat lamp"], ["uvb", "UVB"], ["mist", "Mister"]], (o) => { const ph = part(o, "heat"), pu = part(o, "uvb"), pm = part(o, "mist");
+      return svgH(o, scene(o, 160) + enclosure(o, { x: 44, y: 60, w: 104, h: 96, kind: "glass", doors: "front2", back: "#2a2420", cork: true },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 10}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${o.uid}-sub)"/>` + branch(ix + 6, iy + 60, ix + iw - 10, iy + 34) + leafy(ix + 14, iy + ih - 10, 1.2).replace(/U-leaf/g, o.uid + "-leaf") + A.gecko(ix + 58, iy + 44, 1.2, "#4cc35a"),
+        (ix, iy, iw, ih) => FX.heat(ph, ix + 26, iy, ih) + FX.uvb(pu, ix, iy, iw, ih) + FX.mist(pm, ix + iw - 36, iy)) +
+        lampDome(o, 70, 56, ph.on) + uvbBar(o, 96, 57, 40, pu.on) + meter(o, 108, 66, [75, 88, 60, 80])); }),
+
+    
+    ic("tallviv", "Tall vivarium", [BLK, WHT, GRY], [70, 80, 60, 80], "80", [["uvb", "UVB"], ["mist", "Mister"], ["day", "Day light"]], (o) => { const pu = part(o, "uvb"), pm = part(o, "mist"), pd = part(o, "day");
+      return svgH(o, scene(o, 180) + enclosure(o, { x: 58, y: 34, w: 80, h: 140, kind: "glass", doors: "front2", back: "#22302a", cork: true },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 12}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${o.uid}-sub)"/>` + branch(ix + 4, iy + 90, ix + iw - 4, iy + 50) + branch(ix + iw - 4, iy + 110, ix + 10, iy + 70) +
+          leafy(ix + 12, iy + ih - 12, 1.4).replace(/U-leaf/g, o.uid + "-leaf") + leafy(ix + iw - 12, iy + ih - 12, 1.1).replace(/U-leaf/g, o.uid + "-leaf") + A.gecko(ix + 40, iy + 54, 1.1, "#d98a4a"),
+        (ix, iy, iw, ih) => FX.uvb(pu, ix, iy, iw, ih) + FX.day(pd, ix, iy, iw, ih) + FX.mist(pm, ix + 6, iy)) +
+        uvbBar(o, 62, 31, 34, pu.on) + uvbBar(o, 100, 31, 34, pd.on) + meter(o, 98, 40, [70, 80, 60, 80])); }),
+
+    
+    ic("meshcham", "Mesh chameleon cage", [BLK, WHT, GRY], [72, 85, 50, 70], "60", [["heat", "Heat lamp"], ["uvb", "UVB"], ["mist", "Mister"]], (o) => { const ph = part(o, "heat"), pu = part(o, "uvb"), pm = part(o, "mist");
+      return svgH(o, scene(o, 182) + enclosure(o, { x: 56, y: 36, w: 86, h: 142, kind: "mesh", back: "#26302a" },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 10}H${ix + iw}V${iy + ih}H${ix}Z" fill="#3a2a1e"/>` + `<path d="M${ix + 40} ${iy + ih - 10}V${iy + 40}" stroke="#6a4a2a" stroke-width="3"/>` +
+          leafy(ix + 40, iy + 70, 2).replace(/U-leaf/g, o.uid + "-leaf") + leafy(ix + 40, iy + 110, 1.6).replace(/U-leaf/g, o.uid + "-leaf") + branch(ix + 4, iy + 58, ix + iw - 4, iy + 40) + A.cham(ix + 24, iy + 52, .9),
+        (ix, iy, iw, ih) => FX.heat(ph, ix + 24, iy, ih) + FX.uvb(pu, ix, iy, iw, ih) + FX.mist(pm, ix + iw - 34, iy)) +
+        lampDome(o, 80, 32, ph.on) + uvbBar(o, 100, 33, 36, pu.on) + meter(o, 102, 42, [72, 85, 50, 70])); }),
+
+    
+    ic("pvcpython", "PVC enclosure", [BLK, WHT, GRY, WD], [78, 92, 50, 70], "60", [["heat", "Heat lamp"], ["day", "Day light"]], (o) => { const ph = part(o, "heat"), pd = part(o, "day");
+      return svgH(o, scene(o, 150) + enclosure(o, { x: 22, y: 72, w: 156, h: 74, kind: "pvc", back: "#1e1a18", d: 12 },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 12}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${o.uid}-sub)"/>` + hide(o, ix + iw - 46, iy + ih - 10, 34, 22) + A.python(ix + 50, iy + ih - 10, 1.15) +
+          `<ellipse cx="${ix + 96}" cy="${iy + ih - 9}" rx="10" ry="3" fill="#6fa8c8"/>` + leafy(ix + 10, iy + ih - 10, .9, "#3f8a3a"),
+        (ix, iy, iw, ih) => FX.heat(ph, ix + 40, iy + 8, ih) + FX.day(pd, ix, iy, iw, ih)) +
+        meter(o, 138, 86, [78, 92, 50, 70])); }),
+
+    
+    ic("pvcdragon", "4x2x2 enclosure", [BLK, WD, WHT, GRY], [76, 100, 20, 40], "40", [["heat", "Heat lamp"], ["uvb", "UVB"], ["day", "Day light"]], (o) => { const ph = part(o, "heat"), pu = part(o, "uvb"), pd = part(o, "day");
+      return svgH(o, scene(o, 178) + enclosure(o, { x: 14, y: 70, w: 172, h: 74, kind: "pvc", back: "#2a2018", d: 10, stand: true },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 12}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${o.uid}-sand)"/>` + rock(o, ix + 12, iy + ih - 10, 50, 24) + A.dragon(ix + 40, iy + ih - 32, .85) +
+          `<path d="M${ix + iw - 50} ${iy + ih - 10}l10 -20l14 6l8 14Z" fill="#7a5a3a"/>`,
+        (ix, iy, iw, ih) => FX.heat(ph, ix + 40, iy + 8, ih) + FX.uvb(pu, ix, iy, iw, ih) + FX.day(pd, ix, iy, iw, ih)) +
+        meter(o, 146, 84, [76, 100, 20, 40])); }),
+
+    
+    ic("bioactive", "Bioactive vivarium", [BLK, GRY, WHT], [70, 80, 80, 95], "80", [["day", "Day light"], ["mist", "Mister"], ["pump", "Water pump"]], (o) => { const pd = part(o, "day"), pm = part(o, "mist"), pp = part(o, "pump"), u = o.uid;
+      return svgH(o, scene(o, 176) + enclosure(o, { x: 40, y: 48, w: 120, h: 124, kind: "glass", doors: "front2", back: "#121a14" },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 18}H${ix + iw}V${iy + ih}H${ix}Z" fill="#3a2a1e"/><path d="M${ix} ${iy + ih - 18}Q${ix + 30} ${iy + ih - 24} ${ix + 60} ${iy + ih - 18}T${ix + iw} ${iy + ih - 18}" fill="#4f8a3a"/>` +
+          `<path d="M${ix} ${iy + 30}Q${ix + 30} ${iy + 20} ${ix + iw} ${iy + 34}V${iy + 44}Q${ix + 50} ${iy + 30} ${ix} ${iy + 44}Z" fill="#3f7a34" opacity=".8"/>` + [[ix + 70, iy + 70, 3], [ix + 100, iy + 40, 2], [ix + 50, iy + 90, 2.4]].map((m) => `<ellipse cx="${m[0]}" cy="${m[1]}" rx="${m[2] * 6}" ry="${m[2] * 3}" fill="#4f9a3a" opacity=".85"/>`).join("") +
+          rock(o, ix + 6, iy + ih - 18, 40, 70) + `<path d="M${ix + 8} ${iy + ih - 40}Q${ix + 20} ${iy + ih - 60} ${ix + 30} ${iy + ih - 50}" stroke="#4f9a3a" stroke-width="5" fill="none"/>` + `<path d="M${ix + 26} ${iy + 40}V${iy + ih - 14}" stroke="#7fd8ff" stroke-opacity=".35" stroke-width="6"/>` + (pp.on ? `<path class="${P}flow" d="M${ix + 26} ${iy + 40}V${iy + ih - 14}" stroke="#e6f8ff" stroke-width="3" stroke-dasharray="3 5" fill="none"/>` + `<ellipse class="${P}rip" cx="${ix + 26}" cy="${iy + ih - 13}" rx="10" ry="2" fill="none" stroke="#e6f8ff"/>` : "") +
+          `<ellipse cx="${ix + 34}" cy="${iy + ih - 13}" rx="18" ry="4" fill="url(#${u}-aq)"/>` + leafy(ix + 70, iy + ih - 18, 2).replace(/U-leaf/g, u + "-leaf") + leafy(ix + 100, iy + ih - 18, 1.6).replace(/U-leaf/g, u + "-leaf") +
+          leafy(ix + 90, iy + 50, 1.2).replace(/U-leaf/g, u + "-leaf") + leafy(ix + iw - 10, iy + 80, 1.4).replace(/U-leaf/g, u + "-leaf") + leafy(ix + 46, iy + ih - 18, 1.2).replace(/U-leaf/g, u + "-leaf") + A.frog(ix + 62, iy + ih - 20, 1.3, "#2f8fd6"),
+        (ix, iy, iw, ih) => FX.day(pd, ix, iy, iw, ih) + FX.mist(pm, ix + iw - 36, iy)) +
+        uvbBar(o, 50, 45, 100, pd.on) + meter(o, 120, 54, [70, 80, 80, 95])); }),
+
+    
+    ic("paludarium", "Frog paludarium", [BLK, GRY, WHT], [70, 80, 70, 95], "95", [["day", "Day light"], ["fog", "Fogger"], ["pump", "Water pump"]], (o) => { const pd = part(o, "day"), pf = part(o, "fog"), pp = part(o, "pump"), u = o.uid;
+      return svgH(o, scene(o, 172) + enclosure(o, { x: 30, y: 64, w: 140, h: 104, kind: "glass", back: "#121a14" },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + 50}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${u}-aq)"/><g class="${P}caus"><rect x="${ix - 10}" y="${iy + 52}" width="${iw + 20}" height="40" fill="url(#${u}-wav)" opacity=".4"/></g>` +
+          `<path d="M${ix} ${iy + 46}L${ix + 60} ${iy + 40}L${ix + 70} ${iy + ih}H${ix}Z" fill="#3a2a1e"/><path d="M${ix} ${iy + 46}L${ix + 60} ${iy + 40}L${ix + 62} ${iy + 46}" fill="#4f8a3a"/>` + leafy(ix + 20, iy + 44, 1.6).replace(/U-leaf/g, u + "-leaf") + leafy(ix + 50, iy + 42, 1.2).replace(/U-leaf/g, u + "-leaf") + `<path d="M${ix} ${iy + 4}Q${ix + 40} ${iy + 14} ${ix + iw} ${iy + 6}V${iy + 18}Q${ix + 60} ${iy + 26} ${ix} ${iy + 16}Z" fill="#3f7a34" opacity=".75"/>` + `<path d="M${ix + 80} ${iy + 50}v-18M${ix + 86} ${iy + 50}v-14" stroke="#4f9a3a" stroke-width="2.4"/>` +
+          rock(o, ix + iw - 40, iy + 54, 36, 40) + (pp.on ? `<path class="${P}flow" d="M${ix + iw - 22} ${iy + 16}V${iy + 52}" stroke="#e6f8ff" stroke-width="3" stroke-dasharray="3 5" fill="none"/><ellipse class="${P}rip" cx="${ix + iw - 22}" cy="${iy + 52}" rx="10" ry="2" fill="none" stroke="#e6f8ff"/>` : "") +
+          A.frog(ix + 44, iy + 42, 1, "#4cc35a") + bubbles(pp, [[ix + 90, iy + 90], [ix + 100, iy + 84]]),
+        (ix, iy, iw, ih) => FX.day(pd, ix, iy, iw, ih) + FX.fog(pf, ix, iy + 50, iw)) +
+        uvbBar(o, 40, 61, 120, pd.on) + meter(o, 130, 70, [70, 80, 70, 95])); }),
+
+    
+    ic("tortoise", "Tortoise table", [WD, BLK, WHT, GRY], [70, 95, 30, 60], "40", [["heat", "Heat lamp"], ["uvb", "UVB"]], (o) => { const ph = part(o, "heat"), pu = part(o, "uvb"), u = o.uid;
+      return svgH(o, scene(o, 176) + sh(o, 100, 178, 84, 5) + `<path d="M24 178V160M168 178V160" stroke="${pal(o.color).d}" stroke-width="6"/>` +
+        `<path d="M28 128V108H184V128Z" fill="url(#${u}-v)"/><path d="M28 108H184" stroke="#fff" stroke-opacity=".3"/><path d="M16 150L28 128H184L172 150Z" fill="url(#${u}-sand)"/>` + (ph.on ? `<ellipse cx="70" cy="138" rx="34" ry="8" fill="url(#${u}-heat)" opacity="${n1(.5 + .5 * ph.level)}"/>` : "") + (pu.on ? `<path d="M100 132H170L176 146H96Z" fill="#cfe2ff" opacity=".25"/>` : "") +
+        rock(o, 130, 142, 30, 10) + A.tortoise(76, 144, .9) + `<path d="M108 144l4 -6l4 6Z" fill="#6fc45a"/><path d="M114 146l4 -5l4 5Z" fill="#4f9a3a"/>` +
+        `<path d="M150 150L158 128H184L176 150Z" fill="#3a2a1a" opacity=".55"/><path d="M146 132L154 112H186L178 132Z" fill="url(#${u}-wdg)"/><path d="M146 132H178" stroke="#000" stroke-opacity=".3"/>` + `<path d="M16 150H172V168H16Z" fill="url(#${u}-v)"/><path d="M172 150L184 128V146L172 168Z" fill="url(#${u}-sd)"/><path d="M16 150L28 128H184" fill="none" stroke="${pal(o.color).d}" stroke-width="3"/>` +
+        `<path d="M30 128V60H70" stroke="#2a2e34" stroke-width="3" fill="none"/>` + lampDome(o, 70, 70, ph.on) + `<path d="M150 128V64H120" stroke="#2a2e34" stroke-width="3" fill="none"/>` + uvbBar(o, 96, 70, 50, pu.on) +
+        (o.on ? "" : `<path d="M16 150L28 128H184L172 150Z" fill="#000" opacity=".45"/>`) + meter(o, 130, 152, [70, 95, 30, 60])); }),
+
+    
+    ic("rack", "Snake rack", [BLK, WHT, GRY, WD], [78, 92, 50, 70], "60", [["mat", "Heat mat"]], (o) => { const pm = part(o, "mat"), u = o.uid;
+      let s = scene(o, 184) + sh(o, 100, 186, 80, 5) + `<path d="M30 28H170V182H30Z" fill="url(#${u}-v)"/><path d="M170 28L180 22V176L170 182Z" fill="url(#${u}-sd)"/><path d="M30 28L40 22H180L170 28Z" fill="url(#${u}-tp)"/>`;
+      for (let r = 0; r < 5; r++) { const y = 34 + r * 29;
+        s += `<rect x="36" y="${y}" width="128" height="24" fill="#0e1012"/>` + (pm.on ? `<rect x="36" y="${y + 21}" width="128" height="3" fill="#ff6a2a" opacity=".55"/>` : "") +
+          `<path d="${rr(40, y + 2, 120, 21, 2)}" fill="#e8ecef" opacity=".35"/>` + (r % 2 ? A.python(100, y + 20, .55) : "") + `<rect x="92" y="${y + 9}" width="16" height="5" rx="2" fill="#cfd4d9"/>` +
+          (o.on ? "" : `<rect x="36" y="${y}" width="128" height="24" fill="#000" opacity=".35"/>`); }
+      return svgH(o, s + meter(o, 132, 4, [78, 92, 50, 70])); }),
+
+    
+    ic("leotank", "Leopard gecko tank", [BLK, GRY, WHT], [75, 90, 20, 40], "40", [["mat", "Heat mat"], ["day", "Day light"]], (o) => { const pm = part(o, "mat"), pd = part(o, "day"), u = o.uid;
+      return svgH(o, scene(o, 150) + enclosure(o, { x: 28, y: 80, w: 144, h: 66, kind: "glass", back: "#2a2420" },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 10}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${u}-sand)"/>` + hide(o, ix + 10, iy + ih - 8, 34, 22) + rock(o, ix + iw - 40, iy + ih - 8, 30, 14) +
+          `<ellipse cx="${ix + 90}" cy="${iy + ih - 8}" rx="9" ry="2.6" fill="#6fa8c8"/>` + A.gecko(ix + 70, iy + ih - 10, 1.25),
+        (ix, iy, iw, ih) => FX.mat(pm, ix, iy + ih, iw * .4) + FX.day(pd, ix, iy, iw, ih)) +
+        uvbBar(o, 40, 77, 120, pd.on) + `<rect x="32" y="146" width="56" height="3" fill="${pm.on ? "#ff6a2a" : "#3a3f46"}"/>` + meter(o, 132, 86, [75, 90, 20, 40])); }),
+
+    
+    ic("turtle", "Turtle aquarium", [BLK, GRY, WHT], [75, 90, 40, 95], "60", [["heat", "Heat lamp"], ["uvb", "UVB"], ["pump", "Water pump"]], (o) => { const ph = part(o, "heat"), pu = part(o, "uvb"), pp = part(o, "pump"), u = o.uid;
+      return svgH(o, scene(o, 176) + enclosure(o, { x: 22, y: 76, w: 156, h: 68, kind: "glass", back: "#18262c", stand: true },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + 22}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${u}-aq)"/><g class="${P}caus"><rect x="${ix - 10}" y="${iy + 24}" width="${iw + 20}" height="40" fill="url(#${u}-wav)" opacity=".4"/></g>` +
+          `<path d="M${ix} ${iy + ih - 6}H${ix + iw}V${iy + ih}H${ix}Z" fill="#9a8a6a"/><path d="M${ix + 20} ${iy + 20}H${ix + 70}L${ix + 64} ${iy + 26}H${ix + 26}Z" fill="#8a7a5a"/><path d="M${ix + 70} ${iy + 20}L${ix + 96} ${iy + 40}L${ix + 92} ${iy + 43}L${ix + 66} ${iy + 25}Z" fill="#7a6a4a"/><path d="M${ix + 20} ${iy + 20}V${iy + 8}" stroke="#7a6a4a" stroke-width="2"/>` + A.turtle(ix + 44, iy + 21, 1.2) +
+          (pp.on ? bubbles(pp, [[ix + iw - 20, iy + 60], [ix + iw - 26, iy + 54], [ix + iw - 16, iy + 48]]) + `<path class="${P}flow" d="M${ix + iw - 10} ${iy + 22}q-10 4 -20 2" stroke="#e6f8ff" stroke-width="2" stroke-dasharray="3 4" fill="none"/>` : "") +
+          leafy(ix + 110, iy + ih - 6, 1.3, "#3f8a3a"),
+        (ix, iy, iw, ih) => FX.heat(ph, ix + 44, iy, ih) + FX.uvb(pu, ix, iy, iw, ih)) +
+        lampDome(o, 66, 72, ph.on) + uvbBar(o, 96, 73, 60, pu.on) + `<path d="${rr(164, 100, 10, 30, 2)}" fill="#2a2e34"/>` + meter(o, 138, 82, [75, 90, 40, 95])); }),
+
+    
+    ic("hermit", "Hermit crab tank", [BLK, GRY, WHT], [75, 85, 70, 95], "80", [["mat", "Heat mat"], ["mist", "Mister"]], (o) => { const pm = part(o, "mat"), ps = part(o, "mist"), u = o.uid;
+      return svgH(o, scene(o, 150) + enclosure(o, { x: 30, y: 78, w: 140, h: 68, kind: "glass", back: "#2a2a24" },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 16}Q${ix + 40} ${iy + ih - 22} ${ix + iw} ${iy + ih - 14}V${iy + ih}H${ix}Z" fill="url(#${u}-sand)"/>` +
+          `<path d="M${ix + 10} ${iy + ih - 14}Q${ix + 26} ${iy + ih - 40} ${ix + 44} ${iy + ih - 14}Z" fill="#6a4a2a"/><path d="M${ix + 20} ${iy + ih - 14}Q${ix + 27} ${iy + ih - 26} ${ix + 34} ${iy + ih - 14}Z" fill="#1a120a"/>` +
+          A.crab(ix + 66, iy + ih - 14, 1.3) + A.crab(ix + 100, iy + ih - 12, 1) + `<ellipse cx="${ix + 120}" cy="${iy + ih - 12}" rx="10" ry="3" fill="#6fa8c8"/>` + `<circle cx="${ix + 90}" cy="${iy + ih - 12}" r="3" fill="#e8c8a0"/>`,
+        (ix, iy, iw, ih) => FX.mat(pm, ix + iw * .1, iy + ih, iw * .5) + FX.mist(ps, ix + iw - 40, iy)) + meter(o, 130, 84, [75, 85, 70, 95])); }),
+
+    
+    ic("tarantula", "Tarantula enclosure", [BLK, WHT, GRY], [70, 82, 60, 80], "60", [["mat", "Heat mat"]], (o) => { const pm = part(o, "mat"), u = o.uid;
+      return svgH(o, scene(o, 150) + enclosure(o, { x: 56, y: 70, w: 88, h: 76, kind: "acrylic", back: "#262018", d: 8 },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 22}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${u}-sub)"/>` + `<path d="M${ix + 50} ${iy + ih - 20}l6 -16l20 0l6 16Z" fill="#6a4a2a"/>` + A.tarantula(ix + 30, iy + ih - 20, 1.5) +
+          `<path d="M${ix + 50} ${iy + 10}q10 20 30 10M${ix + 56} ${iy + 6}l14 20" stroke="#fff" stroke-opacity=".2" fill="none"/>`,
+        (ix, iy, iw, ih) => FX.mat(pm, ix + iw - 30, iy + ih, 30)) +
+        [0, 1, 2, 3, 4, 5].map((i) => `<circle cx="${64 + i * 14}" cy="76" r="1.4" fill="#000" opacity=".6"/>`).join("") + meter(o, 104, 80, [70, 82, 60, 80])); }),
+
+    
+    ic("axolotl", "Axolotl tank", [BLK, GRY, WHT], [60, 68, 40, 95], "60", [["day", "Day light"], ["pump", "Water pump"], ["chill", "Chiller"]], (o) => { const pd = part(o, "day"), pp = part(o, "pump"), pc = part(o, "chill"), u = o.uid;
+      return svgH(o, scene(o, 176) + enclosure(o, { x: 18, y: 70, w: 140, h: 74, kind: "glass", back: "#16242a", stand: true },
+        (ix, iy, iw, ih) => `<path d="M${ix} ${iy + 6}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${u}-aq)"/>` + (pc.on ? `<path d="M${ix} ${iy + 6}H${ix + iw}V${iy + ih}H${ix}Z" fill="#9fd8ff" opacity=".15"/>` : "") +
+          `<g class="${P}caus"><rect x="${ix - 10}" y="${iy + 10}" width="${iw + 20}" height="50" fill="url(#${u}-wav)" opacity=".35"/></g><path d="M${ix} ${iy + ih - 7}H${ix + iw}V${iy + ih}H${ix}Z" fill="#c9b48a"/>` +
+          leafy(ix + 20, iy + ih - 7, 1.4, "#3f8a3a") + `<path d="${rr(ix + iw - 46, iy + ih - 18, 30, 12, 6)}" fill="#c0663a"/><ellipse cx="${ix + iw - 44}" cy="${iy + ih - 12}" rx="3" ry="6" fill="#4a2414"/>` + A.axo(ix + 70, iy + 40, 1.1) + bubbles(pp, [[ix + iw - 12, iy + 50], [ix + iw - 16, iy + 40], [ix + iw - 10, iy + 30]]),
+        (ix, iy, iw, ih) => FX.day(pd, ix, iy, iw, ih)) +
+        uvbBar(o, 28, 67, 120, pd.on) + `<path d="${rr(162, 120, 30, 50, 4)}" fill="#2a2e34"/><path d="${rr(165, 126, 24, 10, 2)}" fill="#0a0d10"/>` + digits(pc.on ? "62" : "--", 170, 128, 6, pc.on ? CYAN : "#2b3a40") +
+        [0, 1, 2, 3].map((i) => `<path d="M166 ${142 + i * 6}H188" stroke="#000" stroke-opacity=".5"/>`).join("") + tube("M168 120C168 100 150 96 144 90", 3, ["#1a3a6a", "#3a6ad8", "#9cc8ef"]) + meter(o, 118, 78, [60, 68, 40, 95])); }),
+
+    
+    ic("birdcage", "Bird cage", [WHT, BLK, GRY], [65, 80, 40, 70], "60", [["day", "Day light"]], (o) => { const pd = part(o, "day"), u = o.uid;
+      const cage = `M50 172V72Q50 40 100 40Q150 40 150 72V172Z`;
+      return svgH(o, scene(o, 182) + sh(o, 100, 184, 60, 4) + (pd.on ? `<path d="${cage}" fill="#fff8e6" opacity=".18"/>` : "") +
+        `<path d="M70 100H130" stroke="#8a6a3a" stroke-width="3"/><path d="M60 140H140" stroke="#8a6a3a" stroke-width="3"/>` + A.bird(96, 99, 1) + `<path d="${rr(118, 146, 16, 8, 2)}" fill="#e9dcb8"/>` +
+        `<path d="${cage}" fill="url(#${u}-wire)"/><path d="${cage}" fill="none" stroke="url(#${u}-v)" stroke-width="3"/><path d="M50 72H150M50 120H150" stroke="url(#${u}-v)" stroke-width="2"/>` +
+        `<path d="M44 160H156V174H44Z" fill="url(#${u}-v)"/><circle cx="100" cy="34" r="6" fill="none" stroke="url(#${u}-v)" stroke-width="2.4"/>` + (o.on ? "" : `<path d="${cage}" fill="#000" opacity=".35"/>`) + meter(o, 152, 50, [65, 80, 40, 70])); }),
+
+    
+    ic("hamster", "Hamster cage", [WHT, BLK, GRY], [65, 75, 40, 60], "40", [], (o) => { const u = o.uid, p = pal(o.color);
+      return svgH(o, scene(o, 172) + sh(o, 100, 174, 80, 4) + `<path d="M24 136H176V170H24Z" fill="#8fc0e6" opacity=".55"/><path d="M24 152H176V170H24Z" fill="#e8dcc0"/>` +
+        `<g transform="translate(140 118)"><circle r="22" fill="none" stroke="#c9ced4" stroke-width="3"/><g class="${o.on ? P + "spin" : ""}" style="animation-duration:1.2s">` + [0, 30, 60, 90, 120, 150].map((a) => `<path d="M0 -21V21" stroke="#c9ced4" stroke-width=".8" transform="rotate(${a})"/>`).join("") + `</g></g>` +
+        A.hamster(70, 154, 1.1) + `<path d="M24 64H176V136H24Z" fill="url(#${u}-wire)"/><path d="M24 64H176V136H24Z" fill="none" stroke="#c9ced4" stroke-width="2"/>` +
+        `<path d="M24 136H176V170H24Z" fill="none" stroke="${p.d}" stroke-width="3"/><path d="M24 136H176V142H24Z" fill="url(#${u}-v)"/>` + meter(o, 30, 70, [65, 75, 40, 60])); }),
+
+    
+    ic("rabbitpen", "Indoor rabbit pen", [WHT, BLK, GRY, WD], [60, 72, 30, 60], "40", [], (o) => { const u = o.uid;
+      return svgH(o, scene(o, 120, "board") + `<path d="M14 172L40 124H160L186 172Z" fill="#c9b48a" opacity=".7"/>` + A.rabbit(96, 160, 1.3) + `<path d="${rr(130, 150, 24, 10, 3)}" fill="#7fbf5a"/><path d="M40 140h14l-4 14H44Z" fill="#c9a060"/>` +
+        `<path d="M14 172V124M58 172V112M100 172V108M142 172V112M186 172V124" stroke="url(#${u}-v)" stroke-width="3"/><path d="M14 124L58 112L100 108L142 112L186 124M14 172H186" fill="none" stroke="url(#${u}-v)" stroke-width="3"/>` +
+        `<path d="M14 124L58 112V172H14Z M58 112L100 108V172H58Z M100 108L142 112V172H100Z M142 112L186 124V172H142Z" fill="url(#${u}-wire)" opacity=".7"/>` + meter(o, 150, 84, [60, 72, 30, 60])); }),
+
+    
+    ic("incubator", "Egg incubator", [WHT, GRY, BLK], [82, 88, 80, 95], "80", [], (o) => { const u = o.uid;
+      return svgH(o, scene(o, 150) + sh(o, 100, 152, 76, 5) + `<path d="${rr(30, 100, 140, 50, 6)}" fill="url(#${u}-v)"/><path d="M30 100L42 86H182L170 100Z" fill="#cfe7f2" fill-opacity=".35"/><path d="M170 100L182 86V136L170 150Z" fill="url(#${u}-sd)"/>` +
+        (o.on ? `<path d="M34 92L44 88H178L170 98H40Z" fill="#ffb05a" opacity="${n1(.2 + .3 * o.level)}"/>` : "") +
+        [0, 1, 2, 3, 4].map((i) => `<ellipse cx="${56 + i * 24}" cy="94" rx="7" ry="4.6" fill="#f2ead8"/><ellipse cx="${54 + i * 24}" cy="92.6" rx="2.4" ry="1.4" fill="#fff" opacity=".7"/>`).join("") +
+        `<path d="M30 100L42 86H182L170 100Z" fill="none" stroke="#fff" stroke-opacity=".5"/><path d="${rr(40, 112, 60, 26, 3)}" fill="#0a0d10"/>` + digits(String(tempF(o)), 46, 117, 9, o.on ? AMB : "#2b3a40") + digits(String(+((o.opt && o.opt.hum) || 80)), 72, 117, 9, o.on ? CYAN : "#2b3a40") +
+        [120, 134, 148].map((x) => `<circle cx="${x}" cy="124" r="4" fill="#3a3f46"/>`).join("") + led(o, 160, 124, 1.6, o.on, GREEN, "hg") + meter(o, 124, 54, [82, 88, 80, 95])); }),
+
+    
+    ic("brooder", "Chick brooder", [WD, WHT, GRY], [85, 100, 40, 60], "40", [["plate", "Heat plate"]], (o) => { const pp = part(o, "plate"), u = o.uid;
+      return svgH(o, scene(o, 176) + sh(o, 100, 178, 86, 5) + `<path d="M18 120H182V174H18Z" fill="url(#${u}-v)"/><path d="M26 126H174V168H26Z" fill="#d9c48a"/>` +
+        [[40, 160], [60, 166], [150, 162], [130, 166]].map((q) => `<path d="M${q[0]} ${q[1]}l6 -2" stroke="#b89a5a" stroke-width="2"/>`).join("") +
+        (pp.on ? `<ellipse cx="96" cy="160" rx="44" ry="8" fill="url(#${u}-heat)" opacity="${n1(.5 + .5 * pp.level)}"/>` : "") + A.chick(80, 164, 1) + A.chick(104, 166, 1.1) + A.chick(140, 162, .9) +
+        `<path d="M58 136L62 162M134 136L130 162" stroke="#3a3f46" stroke-width="2.4"/><path d="${rr(54, 130, 84, 8, 2)}" fill="#3a4a3a"/><path d="M56 131H136" stroke="#fff" stroke-opacity=".25"/>` +
+        `<path d="M18 120H182" stroke="${pal(o.color).d}" stroke-width="3"/>` + (o.on ? "" : `<path d="M26 126H174V168H26Z" fill="#000" opacity=".35"/>`) + meter(o, 144, 98, [85, 100, 40, 60])); }),
+  ];
+
+  (window.HDA = window.HDA || []).push({
+    id: "habitats", tab: "Reptile & pet habitats", group: "Home", kind: "device", levelLabel: "Temperature", onWord: "Running", offWord: "Off",
+    intro: "Nineteen reptile, amphibian, bird and small-pet enclosures, each with a thermo-hygrometer. The slider sets the temperature (60-105°F) and the Humidity menu the humidity; the reading turns amber, then red, outside that animal's safe range. Heat lamps glow orange, UVB tubes wash blue-white, misters spray, foggers roll, heat mats glow under the floor and pumps run the waterfalls. Off = lights off and a darker tank.",
+    css: css2, icons,
   });
 })();
 
@@ -28343,6 +29209,1268 @@ ${x.on ? `<path d="M-5.4 4.4 C-3 9.6 3 9.6 5.4 4.4" fill="none" stroke="${x.hot}
   });
 })();
 
+
+(function () {
+  const P = "hda-people-";
+  const N = () => window.HDAH;
+  const f = (n) => (+n).toFixed(1);
+  const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+  const lg = (id, a, x1, y1, x2, y2) => `<linearGradient id="${id}" x1="${x1 || 0}" y1="${y1 || 0}" x2="${x2 == null ? 1 : x2}" y2="${y2 || 0}">${stops(a)}</linearGradient>`;
+  const rg = (id, a, cx, cy, r) => `<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r || .5}">${stops(a)}</radialGradient>`;
+  const rr = (x, y, w, h, r) => `M${f(x + r)} ${f(y)}H${f(x + w - r)}A${r} ${r} 0 0 1 ${f(x + w)} ${f(y + r)}V${f(y + h - r)}A${r} ${r} 0 0 1 ${f(x + w - r)} ${f(y + h)}H${f(x + r)}A${r} ${r} 0 0 1 ${f(x)} ${f(y + h - r)}V${f(y + r)}A${r} ${r} 0 0 1 ${f(x + r)} ${f(y)}Z`;
+  const BGW = (t) => `<g class="hda-bg">${t}</g>`;
+  const M = (p) => `M${f(p[0])} ${f(p[1])}`, L = (p) => `L${f(p[0])} ${f(p[1])}`;
+  const Q = (c, p) => `Q${f(c[0])} ${f(c[1])} ${f(p[0])} ${f(p[1])}`, C = (a, b, p) => `C${f(a[0])} ${f(a[1])} ${f(b[0])} ${f(b[1])} ${f(p[0])} ${f(p[1])}`;
+  const OL = "#241c1c", OW = 1.7, IW = 1.05;
+
+  const SKINS = [["s1", "Light", "#f6d7c3"], ["s2", "Fair", "#f0c3a0"], ["s3", "Medium", "#d9a07a"], ["s4", "Tan", "#b97d55"], ["s5", "Brown", "#8c5a3c"], ["s6", "Deep", "#5e3d2a"]];
+  const ZONES = [["auto", "From on/off"], ["home", "Home"], ["away", "Away"], ["work", "Work"], ["school", "School"], ["gym", "Gym"], ["drive", "Driving"]];
+  const HEIGHTS = [["avg", "Average"], ["short", "Short"], ["tall", "Tall"]];
+  const BUILDS = [["avg", "Average"], ["slim", "Slim"], ["sturdy", "Sturdy"], ["heavy", "Heavy"]];
+  const VH = { short: .93, avg: 1, tall: 1.04 };
+  const BU = {
+    slim:   { S: 19.5, W: 13.5, Hp: 14.5, A: 4.4, Lg: 7, Nk: 3.8, fw: .94, bel: 0 },
+    avg:    { S: 22, W: 15.5, Hp: 16.5, A: 5.1, Lg: 8, Nk: 4.4, fw: 1, bel: 0 },
+    sturdy: { S: 25, W: 19, Hp: 19, A: 6.2, Lg: 9.4, Nk: 5.4, fw: 1.06, bel: .4 },
+    heavy:  { S: 26, W: 23.5, Hp: 22.5, A: 6.9, Lg: 10.6, Nk: 5.9, fw: 1.13, bel: 1 },
+  };
+  
+  const PRE = {
+    man:      { hh: 36, B: 132, legR: .536, sw: 1,   g: "m", age: "adult" },
+    woman:    { hh: 35, B: 128, legR: .545, sw: .92, g: "f", age: "adult" },
+    oldman:   { hh: 36, B: 126, legR: .53,  sw: .98, g: "m", age: "old" },
+    oldwoman: { hh: 35, B: 120, legR: .52,  sw: .9,  g: "f", age: "old" },
+    teenboy:  { hh: 35, B: 120, legR: .535, sw: .86, g: "m", age: "teen" },
+    teengirl: { hh: 34, B: 116, legR: .535, sw: .82, g: "f", age: "teen" },
+    boy:      { hh: 34, B: 86,  legR: .47,  sw: .7,  g: "m", age: "kid" },
+    girl:     { hh: 34, B: 84,  legR: .47,  sw: .68, g: "f", age: "kid" },
+    toddler:  { hh: 33, B: 64,  legR: .4,   sw: .62, g: "n", age: "toddler" },
+    baby:     { hh: 26, B: 40,  legR: .4,   sw: .5,  g: "n", age: "baby" },
+  };
+  const CLO = ["#3b3e46", "#2c3d5e", "#5a4636", "#6b6f78", "#2e4a3c", "#7a2e2e", "#c9c2b4", "#c65b7c", "#d39a2a"];
+  const HAIRC = ["#6b4226", "#2a1a10", "#9a6430", "#d4ac5a", "#b8b6b0", "#141414", "#8a3a22"];
+  const GRAYS = { "#b8b6b0": 1, "#eeece6": 1, "#c9ccd2": 1, "#8a8880": 1 };
+  const first = (all, d) => { const i = Math.max(0, all.findIndex((a) => a[0] === d)); return [all[i]].concat(all.filter((_, k) => k !== i)); };
+
+  function ctx(o, preKey, defs0) {
+    const h = N(), opt = o.opt || {}, pr = PRE[preKey] || PRE.man, c = o.color || defs0.c, hc = o.color2 || defs0.h;
+    const zone = opt.zone && opt.zone !== "auto" ? opt.zone : (o.on ? "home" : "away");
+    const skin = (SKINS.find((s) => s[0] === opt.skin) || SKINS.find((s) => s[0] === defs0.skin) || SKINS[1])[2];
+    const b0 = BU[opt.build] || BU.avg, sw = pr.sw, fem = pr.g === "f";
+    const b = { S: b0.S * sw * (fem ? .9 : 1), W: b0.W * sw * (fem ? .86 : 1), Hp: b0.Hp * sw * (fem ? 1.08 : 1), A: b0.A * sw * (fem ? .88 : 1), Lg: b0.Lg * sw * (fem ? .96 : 1),
+      Nk: b0.Nk * sw * (fem ? .84 : 1), fw: b0.fw, bel: b0.bel * (pr.age === "kid" || pr.age === "toddler" || pr.age === "baby" ? 0 : 1) };
+    return { o, u: o.uid, on: !!o.on, zone, pr, preKey, fem, age: pr.age, hair: opt.hair || defs0.hair, outfit: opt.outfit || defs0.outfit, facial: fem || pr.age !== "adult" && pr.age !== "old" ? "none" : (opt.facial || "none"),
+      glasses: opt.glasses || "none", mob: opt.mobility || "none", vh: VH[opt.height] || 1, b, skinKey: opt.skin,
+      sk: { hl: h.shade(skin, .3), m: skin, d: h.mix(skin, "#a8574a", .32), k: h.shade(skin, -.35) },
+      su: { hl: h.shade(c, .25), m: c, d: h.shade(c, -.32), k: h.shade(c, -.5) },
+      hc, hp: { hl: h.shade(hc, .4), m: hc, d: h.shade(hc, -.35) },
+      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})` };
+  }
+  function defs(x) {
+    const id = x.id;
+    return `<defs>
+${rg(id("warm"), [[0, "#ffe2a8", .95], [.5, "#ffc870", .45], [1, "#ffb050", 0]])}
+${rg(id("vig"), [[0, "#000", 0], [.66, "#000", .06], [1, "#000", .45]], .5, .45, .75)}
+${rg(id("cs"), [[0, "#000", .45], [1, "#000", 0]])}
+${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
+<clipPath id="${id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath></defs>`;
+  }
+  const svg = (x, body) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x)}<g clip-path="${x.url("wc")}">${body}<g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g></g><rect class="hda-bg" x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></svg>`;
+
+  
+  function backdrop(x, fy) {
+    fy = fy || 176; const h = N();
+    if (x.zone === "home") {
+      return BGW(`${lg(x.id("wl"), [[0, "#a88c6c"], [1, "#d6bf9c"]], 0, 0, 0, 1)}<rect x="8" y="8" width="184" height="${fy - 8}" fill="${x.url("wl")}"/>
+<rect x="58" y="26" width="84" height="${fy - 26}" fill="#f2e6cf"/><rect x="62" y="30" width="76" height="${fy - 30}" fill="#3a2a1c"/><ellipse class="${P}glow" cx="100" cy="${fy - 44}" rx="56" ry="84" fill="${x.url("warm")}"/>
+<path d="M138 30L156 38V${fy + 4}L138 ${fy}Z" fill="#8a5a36"/><path d="M141 32L153 38V${fy}L141 ${fy - 2}Z" fill="#a06a40"/><circle cx="143" cy="${fy - 62}" r="1.6" fill="#d9b25a"/>
+<rect x="8" y="${fy}" width="184" height="${192 - fy}" fill="#7a5a3c"/><path d="M8 ${fy + 6}H192M8 ${fy + 12}H192" stroke="#000" stroke-opacity=".18"/><ellipse cx="100" cy="${fy + 6}" rx="50" ry="8" fill="${x.url("warm")}" opacity=".7"/>`);
+    }
+    const tint = { away: ["#3a4458", "#58627a"], work: ["#4a5a66", "#6d7d88"], school: ["#4a5a4a", "#6d7d66"], gym: ["#4a4660", "#6a6680"], drive: ["#3e4a5a", "#60708a"] }[x.zone];
+    return BGW(`${lg(x.id("wl"), [[0, tint[0]], [1, tint[1]]], 0, 0, 0, 1)}<rect x="8" y="8" width="184" height="${fy - 8}" fill="${x.url("wl")}"/><rect x="8" y="${fy}" width="184" height="${192 - fy}" fill="${h.shade(tint[0], -.25)}"/><rect x="8" y="${fy}" width="184" height="5" fill="${x.url("dn")}"/>`);
+  }
+  function badge(x) {
+    const z = x.zone; if (z === "home") return "";
+    const col = { away: "#8a94a8", work: "#5a7ab0", school: "#4f9a5a", gym: "#b05a8a", drive: "#4a8ac0" }[z];
+    let ic = "";
+    if (z === "away") ic = `<path d="M0 -7a5 5 0 0 1 5 5c0 4 -5 9 -5 9s-5 -5 -5 -9a5 5 0 0 1 5 -5z" fill="#fff"/><circle cx="0" cy="-2" r="1.8" fill="${col}"/><path d="M6 4h6M10 1.5l2.5 2.5l-2.5 2.5" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>`;
+    else if (z === "work") ic = `<path d="${rr(-8, -4, 16, 11, 2)}" fill="#fff"/><path d="M-3 -4v-2.5h6v2.5" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M-8 1h16" stroke="${col}" stroke-width="1.2"/>`;
+    else if (z === "school") ic = `<path d="${rr(-6, -6, 12, 14, 3)}" fill="#fff"/><path d="M-3 -6a3 3 0 0 1 6 0" fill="none" stroke="#fff" stroke-width="1.6"/><rect x="-4" y="1" width="8" height="4" rx="1" fill="${col}"/>`;
+    else if (z === "gym") ic = `<rect x="-9" y="-4" width="3" height="8" rx="1" fill="#fff"/><rect x="6" y="-4" width="3" height="8" rx="1" fill="#fff"/><rect x="-6" y="-2.6" width="2" height="5.2" fill="#fff"/><rect x="4" y="-2.6" width="2" height="5.2" fill="#fff"/><rect x="-4" y="-1" width="8" height="2" fill="#fff"/>`;
+    else ic = `<path d="M-9 3v-3l2.5 -5h13l2.5 5v3Z" fill="#fff"/><circle cx="-5" cy="4" r="2" fill="#fff" stroke="${col}"/><circle cx="5" cy="4" r="2" fill="#fff" stroke="${col}"/><path d="M-5.5 -1l1.5 -3h8l1.5 3Z" fill="${col}"/>`;
+    return `<g transform="translate(168 32)"><circle r="14" fill="#000" opacity=".25" transform="translate(1 2)"/><circle r="14" fill="${col}"/><circle r="14" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="1.4"/>${ic}</g>`;
+  }
+
+
+  function tube(pts) {
+    const n = pts.length, A = [], B2 = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], c = pts[Math.min(n - 1, i + 1)], dx = c[0] - a[0], dy = c[1] - a[1], ln = Math.hypot(dx, dy) || 1, w = pts[i][2];
+      A.push([pts[i][0] - dy / ln * w, pts[i][1] + dx / ln * w]); B2.push([pts[i][0] + dy / ln * w, pts[i][1] - dx / ln * w]);
+    }
+    const sm = (Pp) => { let d = ""; for (let i = 1; i < Pp.length - 1; i++) d += Q(Pp[i], i === Pp.length - 2 ? Pp[i + 1] : [(Pp[i][0] + Pp[i + 1][0]) / 2, (Pp[i][1] + Pp[i + 1][1]) / 2]); return d; };
+    const R = B2.slice().reverse();
+    return M(A[0]) + sm(A) + L(R[0]) + sm(R) + "Z";
+  }
+  let CL = 0;
+  function part(x, d, fill, shade, shadeFill, wd) {
+    const k = x.id("cp" + (CL++));
+    return `<clipPath id="${k}"><path d="${d}"/></clipPath><path d="${d}" fill="${fill}"/>` + (shade ? `<g clip-path="url(#${k})"><path d="${shade}" fill="${shadeFill}"/></g>` : "") +
+      `<path d="${d}" fill="none" stroke="${OL}" stroke-width="${wd || OW}" stroke-linejoin="round"/>`;
+  }
+  const line = (d, wd, col, op) => `<path d="${d}" fill="none" stroke="${col || OL}" stroke-width="${wd || IW}" stroke-linecap="round" stroke-linejoin="round"${op ? ` stroke-opacity="${op}"` : ""}/>`;
+  const q2 = (dx, dy) => `q${f(dx)} ${f(dy)} ${f(dx * 2)} 0`;
+
+  
+  const OF = {
+    business: { top: "suit", bot: "trousers", shoe: "oxford", sleeve: "long", pose: "pockets" },
+    casual:   { top: "tee", bot: "jeans", shoe: "sneaker", sleeve: "short", pose: "pockets" },
+    bizcas:   { top: "shirt", bot: "chinos", shoe: "loafer", sleeve: "rolled", pose: "pockets" },
+    formal:   { top: "tux", bot: "tuxpants", shoe: "patent", sleeve: "long", pose: "sides" },
+    workout:  { top: "tank", bot: "shorts", shoe: "runner", sleeve: "none", pose: "hip" },
+    night:    { top: "pj", bot: "pjpants", shoe: "slipper", sleeve: "long", pose: "sides" },
+    outdoor:  { top: "parka", bot: "cargo", shoe: "boot", sleeve: "long", pose: "sides" },
+    hoodie:   { top: "hoodie", bot: "joggers", shoe: "sneaker", sleeve: "long", pose: "kanga" },
+    uniform:  { top: "coverall", bot: "coverall", shoe: "boot", sleeve: "long", pose: "hip" },
+    f_casual:   { top: "tee", bot: "jeans", shoe: "sneaker", sleeve: "short", pose: "pockets" },
+    f_business: { top: "blazer", bot: "pencil", shoe: "pump", sleeve: "long", pose: "sides" },
+    f_bizcas:   { top: "blouse", bot: "slacks", shoe: "flat", sleeve: "rolled", pose: "pockets" },
+    f_formal:   { top: "gowntop", bot: "gown", shoe: "pump", sleeve: "none", pose: "sides" },
+    f_workout:  { top: "tank", bot: "leggings", shoe: "runner", sleeve: "none", pose: "hip" },
+    f_night:    { top: "pj", bot: "pjpants", shoe: "slipper", sleeve: "long", pose: "sides" },
+    f_outdoor:  { top: "parka", bot: "jeans", shoe: "boot", sleeve: "long", pose: "sides" },
+    f_hoodie:   { top: "hoodie", bot: "joggers", shoe: "sneaker", sleeve: "long", pose: "kanga" },
+    f_uniform:  { top: "polo", bot: "slacks", shoe: "sneaker", sleeve: "short", pose: "hip", lanyard: true },
+    k_school:   { top: "polo", bot: "kidpants", shoe: "oxford", sleeve: "short", pose: "sides", pack: true },
+    k_schoolg:  { top: "polo", bot: "pleated", shoe: "maryjane", sleeve: "short", pose: "sides", pack: true, socks: true },
+    k_play:     { top: "tee", bot: "shorts", shoe: "sneaker", sleeve: "short", pose: "sides" },
+    k_playg:    { top: "tee", bot: "denimskirt", shoe: "sneaker", sleeve: "short", pose: "sides" },
+    k_pj:       { top: "pj", bot: "pjpants", shoe: "slipper", sleeve: "long", pose: "sides" },
+    k_sports:   { top: "jersey", bot: "shorts", shoe: "runner", sleeve: "short", pose: "sides", socks: true },
+    k_winter:   { top: "puffer", bot: "jeans", shoe: "boot", sleeve: "long", pose: "sides", hat: true },
+    t_romper:   { top: "romper", bot: "romper", shoe: "kidshoe", sleeve: "short", pose: "sides" },
+    t_overalls: { top: "overalls", bot: "overalls", shoe: "kidshoe", sleeve: "short", pose: "sides" },
+  };
+  const OUT_M = [["business", "Business suit"], ["casual", "Casual"], ["bizcas", "Business casual"], ["formal", "Formal (tuxedo)"], ["workout", "Workout"], ["night", "Nightwear"], ["outdoor", "Outdoor jacket"], ["hoodie", "Hoodie & joggers"], ["uniform", "Work uniform"]];
+  const OUT_F = [["f_casual", "Casual"], ["f_business", "Business (blazer and skirt)"], ["f_bizcas", "Business casual"], ["f_formal", "Formal gown"], ["f_workout", "Workout"], ["f_night", "Nightwear"], ["f_outdoor", "Outdoor jacket"], ["f_hoodie", "Hoodie & joggers"], ["f_uniform", "Work uniform (polo)"]];
+  const OUT_KB = [["k_school", "School clothes"], ["k_play", "Play clothes"], ["k_pj", "Pajamas"], ["k_sports", "Sports"], ["k_winter", "Winter"]];
+  const OUT_KG = [["k_schoolg", "School clothes"], ["k_playg", "Play clothes"], ["k_pj", "Pajamas"], ["k_sports", "Sports"], ["k_winter", "Winter"]];
+  const OUT_T = [["t_romper", "Romper"], ["t_overalls", "Overalls"]];
+  const PANTS = { trousers: 1, jeans: 1, chinos: 1, tuxpants: 1, pjpants: 1, cargo: 1, joggers: 1, leggings: 1, slacks: 1, kidpants: 1, coverall: 1, overalls: 1 };
+  const SKIRTS = { pencil: 1, pleated: 1, denimskirt: 1 };
+
+  
+  function figure(x) {
+    CL = 0;
+    const b = x.b, pr = x.pr, cx = 100, su = x.su, sk = x.sk, h = N(), of = OF[x.outfit] || OF.business;
+    const SHIRT = "#f4f3ef", SHIRTD = "#c9cdd6", TIE = "#8e2f2a", TIED = "#5e1d1a";
+    const hh = pr.hh, seated = x.mob === "wheel", foot = 186, Bl = pr.B * x.vh, tf = Bl * (1 - pr.legR) / 65, lf = Bl * pr.legR / 75;
+    let chin, kneeS = 0;
+    if (seated) { kneeS = foot - 38 * lf; chin = kneeS - 13 * lf - 50 * tf; } else chin = foot - Bl;
+    const top = chin - hh;
+    const Yb = (t) => chin + (t <= 65 ? t * tf : 65 * tf + (t - 65) * lf);
+    const sh = Yb(9), ap = Yb(22), bt = Yb(47), belt = Yb(50), hem = Yb(67), cr = Yb(65), kn = seated ? kneeS : Yb(101), an = seated ? foot - 7 * lf : Yb(133), so = foot;
+    const S = b.S, W = b.W + b.bel * 1.5, Hj = b.Hp + 1.5 + b.bel, cc = cx + 2.2;
+    const pal = (c) => ({ hl: h.shade(c, .25), m: c, d: h.shade(c, -.3), k: h.shade(c, -.5) });
+    const BOT = { trousers: su, tuxpants: su, pjpants: su, coverall: su, overalls: su, romper: su, pencil: su, gown: su, jeans: pal("#3f6290"), chinos: pal("#c4a77a"), shorts: pal("#2f333b"),
+      cargo: pal("#4a4f42"), joggers: pal("#6f747d"), leggings: pal("#26272c"), slacks: pal("#3a3d44"), kidpants: pal("#2c3d5e"), pleated: pal("#2c3d5e"), denimskirt: pal("#4f74a8") }[of.bot] || su;
+    const G = { cx, cc, S, W, Hj, sh, ap, bt, belt, hem, cr, kn, an, so, b, su, sk, SHIRT, SHIRTD, TIE, TIED, BOT, pal, x, lf, tf, seated, top, chin };
+    let legs = "", upper = "", head = "", back = "";
+    x._sh = sh; x._of = of;
+    const lw = b.Lg, lx0 = cx - b.Hp * .5, rx0 = cx + b.Hp * .5;
+
+    
+    if (seated) back += wheelchairBack(x, G);
+    legs += `<ellipse cx="${cx + 2}" cy="${so + 1}" rx="${f(b.Hp + 15 + (seated ? 14 : 0))}" ry="3.2" fill="${x.url("cs")}"/>`;
+
+    if (seated) {
+      
+      const longCover = PANTS[of.bot] || of.bot === "gown";
+      const thigh = (x0, sd) => tube([[x0, belt + 1, lw * 1.45], [x0 + sd * .6, (belt + kn) / 2, lw * 1.38], [x0 + sd * .8, kn, lw * 1.22]]);
+      const shin = (x0, sd) => tube([[x0 + sd * .8, kn, lw * .86], [x0 + sd * 1.2, (kn + an) / 2, lw * .74], [x0 + sd * 1.4, an, lw * .62]]);
+      legs += wheelchairFoot(x, G, lx0 + .6, rx0 + 1.4);
+      [[lx0, -1], [rx0, 1]].forEach(([x0, sd]) => {
+        legs += part(x, shin(x0, sd), longCover ? BOT.m : sk.m, M([x0 + lw * .2, kn]) + L([x0 + 30, kn]) + L([x0 + 30, so]) + L([x0 + lw * .2, so]) + "Z", longCover ? BOT.d : sk.d);
+        if (of.socks || of.shoe === "runner") legs += part(x, rr(x0 + sd * 1.4 - lw * .6, an - 4, lw * 1.2, 5, 1.5), "#f4f4f2", null, null, IW);
+      });
+      legs += shoe(x, lx0 + .6, -1, so, of.shoe, su) + shoe(x, rx0 + 1.4, 1, so, of.shoe, su);
+      if (of.bot === "gown") legs += part(x, M([cx - W - 4, belt]) + L([cx + W + 4, belt]) + Q([cx + W + 12, kn + 10], [cx + W + 13, so - 2]) + Q([cx, so + 1.5], [cx - W - 13, so - 2]) + Q([cx - W - 12, kn + 10], [cx - W - 4, belt]) + "Z", BOT.m, M([cx + 2, belt]) + L([cx + 40, belt]) + L([cx + 40, so]) + L([cx + 2, so]) + "Z", BOT.d);
+      [[lx0, -1], [rx0, 1]].forEach(([x0, sd]) => { legs += part(x, thigh(x0, sd), SKIRTS[of.bot] || of.bot === "shorts" || of.bot === "romper" || longCover ? BOT.m : sk.m, sd > 0 ? M([x0, belt]) + L([x0 + 30, belt]) + L([x0 + 30, kn + 4]) + L([x0, kn + 4]) + "Z" : null, BOT.d); });
+      if (SKIRTS[of.bot]) legs += part(x, M([cx - b.Hp - 2, belt]) + L([cx + b.Hp + 2, belt]) + L([cx + b.Hp + 4, kn + 2]) + Q([cx, kn + 4], [cx - b.Hp - 4, kn + 2]) + "Z", BOT.m, M([cx + 3, belt]) + L([cx + 30, belt]) + L([cx + 30, kn + 6]) + L([cx + 3, kn + 6]) + "Z", BOT.d);
+      legs += line(M([cx, belt + 3]) + L([cx, kn - 2]), .8, OL, .7);
+      
+      [[lx0, -1], [rx0, 1]].forEach(([x0, sd]) => { const kx = x0 + sd * .8, r = lw * 1.18, ry = 3.4 * lf + 1, bare = !longCover;
+        legs += part(x, `M${f(kx - r)} ${f(kn)}a${f(r)} ${f(ry)} 0 1 1 ${f(2 * r)} 0a${f(r)} ${f(ry)} 0 1 1 ${f(-2 * r)} 0Z`, bare ? sk.m : BOT.m, `M${f(kx - r - 1)} ${f(kn + ry * .2)}h${f(2 * r + 2)}v${f(ry * 2)}h${f(-2 * r - 2)}Z`, bare ? sk.d : BOT.d, IW) +
+          line(M([kx - r * .5, kn - ry * .45]) + Q([kx, kn - ry * .8], [kx + r * .4, kn - ry * .5]), .9, bare ? sk.hl : BOT.hl, .8); });
+      if (of.bot === "gown") legs += part(x, M([cx - W - 3, kn - 2]) + L([cx + W + 3, kn - 2]) + Q([cx + W + 11, kn + 10], [cx + W + 12, so - 2]) + Q([cx, so + 1.5], [cx - W - 12, so - 2]) + Q([cx - W - 11, kn + 10], [cx - W - 3, kn - 2]) + "Z", BOT.m, M([cx + 2, kn - 4]) + L([cx + 40, kn - 4]) + L([cx + 40, so]) + L([cx + 2, so]) + "Z", BOT.d);
+    } else {
+      legs += standingLegs(x, G, of, lx0, rx0, lw, BOT);
+    }
+    if (x.mob === "walker" && !seated) legs += walker(x, G);
+
+    
+    upper += topGarment(x, of, G);
+    if (x.fem && x.age !== "kid" && { tee: 1, tank: 1, pj: 1, hoodie: 1 }[of.top]) upper += line(M([cx - S * .55, ap + 4]) + Q([cx - S * .3, ap + 8], [cx - S * .05, ap + 5]) + M([cc + S * .05, ap + 5]) + Q([cc + S * .32, ap + 8], [cc + S * .55, ap + 4]), .7, su.k, .55);
+    if (of.pack) upper += line(M([cx - S + 4, sh + 1]) + Q([cx - S + 2, ap], [cx - S + 4.5, belt - 4]), 2.4, "#2a3a5a") + line(M([cx + S - 4, sh + 1]) + Q([cx + S - 2, ap], [cx + S - 4.5, belt - 4]), 2.4, "#2a3a5a") +
+      line(M([cx - S + 4, sh + 1]) + Q([cx - S + 2, ap], [cx - S + 4.5, belt - 4]), .5, OL, .8) + line(M([cx + S - 4, sh + 1]) + Q([cx + S - 2, ap], [cx + S - 4.5, belt - 4]), .5, OL, .8);
+    if (of.lanyard) upper += line(M([cx - x.b.Nk - 1, sh - 2]) + L([cc - 1, sh + 14]) + M([cx + x.b.Nk + 1, sh - 2]) + L([cc + 1, sh + 14]), .9, "#2f5fb3") + part(x, rr(cc - 3, sh + 14, 6, 8, 1), "#f4f4f2", rr(cc - 3, sh + 14, 6, 2.6, 1), "#2f5fb3", .7);
+
+    
+    const poseFor = (sd) => {
+      if (seated) return "rest";
+      if (x.mob === "walker") return "walker";
+      if (x.mob === "cane" && sd < 0) return "cane";
+      if (of.pose === "pockets") return x.mob === "cane" ? "side" : "pocket";
+      if (of.pose === "kanga") return x.mob === "cane" ? "side" : "kanga";
+      if (of.pose === "hip" && sd < 0) return "hip";
+      return "side";
+    };
+    let arms = "";
+    arms += arm(x, -1, poseFor(-1), of, G) + arm(x, 1, poseFor(1), of, G);
+    if (of.pose === "kanga" && poseFor(-1) === "kanga") arms += kangaPocket(x, G);
+    if (seated) arms += wheelchairFront(x, G);
+
+    
+    const neck = M([cx - b.Nk, chin - 4]) + L([cx - b.Nk - .4, sh - 2]) + L([cx + b.Nk + .4, sh - 2]) + L([cx + b.Nk, chin - 4]) + "Z";
+    head += part(x, neck, sk.m, M([cx - b.Nk - 2, chin - 6]) + Q([cx, chin + 3], [cx + b.Nk + 2, chin - 6]) + L([cx + b.Nk + 2, sh]) + L([cx - b.Nk - 2, sh]) + "Z", sk.d);
+    if (of.top === "hoodie") head += hoodCollar(x, cx, sh, b, su);
+    if (of.top === "parka" || of.top === "puffer") head += part(x, M([cx - b.Nk - 4, sh - 6]) + Q([cx, sh - 3], [cx + b.Nk + 4, sh - 6]) + L([cx + b.Nk + 6, sh + 2]) + Q([cx, sh + 5], [cx - b.Nk - 6, sh + 2]) + "Z", su.m, M([cx + 1, sh - 8]) + L([cx + 20, sh - 8]) + L([cx + 20, sh + 6]) + L([cx + 1, sh + 6]) + "Z", su.d) + line(M([cc, sh - 3.6]) + L([cc, sh + 4]), 1);
+    head += headDraw(x, cx, top, hh, of);
+    return { belt, sh, chin, top, back, legs, upper, arms, head, hairBehind: hairBack(x, cx, top, hh, headW(x)) };
+  }
+  const headW = (x) => 14 * x.b.fw * (x.pr.hh / 36) * (x.age === "kid" ? 1.04 : x.age === "toddler" ? 1.08 : x.age === "baby" ? 1.12 : 1) * (x.fem ? .97 : 1);
+
+  
+  function standingLegs(x, G, of, lx0, rx0, lw, BOT) {
+    const { cx, cc, belt, cr, kn, an, so, b, su, sk, W } = G;
+    let s = "";
+    const ankL = [lx0 - .5, an], ankR = [rx0 + 5, an];
+    const legPts = (x0, out) => [[x0 + (out ? .5 : -.5), belt + 4, lw + 1], [x0 + (out ? 1.5 : -.5), cr + 8, lw], [x0 + (out ? 3 : 0), kn, lw * .8], [x0 + (out ? 5 : -.5), an, lw * .64]];
+    const bareShins = !PANTS[of.bot] && of.bot !== "gown";
+    if (bareShins) {
+      const fromY = SKIRTS[of.bot] ? (of.bot === "pencil" ? kn - 2 : kn - 8) : kn - 6;
+      s += part(x, tube([[lx0 - .5, fromY - 4, lw * .8], [lx0, kn, lw * .74], [lx0 - .5, an, lw * .56]]), sk.m, M([lx0 + 1, fromY - 6]) + L([lx0 + 12, fromY - 6]) + L([lx0 + 12, an + 2]) + L([lx0 + 1, an + 2]) + "Z", sk.d);
+      s += part(x, tube([[rx0 + 2.4, fromY - 4, lw * .8], [rx0 + 3, kn, lw * .74], [rx0 + 5, an, lw * .56]]), sk.m, M([rx0 + 4, fromY - 6]) + L([rx0 + 14, fromY - 6]) + L([rx0 + 14, an + 2]) + L([rx0 + 4, an + 2]) + "Z", sk.d);
+      if (of.shoe === "runner" || of.socks) [ankL, ankR].forEach((a) => { s += part(x, rr(a[0] - lw * .6, a[1] - (of.socks ? 11 : 4), lw * 1.2, of.socks ? 12 : 5, 1.5), "#f4f4f2", null, null, IW); });
+    }
+    if (of.bot !== "gown") s += shoe(x, ankL[0], -1, so, of.shoe, su) + shoe(x, ankR[0], 1, so, of.shoe, su);
+    if (of.bot === "shorts" || of.bot === "romper") {
+      const sL = tube([[lx0 - .5, belt + 4, lw + 1.2], [lx0 - .5, cr + 6, lw + .6], [lx0 - .2, kn - 6, lw + .4]]), sR = tube([[rx0 + .5, belt + 4, lw + 1.2], [rx0 + 1.5, cr + 6, lw + .6], [rx0 + 2.4, kn - 6, lw + .4]]);
+      s += part(x, sL, BOT.m, null, null) + part(x, sR, BOT.m, M([rx0, belt]) + L([rx0 + 20, belt]) + L([rx0 + 20, kn]) + L([rx0, kn]) + "Z", BOT.d);
+      if (of.bot === "shorts") s += line(M([lx0 - lw - 1.2, kn - 12]) + L([lx0 - lw - .4, kn - 6]), 1.4, "#e8e8e6") + line(M([rx0 + lw + 3.2, kn - 12]) + L([rx0 + lw + 2.6, kn - 6]), 1.4, "#e8e8e6");
+    } else if (SKIRTS[of.bot]) {
+      const hemY = of.bot === "pencil" ? kn : kn - 6, fl = of.bot === "pencil" ? -1 : of.bot === "pleated" ? 6 : 3;
+      const sk2 = M([cx - b.Hp - 1, belt]) + L([cx + b.Hp + 1, belt]) + Q([cx + b.Hp + 2 + fl * .5, (belt + hemY) / 2], [cx + b.Hp + 1 + fl, hemY]) + Q([cx, hemY + 2], [cx - b.Hp - 1 - fl, hemY]) + Q([cx - b.Hp - 2 - fl * .5, (belt + hemY) / 2], [cx - b.Hp - 1, belt]) + "Z";
+      s += part(x, sk2, BOT.m, M([cc + 2, belt]) + L([cx + 40, belt]) + L([cx + 40, hemY + 4]) + L([cc + 2, hemY + 4]) + "Z", BOT.d);
+      if (of.bot === "pleated") for (let i = -3; i <= 3; i++) s += line(M([cx + i * b.Hp * .3, belt + 3]) + L([cx + i * (b.Hp + 6) * .3, hemY]), .7, BOT.k, .8);
+      if (of.bot === "pencil") s += line(M([cc + b.Hp * .4, hemY - 6]) + L([cc + b.Hp * .42, hemY]), .8);
+      if (of.bot === "denimskirt") s += line(M([cc, belt + 2]) + L([cc, hemY]), .7, "#d9b26a") + line(M([cx - b.Hp + 1, hemY - 2]) + Q([cx, hemY], [cx + b.Hp - 1, hemY - 2]), .6, "#d9b26a");
+    } else if (of.bot === "gown") {
+      s += shoe(x, ankL[0] - 1, -1, so, "pump", su) + shoe(x, ankR[0] - 1, 1, so, "pump", su);
+      const d = M([cx - W - .5, belt - 1]) + L([cx + W + .5, belt - 1]) + Q([cx + W + 8, cr + 20], [cx + W + 15, so - 2.6]) + Q([cx + 4, so - .6], [cx - W - 15, so - 2.6]) + Q([cx - W - 8, cr + 20], [cx - W - .5, belt - 1]) + "Z";
+      s += part(x, d, BOT.m, M([cc + 3, belt]) + L([cx + 60, belt]) + L([cx + 60, so + 4]) + L([cc + 3, so + 4]) + "Z", BOT.d);
+      s += line(M([cx - W * .3, belt + 8]) + Q([cx - W * .5, cr + 30], [cx - W - 4, so - 2]), .8, BOT.k, .8) + line(M([cc + W * .2, belt + 10]) + Q([cc + W * .5, cr + 30], [cc + W + 6, so - 2]), .8, BOT.k, .8);
+      s += line(M([cx - W * .7, belt + 14]) + Q([cx - W * .8, cr + 26], [cx - W - 9, so - 6]), 1, BOT.hl, .6);
+    } else {
+      const tight = of.bot === "joggers" || of.bot === "pjpants" || of.bot === "leggings";
+      const LL = legPts(lx0, false), RR = legPts(rx0, true);
+      if (of.bot === "joggers" || of.bot === "leggings") { LL[3][2] = lw * .55; RR[3][2] = lw * .55; LL[2][2] = lw * .74; RR[2][2] = lw * .74; }
+      if (of.bot === "cargo" || of.shoe === "boot") { LL[3][1] = an - 3; RR[3][1] = an - 3; }
+      s += part(x, tube(LL), BOT.m, M([lx0 + lw * .25, belt]) + L([lx0 + 40, belt]) + L([lx0 + 40, so]) + L([lx0 + lw * .25, so]) + "Z", BOT.d) +
+        part(x, tube(RR), BOT.m, M([rx0 + lw * .35, belt]) + L([rx0 + 40, belt]) + L([rx0 + 40, so]) + L([rx0 + lw * .35, so]) + "Z", BOT.d);
+      if (of.bot === "trousers" || of.bot === "tuxpants" || of.bot === "chinos" || of.bot === "slacks" || of.bot === "kidpants") s += line(M([lx0 - .5, cr + 4]) + L([lx0, an - 2]), .8, BOT.k, .7) + line(M([rx0 + 1.5, cr + 4]) + Q([rx0 + 3, kn], [rx0 + 5, an - 2]), .8, BOT.k, .7);
+      if (of.bot === "tuxpants") s += line(M([lx0 - lw - .6, cr]) + L([lx0 - lw * .64 - .6, an - 1]), 1.4, "#0c0c0e") + line(M([rx0 + lw + 1.6, cr]) + L([rx0 + 5 + lw * .64, an - 1]), 1.4, "#0c0c0e");
+      if (of.bot === "jeans") s += line(M([lx0 - lw * .6, cr]) + q2(2.4, 1.2) + M([rx0 + lw * .5, cr + 1]) + q2(2.4, 1.2), .7, "#a9c3e4", .8) + line(M([lx0 - lw - .5, cr]) + L([lx0 - lw * .64 - .5, an - 1]), .6, "#d9b26a", .8);
+      if (of.bot === "cargo") [lx0 - .5, rx0 + 3].forEach((px, i) => { s += part(x, rr(px - lw * .9 + (i ? 1 : 0), kn - 18, lw * 1.1, 9, 1.2), BOT.m, null, null, IW) + line(M([px - lw * .9 + (i ? 1 : 0), kn - 15]) + L([px + lw * .2 + (i ? 1 : 0), kn - 15]), .8); });
+      if (of.bot === "joggers") [ankL, ankR].forEach((a) => { s += part(x, rr(a[0] - lw * .6, a[1] - 5, lw * 1.2, 4.6, 1.4), BOT.d, null, null, IW); });
+      if (of.bot === "pjpants") s += line(M([lx0 - lw * .2, cr + 8]) + L([lx0, an - 4]), 1.2, BOT.hl, .5) + line(M([rx0 + lw * .3, cr + 8]) + L([rx0 + 4, an - 4]), 1.2, BOT.hl, .5);
+      if (of.bot === "overalls") [lx0 - .5, rx0 + 4].forEach((px) => { s += part(x, rr(px - lw * .62, an - 5, lw * 1.24, 4, 1), BOT.d, null, null, IW); });
+      if (!tight) s += line(M([lx0 - lw * .6, an - 4]) + Q([lx0, an - 2], [lx0 + lw * .6, an - 4]), .8) + line(M([rx0 + 5 - lw * .6, an - 4]) + Q([rx0 + 5, an - 2], [rx0 + 5 + lw * .6, an - 4]), .8);
+      s += line(M([rx0 + lw * .2, kn - 3]) + q2(3, 2) + M([rx0 + lw * .1, kn + 2]) + q2(4, 1.4), .8);
+    }
+    if (!SKIRTS[of.bot] && of.bot !== "gown") {
+      const seat = M([cx - b.Hp - .5, belt + 1]) + L([cx + b.Hp + .5, belt + 1]) + Q([cx + b.Hp + 1.5, cr - 4], [cx + b.Hp * .2, cr + 2]) + L([cx, cr + 4]) + L([cx - b.Hp * .2, cr + 2]) + Q([cx - b.Hp - 1.5, cr - 4], [cx - b.Hp - .5, belt + 1]) + "Z";
+      s += part(x, seat, BOT.m, M([cx + b.Hp * .25, belt]) + L([cx + 40, belt]) + L([cx + 40, cr + 6]) + L([cx + b.Hp * .25, cr + 6]) + "Z", BOT.d);
+      const elastic = { pjpants: 1, joggers: 1, shorts: 1, leggings: 1, romper: 1, overalls: 1 }[of.bot];
+      if (!elastic) s += line(M([cc, belt + 3]) + Q([cc + .5, cr - 6], [cc - .5, cr + 2]), IW);
+      else if (of.bot !== "romper" && of.bot !== "overalls") s += line(M([cc - 1.2, belt + 2]) + q2(1.2, 3) + M([cc + .4, belt + 2]) + q2(1.2, 3.4), .7);
+    }
+    return s;
+  }
+
+  
+  
+  function shoe(x, ax, sd, so, kind, su) {
+    const ks = Math.min(1, .5 + .55 * x.pr.sw), s = shoe0(x, ax, sd, so, kind, su);
+    return ks < .995 ? `<g transform="translate(${f(ax)} ${f(so)}) scale(${ks.toFixed(3)}) translate(${f(-ax)} ${f(-so)})">${s}</g>` : s;
+  }
+  function shoe0(x, ax, sd, so, kind, su) {
+    const t = ax + sd * 5.5, h0 = ax - sd * 5;
+    const base = (hgt, toe) => M([h0, so - 1]) + Q([h0 - sd * .5, so - hgt], [ax - sd * 1.5, so - hgt - .5]) + Q([t + sd * 1, so - hgt], [t + sd * toe, so - 2.5]) + Q([t + sd * (toe + 1), so], [t + sd * (toe - 1.5), so]) + L([h0, so]) + "Z";
+    const sole = (c, th) => M([h0 - sd * .4, so - th]) + L([t + sd * 6.5, so - th]) + L([t + sd * 6.5, so + 1]) + L([h0 - sd * .4, so + 1]) + "Z";
+    if (kind === "sneaker" || kind === "runner") {
+      const body = kind === "runner" ? su.m : "#f2f2ee";
+      return part(x, base(7, 5), body, sole("#ddd", 2.4), kind === "runner" ? "#f2f2ee" : "#cfd2d6") + line(M([ax - sd * 1.5, so - 6.6]) + L([ax + sd * 1.5, so - 4.4]) + M([ax - sd * .2, so - 6.8]) + L([ax + sd * 2.6, so - 5]), .7) +
+        line(M([h0 + sd * 1.5, so - 3.6]) + Q([ax + sd * 2, so - 2.6], [t + sd * 3, so - 4.5]), .9, kind === "runner" ? "#f2f2ee" : su.m);
+    }
+    if (kind === "boot") {
+      const d = M([h0, so - 1]) + L([h0 - sd * .2, so - 9]) + L([ax + sd * 2.6, so - 9]) + Q([t + sd * 1, so - 6], [t + sd * 4.5, so - 3]) + Q([t + sd * 5.5, so], [t + sd * 3, so]) + L([h0, so]) + "Z";
+      return part(x, d, "#6b4a2e", sole("#2a1e14", 2.2), "#2a1e14") + line(M([h0 - sd * .2, so - 7.5]) + L([ax + sd * 2.4, so - 7.5]), .7, "#3a281a") + line(M([ax - sd * .5, so - 8]) + L([ax + sd * 1.8, so - 6]), .6, "#e8d9b0");
+    }
+    if (kind === "slipper") return part(x, base(5, 5.5), "#8d7f72", sole("#5a4e44", 1.8), "#5a4e44") + line(M([ax - sd * 2, so - 4.6]) + Q([ax + sd * 2, so - 6], [t + sd * 2, so - 3.4]), .8, "#b8ab9c");
+    if (kind === "pump") {
+      
+      const d = M([h0, so - 4.6]) + Q([ax, so - 3.8], [t + sd * 1, so - 3.3]) + Q([t + sd * 5, so - 2.6], [t + sd * 6, so - .5]) + L([ax, so]) + L([h0 + sd * 1.8, so - .2]) + L([h0 + sd * .4, so - 1.4]) + "Z";
+      return part(x, rr(h0 - (sd > 0 ? .2 : 1.6), so - 3.4, 1.8, 3.6, .5), "#1c1c20", null, null, .7) + part(x, d, su.d, null, null, IW) + line(M([ax - sd * 1, so - 3.6]) + Q([ax + sd * 2, so - 3.4], [t + sd * 3, so - 2.6]), .7, "#fff", .4);
+    }
+    if (kind === "flat" || kind === "maryjane") {
+      const mj = kind === "maryjane", c2 = mj ? "#141416" : "#2a2a30";
+      let s = part(x, base(mj ? 5.4 : 4.6, 4.5), c2, sole("#1e1612", 1.8), "#1e1612") + line(M([ax - sd * .5, so - (mj ? 4.8 : 4)]) + Q([ax + sd * 2, so - 4.4], [t + sd * 2.6, so - 3]), mj ? 1 : .7, "#fff", mj ? .55 : .35);
+      if (mj) s += line(M([ax - sd * 2.2, so - 5]) + L([ax + sd * 2.4, so - 4.6]), 1.1, "#141416") + `<circle cx="${f(ax + sd * 2.2)}" cy="${f(so - 4.7)}" r=".7" fill="#c9a24a"/>`;
+      else s += line(M([t + sd * .4, so - 3.6]) + q2(sd * .8, -.6), .7, "#c9a24a");
+      return s;
+    }
+    if (kind === "kidshoe") {
+      
+      return part(x, base(7.4, 5.4), su.m, sole("#f2f2ee", 2.6), "#f2f2ee") + line(M([t - sd * 1, so - 2.6]) + Q([t + sd * 2.6, so - 5.6], [t + sd * 5.2, so - 2.6]), .8) +
+        part(x, rr(ax - (sd > 0 ? 2.6 : 3.6), so - 6.6, 6.2, 2.2, 1), "#f2f2ee", null, null, .7);
+    }
+    const col = kind === "loafer" ? "#7a4a2a" : kind === "patent" ? "#141416" : "#3a2a22";
+    return part(x, base(kind === "loafer" ? 5.6 : 6.4, 4.5), col, sole("#1e1612", 2.2), "#1e1612") + line(M([ax - sd * .5, so - 5.8]) + Q([ax + sd * 2, so - 5.2], [t + sd * 2.6, so - 3.4]), kind === "patent" ? 1 : .7, "#fff", kind === "patent" ? .6 : .35) +
+      (kind === "loafer" ? line(M([ax - sd * 1, so - 5]) + L([ax + sd * 3, so - 5]), .8, "#3a2416") : "");
+  }
+
+  
+  function torsoPath(g, hemY, flare, open) {
+    const { cx, S, W, ap, belt, sh, b } = g, sd = 1;
+    void sd; void open;
+    return M([cx - b.Nk - .4, sh - 3.6]) + Q([cx - S * .6, sh - 3.2], [cx - S, sh + .8]) + Q([cx - S - 2.2, sh + 3], [cx - S - 1.4, sh + 9]) + L([cx - S + 1.2, ap]) + Q([cx - W - .5 - b.bel * 2, belt - 8], [cx - W - .5, belt]) +
+      Q([cx - W - 1 - flare, hemY - 4], [cx - W - .5 - flare, hemY]) + Q([cx, hemY + 2.2], [cx + W + .5 + flare, hemY]) + Q([cx + W + 1 + flare, hemY - 4], [cx + W + .5, belt]) +
+      Q([cx + W + .5 + b.bel * 2, belt - 8], [cx + S - 1.2, ap]) + L([cx + S + 1.4, sh + 9]) + Q([cx + S + 2.2, sh + 3], [cx + S, sh + .8]) + Q([cx + S * .6, sh - 3.2], [cx + b.Nk + .4, sh - 3.6]) + "Z";
+  }
+  const shadeRight = (g, y1) => M([g.cx + g.S * .45, g.sh - 8]) + L([g.cx + 60, g.sh - 8]) + L([g.cx + 60, y1]) + L([g.cx + g.S * .45, y1]) + "Z";
+  function beltDraw(x, g, w) {
+    const bk = g.belt - 1.6;
+    return part(x, rr(g.cc - w - 2.4, bk, 2 * w + .8, 3.6, 1), "#1f1a18", null, null, IW) + part(x, rr(g.cc - 2.4, bk - .4, 4.8, 4.4, .8), "#c9a24a", null, null, .8) + `<rect x="${f(g.cc - 1)}" y="${f(bk + .9)}" width="2" height="1.8" fill="#1f1a18"/>`;
+  }
+  function buttons(g, y0, y1, n, col) { let s = ""; for (let i = 0; i < n; i++) { const y = y0 + (y1 - y0) * i / Math.max(1, n - 1); s += `<circle cx="${f(g.cc + .4)}" cy="${f(y)}" r=".8" fill="${col}" stroke="${OL}" stroke-width=".4"/>`; } return s; }
+  function topGarment(x, of, g) {
+    const { cx, cc, S, W, Hj, sh, ap, bt, belt, hem, b, su, SHIRT, SHIRTD, TIE, TIED } = g;
+    let s = "";
+    if (GM[of.top]) return garmentMore(x, of, g);
+    const collarPts = (col) => part(x, M([cc - b.Nk - .5, sh - 4]) + L([cc - 1.8, sh + 1.4]) + L([cc - b.Nk - 3, sh + 2.6]) + "Z", col, null, null, IW) + part(x, M([cc + b.Nk + .5, sh - 4]) + L([cc + 1.8, sh + 1.4]) + L([cc + b.Nk + 3, sh + 2.6]) + "Z", col, null, null, IW);
+    if (of.top === "suit" || of.top === "tux" || of.top === "blazer") {
+      const tux = of.top === "tux", blz = of.top === "blazer";
+      s += part(x, rr(cc - b.W + 1, sh - 3, 2 * b.W - 2, belt - sh + 4, 3), SHIRT, M([cc + 1, sh - 3]) + L([cc + 30, sh - 3]) + L([cc + 30, belt + 2]) + L([cc + 1, belt + 2]) + "Z", SHIRTD, IW);
+      if (blz) {
+        s += part(x, M([cx - b.Nk - 1.4, sh - 3]) + Q([cc, sh + 11], [cx + b.Nk + 1.4, sh - 3]) + "Z", g.sk.m, null, null, .9);
+        if (x.fem && x.age !== "kid") s += line(M([cc - 3, sh + 9.4]) + Q([cc, sh + 11.4], [cc + 3, sh + 9.4]), .6, g.sk.k, .5);
+      } else if (!tux) {
+        s += beltDraw(x, g, b.Hp - 1);
+        const tieD = M([cc - 1.5, sh + 1.2]) + L([cc + 1.5, sh + 1.2]) + L([cc + 3.2, belt - 4]) + L([cc, belt - 1]) + L([cc - 3.2, belt - 4]) + "Z";
+        s += part(x, tieD, TIE, M([cc + .4, sh]) + L([cc + 5, sh]) + L([cc + 5, belt]) + L([cc + .4, belt]) + "Z", TIED, IW) + part(x, M([cc - 2.4, sh - 2.2]) + L([cc + 2.4, sh - 2.2]) + L([cc + 1.6, sh + 1.6]) + L([cc - 1.6, sh + 1.6]) + "Z", TIE, null, null, IW);
+        s += line(M([cc - 1.2, sh + 6]) + L([cc + 1.6, sh + 4.5]) + M([cc - 1.8, sh + 12]) + L([cc + 2.3, sh + 10]), .5, "#fff", .25);
+      } else {
+        
+        s += part(x, rr(cc - b.Hp + .6, belt - 4, 2 * b.Hp - 1.2, 6, 1.4), "#121214", null, null, IW) + line(M([cc - b.Hp + 1.5, belt - 2]) + L([cc + b.Hp - 1.5, belt - 2]) + M([cc - b.Hp + 1.5, belt]) + L([cc + b.Hp - 1.5, belt]), .5, "#3a3a40");
+        s += buttons(g, sh + 5, belt - 7, 3, "#111") + line(M([cc - 3, sh + 4]) + L([cc - 3, belt - 6]) + M([cc + 3.6, sh + 4]) + L([cc + 3.6, belt - 6]), .5, SHIRTD);
+      }
+      if (!blz) s += collarPts(SHIRT);
+      if (tux) s += part(x, M([cc - 5, sh - 1.6]) + L([cc - 1, sh + .4]) + L([cc - 5, sh + 2.6]) + "Z", "#121214", null, null, IW) + part(x, M([cc + 5, sh - 1.6]) + L([cc + 1, sh + .4]) + L([cc + 5, sh + 2.6]) + "Z", "#121214", null, null, IW) + part(x, rr(cc - 1.4, sh - 1, 2.8, 2.8, .8), "#121214", null, null, IW);
+      const panel = (sd) => M([cx + sd * (b.Nk + .4), sh - 3.6]) + Q([cx + sd * (S * .6), sh - 3.2], [cx + sd * S, sh + .8]) + Q([cx + sd * (S + 2.2), sh + 3], [cx + sd * (S + 1.4), sh + 9]) +
+        L([cx + sd * (S - 1.2), ap]) + Q([cx + sd * (W + .5 + b.bel * 2), belt - 8], [cx + sd * (W + .5), belt]) + Q([cx + sd * (Hj + .6), hem - 8], [cx + sd * Hj, hem]) +
+        Q([cc + sd * (Hj * .62), hem + 2], [cc + sd * (Hj * .45), hem - .5]) + Q([cc + sd * (W * .55), bt + 6], [cc + sd * (W * .5), bt - 2]) + L([cc + sd * 3.4, sh + 4]) + Q([cc + sd * 3, sh - 1.5], [cx + sd * (b.Nk + .4), sh - 3.6]) + "Z";
+      s += part(x, panel(-1), su.m, M([cx - S * .2, sh - 6]) + L([cx - 2, sh - 6]) + L([cx - 2, hem + 4]) + L([cx - S * .2, hem + 4]) + "Z", su.d) + part(x, panel(1), su.m, shadeRight(g, hem + 4), su.d);
+      const lapel = (sd) => M([cc + sd * (b.Nk + .4), sh - 3.4]) + L([cc + sd * (b.Nk + 6), sh + 6]) + (tux ? "" : L([cc + sd * (b.Nk + 4), sh + 7.6])) + L([cc + sd * (b.Nk + 5.6), sh + 11]) + Q([cc + sd * (W * .62), bt - 8], [cc + sd * (W * .5), bt - 2]) + L([cc + sd * 3.4, sh + 4]) + Q([cc + sd * 3, sh - 1.5], [cc + sd * (b.Nk + .4), sh - 3.4]) + "Z";
+      const lc = tux ? N().shade(su.m, -.35) : su.hl;
+      s += part(x, lapel(-1), lc, null, null, IW) + part(x, lapel(1), tux ? N().shade(su.m, -.45) : su.m, null, null, IW);
+      if (tux) s += line(M([cc - b.Nk - 3, sh + 3]) + Q([cc - W * .4, sh + 14], [cc - W * .45, bt - 4]), .6, "#fff", .35);
+      s += `<circle cx="${f(cc - W * .5 + .8)}" cy="${f(bt + 1)}" r="1.2" fill="${su.k}" stroke="${OL}" stroke-width=".6"/>`;
+      s += line(M([cx - S * .62, sh + 12]) + L([cx - S * .3, sh + 11.4]), IW) + line(M([cx - Hj + 2.5, hem - 9]) + L([cx - Hj + 9, hem - 9.6]), IW) + line(M([cx + Hj - 2.5, hem - 9]) + L([cx + Hj - 9, hem - 9.6]), IW);
+      s += line(M([cx - W * .55, belt - 3]) + Q([cx - W * .4, belt + 3], [cx - W * .5, hem - 4]), .8, su.k, .8) + line(M([cx + W * .62, ap + 6]) + Q([cx + W * .4, belt - 6], [cx + W * .62, belt + 4]), .8, su.k, .8);
+      return s;
+    }
+    if (of.top === "shirt") {
+      
+      const t = torsoPath(g, belt + 1.5, -1.5);
+      s += part(x, t, su.m, shadeRight(g, belt + 4), su.d) + beltDraw(x, g, b.Hp - .5);
+      s += line(M([cc, sh + 1]) + L([cc + .2, belt - 1.6]), IW) + line(M([cc + 1.6, sh + 1]) + L([cc + 1.8, belt - 1.6]), .6, su.k, .7) + buttons(g, sh + 5, belt - 5, 4, su.hl);
+      s += part(x, rr(cc - W * .7, sh + 9, W * .42, 6, 1), su.m, null, null, .8);
+      s += line(M([cx - W * .6, belt - 4]) + q(4, -2) + M([cx + W * .5, belt - 5]) + q(-4, -2), .7, su.k, .7);
+      s += collarPts(su.hl) + `<path d="M${f(cc - 1.8)} ${f(sh + 1.4)}L${f(cc)} ${f(sh + 3.4)}L${f(cc + 1.8)} ${f(sh + 1.4)}" fill="none" stroke="${OL}" stroke-width=".7"/>`;
+      return s;
+    }
+    if (of.top === "tee" || of.top === "tank") {
+      const t = torsoPath(of.top === "tank" ? Object.assign({}, g, { S: S - 6.5 }) : g, belt + 9, 1);
+      s += part(x, t, su.m, shadeRight(g, belt + 14), su.d);
+      if (of.top === "tank") {
+        
+        s += part(x, M([cx - b.Nk - 2, sh - 3]) + Q([cc, sh + 9], [cx + b.Nk + 2, sh - 3]) + L([cx + b.Nk + 1, sh - 4]) + Q([cc, sh + 6], [cx - b.Nk - 1, sh - 4]) + "Z", g.sk.m, null, null, .8);
+        s += line(M([cx - S + 3, ap - 1]) + Q([cx - S + 6, ap + 6], [cx - W - .2, ap + 9]) + M([cx + S - 3, ap - 1]) + Q([cx + S - 6, ap + 6], [cx + W + .2, ap + 9]), IW);
+        s += line(M([cc - 4, ap + 6]) + L([cc + 4.6, ap + 6]), 1.4, su.hl, .8);
+      } else {
+        s += line(M([cx - b.Nk - 1.2, sh - 3.2]) + Q([cc, sh + 3.6], [cx + b.Nk + 1.2, sh - 3.2]), 1.6, su.d) + line(M([cx - b.Nk - 1.2, sh - 3.2]) + Q([cc, sh + 3.6], [cx + b.Nk + 1.2, sh - 3.2]), IW);
+      }
+      s += line(M([cx - S * .5, sh + 10]) + Q([cx - S * .2, sh + 22], [cx + W * .3, belt + 4]), .7, su.k, .7) + line(M([cx + W * .2, belt + 2]) + q(3, 2) + M([cx - W * .7, belt + 5]) + q(3, -1.5), .7, su.k, .7);
+      return s;
+    }
+    if (of.top === "pj") {
+      
+      const t = torsoPath(g, belt + 9, 1.5), pip = N().mix(su.m, "#ffffff", .7);
+      s += part(x, t, su.m, shadeRight(g, belt + 14), su.d);
+      for (let i = -3; i <= 3; i++) s += line(M([cx + i * 6, sh + 2]) + L([cx + i * 6 + 1, belt + 9]), .6, su.hl, .4);
+      s += line(M([cc + .4, sh + 4]) + L([cc + .8, belt + 10]), 1.4, pip) + buttons(g, sh + 9, belt + 4, 4, pip);
+      s += part(x, M([cx - b.Nk - .4, sh - 3.6]) + L([cc - 6, sh + 7]) + L([cc, sh + 4]) + "Z", su.m, null, null, IW) + part(x, M([cx + b.Nk + .4, sh - 3.6]) + L([cc + 6, sh + 7]) + L([cc, sh + 4]) + "Z", su.m, null, null, IW);
+      s += line(M([cx - b.Nk - .4, sh - 3.6]) + L([cc - 6, sh + 7]) + M([cx + b.Nk + .4, sh - 3.6]) + L([cc + 6, sh + 7]), 1, pip) + part(x, rr(cc - W * .6, sh + 13, W * .4, 5, 1), su.m, null, null, .8);
+      return s;
+    }
+    if (of.top === "parka") {
+      
+      const t = torsoPath(g, hem + 4, 2.5);
+      s += part(x, t, su.m, shadeRight(g, hem + 8), su.d);
+      s += line(M([cc, sh - 1]) + L([cc + .4, hem + 5.5]), 1.3) + line(M([cc + 1.3, sh]) + L([cc + 1.7, hem + 5]), .5, "#c9ccd2");
+      s += line(M([cx - W - 1.4, belt]) + Q([cc, belt + 2.2], [cx + W + 1.4, belt]), .8, su.k, .9);
+      s += line(M([cx - S * .62, sh + 12]) + L([cx - S * .2, sh + 12]) + M([cx - S * .6, sh + 12]) + L([cx - S * .58, sh + 20]), IW);
+      s += line(M([cx - W + 2, belt + 6]) + L([cx - W * .35, belt + 13]) + M([cx + W - 2, belt + 6]) + L([cx + W * .35, belt + 13]), IW);
+      s += line(M([cx - W * .6, belt + 2]) + q(3, 1.6) + M([cx + W * .3, ap + 8]) + q(3, -2), .7, su.k, .8);
+      return s;
+    }
+    if (of.top === "hoodie") {
+      
+      const t = torsoPath(g, belt + 12, 1.5);
+      s += part(x, t, su.m, shadeRight(g, belt + 16), su.d);
+      s += part(x, rr(cx - W - 1.5, belt + 8.4, 2 * W + 3, 4.4, 1.6), su.d, null, null, IW);
+      for (let i = -4; i <= 4; i++) s += line(M([cx + i * W * .22, belt + 9]) + L([cx + i * W * .22, belt + 12.4]), .4, su.k, .6);
+      s += line(M([cc - 2.4, sh + 2]) + L([cc - 2.8, sh + 15]) + M([cc + 2.4, sh + 2]) + L([cc + 2.8, sh + 14]), 1, "#f2f2ee") + `<circle cx="${f(cc - 2.8)}" cy="${f(sh + 15.6)}" r=".9" fill="#c9ccd2"/><circle cx="${f(cc + 2.8)}" cy="${f(sh + 14.6)}" r=".9" fill="#c9ccd2"/>`;
+      return s;
+    }
+    if (of.top === "coverall") {
+      
+      const t = torsoPath(g, belt + 6, 0);
+      s += part(x, t, su.m, shadeRight(g, belt + 10), su.d);
+      s += part(x, rr(cx - W - .6, belt - 2.4, 2 * W + 1.2, 4, 1.2), su.d, null, null, IW);
+      s += line(M([cc, sh + 1]) + L([cc + .4, belt + 14]), 1.2) + line(M([cc + 1.2, sh + 1]) + L([cc + 1.6, belt + 14]), .5, "#c9ccd2");
+      s += part(x, rr(cx - S * .7, sh + 9, S * .44, 8, 1), su.m, null, null, .9) + line(M([cx - S * .55, sh + 7]) + L([cx - S * .55, sh + 12]), 1.2, "#3a6ad8");
+      s += part(x, rr(cx + S * .22, sh + 10, S * .36, 4.2, .8), "#f2f2ee", null, null, .7);
+      s += collarPts(su.hl);
+      return s;
+    }
+    return s;
+    function q(dx, dy) { return q2(dx, dy); }
+  }
+  function hoodCollar(x, cx, sh, b, su) {
+    const d = M([cx - b.Nk - 6, sh - 1]) + C([cx - b.Nk - 8, sh - 12], [cx + b.Nk + 8, sh - 12], [cx + b.Nk + 6, sh - 1]) + Q([cx, sh + 4], [cx - b.Nk - 6, sh - 1]) + "Z";
+    const inner = M([cx - b.Nk - 2, sh - 2]) + C([cx - b.Nk - 3, sh - 8], [cx + b.Nk + 3, sh - 8], [cx + b.Nk + 2, sh - 2]) + Q([cx, sh + 1.6], [cx - b.Nk - 2, sh - 2]) + "Z";
+    return part(x, d, su.m, M([cx + 2, sh - 14]) + L([cx + 30, sh - 14]) + L([cx + 30, sh + 6]) + L([cx + 2, sh + 6]) + "Z", su.d) + part(x, inner, su.k, null, null, IW);
+  }
+
+  
+  function arm(x, sd, pose, of, g) {
+    const { cx, S, W, sh, ap, belt, b, su, sk, SHIRT, so } = g;
+    const j = [cx + sd * (S - 2.6), sh + 4.5 - (pose === "hip" ? 1.8 : 0)];
+    let el, wr;
+    if (pose === "pocket") { el = [cx + sd * (S + 5.5 + b.bel), belt - 7]; wr = [cx + sd * (b.Hp - 2.5), belt + 11]; }
+    else if (pose === "hip") { el = [cx + sd * (S + 10.5 + b.bel), belt - 10]; wr = [cx + sd * (W + 3.4 + b.bel * .5), belt - 2]; }
+    else if (pose === "walker") { el = [cx + sd * (S + 4.5 + b.bel), belt - 6]; wr = [cx + sd * (b.Hp + 6), belt + 1.5]; }
+    else if (pose === "cane") { el = [cx + sd * (S + 4 + b.bel), belt - 3]; wr = [cx + sd * (S + 8 + b.bel), belt + 11]; }
+    else if (pose === "rest") { el = [cx + sd * (S + 4 + b.bel), belt - 10]; wr = [cx + sd * (b.Hp + 6.6), belt - 6]; }
+    else if (pose === "kanga") { el = [cx + sd * (S + 3 + b.bel), belt - 5]; wr = [cx + sd * (W * .42), belt + 4]; }
+    else { const ak = Math.min(1, (g.tf || 1) * 1.15); el = [cx + sd * (S + 2.2 + b.bel), belt - 4 * ak]; wr = [cx + sd * (S + .6 + b.bel), belt + 16 * ak]; }
+    const fa = pose === "walker" || pose === "cane" || pose === "rest" ? [(el[0] + wr[0]) / 2 + sd * .6, (el[1] + wr[1]) / 2 + 1] : pose === "hip" ? [(el[0] + wr[0]) / 2 + sd * 1.2, (el[1] + wr[1]) / 2 + 1.4] : pose === "kanga" ? [(el[0] + wr[0]) / 2 + sd * 1.5, (el[1] + wr[1]) / 2 + 2] : [wr[0] + sd * (pose === "pocket" ? 2.4 : .6), wr[1] - 5];
+    const sleeve = of.sleeve, skinArm = sleeve === "none" || sleeve === "short" || sleeve === "rolled";
+    const full = tube([[j[0], j[1], b.A + .8], [j[0] + sd * 1.6, ap, b.A + .5], [el[0], el[1], b.A * .92], [fa[0], fa[1], b.A * .8], [wr[0], wr[1], b.A * .76]]);
+    const shade = sd > 0 ? M([j[0] - 1, sh]) + L([j[0] + 24, sh]) + L([j[0] + 24, wr[1] + 6]) + L([el[0] - b.A * .3, wr[1] + 6]) + Q([el[0] - b.A * .4, el[1]], [j[0] + 1, sh]) + "Z"
+      : M([el[0] + b.A * .25, sh + 6]) + Q([el[0] + b.A * .5, el[1]], [wr[0] + b.A * .4, wr[1] + 6]) + L([j[0] + 24, wr[1] + 6]) + L([j[0] + 24, sh + 6]) + "Z";
+    let s = "";
+    if (skinArm) {
+      s += part(x, full, sk.m, shade, sk.d);
+      if (sleeve === "short") s += part(x, tube([[j[0], j[1] - 1, b.A + 1.8], [j[0] + sd * 1.4, ap, b.A + 1.6], [j[0] + (el[0] - j[0]) * .42, j[1] + (el[1] - j[1]) * .5, b.A + 1.3]]), of.top === "overalls" ? "#f2efe6" : su.m, sd > 0 ? shade : null, of.top === "overalls" ? "#cfcabc" : su.d);
+      if (sleeve === "rolled") {
+        const fx2 = fa[0] - el[0], fy2 = fa[1] - el[1], fl = Math.hypot(fx2, fy2) || 1, v = [fx2 / fl, fy2 / fl], E = (t, k) => [el[0] + v[0] * t, el[1] + v[1] * t, k];
+        s += part(x, tube([[j[0], j[1] - 1, b.A + 1.4], [j[0] + sd * 1.6, ap, b.A + 1.1], [el[0], el[1], b.A * .98], E(1.6, b.A * .95)]), su.m, sd > 0 ? shade : null, su.d);
+        s += part(x, tube([E(.8, b.A * 1.06), E(3, b.A * 1.1), E(4.6, b.A * 1.02)]), su.m, null, null, IW) + part(x, tube([E(3.6, b.A * 1.04), E(5.6, b.A * 1.06), E(7, b.A * .96)]), su.hl, null, null, IW);
+        s += line(M([E(2, 0)[0] - v[1] * b.A * .8, E(2, 0)[1] + v[0] * b.A * .8]) + Q([E(2.6, 0)[0], E(2.6, 0)[1]], [E(2, 0)[0] + v[1] * b.A * .8, E(2, 0)[1] - v[0] * b.A * .8]), .55, su.k, .8);
+      }
+      if (sleeve === "none") s += part(x, M([j[0] - sd * (b.A + .2), j[1] + 4]) + C([j[0] - sd * (b.A + .6), j[1] - 4], [j[0] + sd * (b.A + 2.4), j[1] - 5.4], [j[0] + sd * (b.A + 1.8), j[1] + 5]) + Q([j[0], j[1] + 7], [j[0] - sd * (b.A + .2), j[1] + 4]) + "Z", sk.m, sd > 0 ? M([j[0], j[1] - 8]) + L([j[0] + 12, j[1] - 8]) + L([j[0] + 12, j[1] + 8]) + L([j[0], j[1] + 8]) + "Z" : null, sk.d) +
+        line(M([j[0] - sd * (b.A - .6), j[1] + 4.6]) + Q([j[0], j[1] + 6.6], [j[0] + sd * (b.A + 1), j[1] + 5]), .6, sk.k, .6);
+    } else {
+      s += part(x, full, su.m, shade, su.d);
+    }
+    s += line(M([el[0] - sd * b.A * .6, el[1] - 2]) + Q([el[0], el[1] + .6], [el[0] + sd * b.A * .55, el[1] - 1.4]), .8, OL, .6);
+    const ux = wr[0] - fa[0], uy = wr[1] - fa[1], ul = Math.hypot(ux, uy) || 1, u = [ux / ul, uy / ul], at = (t) => [wr[0] + u[0] * t, wr[1] + u[1] * t];
+    
+    if (!skinArm) {
+      const shirtCuff = of.top === "suit" || of.top === "tux";
+      void 0;
+      if (shirtCuff) s += part(x, tube([[...at(-.6), b.A * .7], [...at(1.2), b.A * .68], [...at(2.6), b.A * .64]]), SHIRT, null, null, .9) + `<circle cx="${f(at(1.2)[0] - sd * b.A * .35)}" cy="${f(at(1.2)[1])}" r=".55" fill="#9aa0aa"/>`;
+      else s += part(x, tube([[...at(-2.4), b.A * .82], [...at(0), b.A * .8]]), of.top === "hoodie" || of.top === "parka" || of.top === "puffer" ? su.d : su.hl, null, null, .9);
+    }
+    const w0 = skinArm ? 0 : (of.top === "suit" || of.top === "tux" ? 2.6 : 0);
+    if (pose === "pocket") {
+      s += part(x, tube([[...at(w0), b.A * .56], [...at(w0 + 1.9), b.A * .54]]), sk.m, null, null, .9);
+      const pk = at(w0 + 1.5);
+      s += line(M([pk[0] - sd * (b.A + 2.4), pk[1] - .6]) + Q([pk[0], pk[1] + 2.6], [pk[0] + sd * (b.A + 2.6), pk[1] - 2]), IW);
+    } else if (pose === "cane") {
+      
+      const p = at(w0 + 3.2), sh2 = M([p[0], p[1] + 1]) + L([p[0] + sd * 1.6, so - 1]);
+      const crook = M([p[0], p[1] + 2]) + L([p[0], p[1] - 1.2]) + Q([p[0], p[1] - 5.4], [p[0] - sd * 4, p[1] - 5]) + Q([p[0] - sd * 7.2, p[1] - 4.4], [p[0] - sd * 7, p[1] - 1.2]);
+      s += line(sh2 + crook, 3.6, OL) + line(sh2 + crook, 2.1, "#7a4a2a") + line(M([p[0] - sd * .5, p[1] + 4]) + L([p[0] + sd * 1, so - 6]), .6, "#b07a4c", .8) + part(x, rr(p[0] + sd * 1.6 - 1.8, so - 3, 3.6, 3, 1), "#1c1c20", null, null, .7);
+      s += hand(x, at(w0 - .2), u, sd, "fist", b);
+    } else if (pose === "walker" || pose === "rest") s += hand(x, at(w0 - .2), u, sd, "fist", b);
+    else if (pose !== "kanga") s += hand(x, at(w0 - .2), u, sd, pose, b);
+    return s;
+  }
+  
+  function hand(x, p, u, sd, pose, b) {
+    const sk = x.sk, k = .9 + b.A * .03, n = [-u[1], u[0]];
+    const P = (a, c) => [p[0] + u[0] * a * k + n[0] * c * k * sd, p[1] + u[1] * a * k + n[1] * c * k * sd];
+    if (pose === "fist") {
+      const d = M(P(-.4, -3.2)) + Q(P(2.4, -4.2), P(5.8, -2.8)) + Q(P(8, -.4), P(6.4, 2.6)) + Q(P(3, 4.4), P(-.4, 3.2)) + "Z";
+      return part(x, d, sk.m, null, null, IW) + line(M(P(4.4, -2.6)) + Q(P(5.8, 0), P(4.4, 2.6)), .6, sk.k) + line(M(P(2.6, -3.2)) + Q(P(3.6, -1), P(2.6, .6)), .6, sk.k);
+    }
+    if (pose === "hip") {
+      
+      const ang = sd * .55, ca = Math.cos(ang), sa = Math.sin(ang), u2 = [u[0] * ca - u[1] * sa, u[0] * sa + u[1] * ca], n2 = [-u2[1], u2[0]], kk = k * .92;
+      const H = (a, c) => [p[0] + u2[0] * a * kk + n2[0] * c * kk * sd, p[1] + u2[1] * a * kk + n2[1] * c * kk * sd];
+      const d = M(H(0, -3)) + Q(H(3.4, -3.6), H(6.8, -3)) + Q(H(9.4, -2.2), H(9.6, .2)) + Q(H(9.2, 2.6), H(6.6, 3)) + Q(H(3.2, 3.4), H(0, 3)) + "Z";
+      return part(x, d, sk.m, M(H(0, .8)) + L(H(12, .8)) + L(H(12, 5)) + L(H(0, 5)) + "Z", sk.d, IW) + line(M(H(6.4, -1.4)) + L(H(9, -1.1)) + M(H(6.4, .4)) + L(H(9.1, .7)) + M(H(6.2, 2)) + L(H(8.4, 2.3)), .55, sk.k);
+    }
+    const d = M(P(0, -3.2)) + Q(P(3.6, -3.8), P(7.4, -3.1)) + Q(P(10.4, -2.4), P(10.6, 0)) + Q(P(10.4, 2.6), P(7.6, 3.2)) + Q(P(3.4, 3.8), P(0, 3.2)) + "Z";
+    const th = M(P(1.6, 2.6)) + Q(P(4.2, 5.4), P(6.6, 4.4)) + Q(P(7.2, 3.4), P(5.6, 2.6)) + Q(P(3.8, 2.2), P(1.6, 2.6)) + "Z";
+    return part(x, d, sk.m, M(P(0, .6)) + L(P(12, .6)) + L(P(12, 5)) + L(P(0, 5)) + "Z", sk.d, IW) + part(x, th, sk.m, null, null, .8) +
+      line(M(P(7.6, -1.6)) + L(P(10, -1.4)) + M(P(7.6, .2)) + L(P(10.2, .4)) + M(P(7.4, 1.8)) + L(P(9.6, 2.1)), .55, sk.k);
+  }
+
+  const GM = { blouse: 1, gowntop: 1, polo: 1, jersey: 1, puffer: 1, romper: 1, overalls: 1 };
+  
+  function kangaPocket(x, g) {
+    const { cx, W, belt, su } = g;
+    const pk = M([cx - W * .66, belt + 8.5]) + C([cx - W * .74, belt + 2], [cx - W * .52, belt - 4], [cx - W * .38, belt - 4.5]) + L([cx + W * .45, belt - 4.5]) + C([cx + W * .58, belt - 4], [cx + W * .8, belt + 2], [cx + W * .72, belt + 8.5]) + Q([cx, belt + 10.6], [cx - W * .66, belt + 8.5]) + "Z";
+    return part(x, pk, su.m, M([cx + W * .2, belt - 6]) + L([cx + W, belt - 6]) + L([cx + W, belt + 12]) + L([cx + W * .2, belt + 12]) + "Z", su.d, IW) +
+      line(M([cx - W * .46, belt - 2]) + Q([cx - W * .62, belt + 3], [cx - W * .5, belt + 7]) + M([cx + W * .52, belt - 2]) + Q([cx + W * .68, belt + 3], [cx + W * .56, belt + 7]), .8) +
+      line(M([cx - W * .3, belt + 2]) + Q([cx - W * .18, belt + 4], [cx - W * .05, belt + 2.6]) + M([cx + W * .1, belt + 2.6]) + Q([cx + W * .24, belt + 4], [cx + W * .36, belt + 2]), .7, su.k, .8);
+  }
+
+  
+  const STEEL = "#b9bec6", STEELD = "#6d737c";
+  function walker(x, g) {
+    const { cx, b, belt, so } = g, gy = belt + 6, wx = b.Hp + 6;
+    let s = "";
+    [-1, 1].forEach((sd) => { const px = cx + sd * wx;
+      
+      s += line(M([px + sd * 2, gy + 2]) + L([px + sd * 3, so - 1]), 1.8, STEELD) + line(M([px, gy]) + L([px - sd * .4, so]), 2.2, STEEL) + line(M([px, gy]) + L([px - sd * .4, so]), .5, OL, .8);
+      s += part(x, rr(px - 1.8, gy - 1.4, 3.6, 7, 1.6), "#2a2b30", null, null, .8) + part(x, rr(px - sd * .4 - 2.2, so - 2.6, 4.4, 3.2, 1.4), "#9aa0a8", null, null, .7); });
+    s += line(M([cx - wx, gy + 18]) + L([cx + wx, gy + 18]), 2, STEEL) + line(M([cx - wx, gy + 18]) + L([cx + wx, gy + 18]), .5, OL, .8);
+    return s;
+  }
+  function wheelchairBack(x, g) {
+    const { cx, b, belt, sh, kn, so, S } = g, wx = b.Hp + 12, wy = (belt + so) / 2 - 2, ry = (so - belt) / 2 + 3;
+    let s = "";
+    
+    s += part(x, rr(cx - S - 1, sh - 4, 2 * S + 2, belt - sh + 6, 3), "#2a2c33", null, null, IW);
+    [-1, 1].forEach((sd) => { s += line(M([cx + sd * (S + 1), belt]) + L([cx + sd * (S + 1.6), sh - 12]), 2, STEEL) + part(x, rr(cx + sd * (S + 1.6) - 2, sh - 16, 4, 5, 1.6), "#1d1e22", null, null, .7); });
+    
+    [-1, 1].forEach((sd) => { const px = cx + sd * wx;
+      s += `<ellipse cx="${f(px)}" cy="${f(wy)}" rx="5.2" ry="${f(ry)}" fill="#1c1d22" stroke="${OL}" stroke-width="${OW}"/><ellipse cx="${f(px)}" cy="${f(wy)}" rx="3" ry="${f(ry - 3)}" fill="none" stroke="${STEEL}" stroke-width="1.1"/>` +
+        `<ellipse cx="${f(px + sd * 2.6)}" cy="${f(wy)}" rx="1.4" ry="${f(ry - 4.5)}" fill="none" stroke="${STEELD}" stroke-width=".9"/><circle cx="${f(px)}" cy="${f(wy)}" r="1.6" fill="${STEEL}" stroke="${OL}" stroke-width=".6"/>`; });
+    void kn;
+    return s;
+  }
+  function wheelchairFoot(x, g, lxA, rxA) {
+    const { cx, b, belt, kn, so } = g;
+    let s = "";
+    
+    s += part(x, rr(cx - b.Hp - 6, belt + 1, 2 * b.Hp + 12, 4, 1.4), "#2a2c33", null, null, IW);
+    [-1, 1].forEach((sd) => { const px = cx + sd * (b.Hp + 7);
+      s += line(M([px, belt + 3]) + L([px - sd * 1, kn + 4]) + L([px - sd * 4, so - 6]), 1.8, STEEL) + `<ellipse cx="${f(px)}" cy="${f(so - 2.4)}" rx="1.8" ry="3" fill="#1c1d22" stroke="${OL}" stroke-width=".8"/>`; });
+    [lxA, rxA].forEach((px, i) => { s += part(x, rr(px - 7 + (i ? 1 : -1), so - 1.6, 14, 2.6, 1), STEELD, null, null, .8); });
+    return s;
+  }
+  function wheelchairFront(x, g) {
+    const { cx, b, belt } = g;
+    let s = "";
+    
+    [-1, 1].forEach((sd) => { const px = cx + sd * (b.Hp + 7);
+      s += part(x, rr(px - 3.4, belt - 4, 6.8, 3, 1.3), "#2a2c33", null, null, .9) + line(M([px, belt - 1]) + L([px, belt + 3]), 1.4, STEEL); });
+    return s;
+  }
+
+  
+  function garmentMore(x, of, g) {
+    const { cx, cc, S, W, sh, ap, belt, b, su, SHIRT, SHIRTD } = g;
+    let s = "";
+    const bust = () => x.fem && (x.age === "adult" || x.age === "old" || x.age === "teen") ? line(M([cx - S * .55, ap + 4]) + Q([cx - S * .3, ap + 8], [cx - S * .05, ap + 5]) + M([cc + S * .05, ap + 5]) + Q([cc + S * .32, ap + 8], [cc + S * .55, ap + 4]), .7, su.k, .55) : "";
+    const polCollar = (col) => part(x, M([cx - b.Nk - .6, sh - 3.8]) + L([cc - 1, sh + 2]) + L([cc - b.Nk - 4.4, sh + 2.2]) + "Z", col, null, null, IW) + part(x, M([cx + b.Nk + .6, sh - 3.8]) + L([cc + 1, sh + 2]) + L([cc + b.Nk + 4.4, sh + 2.2]) + "Z", col, null, null, IW);
+    if (of.top === "blouse") {
+      const t = torsoPath(g, belt + 1.5, -1.5);
+      s += part(x, t, su.m, shadeRight(g, belt + 4), su.d) + beltDraw(x, g, b.Hp - .5) + bust();
+      s += part(x, M([cx - b.Nk - 1, sh - 3]) + L([cc, sh + 7]) + L([cx + b.Nk + 1, sh - 3]) + "Z", g.sk.m, null, null, .9) + polCollar(su.hl);
+      s += line(M([cc, sh + 7]) + L([cc + .2, belt - 1.6]), .8, su.k, .8) + buttons(g, sh + 10, belt - 5, 3, su.hl);
+      return s;
+    }
+    if (of.top === "gowntop") {
+      
+      const yT = ap - 1;
+      s += part(x, M([cx - b.Nk - .4, sh - 3.6]) + Q([cx - S * .6, sh - 3.2], [cx - S + 4, sh + 1]) + L([cx - S + 5, yT + 2]) + L([cx + S - 5, yT + 2]) + L([cx + S - 4, sh + 1]) + Q([cx + S * .6, sh - 3.2], [cx + b.Nk + .4, sh - 3.6]) + "Z", g.sk.m, M([cx + 2, sh - 6]) + L([cx + 40, sh - 6]) + L([cx + 40, yT + 4]) + L([cx + 2, yT + 4]) + "Z", g.sk.d, IW);
+      const bod = M([cx - S + 5.5, yT]) + Q([cx - S * .3, yT - 3], [cc, yT + 2]) + Q([cc + S * .3, yT - 3], [cx + S - 5.5, yT]) + Q([cx + W + 2, belt - 6], [cx + W + .5, belt]) + L([cx - W - .5, belt]) + Q([cx - W - 2, belt - 6], [cx - S + 5.5, yT]) + "Z";
+      s += part(x, bod, su.m, M([cc + 2, yT - 4]) + L([cx + 40, yT - 4]) + L([cx + 40, belt + 2]) + L([cc + 2, belt + 2]) + "Z", su.d) + bust();
+      s += line(M([cx - S + 6, yT + 1]) + L([cx - S + 6.6, sh + 2]) + M([cx + S - 6, yT + 1]) + L([cx + S - 6.6, sh + 2]), .9, su.d);
+      s += line(M([cx - W * .5, yT + 6]) + Q([cx - W * .3, belt - 6], [cx - W * .45, belt - 1]), .8, su.hl, .6);
+      return s;
+    }
+    if (of.top === "polo" || of.top === "jersey") {
+      const t = torsoPath(g, belt + 8, 1);
+      s += part(x, t, su.m, shadeRight(g, belt + 13), su.d) + bust();
+      if (of.top === "polo") {
+        s += polCollar(su.hl) + line(M([cc, sh - 1]) + L([cc, sh + 9]), .9) + buttons(g, sh + 2, sh + 8, 2, su.hl);
+      } else {
+        s += line(M([cx - b.Nk - 1.2, sh - 3.2]) + Q([cc, sh + 3.6], [cx + b.Nk + 1.2, sh - 3.2]), 1.8, "#f2f2ee") + line(M([cx - b.Nk - 1.2, sh - 3.2]) + Q([cc, sh + 3.6], [cx + b.Nk + 1.2, sh - 3.2]), IW);
+        s += part(x, M([cx - S + 3, ap + 6]) + L([cx + S - 3, ap + 6]) + L([cx + S - 3.4, ap + 10]) + L([cx - S + 3.4, ap + 10]) + "Z", "#f2f2ee", null, null, .8);
+      }
+      s += line(M([cx - S * .5, sh + 10]) + Q([cx - S * .2, sh + 20], [cx + W * .3, belt + 3]), .7, su.k, .7);
+      return s;
+    }
+    if (of.top === "puffer") {
+      const t = torsoPath(g, belt + 10, 3.5);
+      s += part(x, t, su.m, shadeRight(g, belt + 14), su.d);
+      for (let i = 1; i <= 5; i++) { const y = sh + (belt + 10 - sh) * i / 6; s += line(M([cx - W - 2.5, y]) + Q([cx, y + 2.4], [cx + W + 2.5, y]), .8, su.k, .9); }
+      s += line(M([cc, sh - 1]) + L([cc + .4, belt + 11.5]), 1.2) + line(M([cc + 1.2, sh]) + L([cc + 1.6, belt + 11]), .5, "#c9ccd2");
+      return s;
+    }
+    if (of.top === "romper" || of.top === "overalls") {
+      const tee = of.top === "overalls" ? "#f2efe6" : su.m, teeD = of.top === "overalls" ? "#cfcabc" : su.d;
+      const t = torsoPath(g, belt + 3, 1.5);
+      s += part(x, t, tee, shadeRight(g, belt + 6), teeD);
+      if (of.top === "overalls") {
+        for (let i = 1; i < 5; i++) s += line(M([cx - W - 1, sh + 2 + i * 5.5]) + L([cx + W + 1, sh + 2 + i * 5.5]), 1.2, "#c65b5b", .45);
+        const bib = M([cx - W * .62, ap - 1]) + L([cx + W * .62, ap - 1]) + L([cx + W * .66, belt]) + L([cx + W + 1, belt]) + L([cx + W + 1.5, belt + 4]) + L([cx - W - 1.5, belt + 4]) + L([cx - W - 1, belt]) + L([cx - W * .66, belt]) + "Z";
+        s += part(x, bib, su.m, M([cc + 2, ap - 2]) + L([cx + 30, ap - 2]) + L([cx + 30, belt + 6]) + L([cc + 2, belt + 6]) + "Z", su.d);
+        s += line(M([cx - W * .55, ap]) + L([cx - S + 4, sh]) + M([cx + W * .55, ap]) + L([cx + S - 4, sh]), 2, su.m) + line(M([cx - W * .55, ap]) + L([cx - S + 4, sh]) + M([cx + W * .55, ap]) + L([cx + S - 4, sh]), .5, OL);
+        s += `<circle cx="${f(cx - W * .52)}" cy="${f(ap + 1.2)}" r="1" fill="#d9b26a" stroke="${OL}" stroke-width=".5"/><circle cx="${f(cx + W * .52)}" cy="${f(ap + 1.2)}" r="1" fill="#d9b26a" stroke="${OL}" stroke-width=".5"/>`;
+        s += part(x, rr(cc - W * .3, ap + 4, W * .6, 5, 1), su.m, null, null, .8);
+      } else {
+        s += line(M([cx - b.Nk - 1.2, sh - 3.2]) + Q([cc, sh + 3.6], [cx + b.Nk + 1.2, sh - 3.2]), 1.6, su.d) + line(M([cx - b.Nk - 1.2, sh - 3.2]) + Q([cc, sh + 3.6], [cx + b.Nk + 1.2, sh - 3.2]), IW);
+        for (let i = 0; i < 3; i++) s += `<circle cx="${f(cc)}" cy="${f(sh + 4 + i * 4)}" r=".7" fill="#f2f2ee" stroke="${OL}" stroke-width=".4"/>`;
+      }
+      return s;
+    }
+    void SHIRT; void SHIRTD;
+    return s;
+  }
+
+  
+  const HAIR_M = [["side", "Short side part"], ["crew", "Crew cut"], ["buzz", "Buzz"], ["slick", "Slicked back"], ["messy", "Messy / textured"], ["curly", "Curly short"], ["afro", "Afro"],
+    ["long", "Long (shoulder)"], ["bun", "Man bun"], ["pony", "Ponytail"], ["receding", "Receding"], ["bald", "Bald"]];
+  function capPath(cx, top, hh, w, lift, hl) {
+    return M([cx - w - .6, top + hh * .5]) + C([cx - w - 1.6, top + hh * .14], [cx - w * .7, top - lift], [cx, top - lift]) + C([cx + w * .7, top - lift], [cx + w + 1.6, top + hh * .14], [cx + w + .6, top + hh * .5]) +
+      L([cx + w - .4, top + hh * .5]) + Q([cx + w * .8, top + hh * hl], [cx, top + hh * (hl - .02)]) + Q([cx - w * .8, top + hh * hl], [cx - w + .4, top + hh * .5]) + "Z";
+  }
+  
+  function partL(x, d, fill, layers, wd) {
+    const k = x.id("cp" + (CL++));
+    return `<clipPath id="${k}"><path d="${d}"/></clipPath><path d="${d}" fill="${fill}"/><g clip-path="url(#${k})">${layers}</g><path d="${d}" fill="none" stroke="${OL}" stroke-width="${wd || OW}" stroke-linejoin="round"/>`;
+  }
+  
+  function zig(pts, z, k, cx, w, flip) {
+    let d = "";
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], ln = Math.hypot(dx, dy) || 1, sg = flip ? -1 : 1, nx = sg * dy / ln, ny = -sg * dx / ln;
+      for (let j = 0; j < z.n; j++) {
+        const s0 = lerp(a, b, j / z.n), s1 = lerp(a, b, (j + 1) / z.n), m = lerp(s0, s1, .5), uu = Math.min(1, Math.abs((m[0] - cx) / w)), dp = z.d * k * (z.v ? (1 + z.v * Math.sin(i * 2.3 + j * 1.7)) : 1) * (z.fall ? Math.max(.15, 1 - Math.pow(uu, 4)) : 1);
+        if (z.round) { d += Q([m[0] + nx * dp * 2, m[1] + ny * dp * 2], s1); continue; }
+        const tip = [m[0] + nx * dp + (z.s ? z.s((m[0] - cx) / w) * k : 0), m[1] + ny * dp];
+        const c1 = lerp(s0, tip, .5), c2 = lerp(tip, s1, .5);
+        d += Q([c1[0] + nx * dp * .35, c1[1] + ny * dp * .35], tip) + Q([c2[0] + nx * dp * .06, c2[1] + ny * dp * .06], s1);
+      }
+    }
+    return d;
+  }
+  const strand = (pts, wd, col, op) => line(M(pts[0]) + thru(pts), wd, col, op);
+  
+  
+  const bump = (s, c, r) => Math.max(0, 1 - ((s - c) / r) * ((s - c) / r));
+  function scalp(cx, top, hh, w, th, n) {
+    const P1 = [.86 * w, 0], P2 = [1.04 * w, .26 * hh], P3 = [w, .5 * hh], out = [];
+    for (let i = 0; i <= n; i++) {
+      const s = -1 + 2 * i / n, t = Math.abs(s), sd = s < 0 ? -1 : 1, mt = 1 - t;
+      const bx = 3 * mt * mt * t * P1[0] + 3 * mt * t * t * P2[0] + t * t * t * P3[0], by = 3 * mt * mt * t * P1[1] + 3 * mt * t * t * P2[1] + t * t * t * P3[1];
+      const dx = 3 * mt * mt * P1[0] + 6 * mt * t * (P2[0] - P1[0]) + 3 * t * t * (P3[0] - P2[0]), dy = 3 * mt * mt * P1[1] + 6 * mt * t * (P2[1] - P1[1]) + 3 * t * t * (P3[1] - P2[1]), ln = Math.hypot(dx, dy) || 1;
+      const T = th(s);
+      out.push([cx + sd * (bx + dy / ln * T), top + by - dx / ln * T, s]);
+    }
+    return out;
+  }
+  function shortMass(x, cx, top, hh, w, sp) {
+    const k = hh / 36, hp = x.hp, h = N(), Pt = (u, a, v) => [cx + u * w + a * k, top + v * hh];
+    const sb = sp.sb, tv = sp.tv || .42, n = sp.n || 10;
+    const S = scalp(cx, top, hh, w, (s) => sp.th(s) * k, n), S2 = S.map((p) => [p[0], p[1]]);
+    const z = sp.topZ ? Object.assign({ fall: 1 }, sp.topZ) : null;
+    const seg = (pts) => pts.length < 3 ? L(pts[pts.length - 1]) : thru(pts);
+    let topEdge = seg(S2);
+    if (z) { const i0 = Math.max(0, S.findIndex((p) => p[2] >= (z.from == null ? -1 : z.from))), i1 = z.to == null ? n : Math.max(i0 + 1, S.findIndex((p) => p[2] >= z.to));
+      topEdge = (i0 > 0 ? seg(S2.slice(0, i0 + 1)) : "") + zig(S2.slice(i0, i1 + 1), z, k, cx, w) + (i1 < n ? seg(S2.slice(i1)) : ""); }
+    const sL = S2[0], sR = S2[n];
+    
+    const d = M(Pt(-1, .9, sb)) + Q(Pt(-1, -.3, .54), sL) + topEdge + Q(Pt(1, .3, .54), Pt(1, -.9, sb)) +
+      Q(Pt(1, -2.4, sb - .08), Pt(1, -2, tv + .04)) + Q(Pt(1, -1.9, tv - .02), sp.line[0]) + (sp.lineZ ? zig(sp.line, sp.lineZ, k, cx, w) : seg(sp.line)) + Q(Pt(-1, 1.9, tv - .02), Pt(-1, 2, tv + .04)) + Q(Pt(-1, 2.4, sb - .08), Pt(-1, .9, sb)) + "Z";
+    const fill = sp.soft ? h.mix(hp.m, x.sk.m, .42) : hp.m;
+    let ly = "";
+    if (sp.fade) { const fc = h.mix(hp.m, x.sk.m, sp.fade); [-1, 1].forEach((sd) => { ly += `<path d="${M(Pt(sd, -8 * sd, sp.fadeY || .47)) + L(Pt(sd, 7 * sd, sp.fadeY || .47)) + L(Pt(sd, 7 * sd, .9)) + L(Pt(sd, -8 * sd, .9))}Z" fill="${fc}"/>`; }); }
+    
+    const RS = S.filter((p) => p[2] >= .1), outR = RS.map((p) => [p[0] + (p[0] - cx) * .3 + 3, p[1] - 6]), inR = scalp(cx, top, hh, w, (s) => (sp.th(s) - 1.2 - 2.6 * s) * k, n).filter((p) => p[2] >= .1).map((p) => [p[0], p[1]]);
+    const shade = M(inR[0]) + thru(inR) + L([inR[inR.length - 1][0], top + hh]) + L([cx + w + 9, top + hh]) + L(outR[outR.length - 1]) + thru(outR.slice().reverse()) + "Z";
+    ly += `<path d="${shade}" fill="${hp.d}" opacity="${sp.soft ? .35 : 1}"/>`;
+    if (!sp.soft && !sp.noBand) {
+      const up = sp.line.map((p) => [p[0], p[1] - 2.4 * k]);
+      ly += `<path d="${M(sp.line[0]) + thru(sp.line) + L(up[up.length - 1]) + thru(up.slice().reverse())}Z" fill="${hp.d}" opacity=".8"/>`;
+    }
+    (sp.cl || []).forEach((c) => { ly += strand(c, .8, OL, .55); });
+    (sp.hi || []).forEach((c, i) => { ly += strand(c, (i ? .9 : 1.4) * k, hp.hl, i ? .7 : .95); });
+    if (sp.extra) ly += sp.extra;
+    return partL(x, d, fill, ly, sp.soft ? .6 : OW);
+  }
+  function shortHair(x, cx, top, hh, w, st) {
+    const k = hh / 36, hp = x.hp, h = N(), Pt = (u, a, v) => [cx + u * w + a * k, top + v * hh];
+    if (st === "bald") return `<path d="${M(Pt(.35, 0, .02)) + Q(Pt(.85, 0, .1), Pt(.95, 0, .36))}" fill="none" stroke="${x.sk.d}" stroke-width="${f(2.4 * k)}" stroke-linecap="round" opacity=".5"/>` +
+      `<path d="M${f(cx - w * .5)} ${f(top + hh * .12)}Q${f(cx - w * .1)} ${f(top + 1.2)} ${f(cx + w * .25)} ${f(top + 1.8)}" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.4" stroke-linecap="round"/>`;
+    if (st === "side") return shortMass(x, cx, top, hh, w, { sb: .64, fade: .22, th: (s) => 1.4 + 4.6 * bump(s, .1, .6) + 1.1 * bump(s, -.72, .32), n: 12,
+      line: [Pt(1, -1.7, .42), Pt(.68, 0, .32), Pt(.2, 0, .28), Pt(-.42, 0, .29), Pt(-.78, 0, .34), Pt(-1, 1.7, .42)], lineZ: { n: 1, d: 1.5, s: (u) => u < -.42 ? -.8 : 1.4 },
+      cl: [[Pt(-.38, 0, .21), Pt(.1, 0, .07), Pt(.55, 0, .09), Pt(.9, 0, .28)], [Pt(-.36, 0, .07), Pt(.1, 0, -.06), Pt(.6, 0, -.03), Pt(.97, 0, .13)], [Pt(-.48, 0, .12), Pt(-.76, 0, .18), Pt(-.96, 0, .34)]],
+      hi: [[Pt(-.3, 0, .11), Pt(-.04, 0, -.05), Pt(.3, 0, -.07)], [Pt(-.6, 0, .06), Pt(-.8, 0, .15)]],
+      extra: line(M(Pt(-.42, 0, .29)) + Q(Pt(-.45, 0, .12), Pt(-.4, 0, -.06)), 1) });
+    if (st === "crew") { let tx = ""; for (let i = -3; i <= 3; i++) tx += line(M(Pt(i * .2, 0, .27)) + L(Pt(i * .19 + .02, 0, .16)), .6, OL, .35);
+      return shortMass(x, cx, top, hh, w, { sb: .58, fade: .4, fadeY: .32, th: (s) => 1 + 2.4 * bump(s, 0, .85), n: 10,
+        line: [Pt(1, -1.6, .42), Pt(.72, 0, .31), Pt(.3, 0, .28), Pt(-.3, 0, .28), Pt(-.72, 0, .31), Pt(-1, 1.6, .42)], lineZ: { n: 2, d: .55, round: true },
+        hi: [[Pt(-.5, 0, .11), Pt(-.2, 0, -.01), Pt(.15, 0, -.02)]], extra: tx }); }
+    if (st === "buzz") { let dots = ""; for (let i = 0; i < 70; i++) { const u = ((i * 37) % 100) / 50 - 1, v = ((i * 61) % 100) / 100 * .5 - .02; dots += `<circle cx="${f(cx + u * w)}" cy="${f(top + v * hh)}" r="${f(.32 * k)}" fill="${hp.d}" opacity=".7"/>`; }
+      return shortMass(x, cx, top, hh, w, { soft: 1, sb: .56, th: () => .6, n: 10,
+        line: [Pt(1, -1.5, .4), Pt(.74, 0, .33), Pt(.4, 0, .28), Pt(0, 0, .27), Pt(-.4, 0, .28), Pt(-.74, 0, .33), Pt(-1, 1.5, .4)],
+        extra: dots + `<path d="${M(Pt(.2, 0, -.2)) + Q(Pt(.8, 0, .0), Pt(.7, 0, .5)) + L(Pt(1, 9, .8)) + L(Pt(1, 9, -.4))}Z" fill="${hp.d}" opacity=".3"/>` + strand([Pt(-.5, 0, .1), Pt(-.2, 0, .0), Pt(.1, 0, .01)], 1.1 * k, "#fff", .3) }); }
+    if (st === "slick") { const cl = [-.6, -.36, -.12, .12, .36, .6].map((u) => [Pt(u, 0, .25 + Math.abs(u) * .05), Pt(u * .8, 0, .02), Pt(u * .35, 0, -.2)]);
+      return shortMass(x, cx, top, hh, w, { sb: .6, fade: .25, fadeY: .4, noBand: 1, th: (s) => 1.2 + 6.2 * bump(s, -.05, .78), n: 10,
+        line: [Pt(1, -1.6, .42), Pt(.78, 0, .37), Pt(.6, 0, .25), Pt(.3, 0, .21), Pt(0, 0, .215), Pt(-.3, 0, .21), Pt(-.6, 0, .25), Pt(-.78, 0, .37), Pt(-1, 1.6, .42)],
+        cl, hi: [[Pt(-.46, 0, .2), Pt(-.4, 0, -.02), Pt(-.12, 0, -.18)], [Pt(-.22, 0, .19), Pt(-.17, 0, .0), Pt(.03, 0, -.16)]] }); }
+    if (st === "messy") return shortMass(x, cx, top, hh, w, { sb: .6, fade: .2, th: (s) => 1.8 + 6.4 * bump(s, 0, .9), n: 8, topZ: { n: 1, d: 2.6, v: .25, s: (u) => Math.round((u + 1) * 3) % 2 ? 1.8 : -1.4 },
+      line: [Pt(1, -1.7, .44), Pt(.64, 0, .31), Pt(.22, 0, .32), Pt(-.2, 0, .3), Pt(-.62, 0, .32), Pt(-1, 1.7, .44)], lineZ: { n: 1, d: 3.4, v: .25, s: (u) => u > .3 ? 1 : -1.6 },
+      cl: [[Pt(0, 0, -.1), Pt(-.25, 0, .12), Pt(-.4, 0, .4)], [Pt(.05, 0, -.1), Pt(.15, 0, .15), Pt(.2, 0, .42)], [Pt(.1, 0, -.1), Pt(.5, 0, .1), Pt(.64, 0, .38)], [Pt(-.05, 0, -.1), Pt(-.6, 0, .08), Pt(-.86, 0, .3)]],
+      hi: [[Pt(-.5, 0, .05), Pt(-.3, 0, -.1), Pt(-.05, 0, -.13)], [Pt(-.18, 0, .2), Pt(-.24, 0, .31)]] });
+    if (st === "curly") { let tx = ""; for (let i = 0; i < 24; i++) { const u = ((i * 41) % 100) / 100 * 1.8 - .9, v = ((i * 67) % 100) / 100 * .42 - .12, p = Pt(u, 0, v), r = 1.5 * k;
+        tx += `<path d="M${f(p[0] - r)} ${f(p[1] + .4)}a${f(r)} ${f(r)} 0 1 1 ${f(r * 1.6)} ${f(-.4 * r)}" fill="none" stroke="${i % 4 ? hp.d : hp.hl}" stroke-width="${i % 4 ? .8 : 1}" stroke-linecap="round"/>`; }
+      return shortMass(x, cx, top, hh, w, { sb: .58, fade: .15, th: (s) => 1.2 + 7.2 * bump(s, 0, .8), n: 9, topZ: { n: 1, d: 1.3, round: true },
+        line: [Pt(1, -1.6, .42), Pt(.62, 0, .34), Pt(0, 0, .32), Pt(-.62, 0, .34), Pt(-1, 1.6, .42)], lineZ: { n: 2, d: 1.2, round: true }, extra: tx }); }
+    if (st === "bun" || st === "pony") { const T = st === "bun" ? Pt(.08, 0, -.12) : Pt(0, 0, -.1);
+      const cl = [-.8, -.5, -.2, .15, .45, .78].map((u) => { const a = Pt(u, 0, .3 + Math.abs(u) * .08); return [a, lerp(a, T, .5).map((v, i) => i ? v : v - u * 1.2 * k), T]; });
+      return shortMass(x, cx, top, hh, w, { sb: .55, fade: .12, th: (s) => 1 + 1.6 * bump(s, 0, .9), n: 10,
+        line: [Pt(1, -1.5, .42), Pt(.72, 0, .31), Pt(.35, 0, .27), Pt(0, 0, .26), Pt(-.35, 0, .27), Pt(-.72, 0, .31), Pt(-1, 1.5, .42)],
+        cl, hi: [[Pt(-.5, 0, .14), Pt(-.35, 0, .0), Pt(-.05, 0, -.06)]] }); }
+    if (st === "receding") {
+      
+      const thin = h.mix(hp.m, x.sk.m, .55);
+      let g = `<path d="${M(Pt(-.8, 0, .14)) + C(Pt(-.7, 0, -.06), Pt(.7, 0, -.06), Pt(.8, 0, .14)) + Q(Pt(.4, 0, .06), Pt(0, 0, .08)) + Q(Pt(-.4, 0, .06), Pt(-.8, 0, .14))}Z" fill="${thin}" opacity=".85"/>`;
+      [-1, 1].forEach((sd) => { const d = M(Pt(sd, -.4 * sd, .64)) + Q(Pt(sd, 1.1 * sd, .5), Pt(sd, 1.3 * sd, .3)) + Q(Pt(sd, 1 * sd, .12), Pt(sd * .8, 0, .08)) + Q(Pt(sd * .8, 0, .2), Pt(sd, -1.4 * sd, .34)) + Q(Pt(sd, -1.9 * sd, .46), Pt(sd, -2 * sd, .62)) + "Z";
+        g += partL(x, d, hp.m, sd > 0 ? `<path d="${M(Pt(.6, 0, 0)) + L(Pt(1.4, 0, 0)) + L(Pt(1.4, 0, .8)) + L(Pt(.6, 0, .8))}Z" fill="${hp.d}"/>` : strand([Pt(-1, -.4, .2), Pt(-1, -.9, .34)], .9 * k, hp.hl, .7), IW); });
+      const isl = M(Pt(-.26, 0, .07)) + Q(Pt(0, 0, .02), Pt(.24, 0, .07)) + Q(Pt(.14, 0, .14), Pt(.04, 0, .2)) + Q(Pt(-.04, 0, .13), Pt(-.12, 0, .17)) + Q(Pt(-.2, 0, .12), Pt(-.26, 0, .07)) + "Z";
+      g += `<path d="${isl}" fill="${h.mix(hp.m, x.sk.m, .35)}"/>` + line(M(Pt(-.16, 0, .08)) + Q(Pt(-.05, 0, .12), Pt(.02, 0, .18)) + M(Pt(.04, 0, .07)) + Q(Pt(.1, 0, .11), Pt(.12, 0, .15)), .6, hp.d, .7);
+      return g + `<path d="M${f(cx - w * .5)} ${f(top + hh * .14)}Q${f(cx - w * .3)} ${f(top + 1.4)} ${f(cx - w * .05)} ${f(top + 1)}" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="1.2" stroke-linecap="round"/>`;
+    }
+    if (st === "afro") {
+      
+      const R = afroR(x, cx, top, hh, w), fillD = afroOuter(R) + L(Pt(1, -1.4, .55)) + zig([Pt(1, -1.4, .55), Pt(.66, 0, .33), Pt(0, 0, .29), Pt(-.66, 0, .33), Pt(-1, 1.4, .55)], { n: 3, d: .9, round: true }, k, cx, w) + "Z";
+      const hl = M(Pt(1, -1.4, .55)) + zig([Pt(1, -1.4, .55), Pt(.66, 0, .33), Pt(0, 0, .29), Pt(-.66, 0, .33), Pt(-1, 1.4, .55)], { n: 3, d: .9, round: true }, k, cx, w);
+      const kc = x.id("cp" + (CL++));
+      return `<clipPath id="${kc}"><path d="${fillD}"/></clipPath><path d="${fillD}" fill="${hp.m}"/><g clip-path="url(#${kc})">${afroTex(x, R, hh)}</g><path d="${hl}" fill="none" stroke="${OL}" stroke-width="${IW}"/>`;
+    }
+    return "";
+  }
+  
+  const afroR = (x, cx, top, hh, w) => ({ cx, cy: top + hh * .34, rx: w + 7.5 * hh / 36, ry: hh * .6, k: hh / 36, top, hh, w });
+  function afroOuter(R) {
+    let d = ""; const n = 24;
+    for (let i = 0; i <= n; i++) { const a = Math.PI * (.8 + i / n * 1.4), p0 = [R.cx + Math.cos(a) * R.rx, Math.min(R.top + R.hh * .7, R.cy + Math.sin(a) * R.ry)];
+      if (!i) d += M(p0); else { const am = Math.PI * (.8 + (i - .5) / n * 1.4); d += Q([R.cx + Math.cos(am) * (R.rx + 2.2 * R.k), Math.min(R.top + R.hh * .72, R.cy + Math.sin(am) * (R.ry + 2.2 * R.k))], p0); } }
+    return d;
+  }
+  function afroTex(x, R, hh) {
+    const hp = x.hp; let g = `<path d="${M([R.cx + R.rx * .1, R.cy - R.ry - 4]) + Q([R.cx + R.rx * .9, R.cy - R.ry * .6], [R.cx + R.rx * .7, R.cy + R.ry])}L${f(R.cx + R.rx + 6)} ${f(R.cy + R.ry)}L${f(R.cx + R.rx + 6)} ${f(R.cy - R.ry - 4)}Z" fill="${hp.d}"/>`;
+    for (let i = 0; i < 70; i++) { const a = i * 2.39996, r = Math.sqrt((i + .5) / 70), px = R.cx + Math.cos(a) * R.rx * r * .95, py = R.cy + Math.sin(a) * R.ry * r * .95, s = 1.6 * R.k;
+      g += `<path d="M${f(px - s)} ${f(py + .5)}a${f(s)} ${f(s)} 0 1 1 ${f(s * 1.7)} ${f(-.5)}" fill="none" stroke="${i % 5 === 0 ? hp.hl : hp.d}" stroke-width="${i % 5 === 0 ? .9 : .7}" stroke-linecap="round" stroke-opacity="${i % 5 === 0 ? .9 : .75}"/>`; }
+    return g + `<path d="M${f(R.cx - R.rx * .62)} ${f(R.cy - R.ry * .5)}Q${f(R.cx - R.rx * .25)} ${f(R.cy - R.ry * .92)} ${f(R.cx + R.rx * .2)} ${f(R.cy - R.ry * .86)}" fill="none" stroke="${hp.hl}" stroke-width="${f(1.8 * R.k)}" stroke-linecap="round" stroke-opacity=".75"/>`;
+    void hh;
+  }
+  
+  function shortBack(x, cx, top, hh, w) {
+    const st = x.hair, k = hh / 36, hp = x.hp;
+    if (st === "afro") { const R = afroR(x, cx, top, hh, w), d = afroOuter(R) + "Z"; return partL(x, d, hp.m, afroTex(x, R, hh)); }
+    if (st === "bun") { const bx = cx + w * .08, by = top - 2.4 * k;
+      return partL(x, `M${f(bx - 6 * k)} ${f(by)}a${f(6 * k)} ${f(5 * k)} 0 1 1 ${f(12 * k)} 0a${f(6 * k)} ${f(5 * k)} 0 1 1 ${f(-12 * k)} 0Z`, hp.m,
+        `<path d="M${f(bx + 1.5 * k)} ${f(by - 8 * k)}h${f(8 * k)}v${f(14 * k)}h${f(-8 * k)}Z" fill="${hp.d}"/>` + line(M([bx - 4 * k, by - 1.4 * k]) + Q([bx, by - 4.6 * k], [bx + 4 * k, by - 1.6 * k]) + M([bx - 3 * k, by + 1.4 * k]) + Q([bx + .5, by - 1.4 * k], [bx + 4.4 * k, by + .6 * k]), .7, OL, .6) +
+        strand([[bx - 4 * k, by - 2.6 * k], [bx - 2 * k, by - 4.4 * k], [bx + 1 * k, by - 4.6 * k]], 1.1 * k, hp.hl, .8)); }
+    return "";
+  }
+
+  
+  const FACIAL = [["none", "None"], ["stubble", "Stubble"], ["mustache", "Mustache"], ["goatee", "Goatee"], ["short", "Short beard"], ["full", "Full beard"]];
+  function facialHair(x, cx, top, hh, w, fx, ny, my) {
+    const fh = x.facial, chin = top + hh, h = N();
+    if (!fh || fh === "none") return { under: "", over: "" };
+    const fhc = GRAYS[x.hc] ? h.shade(x.hc, -.12) : x.hp.m, fhd = h.shade(fhc, -.32), fhl = h.shade(fhc, .3);
+    const jawR = (drop, b1, cheekY) => M([cx - w * .96, top + hh * .62]) + C([cx - w * (.97 + b1), top + hh * .8], [cx - w * (.72 + b1), chin + drop * .6], [fx, chin + drop]) + C([cx + w * (.72 + b1), chin + drop * .6], [cx + w * (.97 + b1), top + hh * .8], [cx + w * .96, top + hh * .62]) +
+      L([cx + w * .84, top + hh * .62]) + Q([cx + w * .66, cheekY], [fx + 5.6, my - .8]) + Q([fx + 5.2, my + 3.2], [fx, my + 3.4]) + Q([fx - 5.2, my + 3.2], [fx - 5.6, my - .8]) + Q([cx - w * .66, cheekY], [cx - w * .84, top + hh * .62]) + "Z";
+    const shR = (y1) => `<path d="M${f(fx + 1)} ${f(top)}L${f(cx + w * 2)} ${f(top)}L${f(cx + w * 2)} ${f(y1)}L${f(fx + 1)} ${f(y1)}Z" fill="${fhd}"/>`;
+    const mus = (th) => M([fx - 5.2, my]) + Q([fx - 5, my - 2.4 - th], [fx - 2.4, my - 3.1 - th]) + Q([fx - .8, my - 3.5 - th], [fx, my - 2.9 - th]) + Q([fx + .8, my - 3.5 - th], [fx + 2.4, my - 3.1 - th]) + Q([fx + 5, my - 2.4 - th], [fx + 5.2, my]) +
+      Q([fx + 4, my - 1.2], [fx + 2, my - 1.5]) + Q([fx, my - 1.1], [fx - 2, my - 1.5]) + Q([fx - 4, my - 1.2], [fx - 5.2, my]) + "Z";
+    const musTex = line(M([fx - 3.8, my - 2.2]) + L([fx - 3.5, my - 1.2]) + M([fx - 2.1, my - 2.7]) + L([fx - 1.9, my - 1.6]) + M([fx + 1.8, my - 2.7]) + L([fx + 2, my - 1.6]) + M([fx + 3.5, my - 2.2]) + L([fx + 3.8, my - 1.2]), .5, fhd, .9) +
+      line(M([fx - 4.2, my - 1.6]) + Q([fx - 3.3, my - 3], [fx - 1.4, my - 3]), .8, fhl, .8);
+    const mustache = (th) => partL(x, mus(th), fhc, shR(my + 2) + musTex, IW);
+    if (fh === "stubble") {
+      const d = jawR(1.2, 0, ny + 2.4);
+      return { under: `<path d="${d}" fill="${fhc}" opacity=".16"/><path d="${jawR(.6, -.03, ny + 3.2)}" fill="${fhc}" opacity=".08"/>`,
+        over: `<path d="${mus(-.4)}" fill="${fhc}" opacity=".2"/>` };
+    }
+    if (fh === "mustache") return { under: "", over: mustache(.2) };
+    if (fh === "goatee") {
+      const d = M([fx - 5.8, my - .4]) + Q([fx - 6.6, my + 4], [fx - 3.8, chin + .9]) + Q([fx, chin + 2.8], [fx + 3.8, chin + .9]) + Q([fx + 6.6, my + 4], [fx + 5.8, my - .4]) + L([fx + 4.6, my + .5]) + Q([fx, my + 3.7], [fx - 4.6, my + .5]) + "Z";
+      return { under: partL(x, d, fhc, shR(chin + 4) + line(M([fx - 3.2, chin - 1]) + q2(1.2, 1.6) + M([fx + .8, chin]) + q2(1.2, 1.6), .6, fhd, .9) + line(M([fx - 4.6, my + 2.6]) + Q([fx - 4.4, chin - 1], [fx - 2.6, chin + .2]), .9, fhl, .7), IW), over: mustache(.2) };
+    }
+    if (fh === "short") {
+      const d = jawR(1.8, .03, my - 1.6);
+      const tex = line(M([cx - w * .7, top + hh * .74]) + q2(1, 1.6) + M([cx - w * .4, chin - 2]) + q2(1, 1.6) + M([fx + 2, chin - 1]) + q2(1, 1.6) + M([cx + w * .55, top + hh * .8]) + q2(1, 1.6), .55, fhd, .9) +
+        line(M([cx - w * .9, top + hh * .6]) + Q([cx - w * .86, top + hh * .8], [cx - w * .6, chin - 2]), 1, fhl, .6);
+      return { under: partL(x, d, fhc, shR(chin + 6) + `<path d="M${f(cx - w)} ${f(chin - 1)}Q${f(fx)} ${f(chin + 3.6)} ${f(cx + w)} ${f(chin - 1)}L${f(cx + w)} ${f(chin + 6)}L${f(cx - w)} ${f(chin + 6)}Z" fill="${fhd}" opacity=".6"/>` + tex, IW), over: mustache(.3) };
+    }
+    
+    const Lt = [cx - w * .96, top + hh * .62], Rt = [cx + w * .96, top + hh * .62];
+    const bot = [[cx - w * .84, chin + .4], [fx - w * .46, chin + 4.4], [fx, chin + 6], [fx + w * .46, chin + 4.4], [cx + w * .84, chin + .4]];
+    const d = M(Lt) + C([cx - w * 1.04, top + hh * .76], [cx - w * 1.02, chin - 3], bot[0]) + zig(bot, { n: 1, d: 1.8, s: (u) => u * -.8 }, 1, cx, w, true) + C([cx + w * 1.02, chin - 3], [cx + w * 1.04, top + hh * .76], Rt) +
+      L([cx + w * .84, top + hh * .62]) + Q([cx + w * .68, my - 2.4], [fx + 5.8, my - 1]) + Q([fx + 5.2, my + 3], [fx, my + 3.2]) + Q([fx - 5.2, my + 3], [fx - 5.8, my - 1]) + Q([cx - w * .68, my - 2.4], [cx - w * .84, top + hh * .62]) + "Z";
+    const tex = line(M([cx - w * .62, chin - 2]) + Q([cx - w * .55, chin + 2], [cx - w * .42, chin + 4]) + M([fx - 2, chin]) + Q([fx - 1.6, chin + 3], [fx - 1, chin + 5.6]) + M([fx + 3, chin - .4]) + Q([fx + 3.6, chin + 2.6], [fx + 4.4, chin + 4.6]) + M([cx + w * .7, top + hh * .76]) + Q([cx + w * .74, chin - 2], [cx + w * .66, chin + 1.4]), .7, fhd, .9) +
+      line(M([cx - w * .92, top + hh * .6]) + Q([cx - w * .92, top + hh * .85], [cx - w * .64, chin + 1]), 1.2, fhl, .65);
+    return { under: partL(x, d, fhc, shR(chin + 10) + `<path d="M${f(cx - w * 1.2)} ${f(chin + 1)}Q${f(fx)} ${f(chin + 5)} ${f(cx + w * 1.2)} ${f(chin + 1)}L${f(cx + w * 1.2)} ${f(chin + 10)}L${f(cx - w * 1.2)} ${f(chin + 10)}Z" fill="${fhd}" opacity=".55"/>` + tex), over: mustache(.5) };
+  }
+
+  
+  function headDraw(x, cx, top, hh, of) {
+    const k = hh / 36, age = x.age, kid = age === "kid" || age === "toddler" || age === "baby", old = age === "old", fem = x.fem;
+    const fx = cx + 1.6 * k, sk = x.sk, hp = x.hp, w = headW(x), chin = top + hh;
+    const ey = top + hh * (kid ? .6 : .56), ny = top + hh * (kid ? .75 : .72), my = top + hh * (kid ? .865 : .855);
+    const cw = kid ? .6 : fem ? .44 : .5, jx = kid ? .94 : fem ? .76 : .8;
+    const face = M([cx, top]) + C([cx + w * .86, top], [cx + w * 1.04, top + hh * .26], [cx + w, top + hh * .5]) + C([cx + w * .98, top + hh * .7], [cx + w * jx, top + hh * .86], [cx + w * cw, chin - 1.2 * k]) +
+      Q([cx, chin + k], [cx - w * cw, chin - 1.2 * k]) + C([cx - w * jx, top + hh * .86], [cx - w * .98, top + hh * .7], [cx - w, top + hh * .5]) + C([cx - w * 1.04, top + hh * .26], [cx - w * .86, top], [cx, top]) + "Z";
+    let g = "";
+    [-1, 1].forEach((sd) => { const ex = cx + sd * (w - .8);
+      const d = M([ex, ey - 1.5 * k]) + C([ex + sd * 3.4 * k, ey - 3.4 * k], [ex + sd * 4 * k, ey + 3.4 * k], [ex + sd * .6, ny + 1.4 * k]) + "Z";
+      g += part(x, d, sd < 0 ? sk.m : sk.d, null, null, IW + .2) + line(M([ex + sd * 1.2 * k, ey - .6 * k]) + Q([ex + sd * 2.8 * k, ey + k], [ex + sd * 1.4 * k, ny - .2]), .7, sk.k); });
+    const shade = M([cx + w * .45, top]) + C([cx + w * 1.1, top + hh * .3], [cx + w, top + hh * .8], [cx + w * .2, chin + 2]) + L([cx + w * 2, chin + 2]) + L([cx + w * 2, top]) + "Z";
+    g += part(x, face, sk.m, shade, sk.d, OW);
+    const blush = kid ? .45 : fem ? .36 : .28;
+    g += `<ellipse cx="${f(fx - w * .5)}" cy="${f(ny + .8 * k)}" rx="${f(2.3 * k)}" ry="${f(1.3 * k)}" fill="#e8806a" opacity="${blush}"/><ellipse cx="${f(fx + w * .46)}" cy="${f(ny + .8 * k)}" rx="${f(1.9 * k)}" ry="${f(1.2 * k)}" fill="#e8806a" opacity="${f(blush * .85)}"/>`;
+    
+    if (old) g += line(M([cx - w * .45, top + hh * .37]) + Q([cx, top + hh * .34], [cx + w * .45, top + hh * .37]) + M([cx - w * .32, top + hh * .43]) + Q([cx, top + hh * .405], [cx + w * .32, top + hh * .43]), .6, sk.k, .55) +
+      line(M([fx - 3.8, ny + 1]) + Q([fx - 5.2, my - 1], [fx - 4.6, my + 1.2]) + M([fx + 3.8, ny + 1]) + Q([fx + 5, my - 1], [fx + 4.4, my + 1.2]), .65, sk.k, .55);
+    
+    const ke = k * (kid ? 1.2 : fem ? 1.06 : 1), es = w * (kid ? .42 : .4), ew = 3.3 * ke, eh = 4 * ke;
+    let eyes = "";
+    [-1, 1].forEach((sd) => { const ex = fx + sd * es * (sd > 0 ? .94 : 1), e2 = ew * (sd > 0 ? .92 : 1);
+      if (x.asleep) { eyes += line(M([ex - e2, ey + .4]) + Q([ex, ey + eh * .75], [ex + e2, ey + .2]), 1.2) + line(M([ex + sd * e2 * .7, ey + eh * .35]) + L([ex + sd * (e2 + .6), ey + eh * .55]), .7); return; }
+      eyes += `<ellipse cx="${f(ex)}" cy="${f(ey)}" rx="${f(e2)}" ry="${f(eh)}" fill="#fff" stroke="${OL}" stroke-width=".55"/>` +
+        `<circle cx="${f(ex + 1.1 * ke)}" cy="${f(ey + .5 * ke)}" r="${f(2.15 * ke)}" fill="#7a4a2c" stroke="#3a2214" stroke-width=".55"/><circle cx="${f(ex + 1.1 * ke)}" cy="${f(ey + .9 * ke)}" r="${f(1.4 * ke)}" fill="#5c361f" opacity=".6"/>` +
+        `<circle cx="${f(ex + 1.1 * ke)}" cy="${f(ey + .5 * ke)}" r="${f(1.05 * ke)}" fill="#0e0907"/><circle cx="${f(ex + .4 * ke)}" cy="${f(ey - .4 * ke)}" r="${f(.7 * ke)}" fill="#fff"/><circle cx="${f(ex + 1.8 * ke)}" cy="${f(ey + 1.3 * ke)}" r="${f(.32 * ke)}" fill="#fff"/>` +
+        `<path d="M${f(ex - e2 - .3)} ${f(ey - .2)}Q${f(ex - .4)} ${f(ey - eh - 1.6 * ke)} ${f(ex + e2 + .4)} ${f(ey - .9 * ke)}l${f(sd * .9)} -.7" fill="none" stroke="${OL}" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/>` +
+        `<path d="M${f(ex - e2 + .6)} ${f(ey + eh - .5)}Q${f(ex)} ${f(ey + eh + .5)} ${f(ex + e2 - .6)} ${f(ey + eh - .6)}" fill="none" stroke="${sk.k}" stroke-width=".55" stroke-opacity=".7"/>`;
+      if (fem) { const oxp = ex + sd * (e2 + .1), oy = ey - eh * (sd > 0 ? .3 : .1);
+        eyes += line(M([oxp, oy]) + L([oxp + sd * 1.5 * ke, oy - 1.1 * ke]) + M([oxp - sd * 1.3 * ke, oy - eh * .45]) + L([oxp + sd * .2, oy - eh * .45 - 1.5 * ke]), .8); }
+      if (old) eyes += line(M([ex - e2 + .8, ey + eh + 1.2]) + Q([ex, ey + eh + 2.4], [ex + e2 - .4, ey + eh + 1]), .5, sk.k, .5) + line(M([ex + sd * (e2 + 1), ey - .4]) + L([ex + sd * (e2 + 2.6), ey - 1.2]) + M([ex + sd * (e2 + 1), ey + 1]) + L([ex + sd * (e2 + 2.6), ey + 1.6]), .5, sk.k, .55); });
+    g += `<g class="${P}blink">${eyes}</g>`;
+    
+    const browC = GRAYS[x.hc] ? "#8a8880" : N().shade(hp.m, -.25), bt = fem ? .55 : kid ? .8 : old ? 1.2 : 1, ar = fem ? 1.4 : 0;
+    if (age !== "baby") [-1, 1].forEach((sd) => { const bx = fx + sd * es * (sd > 0 ? .94 : 1), by = ey - (kid ? 1.1 : 0) * k;
+      g += `<path d="M${f(bx - sd * 3.4 * ke)} ${f(by - 5.4 * ke)}Q${f(bx - sd * .2)} ${f(by - (7.6 + ar) * ke)} ${f(bx + sd * 4 * ke)} ${f(by - 4.8 * ke)}Q${f(bx)} ${f(by - (7.6 + ar - 1.4 * bt) * ke)} ${f(bx - sd * 3.2 * ke)} ${f(by - (5.4 - 1.4 * bt) * ke)}Z" fill="${browC}" stroke="${OL}" stroke-width=".5" stroke-linejoin="round"/>`; });
+    else [-1, 1].forEach((sd) => { const bx = fx + sd * es; g += line(M([bx - 2.4 * ke, ey - 5.6 * ke]) + Q([bx, ey - 6.6 * ke], [bx + 2.4 * ke, ey - 5.6 * ke]), .6, browC, .6); });
+    
+    const kn = k * (fem ? .85 : 1);
+    if (kid) g += line(M([fx - 1.5 * k, ny + .2]) + Q([fx, ny + 1.5 * k], [fx + 1.5 * k, ny + .1]), .85) + `<ellipse cx="${f(fx - .2)}" cy="${f(ny - 1.2 * k)}" rx="${f(.8 * k)}" ry="${f(.9 * k)}" fill="${sk.hl}" opacity=".8"/>`;
+    else g += line(M([fx + .8 * kn, ey + 1.5 * k]) + Q([fx + 2.4 * kn, ny - k], [fx + 1.8 * kn, ny + .6]), .9) + line(M([fx - 1.8 * kn, ny + .4]) + Q([fx - .4 * kn, ny + 1.6], [fx + 1.8 * kn, ny + .6]), .9) +
+      `<ellipse cx="${f(fx - .6)}" cy="${f(ny - 1.6)}" rx=".8" ry="1.2" fill="${sk.hl}" opacity=".7"/>`;
+    
+    const fh = x.facial, FHx = facialHair(x, cx, top, hh, w, fx, ny, my);
+    g += FHx.under;
+    
+    if (kid) g += line(M([fx - 2.6 * k, my - .6]) + Q([fx, my + 1.9 * k], [fx + 2.6 * k, my - .8]), .95) + line(M([fx - .9 * k, my + 2.3 * k]) + Q([fx, my + 2.7 * k], [fx + .9 * k, my + 2.3 * k]), .6, sk.k, .7);
+    else if (fem) { const lip = N().mix(sk.m, "#c0485a", .5), lipD = N().shade(lip, -.2);
+      g += `<path d="M${f(fx - 3.1)} ${f(my - .2)}Q${f(fx)} ${f(my + 3.4)} ${f(fx + 3.1)} ${f(my - .5)}Q${f(fx)} ${f(my + .8)} ${f(fx - 3.1)} ${f(my - .2)}Z" fill="${lip}" stroke="${OL}" stroke-width=".5"/>` +
+        `<path d="M${f(fx - 3.4)} ${f(my - .3)}Q${f(fx - 1.6)} ${f(my - 2.2)} ${f(fx)} ${f(my - 1.3)}Q${f(fx + 1.6)} ${f(my - 2.2)} ${f(fx + 3.4)} ${f(my - .7)}Q${f(fx)} ${f(my + .5)} ${f(fx - 3.4)} ${f(my - .3)}Z" fill="${lipD}" stroke="${OL}" stroke-width=".5"/>` +
+        line(M([fx - 3.3, my - .3]) + Q([fx, my + 1.2], [fx + 3.3, my - .7]), .9) + `<ellipse cx="${f(fx - .6)}" cy="${f(my + 1.5)}" rx="1.2" ry=".45" fill="#fff" opacity=".45"/>`; }
+    else g += line(M([fx - 3.4, my - .4]) + Q([fx, my + 1.8], [fx + 3.4, my - .8]), 1.1) + (fh === "full" || fh === "short" || fh === "goatee" ? "" : line(M([fx - 1.4, my + 2.2]) + Q([fx, my + 2.8], [fx + 1.4, my + 2.2]), .7, sk.k));
+    g += FHx.over;
+    g += hairFront(x, cx, top, hh, w);
+    if (of && of.hat) g += beanie(x, cx, top, hh, w);
+    if (x.glasses !== "none" && age !== "baby") {
+      const kg = Math.max(.85, Math.min(1.1, ke));
+      g += `<g transform="translate(${f(fx)} ${f(ey)}) scale(${kg.toFixed(3)}) translate(${f(-fx)} ${f(-ey)})">${glasses(x, fx, ey, es / kg, fx + (cx - fx) / kg, w / kg)}</g>`;
+    }
+    return g;
+  }
+
+  
+  function glasses(x, fx, ey, es, cx, w) {
+    const gl = x.glasses; if (gl === "none") return "";
+    const lx = [fx - es, fx + es * .94], y = ey + .3;
+    const frame = { rect: "#1c1c20", round: "#6b3f22", browline: "#1c1c20", sun: "#141416", cat: "#7a2e4a" }[gl] || "#1c1c20";
+    let s = "";
+    const lens = (px) => gl === "round" ? `<circle cx="${f(px)}" cy="${f(y)}" r="4.3"/>` : gl === "cat" ? `<path d="M${f(px - 4.7)} ${f(y - 3.4)}Q${f(px)} ${f(y - 2.6)} ${f(px + 4.7)} ${f(y - 3.6)}Q${f(px + 4.6)} ${f(y + 3.2)} ${f(px)} ${f(y + 3.1)}Q${f(px - 4.4)} ${f(y + 3)} ${f(px - 4.7)} ${f(y - 3.4)}Z"/>` :
+      `<rect x="${f(px - 4.5)}" y="${f(y - 3.3)}" width="9" height="6.6" rx="${gl === "sun" ? 2.6 : 1.6}"/>`;
+    s += line(M([lx[0] - (gl === "round" ? 4.2 : 4.4), y - 1.4]) + L([cx - w + .6, y - 1.8]) + M([lx[1] + (gl === "round" ? 4.2 : 4.4), y - 1.4]) + L([cx + w - .6, y - 1.8]), 1.1, frame);
+    s += line(M([lx[0] + (gl === "round" ? 4.2 : 4.4), y - 1]) + Q([fx + .2, y - 2.6], [lx[1] - (gl === "round" ? 4.2 : 4.4), y - 1]), 1.1, frame);
+    lx.forEach((px) => {
+      const fill = gl === "sun" ? `fill="#1e2430" fill-opacity=".88"` : `fill="#cfe4f4" fill-opacity=".18"`;
+      s += `<g ${fill} stroke="${gl === "browline" ? "#c9a24a" : frame}" stroke-width="${gl === "browline" ? .8 : 1.15}">${lens(px)}</g>`;
+      if (gl === "browline") s += line(M([px - 4.6, y - 2.4]) + Q([px, y - 4.6], [px + 4.6, y - 2.6]), 2, frame);
+      if (gl === "round") s += `<circle cx="${f(px - 2.6)}" cy="${f(y - 2.2)}" r=".6" fill="#a8743e"/><circle cx="${f(px + 3)}" cy="${f(y + 1.6)}" r=".55" fill="#3a2010"/>`;
+      if (gl === "cat") s += line(M([px + (px > fx ? 3.4 : -3.4), y - 3.4]) + L([px + (px > fx ? 5.4 : -5.4), y - 4.6]), 1.6, frame);
+      s += line(M([px - 2.4, y + 1.6]) + L([px + .6, y - 2]), gl === "sun" ? .9 : .7, "#fff", gl === "sun" ? .45 : .6);
+    });
+    return s;
+  }
+
+  
+  const HAIR_TOP = { afro: 11.5, bun: 8, messy: 11.5, curly: 9, long: 3, side: 8, slick: 8, crew: 4, pony: 2.5, buzz: 1.5, receding: 1, bald: 0,
+    fstraight: 3, fwavy: 4, bob: 4, pixie: 6, fbun: 11, fpony: 6, braids: 3, fcurly: 5, updo: 6, perm: 10, pigtails: 3, tuft: 6, fuzz: .5 };
+  const HAIR_W = { pigtails: 10, afro: 6, curly: 1, messy: .5, fcurly: 7, fwavy: 5, fstraight: 4.5, bob: 4.5, perm: 3.5, braids: 3, long: 6, fpony: 6 };
+  const LONG = { fstraight: { wave: 0 }, fwavy: { wave: 1.7 }, fcurly: { wave: 2.4, curl: true }, long: { wave: .5, len: 1.45 } };
+  const lenFor = (x, st) => LONG[st].len || (x.age === "kid" || x.age === "toddler" ? 1.72 : x.age === "old" ? 1.6 : 1.95);
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const thru = (Pp) => { let d = ""; for (let i = 1; i < Pp.length - 1; i++) d += Q(Pp[i], i === Pp.length - 2 ? Pp[i + 1] : [(Pp[i][0] + Pp[i + 1][0]) / 2, (Pp[i][1] + Pp[i + 1][1]) / 2]); return d; };
+  const pl = (a, y) => { for (let i = 1; i < a.length; i++) if (y <= a[i][0] || i === a.length - 1) { const t = Math.max(0, Math.min(1, (y - a[i - 1][0]) / ((a[i][0] - a[i - 1][0]) || 1))); return a[i - 1][1] + (a[i][1] - a[i - 1][1]) * t; } return a[0][1]; };
+  
+  function tips(a, b, k, n) {
+    const tp = n === 2 ? [[.25, 3.2], [.5, -2.4], [.75, 2.4]] : [[.17, 3.5], [.36, -2.6], [.52, 4.6], [.68, -2.4], [.84, 2.6]];
+    let d = "", prev = a;
+    tp.forEach(([t, dy]) => { const p = lerp(a, b, t), y = p[1] + dy * k; d += Q([(prev[0] + p[0]) / 2, Math.max(prev[1], y) + (dy > 0 ? .4 : -.6) * k], [p[0], y]); prev = [p[0], y]; });
+    return d + Q([(prev[0] + b[0]) / 2, Math.max(prev[1], b[1]) + .4 * k], b);
+  }
+  function longLocks(x, cx, top, hh, w, cfg) {
+    const hp = x.hp, k = hh / 36, sh = x._sh || top + hh + 9, nk = x.b.Nk, chin = top + hh, ey = top + hh * .56;
+    const yb = top + hh * cfg.len, wave = (cfg.wave || 0) * k, vol = (cfg.wave || 0) * .9, y0 = top + hh * .3, N2 = 8;
+    const gx = cfg.curl ? 5 : cfg.wave ? 1.6 : 0, outer = [[y0, w + 1.6], [top + hh * .62, w + 2.8 + vol * .5], [chin, w + 3.6 + vol], [Math.max(sh, chin + 2), w + 5 + vol + gx * .6], [yb, w + 4.6 + vol + gx]];
+    const inner = [[ey - 2 * k, w - 1.8], [top + hh * .8, w * .9], [chin, nk + 3.6], [Math.max(sh, chin + 2), nk + 2.6], [yb, nk + 4]];
+    const wv = (y) => { const t = Math.max(0, (y - y0) / (yb - y0)); return wave * Math.sin(t * Math.PI * (cfg.curl ? 3.6 : 2.6)) * Math.pow(t, .6); };
+    let front = "", back = "";
+    const side = (sd) => {
+      const O = [], I = [];
+      for (let i = 0; i <= N2; i++) { const yo = y0 + (yb - 2 * k - y0) * i / N2, yi = ey - 2 * k + (yb - k - (ey - 2 * k)) * i / N2;
+        O.push([cx + sd * (pl(outer, yo) + wv(yo)), yo]); I.push([cx + sd * (pl(inner, yi) + wv(yi)), yi]); }
+      const d = M(O[0]) + thru(O) + tips(O[N2], I[N2], k) + thru(I.slice().reverse()) + "Z";
+      const SH = I.map((p, i) => lerp(p, O[i], sd > 0 ? .55 : .28));
+      const shd = M(I[0]) + thru(I) + L(SH[N2]) + thru(SH.slice().reverse()) + "Z";
+      let s = part(x, d, hp.m, shd, hp.d, OW);
+      [[.36, 1], [.68, 1]].forEach(([fr]) => { const C2 = O.map((p, i) => lerp(p, I[i], fr)).slice(1); C2[C2.length - 1] = [C2[C2.length - 1][0], C2[C2.length - 1][1] - 2.4 * k]; s += line(M(C2[0]) + thru(C2), .75, OL, .6); });
+      const H = O.map((p, i) => lerp(p, I[i], .2)).slice(0, 5);
+      s += line(M(H[0]) + thru(H), 1.2 * k, hp.hl, sd < 0 ? .85 : .4);
+      if (cfg.curl) for (let i = 2; i < N2; i += 1) { const p = lerp(O[i], I[i], i % 2 ? .3 : .62); s += `<path d="M${f(p[0] - 1.4 * k)} ${f(p[1] + .5)}a${f(1.5 * k)} ${f(1.5 * k)} 0 1 1 ${f(2.5 * k)} -.5" fill="none" stroke="${i % 3 ? hp.d : hp.hl}" stroke-width=".7" stroke-linecap="round"/>`; }
+      return { s, O, I };
+    };
+    const Lf = side(-1), Rt = side(1);
+    front = Lf.s + Rt.s;
+    
+    const BO = (sd) => { const P2 = []; for (let i = 0; i <= N2; i++) { const y = top + hh * .25 + (yb - 3 * k - top - hh * .25) * i / N2; P2.push([cx + sd * (pl(outer, y) + 1.8 + wv(y) * .6), y]); } return P2; };
+    const bl = BO(-1), br = BO(1), il = [cx - nk - 1, yb - 4 * k], ir = [cx + nk + 1, yb - 4 * k];
+    back = part(x, M(bl[0]) + thru(bl) + tips(bl[N2], il, k, 2) + L(ir) + tips(ir, br[N2], k, 2) + thru(br.slice().reverse()) + C([cx + w * .9, top - 4 * k], [cx - w * .9, top - 4 * k], bl[0]) + "Z", hp.d, null, null, OW);
+    return { front, back };
+  }
+  
+  function femCap(x, cx, top, hh, w, kind, lift) {
+    const k = hh / 36, Pt = (u, a, v) => [cx + u * w + a * k, top + v * hh], pu = kind === "center" ? 0 : -.36, lt = lift == null ? 1.6 : lift;
+    const line2 = kind === "center" ? [Pt(1, -1.4, .5), Pt(.72, 0, .32), Pt(.3, 0, .2), Pt(0, 0, .17), Pt(-.3, 0, .2), Pt(-.72, 0, .32), Pt(-1, 1.4, .5)]
+      : [Pt(1, -1.4, .5), Pt(.74, 0, .34), Pt(.3, 0, .22), Pt(pu, 0, .17), Pt(-.64, 0, .24), Pt(-1, 1.4, .5)];
+    const sweep = (u0, u1, v0) => [Pt(u0, 0, v0), Pt((u0 + u1) / 2, 0, v0 + .02), Pt(u1, 0, .34)];
+    return shortMass(x, cx, top, hh, w, { sb: .5, th: (s) => 1 + lt * bump(s, pu * .5, 1.1), n: 10, line: line2, noBand: 1,
+      cl: [sweep(pu + .08, .92, .06), sweep(pu + .1, .7, .14), sweep(pu - .06, -.92, .08)],
+      hi: [[Pt(pu - .1, 0, .02), Pt(-.5, 0, .1), Pt(-.8, 0, .3)], [Pt(pu + .2, 0, .02), Pt(.45, 0, .08)]],
+      extra: line(M(Pt(pu, 0, .17)) + Q(Pt(pu - .02, 0, .06), Pt(pu + .04, 0, -.06)), .9) });
+  }
+  function hairBack(x, cx, top, hh, w) {
+    const st = x.hair, hp = x.hp, k = hh / 36, chin = top + hh;
+    if (LONG[st]) return longLocks(x, cx, top, hh, w, Object.assign({ len: lenFor(x, st) }, LONG[st])).back;
+    if (st === "bob") return part(x, M([cx - w - 1.4, top + hh * .4]) + C([cx - w - 5, top + hh * .7], [cx - w - 5.5, chin], [cx - w - 3, chin + 2.6 * k]) + L([cx + w + 3, chin + 2.6 * k]) + C([cx + w + 5.5, chin], [cx + w + 5, top + hh * .7], [cx + w + 1.4, top + hh * .4]) + "Z", hp.d, null, null, OW);
+    if (st === "fpony") {
+      
+      const t0 = [cx + w * .1, top - 2 * k], ob = [cx + w + 5.6 * k, top + hh * 1.45], ib = [cx + w + 1 * k, top + hh * 1.32];
+      const d = M([t0[0] - 3 * k, t0[1]]) + C([cx + w * .6, top - 9 * k], [cx + w + 10 * k, top + hh * .1], [cx + w + 8 * k, top + hh * .7]) + Q([cx + w + 8 * k, top + hh * 1.1], ob) + tips(ob, ib, k, 2) +
+        Q([cx + w + 2.4 * k, top + hh * .8], [cx + w * .7, top + hh * .2]) + Q([cx + w * .4, top - 1], [t0[0] + 3 * k, t0[1] + 1]) + "Z";
+      return partL(x, d, hp.m, `<path d="${M([cx + w + 2 * k, top - 10]) + L([cx + w + 30, top - 10]) + L([cx + w + 30, top + hh * 2]) + L([cx + w + 2 * k, top + hh * 2])}Z" fill="${hp.d}"/>` +
+        line(M([cx + w * .5, top - 4 * k]) + Q([cx + w + 6 * k, top + hh * .1], [cx + w + 5 * k, top + hh * 1.2]), .75, OL, .55) + line(M([cx + w * .3, top - 5 * k]) + Q([cx + w + 4 * k, top - 3 * k], [cx + w + 6.4 * k, top + hh * .5]), 1.2 * k, hp.hl, .7));
+    }
+    if (st === "fbun") { const bx = cx, by = top - 4.6 * k;
+      return partL(x, `M${f(bx - 7.2 * k)} ${f(by)}a${f(7.2 * k)} ${f(6 * k)} 0 1 1 ${f(14.4 * k)} 0a${f(7.2 * k)} ${f(6 * k)} 0 1 1 ${f(-14.4 * k)} 0Z`, hp.m,
+        `<path d="M${f(bx + 2 * k)} ${f(by - 9 * k)}h${f(10 * k)}v${f(16 * k)}h${f(-10 * k)}Z" fill="${hp.d}"/>` + line(M([bx - 5 * k, by - 1.6 * k]) + Q([bx, by - 5.6 * k], [bx + 5 * k, by - 2 * k]) + M([bx - 4 * k, by + 1.8 * k]) + Q([bx + .5, by - 1.6 * k], [bx + 5.4 * k, by + .6 * k]) + M([bx - 6 * k, by + .4 * k]) + Q([bx - 3 * k, by + 4 * k], [bx + 3 * k, by + 4.4 * k]), .7, OL, .6) +
+        line(M([bx - 5 * k, by - 3 * k]) + Q([bx - 2 * k, by - 5.4 * k], [bx + 1.4 * k, by - 5.6 * k]), 1.2 * k, hp.hl, .8)); }
+    if (st === "perm" || st === "braids" || st === "pigtails" || st === "tuft" || st === "fuzz" || st === "pixie" || st === "updo") return "";
+    return shortBack(x, cx, top, hh, w);
+  }
+  
+  function braid(x, x0, y0, x1, y1, k, n) {
+    const hp = x.hp; let g = "";
+    const P2 = (t) => [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t], seg = (y1 - y0) / n;
+    const tipY = y1 + seg * .3, bx = x1;
+    g += part(x, M([bx - 1.4 * k, y1]) + L([bx - 2.6 * k, tipY + 3.6 * k]) + L([bx - .8 * k, tipY + 2 * k]) + L([bx + .2 * k, tipY + 4 * k]) + L([bx + 1.4 * k, tipY + 1.8 * k]) + L([bx + 2.6 * k, tipY + 3.2 * k]) + L([bx + 1.6 * k, y1]) + "Z", hp.m, null, null, IW);
+    for (let i = n - 1; i >= 0; i--) {
+      const t = (i + .5) / n, c = P2(t), wd = (4.8 - 1.6 * t) * k, sd = i % 2 ? 1 : -1;
+      
+      const a = [c[0] - sd * wd, c[1] - seg * .9], b = [c[0] + sd * wd * .85, c[1] + seg * .7];
+      const d = M(a) + Q([c[0] + sd * wd * 1.3, c[1] - seg * .4], b) + Q([c[0] - sd * wd * 1.1, c[1] + seg * .2], a) + "Z";
+      g += part(x, d, hp.m, sd > 0 ? `M${f(c[0])} ${f(c[1] - seg)}h20v${f(seg * 2)}h-20Z` : `M${f(c[0] - 20)} ${f(c[1] + seg * .05)}h40v${f(seg)}h-40Z`, hp.d, IW) +
+        line(M(lerp(a, b, .25)) + Q([c[0] + sd * wd * .3, c[1] - seg * .2], lerp(a, b, .7)), .8 * k, hp.hl, .7);
+    }
+    g += part(x, rr(bx - 2.2 * k, y1 - .4 * k, 4.4 * k, 2.2 * k, .9), x.su.m, null, null, .7);
+    return g;
+  }
+  function hairFront(x, cx, top, hh, w) {
+    const st = x.hair, hp = x.hp, k = hh / 36, chin = top + hh, Pt = (u, a, v) => [cx + u * w + a * k, top + v * hh];
+    if (LONG[st]) {
+      const Lk = longLocks(x, cx, top, hh, w, Object.assign({ len: lenFor(x, st) }, LONG[st]));
+      return Lk.front + femCap(x, cx, top, hh, w, st === "fwavy" ? "side" : "center", st === "fcurly" ? 3.4 : st === "fwavy" ? 2.6 : 1.4);
+    }
+    if (st === "bob") {
+      let g = "";
+      [-1, 1].forEach((sd) => { const d = M([cx + sd * (w + 1.2), top + hh * .36]) + C([cx + sd * (w + 4.4), top + hh * .66], [cx + sd * (w + 5), chin - 2], [cx + sd * (w + 3.2), chin + 2.4 * k]) +
+          Q([cx + sd * (w * .9), chin + 3.8 * k], [cx + sd * (w * .64), chin + .4]) + Q([cx + sd * (w * .9), top + hh * .8], [cx + sd * (w - 1.4), top + hh * .5]) + "Z";
+        g += partL(x, d, hp.m, `<path d="${M([cx + sd * (w * .64), top]) + L([cx + sd * (w * .95), top]) + L([cx + sd * (w * .95), chin + 6]) + L([cx + sd * (w * .64), chin + 6])}Z" fill="${hp.d}"/>` + (sd > 0 ? `<path d="${M([cx + w + 3.6 * k, top]) + L([cx + w + 12, top]) + L([cx + w + 12, chin + 6]) + L([cx + w + 3.6 * k, chin + 6])}Z" fill="${hp.d}"/>` : "") +
+          line(M([cx + sd * (w + 1.6), top + hh * .5]) + Q([cx + sd * (w + 3.4), top + hh * .8], [cx + sd * (w + 1.8), chin + 2]), .75, OL, .6) +
+          line(M([cx + sd * (w + 2.6), top + hh * .45]) + Q([cx + sd * (w + 4.2), top + hh * .7], [cx + sd * (w + 3.6), chin - 2]), 1.1 * k, hp.hl, sd < 0 ? .85 : .4), OW); });
+      
+      const bang = [Pt(1, -1.2, .48), Pt(.75, 0, .41), Pt(.25, 0, .42), Pt(-.25, 0, .42), Pt(-.75, 0, .41), Pt(-1, 1.2, .48)];
+      let tx = ""; for (let i = 1; i < 7; i++) { const u = -1 + i * 2 / 7; tx += line(M(Pt(u, 0, .18)) + L(Pt(u * 1.02, 0, .39)), .6, OL, .45); }
+      return g + shortMass(x, cx, top, hh, w, { sb: .5, th: (s) => 1.2 + 2.6 * bump(s, 0, 1), n: 10, line: bang, lineZ: { n: 2, d: .7, s: () => 0 }, noBand: 1, extra: tx,
+        hi: [[Pt(-.6, 0, .12), Pt(-.25, 0, -.02), Pt(.2, 0, -.02)]] });
+    }
+    if (st === "pixie") return shortMass(x, cx, top, hh, w, { sb: .62, fade: .15, th: (s) => 1.2 + 4.2 * bump(s, -.1, .75), n: 10,
+      
+      line: [Pt(1, -1.6, .44), Pt(.78, 0, .42), Pt(.4, 0, .36), Pt(0, 0, .3), Pt(-.36, 0, .24), Pt(-.7, 0, .3), Pt(-1, 1.6, .42)], lineZ: { n: 1, d: 2.6, s: (u) => u > -.36 ? 2.2 : -1 },
+      cl: [[Pt(-.4, 0, .1), Pt(0, 0, .14), Pt(.4, 0, .28), Pt(.74, 0, .42)], [Pt(-.3, 0, .0), Pt(.2, 0, .04), Pt(.6, 0, .18), Pt(.92, 0, .36)], [Pt(-.5, 0, .14), Pt(-.8, 0, .24)]],
+      hi: [[Pt(-.3, 0, .08), Pt(.05, 0, .06), Pt(.35, 0, .16)], [Pt(-.55, 0, .04), Pt(-.75, 0, .14)]] });
+    if (st === "perm") { let tx = ""; for (let i = 0; i < 30; i++) { const u = ((i * 41) % 100) / 100 * 2.1 - 1.05, v = ((i * 67) % 100) / 100 * .62 - .14, p = Pt(u, 0, v), r = 1.6 * k;
+        tx += `<path d="M${f(p[0] - r)} ${f(p[1] + .4)}a${f(r)} ${f(r)} 0 1 1 ${f(r * 1.6)} ${f(-.4 * r)}" fill="none" stroke="${i % 4 ? hp.d : hp.hl}" stroke-width="${i % 4 ? .8 : 1}" stroke-linecap="round"/>`; }
+      return shortMass(x, cx, top, hh, w, { sb: .7, fade: 0, th: (s) => 3 + 4.4 * bump(s, 0, 1), n: 10, topZ: { n: 1, d: 1.4, round: true, fall: 0 },
+        line: [Pt(1, -2, .5), Pt(.62, 0, .32), Pt(0, 0, .3), Pt(-.62, 0, .32), Pt(-1, 2, .5)], lineZ: { n: 2, d: 1.3, round: true }, extra: tx }); }
+    if (st === "fbun" || st === "fpony" || st === "updo") {
+      const up = st === "updo", T = st === "fbun" ? Pt(0, 0, -.14) : st === "fpony" ? Pt(.1, 0, -.08) : Pt(.25, 0, -.2);
+      const cl = [-.84, -.56, -.28, 0, .28, .56, .84].map((u) => { const a = Pt(u, 0, .3 + Math.abs(u) * .1); return [a, [a[0] * .5 + T[0] * .5, a[1] * .4 + T[1] * .6], T]; });
+      let g = shortMass(x, cx, top, hh, w, { sb: .52, th: (s) => 1 + (up ? 4.4 : 1) * bump(s, up ? .15 : 0, .95), n: 10,
+        line: [Pt(1, -1.5, .44), Pt(.72, 0, .31), Pt(.35, 0, .26), Pt(0, 0, .25), Pt(-.35, 0, .26), Pt(-.72, 0, .31), Pt(-1, 1.5, .44)],
+        cl, hi: [[Pt(-.55, 0, .16), Pt(-.4, 0, .0), Pt(-.1, 0, -.06)]] });
+      if (st === "fpony") g += part(x, `M${f(cx + w * .1 - 3 * k)} ${f(top - 2 * k)}a${f(3 * k)} ${f(2.2 * k)} 0 1 1 ${f(6 * k)} 0a${f(3 * k)} ${f(2.2 * k)} 0 1 1 ${f(-6 * k)} 0Z`, x.su.m, null, null, .8);
+      if (st === "fbun") g += part(x, rr(cx - 4.4 * k, top - 1.6 * k, 8.8 * k, 2.4 * k, 1), x.su.m, null, null, .7);
+      
+      if (up) [-1, 1].forEach((sd) => { const d = M(Pt(sd, -1.4 * sd, .4)) + Q(Pt(sd, .6 * sd, .6), Pt(sd, -.6 * sd, .8)) + Q(Pt(sd, .2 * sd, .9), Pt(sd, -.4 * sd, .98)); g += line(d, 1.9 * k, OL) + line(d, 1.1 * k, hp.m); });
+      return g;
+    }
+    if (st === "braids" || st === "pigtails") {
+      let g = "";
+      const yb = top + hh * (st === "braids" ? lenFor(x, "fstraight") : (x.age === "toddler" ? 1.15 : 1.3));
+      if (st === "pigtails") [-1, 1].forEach((sd) => {
+        
+        const t0 = Pt(sd, 1.4 * sd, .3), ob = [cx + sd * (w + 7.6 * k), yb], ib = [cx + sd * (w + 1.6 * k), yb - 2 * k];
+        const d = M([t0[0] - sd * 1.6 * k, t0[1] - 1.6 * k]) + C([cx + sd * (w + 7 * k), top + hh * .2], [cx + sd * (w + 8.6 * k), top + hh * .7], ob) + tips(ob, ib, k, 2) + Q([cx + sd * (w + 1.4 * k), top + hh * .7], [t0[0] - sd * 1.2 * k, t0[1] + 2 * k]) + "Z";
+        g += partL(x, d, hp.m, `<path d="${M([cx + sd * (w + 1 * k), top + hh * .36]) + L([cx + sd * (w + 2.6 * k), yb + 5]) + L([cx + sd * (w + 1 * k), yb + 5])}Z" fill="${hp.d}"/>` + (sd > 0 ? `<path d="${M([cx + w + 5 * k, top]) + L([cx + w + 20, top]) + L([cx + w + 20, yb + 5]) + L([cx + w + 5 * k, yb + 5])}Z" fill="${hp.d}"/>` : "") +
+          line(M([cx + sd * (w + 3.4 * k), top + hh * .45]) + Q([cx + sd * (w + 5.6 * k), top + hh * .8], [cx + sd * (w + 5 * k), yb - 2]), .75, OL, .6) +
+          line(M([cx + sd * (w + 3 * k), top + hh * .36]) + Q([cx + sd * (w + 6 * k), top + hh * .5], [cx + sd * (w + 6.6 * k), top + hh * .9]), 1.1 * k, hp.hl, sd < 0 ? .85 : .45)); });
+      g += femCap(x, cx, top, hh, w, "center", 1.2);
+      if (st === "pigtails") [-1, 1].forEach((sd) => { const t0 = Pt(sd, 1.4 * sd, .3); g += `<ellipse cx="${f(t0[0])}" cy="${f(t0[1])}" rx="${f(1.7 * k)}" ry="${f(2.7 * k)}" fill="${x.su.m}" stroke="${OL}" stroke-width=".8"/>`; });
+      else [-1, 1].forEach((sd) => {
+        
+        g += partL(x, M(Pt(sd, 1.2 * sd, .44)) + Q(Pt(sd, 2.4 * sd, .66), Pt(sd, 2.2 * sd, .8)) + L(Pt(sd, -1.4 * sd, .8)) + Q(Pt(sd, -1.2 * sd, .6), Pt(sd, -.6 * sd, .44)) + "Z", hp.m, sd > 0 ? `<path d="${M(Pt(1, -1, .4)) + L(Pt(1, 9, .4)) + L(Pt(1, 9, .9)) + L(Pt(1, -1, .9))}Z" fill="${hp.d}"/>` : "", IW);
+        g += braid(x, cx + sd * (w + 1 * k), top + hh * .78, cx + sd * (w + 3.4 * k), yb, k, 7);
+      });
+      return g;
+    }
+    if (st === "tuft" || st === "fuzz") {
+      const cap = capPath(cx, top, hh, w, .4, .27);
+      let g = `<path d="${cap}" fill="${hp.m}" opacity="${st === "fuzz" ? .5 : .32}"/><path d="${cap}" fill="none" stroke="${OL}" stroke-width=".5" stroke-opacity=".45"/>`;
+      if (st === "tuft") { const d = M([cx - 1, top + 1.4]) + C([cx - 2.6 * k, top - 5 * k], [cx + 4 * k, top - 8 * k], [cx + 4.8 * k, top - 3.4 * k]) + C([cx + 5 * k, top - .6 * k], [cx + 1.6 * k, top - .6 * k], [cx + 2 * k, top - 2.8 * k]); g += line(d, 2.8 * k, OL) + line(d, 1.6 * k, hp.m) + line(M([cx - .6, top - 1.4 * k]) + Q([cx + .6 * k, top - 4.6 * k], [cx + 3 * k, top - 5.2 * k]), .6 * k, hp.hl, .8); }
+      return g + `<path d="M${f(cx - w * .5)} ${f(top + hh * .12)}Q${f(cx - w * .1)} ${f(top + 1.2)} ${f(cx + w * .25)} ${f(top + 1.8)}" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="${f(1.3 * k)}" stroke-linecap="round"/>`;
+    }
+    return shortHair(x, cx, top, hh, w, st);
+  }
+  
+  function beanie(x, cx, top, hh, w) {
+    const k = hh / 36, su = x.su, h = N(), cu = h.mix(su.m, "#ffffff", .55);
+    const dome = M([cx - w - 1.8, top + hh * .36]) + C([cx - w - 2.4, top - 2 * k], [cx - w * .6, top - 6.4 * k], [cx, top - 6.4 * k]) + C([cx + w * .6, top - 6.4 * k], [cx + w + 2.4, top - 2 * k], [cx + w + 1.8, top + hh * .36]) + "Z";
+    let g = part(x, dome, su.m, M([cx + w * .25, top - 12]) + L([cx + w + 8, top - 12]) + L([cx + w + 8, top + hh * .4]) + L([cx + w * .25, top + hh * .4]) + "Z", su.d, OW);
+    for (let i = -3; i <= 3; i++) g += line(M([cx + i * w * .26, top + hh * .2]) + Q([cx + i * w * .3, top - 1], [cx + i * w * .12, top - 5.4 * k]), .55, su.k, .6);
+    const cuff = M([cx - w - 2.4, top + hh * .2]) + Q([cx, top + hh * .12], [cx + w + 2.4, top + hh * .2]) + L([cx + w + 2.2, top + hh * .4]) + Q([cx, top + hh * .33], [cx - w - 2.2, top + hh * .4]) + "Z";
+    g += part(x, cuff, cu, M([cx + w * .3, top]) + L([cx + w + 8, top]) + L([cx + w + 8, top + hh * .5]) + L([cx + w * .3, top + hh * .5]) + "Z", h.shade(cu, -.18), OW);
+    for (let i = -6; i <= 6; i++) g += line(M([cx + i * (w + 1.6) / 6.4, top + hh * .2 - (1 - Math.abs(i) / 7) * 1.6 * k]) + L([cx + i * (w + 1.6) / 6.4, top + hh * .37 - (1 - Math.abs(i) / 7) * 1.4 * k]), .5, h.shade(cu, -.35), .7);
+    let pom = ""; const py = top - 7.6 * k, pr2 = 4 * k;
+    for (let i = 0; i <= 12; i++) { const a = i / 12 * Math.PI * 2, r = pr2 + (i % 2 ? .7 : 0) * k, p0 = [cx + Math.cos(a) * r, py + Math.sin(a) * r]; pom += i ? L(p0) : M(p0); }
+    g += part(x, pom + "Z", cu, `M${f(cx + .6)} ${f(py - 6)}h8v12h-8Z`, h.shade(cu, -.18), IW);
+    return g;
+  }
+
+  
+  const BABYC = ["#9cc3e4", "#f2b8c6", "#f4e3a1", "#b9dcb4", "#e8e4dc", "#c9b6e4", "#6f8fbf"];
+  const BLANKC = ["#f2e6c9", "#cfe3f1", "#f6d1da", "#d9e8c8", "#e6dcf2", "#f0c99a", "#b8c4d6"];
+  const BHAIRC = [["brown", "Brown", "#6b4226"], ["dark", "Dark", "#2a1a10"], ["blond", "Blond", "#d4ac5a"], ["red", "Red", "#8a3a22"], ["black", "Black", "#141414"]];
+  function babyFigure(x) {
+    CL = 0;
+    const cx = 100, su = x.su, sk = x.sk, h = N(), bl = { hl: h.shade(x.blank, .3), m: x.blank, d: h.shade(x.blank, -.22), k: h.shade(x.blank, -.4) };
+    const shellC = "#40454e", shellD = "#2c3037", pad = "#dcd6ca", padD = "#bfb7a8", hh = x.pr.hh, top = 99, chin = top + hh;
+    let back = "", body = "", front = "";
+    back += `<ellipse cx="${cx + 1}" cy="187" rx="40" ry="3.2" fill="${x.url("cs")}"/>`;
+    
+    const hd = M([cx - 36, 148]) + C([cx - 38, 96], [cx - 20, 78], [cx, 78]) + C([cx + 20, 78], [cx + 38, 96], [cx + 36, 148]);
+    back += line(hd, 7, OL) + line(hd, 4.6, "#4b5059") + line(M([cx - 33, 128]) + C([cx - 33, 96], [cx - 18, 81], [cx, 81]), 1, "#7d838d", .8);
+    back += part(x, rr(cx - 11, 75, 22, 6.4, 3.2), "#26282d", null, null, IW);
+    for (let i = -3; i <= 3; i++) back += line(M([cx + i * 2.6, 76.4]) + L([cx + i * 2.6, 79.8]), .6, "#4b5059");
+    
+    back += part(x, M([cx - 30, 176]) + L([cx - 31, 112]) + C([cx - 31, 90], [cx + 31, 90], [cx + 31, 112]) + L([cx + 30, 176]) + "Z", shellC, M([cx + 10, 80]) + L([cx + 40, 80]) + L([cx + 40, 180]) + L([cx + 10, 180]) + "Z", shellD);
+    back += part(x, M([cx - 25, 172]) + L([cx - 25.5, 112]) + C([cx - 25, 96], [cx + 25, 96], [cx + 25.5, 112]) + L([cx + 25, 172]) + "Z", pad, M([cx + 12, 90]) + L([cx + 40, 90]) + L([cx + 40, 176]) + L([cx + 12, 176]) + "Z", padD, IW);
+    back += line(M([cx - 25, 132]) + Q([cx - 17, 128], [cx - 16, 110]) + M([cx + 25, 132]) + Q([cx + 17, 128], [cx + 16, 110]), .8, padD) + line(M([cx - 12, 136]) + L([cx - 12, 168]) + M([cx + 12, 136]) + L([cx + 12, 168]), .6, padD, .8);
+    
+    const tor = M([cx - 11, 128]) + Q([cx - 15, 131], [cx - 15, 140]) + L([cx - 14, 160]) + L([cx + 14, 160]) + L([cx + 15, 140]) + Q([cx + 15, 131], [cx + 11, 128]) + Q([cx, 124.5], [cx - 11, 128]) + "Z";
+    body += part(x, tor, su.m, M([cx + 5, 120]) + L([cx + 30, 120]) + L([cx + 30, 162]) + L([cx + 5, 162]) + "Z", su.d);
+    body += line(M([cx - 6, 126.6]) + Q([cx, 129.4], [cx + 6, 126.6]), 1.4, su.hl) + line(M([cx - 6, 126.6]) + Q([cx, 129.4], [cx + 6, 126.6]), .6);
+    [-1, 1].forEach((sd) => { const st = M([cx + sd * 7.5, 126]) + Q([cx + sd * 6.5, 140], [cx + sd * 2.6, 152]); body += line(st, 3.6, OL) + line(st, 2.4, "#2f333a"); });
+    body += line(M([cx, 160]) + L([cx, 153]), 3.6, OL) + line(M([cx, 160]) + L([cx, 153]), 2.4, "#2f333a");
+    body += part(x, rr(cx - 5.4, 136.4, 10.8, 3.6, 1.2), "#d0453a", null, null, .8) + part(x, rr(cx - 4.4, 150, 8.8, 6.4, 1.8), "#2a2c31", null, null, .9) + `<circle cx="${cx}" cy="153.2" r="1.5" fill="#d0453a"/>`;
+    [-1, 1].forEach((sd) => {
+      const ar = tube([[cx + sd * 12.4, 130.5, 3.8], [cx + sd * 16, 139, 3.4], [cx + sd * 14.4, 145, 3.1], [cx + sd * 10.6, 147.4, 2.9]]);
+      body += part(x, ar, su.m, sd > 0 ? M([cx + 13, 126]) + L([cx + 30, 126]) + L([cx + 30, 152]) + L([cx + 13, 152]) + "Z" : null, su.d, IW);
+      body += part(x, `M${f(cx + sd * 9.6 - 3.1)} 147.8a3.1 2.9 0 1 1 6.2 0a3.1 2.9 0 1 1 -6.2 0Z`, sk.m, sd > 0 ? `M${f(cx + sd * 9.6)} 146h5v6h-5Z` : null, sk.d, IW) + line(M([cx + sd * 9.6 - sd * 1.4, 146.4]) + Q([cx + sd * 9.6, 147.4], [cx + sd * 9.6 + sd * .6, 149.6]), .5, sk.k);
+    });
+    
+    const bk = M([cx - 24, 155]) + Q([cx - 12, 151], [cx + 1, 154]) + Q([cx + 13, 150.6], [cx + 24, 155]) + L([cx + 26.4, 170]) + Q([cx + 27, 178], [cx + 20, 179]) + L([cx - 20, 179]) + Q([cx - 27, 178], [cx - 26.4, 170]) + "Z";
+    front += part(x, bk, bl.m, M([cx + 8, 148]) + L([cx + 34, 148]) + L([cx + 34, 182]) + L([cx + 8, 182]) + "Z", bl.d);
+    front += `<path d="M${f(cx - 22)} 157.4Q${f(cx - 11)} 153.8 ${f(cx + 1)} 156.6Q${f(cx + 12)} 153.4 ${f(cx + 22)} 157.4" fill="none" stroke="${bl.k}" stroke-width=".7" stroke-dasharray="1.6 1.4"/>`;
+    front += line(M([cx - 9, 160]) + Q([cx - 11, 168], [cx - 8, 176]) + M([cx + 6, 159]) + Q([cx + 9, 168], [cx + 7, 176]), .8, bl.k, .7) + line(M([cx - 16, 160]) + Q([cx - 14, 166], [cx - 15, 172]), 1.2, bl.hl, .8);
+    front += line(M([cx - 9, 166]) + q2(2.6, -2.2) + M([cx + 3.6, 166]) + q2(2.6, -2.2), .8, bl.k, .8);
+    
+    [-1, 1].forEach((sd) => { const d = M([cx + sd * 32, 118]) + Q([cx + sd * 36.4, 152], [cx + sd * 30, 178]) + L([cx + sd * 22, 180]) + Q([cx + sd * 26.4, 152], [cx + sd * 25.4, 122]) + "Z";
+      front += part(x, d, shellC, sd > 0 ? M([cx + 20, 110]) + L([cx + 40, 110]) + L([cx + 40, 182]) + L([cx + 20, 182]) + "Z" : null, shellD) + line(M([cx + sd * 31, 122]) + Q([cx + sd * 34.6, 150], [cx + sd * 29.6, 172]), .8, "#6d737d", .8); });
+    front += part(x, M([cx - 30, 171]) + Q([cx, 177], [cx + 30, 171]) + L([cx + 29, 181]) + Q([cx, 186.6], [cx - 29, 181]) + "Z", shellC, M([cx + 8, 168]) + L([cx + 34, 168]) + L([cx + 34, 188]) + L([cx + 8, 188]) + "Z", shellD);
+    front += line(M([cx - 26, 174.6]) + Q([cx, 179.6], [cx + 26, 174.6]), 1, su.m, .9);
+    front += part(x, rr(cx - 31, 181.6, 62, 4.8, 2.4), "#25272c", null, null, IW);
+    [-1, 1].forEach((sd) => { front += `<circle cx="${f(cx + sd * 34)}" cy="146" r="3.8" fill="#6d737d" stroke="${OL}" stroke-width="${IW}"/><circle cx="${f(cx + sd * 34)}" cy="146" r="1.5" fill="#3a3e45"/>`; });
+    const head = headDraw(x, cx, top, hh, null);
+    return { top, chin, belt: 156, hh, topAll: 75, back: back + hairBack(x, cx, top, hh, headW(x)), body, head, front };
+  }
+
+  
+  const GLASSES = [["none", "None"], ["rect", "Rectangle (black)"], ["round", "Round (tortoise)"], ["browline", "Browline (black and gold)"], ["cat", "Cat-eye (plum)"], ["sun", "Sunglasses"]];
+  const MOB = [["none", "None"], ["cane", "Cane"], ["walker", "Walker"], ["wheel", "Wheelchair"]];
+  const VIEWS = [["full", "Full body"], ["face", "Face"], ["portrait", "Portrait"], ["half", "Half body"]];
+  const HAIR_F = [["fstraight", "Long straight"], ["fwavy", "Long wavy"], ["bob", "Bob with bangs"], ["pixie", "Pixie"], ["fbun", "Top bun"], ["fpony", "Ponytail"], ["braids", "Braids"], ["fcurly", "Long curly"], ["afro", "Afro"], ["updo", "Updo (twist)"]];
+  const HAIR_OF = [["perm", "Short curls"], ["bob", "Bob with bangs"], ["pixie", "Pixie"], ["fbun", "Bun"], ["updo", "Updo (twist)"], ["fstraight", "Shoulder length"], ["afro", "Afro"]];
+  const HAIR_OM = [["receding", "Receding"], ["side", "Short side part"], ["crew", "Crew cut"], ["slick", "Slicked back"], ["buzz", "Buzz"], ["curly", "Curly short"], ["bald", "Bald"]];
+  const HAIR_TB = HAIR_M.filter((a) => a[0] !== "receding" && a[0] !== "bald");
+  const HAIR_KB = [["messy", "Messy"], ["side", "Side part"], ["crew", "Crew cut"], ["buzz", "Buzz"], ["curly", "Curly"], ["afro", "Afro"]];
+  const HAIR_KG = [["pigtails", "Pigtails"], ["fpony", "Ponytail"], ["bob", "Bob with bangs"], ["braids", "Braids"], ["fstraight", "Long straight"], ["fcurly", "Long curly"], ["afro", "Afro"], ["fbun", "Top bun"]];
+  const HAIR_TOD = [["tuft", "Little tuft"], ["curly", "Curly"], ["pigtails", "Pigtails"], ["bob", "Bob with bangs"], ["afro", "Afro"]];
+  const HAIR_BABY = [["tuft", "Little tuft"], ["fuzz", "Soft fuzz"], ["bald", "Bald"], ["curly", "Curls"]];
+  const GRAY = ["#b8b6b0", "#eeece6", "#c9ccd2"].concat(HAIRC.filter((c) => c !== "#b8b6b0"));
+  const cfirst = (all, c) => [c].concat(all.filter((v) => v !== c));
+  
+  const CARDS = [
+    { id: "man", name: "Adult man", pre: "man", out: OUT_M, hair: HAIR_M, d: { outfit: "business", hair: "side", c: "#3b3e46", h: "#6b4226", skin: "s2" }, mob: 1, build: 1, facial: 1, height: 1 },
+    { id: "woman", name: "Adult woman", pre: "woman", out: OUT_F, hair: HAIR_F, d: { outfit: "f_bizcas", hair: "fwavy", c: "#c65b7c", h: "#6b4226", skin: "s3" }, mob: 1, build: 1, height: 1 },
+    { id: "oldman", name: "Older man", pre: "oldman", out: OUT_M, hair: HAIR_OM, d: { outfit: "bizcas", hair: "receding", c: "#6b6f78", h: "#b8b6b0", skin: "s2", glasses: "browline" }, mob: 1, build: 1, facial: 1, height: 1, gray: 1 },
+    { id: "oldwoman", name: "Older woman", pre: "oldwoman", out: OUT_F, hair: HAIR_OF, d: { outfit: "f_bizcas", hair: "perm", c: "#2e4a3c", h: "#b8b6b0", skin: "s4", glasses: "round" }, mob: 1, build: 1, height: 1, gray: 1 },
+    { id: "teenboy", name: "Teen boy", pre: "teenboy", out: OUT_M, hair: HAIR_TB, d: { outfit: "hoodie", hair: "messy", c: "#2c3d5e", h: "#2a1a10", skin: "s5" }, build: 1, height: 1 },
+    { id: "teengirl", name: "Teen girl", pre: "teengirl", out: OUT_F, hair: HAIR_F, d: { outfit: "f_casual", hair: "fpony", c: "#d39a2a", h: "#9a6430", skin: "s1" }, build: 1, height: 1 },
+    { id: "boy", name: "Young boy", pre: "boy", out: OUT_KB, hair: HAIR_KB, d: { outfit: "k_play", hair: "messy", c: "#7a2e2e", h: "#d4ac5a", skin: "s2" }, height: 1 },
+    { id: "girl", name: "Young girl", pre: "girl", out: OUT_KG, hair: HAIR_KG, d: { outfit: "k_playg", hair: "pigtails", c: "#c65b7c", h: "#6b4226", skin: "s4" }, height: 1 },
+    { id: "toddler", name: "Toddler", pre: "toddler", out: OUT_T, hair: HAIR_TOD, d: { outfit: "t_overalls", hair: "tuft", c: "#2c3d5e", h: "#9a6430", skin: "s3" } },
+    { id: "baby", name: "Baby", pre: "baby", baby: 1, hair: HAIR_BABY, d: { hair: "tuft", c: BABYC[0], h: BLANKC[0], skin: "s2" } },
+  ];
+  
+  function zoom(fg, x, view, topExt, wide) {
+    const hh = fg.hh, ey = fg.top + hh * (x.age === "kid" || x.age === "toddler" || x.age === "baby" ? .6 : .56), ex = 99.6;
+    if (view === "face") { const yb = fg.chin + (x.facial === "full" ? 9 : x.facial === "short" || x.facial === "goatee" ? 4.5 : 3), k = Math.min(176 / (yb - topExt + 4), 178 / wide); return { k, tx: 100 - k * ex, ty: 12 - k * (topExt - 2) }; }
+    if (view === "portrait") { const k = Math.min(2.7, (80 - 13) / (ey - topExt + 2), 180 / (wide + 26)); return { k, tx: 100 - k * ex, ty: 80 - k * ey }; }
+    if (view === "half") { const k = Math.min(176 / (fg.belt + 12 - topExt + 3), 3); return { k, tx: 100 - k * ex, ty: 12 - k * (topExt - 3) }; }
+    const tA = Math.min(topExt, fg.topAll || topExt);
+    let k = tA < 13 ? (186 - 13) / (186 - tA) : 1;
+    if (x.age === "kid" || x.age === "toddler" || x.age === "baby" || x.mob === "wheel") k = Math.max(k, Math.min(1.8, (186 - 22) / (186 - tA)));
+    return { k, tx: 100 - 100 * k, ty: 187 - 187 * k };
+  }
+  function makeCard(cd) {
+    const opts = [{ id: "view", name: "View", values: VIEWS }];
+    if (cd.out) opts.push({ id: "outfit", name: "Outfit", values: first(cd.out, cd.d.outfit) });
+    if (cd.mob) opts.push({ id: "mobility", name: "Mobility", values: MOB });
+    if (cd.height) opts.push({ id: "height", name: "Height", values: HEIGHTS });
+    if (cd.build) opts.push({ id: "build", name: "Build", values: BUILDS });
+    opts.push({ id: "hair", name: "Hair", values: first(cd.hair, cd.d.hair) });
+    if (cd.baby) opts.push({ id: "hairc", name: "Hair color", values: BHAIRC.map((a) => [a[0], a[1]]) }, { id: "eyes", name: "Eyes", values: [["awake", "Awake"], ["asleep", "Asleep"]] });
+    if (cd.facial) opts.push({ id: "facial", name: "Facial hair", values: FACIAL });
+    if (!cd.baby) opts.push({ id: "glasses", name: "Glasses", values: first(GLASSES, cd.d.glasses || "none") });
+    opts.push({ id: "skin", name: "Skin tone", values: first(SKINS.map((s) => [s[0], s[1]]), cd.d.skin) }, { id: "zone", name: "Zone", values: ZONES });
+    const hairOk = {}; cd.hair.forEach((a) => { hairOk[a[0]] = 1; });
+    const outOk = {}; (cd.out || []).forEach((a) => { outOk[a[0]] = 1; });
+    const build = (o) => {
+      const opt = Object.assign({}, o.opt || {});
+      if (!hairOk[opt.hair]) delete opt.hair;
+      if (!outOk[opt.outfit]) delete opt.outfit;
+      if (!cd.mob) delete opt.mobility;
+      if (!cd.build) delete opt.build;
+      if (!cd.height) delete opt.height;
+      if (cd.d.glasses && !opt.glasses) opt.glasses = cd.d.glasses;
+      const x = ctx(Object.assign({}, o, { opt }), cd.pre, cd.d);
+      if (cd.baby) { const hc = (BHAIRC.find((a) => a[0] === opt.hairc) || BHAIRC[0])[2], h = N();
+        x.hc = hc; x.hp = { hl: h.shade(hc, .4), m: hc, d: h.shade(hc, -.35) }; x.blank = o.color2 || cd.d.h; x.asleep = opt.eyes === "asleep"; x.glasses = "none"; }
+      const fg = cd.baby ? babyFigure(x) : figure(x);
+      if (!fg.hh) fg.hh = x.pr.hh;
+      const of = OF[x.outfit] || {}, view = opt.view || "full";
+      const topExt = fg.top - Math.max(HAIR_TOP[x.hair] || 0, of.hat && !cd.baby ? 9 * x.pr.hh / 36 : 0);
+      const wide = 2 * (headW(x) + 4 + (HAIR_W[x.hair] || 0) * x.pr.hh / 36) + 4;
+      return { x, fg, view, topExt, z: zoom(fg, x, view, topExt, wide) };
+    };
+    return {
+      id: cd.id, name: cd.name, colors: cd.baby ? BABYC : cfirst(CLO, cd.d.c), picker: true, colorLabel: cd.baby ? "Onesie" : "Clothes",
+      colors2: cd.baby ? BLANKC : (cd.gray ? GRAY : cfirst(HAIRC, cd.d.h)), picker2: true, colorLabel2: cd.baby ? "Blanket" : "Hair",
+      options: opts,
+      render(o) {
+        const { x, fg, view, z } = build(o);
+        let person;
+        if (cd.baby) person = `${fg.back}<g class="${P}breathe">${fg.body}${fg.head}</g>${fg.front}`;
+        else { const R = `rotate(-1.6 100 ${f(fg.belt)})`;
+          person = `${fg.back}<g transform="${R}">${fg.hairBehind}</g><g transform="translate(-2 0)">${fg.legs}</g><g class="${P}breathe"><g transform="${R}">${fg.upper}${fg.arms}${fg.head}</g></g>`; }
+        let scene = backdrop(x, 168) + (x.zone === "away" ? `<g opacity=".42">${person}</g>` : person);
+        if (Math.abs(z.k - 1) > .001) {
+          
+          scene = scene.replace(/stroke-width="([\d.]+)"/g, (m, v) => `stroke-width="${(v / z.k).toFixed(3)}"`);
+          scene = `<g transform="translate(${f(z.tx)} ${f(z.ty)}) scale(${z.k.toFixed(4)})">${scene}</g>`;
+        }
+        return svg(x, scene + badge(x));
+      },
+      
+      fitTop(o) { const { fg, view, topExt, z } = build(o); const t = view === "full" ? Math.min(topExt, fg.topAll || topExt) : topExt; return z.ty + z.k * t; },
+    };
+  }
+  const icons = CARDS.map(makeCard);
+
+  const css = `
+.hda-people-breathe{transform-box:view-box;transform-origin:100px 120px}
+.hda-anim .hda-people-breathe{animation:hda-people-breathe 4.2s ease-in-out infinite}
+@keyframes hda-people-breathe{0%,100%{transform:translate(0,0)}45%{transform:translate(0,-.6px)}}
+.hda-people-blink{transform-box:fill-box;transform-origin:50% 55%}
+.hda-anim .hda-people-blink{animation:hda-people-blink 5.5s linear infinite}
+@keyframes hda-people-blink{0%,93%,100%{transform:scaleY(1)}95%{transform:scaleY(.08)}97%{transform:scaleY(1)}}
+.hda-anim .hda-people-glow{animation:hda-people-glow 4s ease-in-out infinite}
+@keyframes hda-people-glow{0%,100%{opacity:1}50%{opacity:.8}}
+@media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-people-"]{animation:none!important}}`;
+
+  (window.HDA = window.HDA || []).push({
+    id: "people",
+    tab: "People",
+    group: "Home",
+    kind: "device",
+    onWord: "Home",
+    offWord: "Away",
+    intro: "People in a clean semi-realistic cartoon style (outlined, cel-shaded): adult man and woman, older man and woman, teen boy and girl, young boy and girl, toddler, and a baby in a car-seat carrier. Each card has a View (face, portrait, half or full body), outfits and hair styles for its age, glasses, skin tone and zone; adults and older people add Mobility (cane, walker, wheelchair). Color = main garment, second color = hair (baby: onesie and blanket).",
+    css,
+    icons,
+  });
+})();
+
 (function () {
   const H = window.HDAH, P = "hda-pets-";
   const f = (n) => (+n).toFixed(1), a2 = (n) => Math.max(0, Math.min(1, n)).toFixed(2);
@@ -28864,6 +30992,610 @@ ${x.on ? `<path d="M-5.4 4.4 C-3 9.6 3 9.6 5.4 4.4" fill="none" stroke="${x.hot}
     intro: "Ten pet gadgets on kitchen floors, in the yard and on the counter. On means working: kibble drops into the bowl, the fountain flows, the litter globe turns, the pet door unlocks, treats fly, fish swim under the light, the bed glows warm, balls launch. The slider is the level: food, water, light, warmth or battery.",
     
     levelLabel: "Level", onWord: "On", offWord: "Off",
+    css, icons,
+  });
+})();
+
+
+(function () {
+  const H = window.HDAH, P = "hda-petsfig-";
+  const f = (n) => (+n).toFixed(1), a2 = (n) => Math.max(0, Math.min(1, n)).toFixed(2);
+  const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+
+  
+  function X(o, opt) {
+    opt = opt || {};
+    const on = !!o.on, lv = o.level == null ? 1 : Math.max(0, Math.min(1, o.level));
+    const x = { o, u: o.uid, on, lv, an: on && o.anim, L: on ? .35 + .65 * lv : 0, d: [], k: {}, n: 0 };
+    x.led = opt.led || o.color || "#4da3ff"; x.body = opt.body || "#eef0f2";
+    x.id = (s) => `${o.uid}-${s}`;
+    x.def = (key, mk) => { if (!x.k[key]) { const id = `${o.uid}-g${x.n++}`; x.k[key] = id; x.d.push(mk(id)); } return `url(#${x.k[key]})`; };
+    x.lg = (a, x1, y1, x2, y2) => { x1 = x1 || 0; y1 = y1 || 0; x2 = x2 == null ? 0 : x2; y2 = y2 == null ? 1 : y2;
+      return x.def("l" + JSON.stringify(a) + [x1, y1, x2, y2], (id) => `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops(a)}</linearGradient>`); };
+    x.rg = (a, cx, cy, r) => { cx = cx == null ? .5 : cx; cy = cy == null ? .5 : cy; r = r || .5;
+      return x.def("r" + JSON.stringify(a) + [cx, cy, r], (id) => `<radialGradient id="${id}" cx="${cx}" cy="${cy}" r="${r}">${stops(a)}</radialGradient>`); };
+    return x;
+  }
+  const pal = (c) => ({ l: H.shade(c, .5), m: c, d: H.shade(c, -.3), k: H.shade(c, -.56), e: H.shade(c, -.45) });
+
+  
+  const M = {
+    v: (x, c) => { const p = pal(c); return x.lg([[0, p.l], [.45, p.m], [1, p.d]]); },
+    h: (x, c) => { const p = pal(c); return x.lg([[0, p.d], [.22, p.l], [.6, p.m], [1, p.k]], 0, 0, 1, 0); },
+    s: (x, c) => { const p = pal(c); return x.rg([[0, p.l], [.6, p.m], [1, p.d]], .38, .32, .78); },
+    side: (x, c) => { const p = pal(c); return x.lg([[0, p.d], [1, p.k]], 0, 0, 1, 1); },
+    gloss: (x) => x.lg([[0, "#fff", .55], [.5, "#fff", 0]], 0, 0, 1, 1),
+    shadow: (x) => x.rg([[0, "#000", .6], [.6, "#000", .24], [1, "#000", 0]]),
+    halo: (x, c) => x.rg([[0, c, .9], [.38, c, .32], [1, c, 0]]),
+    steel: (x) => x.lg([[0, "#4b5057"], [.3, "#e2e6ea"], [.55, "#9aa1a9"], [1, "#3f444a"]], 0, 0, 1, 0),
+    metal: (x, c) => x.lg([[0, H.shade(c, -.55)], [.25, H.shade(c, .35)], [.42, H.shade(c, .7)], [.62, H.shade(c, -.1)], [1, H.shade(c, -.6)]], 0, 0, 1, 0),
+    hole: (x) => x.lg([[0, "#030305"], [1, "#1c1d24"]]),
+  };
+
+  
+  const WALLS = { sage: ["#4c5850", "#333c36"], blue: ["#3e485b", "#2a3141"], clay: ["#62493f", "#45332c"], cream: ["#5e5950", "#433f38"],
+    lav: ["#554f68", "#3a354b"], navy: ["#2f3852", "#1e2537"], gray: ["#4b4e56", "#33353c"], garage: ["#55585e", "#3c3e43"], olive: ["#4f5140", "#363829"] };
+  function dots(seed, n, x0, y0, w, h, big, op) {
+    const r = rnd(seed); let s = "";
+    for (let i = 0; i < n; i++) s += `<circle cx="${f(x0 + r() * w)}" cy="${f(y0 + r() * h)}" r="${f(.3 + r() * big)}" fill="${r() > .5 ? "#000" : "#fff"}" fill-opacity="${(op * (.4 + r() * .6)).toFixed(2)}"/>`;
+    return s;
+  }
+  function wallB(x, k, y0, y1) {
+    y0 = y0 || 8; y1 = y1 || 192; const w = WALLS[k] || WALLS.gray;
+    return `<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="${x.lg([[0, w[0]], [1, w[1]]])}"/>` + dots(k.length * 131 + 7, 40, 8, y0, 184, y1 - y0, .7, .1);
+  }
+  function woodB(x, y0, tone) {
+    tone = tone || "#8a6142"; const r = rnd(y0 * 17 + 3); let s = `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.lg([[0, H.shade(tone, -.35)], [1, H.shade(tone, .08)]])}"/>`;
+    let y = y0, g = 4.5;
+    while (y < 192) { const y2 = y + g;
+      s += `<rect x="8" y="${f(y)}" width="184" height="${f(g)}" fill="${r() > .5 ? "#fff" : "#000"}" fill-opacity="${(.02 + r() * .06).toFixed(2)}"/>`;
+      s += `<path d="M8 ${f(y2)}H192" stroke="#1b0f07" stroke-opacity=".5" stroke-width="${f(.5 + g * .06)}"/>`;
+      const sx = 8 + r() * 184; s += `<path d="M${f(sx)} ${f(y)}V${f(y2)}" stroke="#1b0f07" stroke-opacity=".45" stroke-width=".8"/>`;
+      s += `<path d="M${f(8 + r() * 60)} ${f(y + g * .45)}H${f(70 + r() * 120)}" stroke="#2a180b" stroke-opacity=".18" stroke-width=".6"/>`;
+      y = y2; g *= 1.32; }
+    return s;
+  }
+  function baseB(x, y, floor) {
+    return `<rect x="8" y="${y}" width="184" height="18" fill="${x.lg([[0, "#e6e3ea"], [.25, "#cfccd6"], [1, "#a29fac"]])}"/>
+<path d="M8 ${y + .5}H192" stroke="#000" stroke-opacity=".35" stroke-width="1.2"/><path d="M8 ${y + 3.5}H192" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/><path d="M8 ${y + 5}H192" stroke="#000" stroke-opacity=".12" stroke-width="1"/>` +
+      (floor === "carpet" ? carpetB(x, y + 18) : woodB(x, y + 18, floor)) + `<path d="M8 ${y + 18.5}H192" stroke="#000" stroke-opacity=".45" stroke-width="1.4"/>`;
+  }
+  function tileB(x, y0, y1, col) {
+    col = col || "#d9dde3"; let s = `<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="#6d7079"/>`; const g = x.lg([[0, H.shade(col, .4)], [.5, col], [1, H.shade(col, -.25)]]);
+    for (let row = 0, y = y0; y < y1; y += 13, row++) for (let bx = 8 - (row % 2) * 13; bx < 192; bx += 26)
+      s += `<rect x="${bx + .7}" y="${y + .7}" width="24.6" height="11.6" rx="1.6" fill="${g}"/><path d="M${bx + 2} ${y + 2.4}H${bx + 18}" stroke="#fff" stroke-opacity=".55" stroke-width=".8" stroke-linecap="round"/>`;
+    return s + `<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="${x.lg([[0, "#000", .2], [1, "#000", .45]])}"/>`;
+  }
+  function counterB(x, y, col) {
+    col = col || "#cfd0d6";
+    return `<rect x="8" y="${y}" width="184" height="${192 - y}" fill="${x.lg([[0, H.shade(col, -.25)], [1, H.shade(col, -.05)]])}"/>` + dots(y * 7 + 1, 70, 8, y, 184, 192 - y, .8, .2) +
+      `<path d="M8 ${y + .6}H192" stroke="#000" stroke-opacity=".5" stroke-width="1.6"/><path d="M8 ${y + 2.2}H192" stroke="#fff" stroke-opacity=".25" stroke-width=".8"/>`;
+  }
+  function carpetB(x, y0) {
+    return `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.lg([[0, "#3d3a46"], [1, "#575263"]])}"/>` + dots(y0 * 3 + 5, 260, 8, y0, 184, 192 - y0, .9, .16);
+  }
+  function concreteB(x, y0, col) {
+    col = col || "#6c6f75";
+    return `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.lg([[0, H.shade(col, -.35)], [1, col]])}"/>` + dots(y0 * 5 + 9, 120, 8, y0, 184, 192 - y0, .9, .14) +
+      `<path d="M8 ${y0 + .5}H192" stroke="#000" stroke-opacity=".5" stroke-width="1.4"/>`;
+  }
+  function sidingB(x, col) {
+    col = col || "#55606c"; let s = `<rect x="8" y="8" width="184" height="184" fill="${x.lg([[0, H.shade(col, .1)], [1, H.shade(col, -.3)]])}"/>`;
+    for (let y = 8; y < 192; y += 16) s += `<rect x="8" y="${y}" width="184" height="16" fill="${x.lg([[0, "#fff", .0], [1, "#fff", .08]])}"/><path d="M8 ${y + 15}H192" stroke="#000" stroke-opacity=".45" stroke-width="2.2"/><path d="M8 ${y + 16.6}H192" stroke="#fff" stroke-opacity=".1" stroke-width="1"/>`;
+    return s;
+  }
+  function blockB(x, y1) {
+    let s = `<rect x="8" y="8" width="184" height="${y1 - 8}" fill="${x.lg([[0, "#686a6f"], [1, "#4a4c51"]])}"/>`; const r = rnd(77);
+    for (let row = 0, y = 8; y < y1; y += 22, row++) for (let bx = 8 - (row % 2) * 22; bx < 192; bx += 44) {
+      s += `<rect x="${bx + 1}" y="${y + 1}" width="42" height="20" rx="1" fill="${r() > .5 ? "#fff" : "#000"}" fill-opacity="${(.03 + r() * .06).toFixed(2)}"/>`;
+      s += `<path d="M${bx} ${y}V${y + 22}M${bx} ${y}H${bx + 44}" stroke="#2e3034" stroke-opacity=".7" stroke-width="1.6"/><path d="M${bx + 1.4} ${y + 1.4}H${bx + 43}" stroke="#fff" stroke-opacity=".08"/>`; }
+    return s + dots(31, 120, 8, 8, 184, y1 - 8, .8, .14);
+  }
+  function fenceB(x) {
+    let s = `<rect x="8" y="8" width="184" height="184" fill="#3d2c22"/>`; const r = rnd(41);
+    for (let bx = 8; bx < 192; bx += 23) { const t = H.mix("#7a5a40", "#5d4330", r());
+      s += `<rect x="${bx + .8}" y="8" width="21.4" height="184" fill="${x.lg([[0, H.shade(t, -.2)], [.4, H.shade(t, .12)], [1, H.shade(t, -.25)]], 0, 0, 1, 0)}"/>`;
+      for (let g = 0; g < 3; g++) { const gx = bx + 3 + r() * 16; s += `<path d="M${f(gx)} 8C${f(gx + 2)} 70 ${f(gx - 2)} 130 ${f(gx + 1)} 192" fill="none" stroke="#2a1a10" stroke-opacity=".3" stroke-width=".7"/>`; }
+      s += `<circle cx="${bx + 11.5}" cy="40" r="1.1" fill="#1a1a1a"/><circle cx="${bx + 11.5}" cy="150" r="1.1" fill="#1a1a1a"/>`; }
+    return s + `<rect x="8" y="8" width="184" height="184" fill="${x.lg([[0, "#0b0d22", .45], [.6, "#000", .1], [1, "#000", .3]])}"/>`;
+  }
+
+  
+  function scene(x, back, body) {
+    const vig = x.rg([[0, "#000", 0], [.65, "#000", .06], [1, "#000", .5]], .5, .46, .75), c = x.id("clip");
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="${c}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>${x.d.join("")}</defs>
+<g clip-path="url(#${c})"><g class="hda-bg">${back}<rect x="8" y="8" width="184" height="184" fill="${vig}"/></g>${body}</g>
+<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g></svg>`;
+  }
+
+  
+  
+  function holes(x, cx, cy, s) {
+    const hs = [
+      `M${f(cx - 5.6 * s)} ${f(cy - 7 * s)}h${f(2 * s)}v${f(7.8 * s)}h${f(-2 * s)}z`,
+      `M${f(cx + 3.6 * s)} ${f(cy - 6.4 * s)}h${f(2 * s)}v${f(6.4 * s)}h${f(-2 * s)}z`,
+      `M${f(cx - 2.4 * s)} ${f(cy + 3.2 * s)}h${f(4.8 * s)}v${f(1.4 * s)}a${f(2.4 * s)} ${f(2.4 * s)} 0 0 1 ${f(-4.8 * s)} 0z`];
+    return hs.map((d) => `<path d="${d}" fill="#fff" fill-opacity=".55" transform="translate(0 ${f(.7 * s)})"/><path d="${d}" fill="${M.hole(x)}"/>`).join("");
+  }
+  
+  function face(x, cx, cy, s, col) {
+    const w = 22 * s, h = 20 * s;
+    return `<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2 + 1.2 * s)}" width="${f(w)}" height="${f(h)}" rx="${f(9.6 * s)}" fill="#000" fill-opacity=".22"/>
+<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(9.6 * s)}" fill="${x.lg([[0, H.shade(col, .7)], [.6, col], [1, H.shade(col, -.18)]])}" stroke="${H.shade(col, -.35)}" stroke-width=".5"/>
+<path d="M${f(cx - w * .34)} ${f(cy - h * .34)}Q${f(cx)} ${f(cy - h * .52)} ${f(cx + w * .34)} ${f(cy - h * .34)}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="${f(.8 * s)}" stroke-linecap="round"/>` + holes(x, cx, cy - .4 * s, s * 1.02);
+  }
+  const screw = (x, cx, cy, r, a) => `<circle cx="${f(cx)}" cy="${f(cy + .5)}" r="${f(r)}" fill="#000" fill-opacity=".3"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${M.steel(x)}"/>
+<path d="M${f(cx - r * .7)} ${f(cy + r * (a || 0))}L${f(cx + r * .7)} ${f(cy - r * (a || 0))}" stroke="#2a2d33" stroke-width="${f(r * .38)}" stroke-linecap="round"/>`;
+  function plateShadow(x0, y0, w, h, r) {
+    return `<rect x="${f(x0 + 2.5)}" y="${f(y0 + 4)}" width="${f(w)}" height="${f(h)}" rx="${f(r + 2)}" fill="#000" fill-opacity=".16"/><rect x="${f(x0 + 1.2)}" y="${f(y0 + 2)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="#000" fill-opacity=".26"/>`;
+  }
+  function plateBody(x, x0, y0, w, h, r, col) {
+    return plateShadow(x0, y0, w, h, r) + `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${x.lg([[0, H.shade(col, .65)], [.5, col], [1, H.shade(col, -.22)]])}"/>
+<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${x.lg([[0, "#fff", .25], [.2, "#fff", 0], [.85, "#000", 0], [1, "#000", .18]], 0, 0, 1, 0)}"/>
+<rect x="${f(x0 + 1.4)}" y="${f(y0 + 1.4)}" width="${f(w - 2.8)}" height="${f(h - 2.8)}" rx="${f(Math.max(1, r - 1))}" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/>
+<rect x="${f(x0 + .3)}" y="${f(y0 + .3)}" width="${f(w - .6)}" height="${f(h - .6)}" rx="${f(r)}" fill="none" stroke="${H.shade(col, -.45)}" stroke-opacity=".6" stroke-width=".6"/>`;
+  }
+  
+  function plateT(x, cx, cy, s, col) {
+    col = col || "#eceef1"; const w = 50 * s, h = 80 * s;
+    return plateBody(x, cx - w / 2, cy - h / 2, w, h, 4 * s, col) + face(x, cx, cy - 17 * s, s, col) + face(x, cx, cy + 17 * s, s, col) + screw(x, cx, cy, 2.6 * s, .3);
+  }
+  
+  function plateD(x, cx, cy, s, col, inner) {
+    col = col || "#eceef1"; const w = 48 * s, h = 78 * s, iw = 29 * s, ih = 58 * s;
+    return plateBody(x, cx - w / 2, cy - h / 2, w, h, 3.5 * s, col) +
+      `<rect x="${f(cx - iw / 2 - 1)}" y="${f(cy - ih / 2 - 1)}" width="${f(iw + 2)}" height="${f(ih + 2)}" rx="${f(2.6 * s)}" fill="#000" fill-opacity=".3"/>
+<rect x="${f(cx - iw / 2)}" y="${f(cy - ih / 2)}" width="${f(iw)}" height="${f(ih)}" rx="${f(2.4 * s)}" fill="${x.lg([[0, H.shade(col, .5)], [.5, H.shade(col, -.04)], [1, H.shade(col, -.2)]])}"/>
+<path d="M${f(cx - iw / 2 + 2)} ${f(cy - ih / 2 + 1)}H${f(cx + iw / 2 - 2)}" stroke="#fff" stroke-opacity=".7" stroke-width=".8"/>` +
+      (inner || "") + holes(x, cx, cy - 13 * s, s) + holes(x, cx, cy + 13 * s, s);
+  }
+
+  
+  function plugHead(x, cx, cy, s, col, rot) {
+    const w = 15 * s, h = 17 * s, p = pal(col), r = 3.4 * s, t = rot ? ` transform="rotate(${rot} ${f(cx)} ${f(cy)})"` : "";
+    let g = `<rect x="${f(cx - w / 2 + 1.5)}" y="${f(cy - h / 2 + 2.5)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="#000" fill-opacity=".35"/>
+<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${M.h(x, col)}"/>
+<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${M.gloss(x)}" opacity=".35"/>`;
+    for (let i = 0; i < 4; i++) g += `<path d="M${f(cx - w * .32)} ${f(cy - h * .28 + i * 2.4 * s)}H${f(cx + w * .32)}" stroke="${p.k}" stroke-opacity=".55" stroke-width="${f(.7 * s)}"/>`;
+    g += `<rect x="${f(cx - 3.2 * s)}" y="${f(cy + h / 2 - 1.5 * s)}" width="${f(6.4 * s)}" height="${f(5.5 * s)}" rx="${f(2 * s)}" fill="${M.h(x, col)}"/>
+<path d="M${f(cx - w / 2 + 1.5)} ${f(cy - h / 2 + 1.2)}H${f(cx + w / 2 - 2)}" stroke="#fff" stroke-opacity=".45" stroke-width=".8" stroke-linecap="round"/>`;
+    return `<g${t}>${g}</g>`;
+  }
+
+  
+  function bez(a, b, c, d, t) { const m = 1 - t; return m * m * m * a + 3 * m * m * t * b + 3 * m * t * t * c + t * t * t * d; }
+  function cordD(pts) { let d = `M${pts[0]} ${pts[1]}`; for (let i = 2; i + 5 < pts.length; i += 6) d += `C${pts.slice(i, i + 6).join(" ")}`; return d; }
+  function samples(pts, n) {
+    const segs = (pts.length - 2) / 6, out = [];
+    for (let i = 0; i < n; i++) { const T = (i + .5) / n * segs, k = Math.min(segs - 1, Math.floor(T)), t = T - k, b = k * 6;
+      const P0 = [pts[b], pts[b + 1]], P1 = [pts[b + 2], pts[b + 3]], P2 = [pts[b + 4], pts[b + 5]], P3 = [pts[b + 6], pts[b + 7]];
+      out.push([bez(P0[0], P1[0], P2[0], P3[0], t), bez(P0[1], P1[1], P2[1], P3[1], t)]); }
+    return out;
+  }
+  function cord(x, pts, w, col, flow, n) {
+    const d = cordD(pts), p = pal(col);
+    let s = `<path d="${d}" fill="none" stroke="#000" stroke-opacity=".28" stroke-width="${f(w + 1.6)}" stroke-linecap="round" transform="translate(2 3)"/>
+<path d="${d}" fill="none" stroke="${p.k}" stroke-width="${f(w)}" stroke-linecap="round"/>
+<path d="${d}" fill="none" stroke="${col}" stroke-width="${f(w * .6)}" stroke-linecap="round"/>
+<path d="${d}" fill="none" stroke="${p.l}" stroke-opacity=".7" stroke-width="${f(Math.max(.5, w * .2))}" stroke-linecap="round" transform="translate(${f(-w * .16)} ${f(-w * .16)})"/>`;
+    if (flow && x.on) s += chase(x, pts, n || 14, w, flow);
+    return s;
+  }
+  function chase(x, pts, n, w, col) {
+    const c = H.mix(col, "#ffffff", .45), dur = (2.2 - 1.3 * x.lv);
+    return samples(pts, n).map(([cx, cy], i) => `<circle class="${P}flow" cx="${f(cx)}" cy="${f(cy)}" r="${f(Math.max(.9, w * .34))}" fill="${c}" style="animation-duration:${dur.toFixed(2)}s;animation-delay:${(-dur * (1 - i / n)).toFixed(2)}s"/>`).join("");
+  }
+
+  
+  function led(x, cx, cy, r, col, k) {
+    col = col || x.led; k = k == null ? 1 : k;
+    if (!x.on) return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${H.mix(col, "#15161b", .78)}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .35)}" r="${f(r * .38)}" fill="#fff" fill-opacity=".25"/>`;
+    return `<g class="${P}pulse"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * 5)}" fill="${M.halo(x, col)}" opacity="${a2(.85 * k * x.L)}"/></g>
+<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${H.mix(col, "#ffffff", .5)}"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * .5)}" fill="#fff"/>`;
+  }
+  
+  function ringLed(x, cx, cy, rx, ry, w, col, k) {
+    col = col || x.led; k = k == null ? 1 : k;
+    if (!x.on) return `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="${H.mix(col, "#202128", .75)}" stroke-width="${f(w)}"/>
+<ellipse cx="${f(cx)}" cy="${f(cy - w * .3)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="${f(w * .3)}"/>`;
+    return `<g class="${P}pulse"><ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="${col}" stroke-opacity="${a2(.22 * k * x.L)}" stroke-width="${f(w * 5)}"/>
+<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="${col}" stroke-opacity="${a2(.4 * k * x.L)}" stroke-width="${f(w * 2.4)}"/></g>
+<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="${H.mix(col, "#ffffff", .35)}" stroke-width="${f(w)}"/>
+<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="${f(w * .3)}"/>`;
+  }
+  
+  const spot = (x, cx, cy, rx, ry, col, k) => x.on ? `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${M.halo(x, col || x.led)}" opacity="${a2((k == null ? .6 : k) * x.L)}"/>` : "";
+
+  
+  function box(x, x0, y0, w, h, r, dx, dy, col, fr) {
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 1.2)), sd = M.side(x, col);
+    let s = `<rect x="${f(x0 + dx + 3)}" y="${f(y0 + dy + 5)}" width="${f(w)}" height="${f(h)}" rx="${f(r + 3)}" fill="#000" fill-opacity=".16"/><rect x="${f(x0 + dx + 1)}" y="${f(y0 + dy + 2)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="#000" fill-opacity=".28"/>`;
+    for (let i = n; i >= 1; i--) s += `<rect x="${f(x0 + dx * i / n)}" y="${f(y0 + dy * i / n)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${sd}"/>`;
+    s += `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${fr || M.v(x, col)}"/>
+<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${M.gloss(x)}" opacity=".3"/>
+<rect x="${f(x0 + .7)}" y="${f(y0 + .7)}" width="${f(w - 1.4)}" height="${f(h - 1.4)}" rx="${f(Math.max(.5, r - .7))}" fill="none" stroke="#fff" stroke-opacity=".38" stroke-width=".8"/>`;
+    return s;
+  }
+  
+  function button(x, cx, cy, r, col) {
+    return `<circle cx="${f(cx)}" cy="${f(cy + .6)}" r="${f(r + .6)}" fill="#000" fill-opacity=".25"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${M.s(x, col)}"/>
+<path d="M${f(cx - r * .6)} ${f(cy - r * .45)}A${f(r * .8)} ${f(r * .8)} 0 0 1 ${f(cx + r * .4)} ${f(cy - r * .7)}" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="${f(Math.max(.5, r * .18))}" stroke-linecap="round"/>`;
+  }
+
+  
+  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+  function digits(x, xr, y, h, str, n, col) {
+    const w = h * .56, gap = h * .2, t = Math.max(.7, h * .14), hh = h / 2, ch = String(str).padStart(n, " ").slice(-n);
+    const lit = x.on ? H.mix(col, "#ffffff", .25) : col; let s = "";
+    for (let i = 0; i < n; i++) {
+      const x0 = xr - (n - i) * (w + gap) + gap, on = SEG[ch[i]] || "";
+      const R = { a: [x0 + t * .6, y, w - t * 1.2, t], g: [x0 + t * .6, y + hh - t / 2, w - t * 1.2, t], d: [x0 + t * .6, y + h - t, w - t * 1.2, t],
+        f: [x0, y + t * .6, t, hh - t * .9], b: [x0 + w - t, y + t * .6, t, hh - t * .9], e: [x0, y + hh + t * .3, t, hh - t * .9], c: [x0 + w - t, y + hh + t * .3, t, hh - t * .9] };
+      for (const k in R) { const r = R[k], lt = x.on && on.indexOf(k) >= 0;
+        s += `<rect x="${f(r[0])}" y="${f(r[1])}" width="${f(r[2])}" height="${f(r[3])}" rx="${f(t / 2)}" fill="${lt ? lit : "#fff"}" fill-opacity="${lt ? 1 : .05}"/>`; }
+    }
+    return `<g transform="translate(${f(y * .09)} 0) skewX(-5)">${s}</g>`;
+  }
+  
+  function lcd(x, x0, y0, w, h, col) {
+    return `<rect x="${f(x0 - 1)}" y="${f(y0 - 1)}" width="${f(w + 2)}" height="${f(h + 2)}" rx="3" fill="#000" fill-opacity=".45"/><rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="2.4" fill="${x.lg([[0, "#07090d"], [1, "#151922"]])}"/>` +
+      (x.on ? `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="2.4" fill="${x.rg([[0, col, .35], [1, col, 0]], .5, .5, .7)}" opacity="${a2(.5 + .5 * x.L)}"/>` : "");
+  }
+  const glass = (x, x0, y0, w, h) => `<path d="M${f(x0 + 2)} ${f(y0 + 1.5)}H${f(x0 + w * .7)}L${f(x0 + w * .45)} ${f(y0 + h - 1.5)}H${f(x0 + 2)}Z" fill="#fff" fill-opacity=".07"/>`;
+  const watts = (x) => x.on ? Math.round(2 + 1498 * Math.pow(x.lv, 1.25)) : 0;
+  const clipU = (x, key, shape) => x.def("c" + key, (id) => `<clipPath id="${id}">${shape}</clipPath>`);
+  
+  function grass(x, y0) {
+    const r = rnd(29); let s = `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.lg([[0, "#3f6a30"], [1, "#5b8a43"]])}"/>`;
+    for (let i = 0; i < 80; i++) { const gx = 8 + r() * 184, gy = y0 + 2 + r() * (190 - y0); s += `<path d="M${f(gx)} ${f(gy)}l${f(r() * 2 - 1)} ${f(-2 - r() * 4)}" stroke="${r() > .5 ? "#7aa85a" : "#2f5524"}" stroke-width=".9" stroke-linecap="round"/>`; }
+    return s;
+  }
+  function tiles(x, y0, col) {
+    let s = `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.lg([[0, H.shade(col, -.25)], [1, col]])}"/>`;
+    for (let i = 1; i < 5; i++) { const y = y0 + (192 - y0) * Math.pow(i / 5, 1.3); s += `<path d="M8 ${f(y)}H192" stroke="#000" stroke-opacity=".18"/>`; }
+    for (let k = -5; k <= 5; k++) { const xb = 100 + k * 40, xt = 100 + (xb - 100) * .6; s += `<path d="M${f(xt)} ${y0}L${f(xb)} 192" stroke="#000" stroke-opacity=".15"/>`; }
+    return s;
+  }
+  function bed(x, cx, cy, w) {
+    return `<ellipse cx="${cx}" cy="${cy + 4}" rx="${w / 2 + 4}" ry="13" fill="#000" fill-opacity=".3"/><ellipse cx="${cx}" cy="${cy}" rx="${w / 2}" ry="14" fill="${x.lg([[0, "#8c6f8f"], [1, "#4f3c52"]])}"/>` +
+      `<ellipse cx="${cx}" cy="${cy - 1}" rx="${w / 2 - 9}" ry="8" fill="${x.lg([[0, "#5a465c"], [1, "#a68aa8"]])}"/><path d="M${cx - w / 2 + 4} ${cy - 5}Q${cx} ${cy - 18} ${cx + w / 2 - 4} ${cy - 5}" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="2"/>`;
+  }
+  function backdrop(x, zone, act, away) {
+    const G = 166;
+    if (away) return `<rect x="8" y="8" width="184" height="184" fill="${x.lg([[0, "#5d7fa8"], [1, "#b9cde0"]])}"/>` +
+      `<path d="M8 120L40 96L70 112L110 88L150 110L192 92V140H8Z" fill="#6f879e"/><rect x="8" y="140" width="184" height="52" fill="${x.lg([[0, "#8d8f94"], [1, "#a9abb0"]])}"/>` +
+      `<path d="M8 150H192" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-dasharray="12 10"/>` + dots(5, 60, 8, 140, 184, 52, .8, .2);
+    if (zone === "yard") { let fence = ""; for (let i = 0; i < 12; i++) fence += `<rect x="${8 + i * 16}" y="${i % 2 ? 74 : 70}" width="15" height="${i % 2 ? 66 : 70}" fill="${x.lg([[0, "#ece6da"], [1, "#bdb5a6"]], 0, 0, 1, 0)}"/>`;
+      return `<rect x="8" y="8" width="184" height="140" fill="${x.lg([[0, "#4a86c8"], [1, "#c6e0f2"]])}"/>` + fence + `<rect x="8" y="96" width="184" height="4" fill="#a39c90"/><rect x="8" y="124" width="184" height="4" fill="#a39c90"/>` + grass(x, 138); }
+    if (zone === "vet") return `<rect x="8" y="8" width="184" height="${G - 26}" fill="${x.lg([[0, "#bfe2dc"], [1, "#9fcac2"]])}"/><rect x="8" y="${G - 34}" width="184" height="8" fill="#e8f2f0"/>` +
+      `<rect x="146" y="26" width="30" height="30" rx="6" fill="#fff" fill-opacity=".85"/><path d="M161 32V50M152 41H170" stroke="#e0483e" stroke-width="5" stroke-linecap="round"/>` + tiles(x, G - 26, "#dfe6e6");
+    if (zone === "daycare") { let paws = ""; const r = rnd(8); for (let i = 0; i < 7; i++) { const px = 20 + r() * 160, py = 20 + r() * 90; paws += `<g fill="#fff" fill-opacity=".35"><ellipse cx="${f(px)}" cy="${f(py)}" rx="4" ry="3.4"/><circle cx="${f(px - 4)}" cy="${f(py - 5)}" r="1.6"/><circle cx="${f(px)}" cy="${f(py - 6.5)}" r="1.6"/><circle cx="${f(px + 4)}" cy="${f(py - 5)}" r="1.6"/></g>`; }
+      return `<rect x="8" y="8" width="184" height="${G - 26}" fill="${x.lg([[0, "#f2b45a"], [1, "#e0904a"]])}"/>` + paws + `<rect x="8" y="${G - 26}" width="184" height="${218 - G}" fill="${x.lg([[0, "#3d8a7a"], [1, "#5aa898"]])}"/>` +
+        `<circle cx="34" cy="${G + 10}" r="6" fill="#e0483e"/><circle cx="172" cy="${G + 14}" r="7" fill="#3a6fd8"/><path d="M168 ${G + 14}H176" stroke="#fff" stroke-width="1.4"/>`; }
+    return wallB(x, "clay", 8, G - 26) + `<rect x="8" y="${G - 30}" width="184" height="5" fill="#e6e1d8"/>` + woodB(x, G - 26, "#8a6142") +
+      `<rect x="150" y="30" width="30" height="40" rx="2" fill="#2a2420"/><rect x="153" y="33" width="24" height="34" fill="${x.lg([[0, "#d9a066"], [1, "#7a5a8a"]])}"/>` +
+      (act === "rest" || act === "sleep" ? bed(x, 100, G, 150) : `<ellipse cx="100" cy="${G + 6}" rx="80" ry="14" fill="${x.lg([[0, "#7a4a3a"], [1, "#a8664e"]])}"/><ellipse cx="100" cy="${G + 6}" rx="72" ry="11" fill="none" stroke="#e8c49a" stroke-opacity=".5" stroke-dasharray="3 3"/>`);
+  }
+
+
+  
+  const R2 = (p) => `${f(p[0])} ${f(p[1])}`;
+  const circ = (c, r) => `M${f(c[0] - r)} ${f(c[1])}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2 * r)} 0Z`;
+  function cap(p, r1, q, r2) {
+    const dx = q[0] - p[0], dy = q[1] - p[1], d = Math.hypot(dx, dy);
+    if (d < .01 || d <= Math.abs(r1 - r2)) return r1 >= r2 ? circ(p, r1) : circ(q, r2);
+    const a = Math.atan2(dy, dx), ph = Math.acos((r1 - r2) / d), n = 9; let s = "";
+    for (let i = 0; i <= n; i++) { const t = a - ph + 2 * ph * i / n; s += (i ? "L" : "M") + R2([q[0] + r2 * Math.cos(t), q[1] + r2 * Math.sin(t)]); }
+    for (let i = 0; i <= n; i++) { const t = a + ph + (2 * Math.PI - 2 * ph) * i / n; s += "L" + R2([p[0] + r1 * Math.cos(t), p[1] + r1 * Math.sin(t)]); }
+    return s + "Z";
+  }
+  const chain = (pts) => { const out = []; for (let i = 0; i + 1 < pts.length; i++) out.push(cap(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1])); return out; };
+  const add = (p, v, k) => [p[0] + v[0] * (k == null ? 1 : k), p[1] + v[1] * (k == null ? 1 : k)];
+  const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+  const pol = (p, len, deg) => [p[0] + len * Math.cos(deg * Math.PI / 180), p[1] + len * Math.sin(deg * Math.PI / 180)];
+  
+  function unit(x, key, shapes, fill, over) {
+    const cp = clipU(x, key, shapes.map((d) => `<path d="${d}"/>`).join(""));
+    return shapes.map((d) => `<path d="${d}" fill="${fill}"/>`).join("") + (over ? `<g clip-path="${cp}">${over}</g>` : "");
+  }
+  const shadeRect = (x, y0, y1) => `<rect x="-300" y="${f(y0)}" width="600" height="${f(y1 - y0)}" fill="${x.lg([[0, "#fff", .26], [.35, "#fff", 0], [.62, "#000", 0], [1, "#000", .38]])}"/>`;
+  const glowAt = (x, c, r, col, k) => `<circle cx="${f(c[0])}" cy="${f(c[1])}" r="${f(r)}" fill="${x.rg([[0, col, k == null ? .35 : k], [1, col, 0]])}"/>`;
+
+  
+  const DOG = (o) => Object.assign({ L: 50, D: 30, Lg: 30, N: 18, r: 12, m: 14, w: 8, w2: 6, ear: "drop", tail: "otter", T: 32, tr: 5, coat: "short", pat: "solid", slope: 0, neckA: -52 }, o);
+  const BREEDS = [
+    ["labrador", "Labrador Retriever", ["#e3c48c", "#1f1d1c", "#5a3b25", "#c88a4e"], DOG({ L: 54, D: 34, Lg: 33, N: 19, r: 12.5, m: 15, w: 9, w2: 7.5, tail: "otter", T: 34, tr: 5.5 })],
+    ["golden", "Golden Retriever", ["#d9a056", "#ecd2a0", "#b8742e", "#c98a44"], DOG({ L: 54, D: 33, Lg: 33, N: 20, r: 12.5, m: 14, w: 8.5, w2: 7, tail: "plume", T: 36, tr: 5, coat: "long" })],
+    ["shepherd", "German Shepherd", ["#b8783a", "#9a7448", "#1f1d1c", "#ece6da"], DOG({ L: 60, D: 34, Lg: 33, N: 22, r: 12, m: 17, w: 8, w2: 5.5, ear: "prick", earH: 1.55, tail: "saber", T: 42, tr: 6, coat: "double", pat: "saddle", slope: 6, neckA: -48 })],
+    ["frenchie", "French Bulldog", ["#c9a274", "#4a3a2c", "#e8d6b8", "#6c7077"], DOG({ L: 34, D: 30, Lg: 22, N: 8, r: 14, m: 3.5, w: 10, w2: 9, ear: "bat", earH: 1.3, tail: "stub", T: 6, tr: 4, pat: "mask", neckA: -60 })],
+    ["beagle", "Beagle", ["#b9763a", "#e2c27e", "#a8552d"], DOG({ L: 42, D: 26, Lg: 26, N: 14, r: 10.5, m: 12, w: 7, w2: 6, ear: "long", tail: "flag", T: 26, tr: 3.6, pat: "tri", tip: 1 })],
+    ["dachshund", "Dachshund", ["#9a4a24", "#2a221d", "#5a3b25", "#e2c08a"], DOG({ L: 66, D: 22, Lg: 12, N: 14, r: 10, m: 16, w: 6.5, w2: 5, ear: "long", tail: "whip", T: 30, tr: 3, neckA: -45 })],
+    ["husky", "Siberian Husky", ["#6e7279", "#2a2a2c", "#a8603a", "#7a6650"], DOG({ L: 50, D: 30, Lg: 32, N: 16, r: 11.5, m: 13, w: 7.5, w2: 5.5, ear: "prick", earH: 1.25, tail: "curl", T: 34, tr: 6.5, coat: "double", pat: "husky" })],
+    ["corgi", "Corgi", ["#c87a3c", "#9a6a3c", "#2a221d", "#d9a060"], DOG({ L: 50, D: 26, Lg: 12, N: 12, r: 11.5, m: 11, w: 7, w2: 5, ear: "prick", earH: 1.55, tail: "stub", T: 6, tr: 6, coat: "double", pat: "white", neckA: -60 })],
+    ["collie", "Border Collie", ["#1f1d1c", "#8a4a2c", "#7d838c", "#5a3b25"], DOG({ L: 48, D: 26, Lg: 28, N: 16, r: 10.5, m: 12, w: 6.5, w2: 4.5, ear: "semi", earH: 1.15, tail: "saber", T: 36, tr: 4.4, coat: "long", pat: "collie", tip: 1 })],
+    ["poodle", "Poodle", ["#f2eee8", "#1f1d1c", "#e0b07a", "#8d8f93", "#5a3b25"], DOG({ L: 40, D: 26, Lg: 36, N: 22, r: 10, m: 15, w: 6, w2: 5, ear: "long", tail: "pom", T: 18, tr: 3.4, coat: "curly", neckA: -62 })],
+  ];
+  const CAT = (o) => Object.assign({ L: 38, D: 20, Lg: 20, N: 6, r: 9.5, m: 2.6, w: 5, w2: 4, ear: "cat", earH: 1.15, tail: "cat", T: 40, tr: 2.7, coat: "short", pat: "solid", cat: 1, neckA: -40, eye: "#c9b23a" }, o);
+  const CATS = [
+    ["tabby", "Tabby cat", ["#9a7650", "#8a8378", "#b08a5a"], CAT({ pat: "tabby", eye: "#9ac23a" })],
+    ["blackcat", "Black cat", ["#1e1d1d", "#3a3536", "#2b2a2e"], CAT({ eye: "#e0b830" })],
+    ["siamese", "Siamese cat", ["#e9dcc5", "#efe6d6", "#d8cbb4"], CAT({ pat: "points", eye: "#5aa8e8", L: 40, Lg: 22, r: 9, m: 3.6, earH: 1.35 })],
+    ["orangecat", "Orange cat", ["#d9853a", "#e8a45a", "#c46a2a"], CAT({ pat: "tabby", eye: "#c9a23a" })],
+  ];
+
+  
+  function skeleton(B, act, phase) {
+    const { L, D, Lg } = B, cat = !!B.cat, S = {};
+    const stand = (slope) => { S.Cc = [L / 2, -(Lg + D * .5)]; S.Mid = [-L * .08, S.Cc[1] - D * .1 + slope * .4]; S.Hc = [-L / 2, S.Cc[1] + slope]; S.rc = D * .5; S.rm = D * (cat ? .4 : .37); S.rh = D * (cat ? .42 : .4); };
+    S.lie = act === "rest" || act === "sleep" || (cat && act === "eat");
+    if (act === "rest" || act === "sleep") {
+      S.Cc = [L / 2, -D * .5]; S.Mid = [-L * .05, -D * .52]; S.Hc = [-L / 2 + D * .1, -D * .46]; S.rc = D * .5; S.rm = D * .44; S.rh = D * .46;
+      if (act === "sleep") { S.Cc = [L * .42, -D * .46]; S.Mid = [0, -D * .62]; S.Hc = [-L * .42, -D * .5]; S.rm = D * .5; }
+      if (act === "sleep" && cat) { S.Cc = [L * .22, -D * .55]; S.Mid = [0, -D * .7]; S.Hc = [-L * .26, -D * .56]; S.rc = D * .56; S.rm = D * .66; S.rh = D * .58; }
+    } else if (act === "play") {
+      stand(0); S.Cc = [L * .48, -D * .58]; S.Mid = [-L * .05, (S.Cc[1] + S.Hc[1]) / 2 - D * .05];
+    } else if (cat && act === "eat") {
+      S.Cc = [L / 2, -(Lg * .9 + D * .5)]; S.Mid = [-L * .05, -D * .7]; S.Hc = [-L / 2 + D * .15, -D * .5]; S.rc = D * .48; S.rm = D * .42; S.rh = D * .46;
+    } else stand(B.slope || 0);
+    
+    const legF = (dx, P) => { const Sh = [S.Cc[0] - D * .02 + dx, S.Cc[1] - D * .05], rP = D * (cat ? .1 : .095);
+      const d = Math.hypot(P[0] - Sh[0], P[1] - Sh[1]), seg = (Lg + D * .45) * .52, b = Math.sqrt(Math.max(0, seg * seg - d * d / 4)) * .55;
+      const mid = lerp(Sh, P, .5), nx = -(P[1] - Sh[1]) / d, ny = (P[0] - Sh[0]) / d, E = [mid[0] - Math.abs(nx) * b - D * .05, mid[1] + ny * 0];
+      const K = lerp(E, P, .84);
+      const q = cat ? .78 : 1; return [[Sh, D * .3 * q], [E, D * .14 * q], [K, D * .085 * q], [[P[0] + rP * .6, P[1] - rP * .1], rP * (cat ? .85 : 1)]]; };
+    const legH = (dx, P) => { const Hp = [S.Hc[0] + D * .06 + dx, S.Hc[1] + D * .02], rP = D * (cat ? .1 : .095);
+      const Hk = [P[0] - D * .2, P[1] - Lg * .3 - D * .05], St = [lerp(Hp, Hk, .5)[0] + D * .26, lerp(Hp, Hk, .5)[1] + D * .05];
+      const q = cat ? .8 : 1; return [[Hp, D * .38 * q], [St, D * .17 * q], [Hk, D * .08 * q], [[P[0] + rP * .5, P[1] - rP * .1], rP * (cat ? .85 : 1)]]; };
+    S.legs = (t) => {  
+      const g = (ph) => { if (t == null) return [0, 0]; const a = 2 * Math.PI * (t + ph); return [Math.cos(a) * D * .42, Math.max(0, -Math.sin(a)) * D * .22]; };
+      const fx = S.Cc[0] + D * .02, hx = S.Hc[0] - D * .02;
+      const nf = g(0), ff = g(.5), nh = g(.5), fh = g(0);
+      return { nearF: legF(0, [fx + nf[0], -nf[1]]), farF: legF(-D * .16, [fx - D * .16 + ff[0], -ff[1]]), nearH: legH(0, [hx + nh[0], -nh[1]]), farH: legH(D * .14, [hx + D * .14 + fh[0], -fh[1]]) };
+    };
+    if (act === "eat" && !cat) S.legs = () => ({ nearF: legF(0, [S.Cc[0] + D * .42, 0]), farF: legF(-D * .1, [S.Cc[0] + D * .2, 0]), nearH: legH(0, [S.Hc[0] - D * .04, 0]), farH: legH(D * .14, [S.Hc[0] + D * .12, 0]) });
+    if (act === "play") S.legs = () => { const E = [S.Cc[0] - D * .02, -D * .13], E2 = [S.Cc[0] - D * .18, -D * .12];
+      const fl = (e) => [[[S.Cc[0], S.Cc[1] + D * .05], D * .28], [e, D * .14], [[e[0] + D * .62, -D * .085], D * .085], [[e[0] + D * .82, -D * .09], D * .095]];
+      return { nearF: fl(E), farF: fl(E2), nearH: legH(0, [S.Hc[0] - D * .02, 0]), farH: legH(D * .14, [S.Hc[0] + D * .12, 0]) }; };
+    if (S.lie) S.legs = () => {
+      const fl = (dx) => [[[S.Cc[0] - D * .05 + dx, S.Cc[1] + D * .05], D * .26], [[S.Cc[0] - D * .05 + dx, -D * .14], D * .14], [[S.Cc[0] + D * .65 + dx, -D * .085], D * .085], [[S.Cc[0] + D * .88 + dx, -D * .09], D * .095]];
+      const hl = (dx) => [[[S.Hc[0] + D * .08 + dx, S.Hc[1] + D * .02], D * .44], [[S.Hc[0] + D * .5 + dx, -D * .2], D * .15], [[S.Hc[0] + D * .7 + dx, -D * .085], D * .085]];
+      const catEat = cat && act === "eat";
+      const front = act === "sleep" ? (dx) => [[[S.Cc[0] - D * .05 + dx, S.Cc[1] + D * .05], D * .24], [[S.Cc[0] + D * .1 + dx, -D * .12], D * .13], [[S.Cc[0] + D * .5 + dx, -D * .09], D * .09]]
+        : catEat ? (dx) => [[[S.Cc[0] + dx, S.Cc[1] + D * .05], D * .27], [[S.Cc[0] + D * .05 + dx, -Lg * .55], D * .13], [[S.Cc[0] + D * .12 + dx, -D * .08], D * .085], [[S.Cc[0] + D * .26 + dx, -D * .09], D * .1]] : fl;
+      const fr = act === "rest" && cat ? (dx) => [[[S.Cc[0] - D * .05 + dx, S.Cc[1] + D * .05], D * .26], [[S.Cc[0] + D * .1 + dx, -D * .12], D * .13], [[S.Cc[0] + D * .35 + dx, -D * .09], D * .1]] : front;
+      return { nearF: fr(0), farF: fr(-D * .18), nearH: hl(0), farH: [] }; };
+    
+    let na = B.neckA, nl = B.N;
+    if (act === "walk") na += 10;
+    if (act === "play") { na = -24; nl = B.N * .8; }
+    if (act === "eat") { na = cat ? 60 : 58; }
+    if (act === "rest") na = B.neckA - 6;
+    S.Nb = [S.Cc[0] + D * .14, S.Cc[1] - D * .22];
+    if (act === "eat") nl = Math.max(B.N * .5, (-(B.r * (cat ? 1.25 : 1.55) + D * .42) - S.Nb[1]) / Math.sin(na * Math.PI / 180));
+    S.Hj = act === "sleep" ? [S.Cc[0] + D * (cat ? .42 : .55), -B.r * .78] : pol(S.Nb, nl, na);
+    S.headA = act === "eat" ? (cat ? 48 : 60) : act === "sleep" ? 14 : act === "play" ? -4 : 0;
+    return S;
+  }
+
+  
+  function head(x, B, col, dk, lt, act, uidK) {
+    const r = B.r, m = B.m, cat = !!B.cat, closed = act === "sleep";
+    const Hs = [r * .35, -r * .15], mb = [Hs[0] + r * .45, Hs[1] + r * .32], tip = [Hs[0] + r * .62 + m, Hs[1] + r * (cat ? .35 : .3)];
+    const shapes = [circ(Hs, r), cap(mb, B.w, tip, B.w2), cap([Hs[0] + r * .1, Hs[1] + r * .45], r * .6, [tip[0] - m * .25, tip[1] + B.w2 * .7], B.w2 * .62), cap([0, 0], r * .72, Hs, r * .8)];
+    if (B.pat === "mask" || B.w > 9) shapes.push(circ([Hs[0] + r * .7, Hs[1] + r * .38], r * .62));
+    if (B.coat === "curly") shapes.push(circ([Hs[0] - r * .15, Hs[1] - r * .8], r * .68));
+    let over = shadeRect(x, Hs[1] - r * 1.1, tip[1] + B.w2 * 1.6) + glowAt(x, [Hs[0] - r * .1, Hs[1] - r * .55], r * .9, "#ffffff", .22);
+    const WH = "#f4f0e8", BK = "#1d1a18";
+    if (B.pat === "saddle" || B.pat === "mask") over += cap(mb, B.w + 1.5, [tip[0] + 2, tip[1]], B.w2 + 2).replace(/^/, `<path fill="${BK}" opacity=".85" d="`) + `"/>`;
+    if (B.pat === "husky") over += `<path d="${cap([Hs[0] + r * .2, Hs[1] + r * .5], r * .62, [tip[0], tip[1] + 2], B.w2 + 2)}" fill="${WH}"/><circle cx="${f(Hs[0] + r * .5)}" cy="${f(Hs[1] - r * .48)}" r="${f(r * .14)}" fill="${WH}"/>`;
+    if (B.pat === "tri" || B.pat === "white" || B.pat === "collie") over += `<path d="${cap([Hs[0] + r * .52, Hs[1] - r * 1.05], r * .1, [Hs[0] + r * .8, Hs[1] + r * .1], r * .22)}" fill="${WH}"/><path d="${cap(mb, B.w + 1, [tip[0] + 2, tip[1] + 1], B.w2 + 2)}" fill="${WH}" opacity=".95"/>`;
+    if (B.pat === "points") over += `<path d="${cap([Hs[0] + r * .45, Hs[1] + r * .2], r * .55, [tip[0], tip[1]], B.w2 + 2.5)}" fill="${H.shade(col, -.62)}" opacity=".9"/>`;
+    if (B.pat === "tabby") over += `<path d="M${f(Hs[0] - r * .05)} ${f(Hs[1] - r * .9)}l${f(r * .12)} ${f(r * .35)} ${f(r * .12)} ${f(-r * .35)} ${f(r * .12)} ${f(r * .35)}M${f(Hs[0] - r * .6)} ${f(Hs[1] + r * .05)}q${f(r * .3)} ${f(-r * .1)} ${f(r * .55)} ${f(r * .05)}M${f(Hs[0] - r * .55)} ${f(Hs[1] + r * .35)}q${f(r * .3)} ${f(-r * .05)} ${f(r * .55)} ${f(r * .08)}" fill="none" stroke="${H.shade(col, -.5)}" stroke-width="${f(r * .1)}" stroke-linecap="round"/>`;
+    if (B.coat === "curly") over += curls(x, Hs[0] - r * 1.1, Hs[1] - r * 1.6, r * 2, r * 2.2, dk, 9);
+    const headU = unit(x, "hd" + uidK, shapes, x.rg([[0, lt], [.6, col], [1, dk]], .4, .35, .8), over);
+    
+    const eC = [Hs[0] + r * .5, Hs[1] - r * .12], er = r * (cat ? .2 : .14);
+    const eye = closed ? `<path d="M${f(eC[0] - er)} ${f(eC[1])}q${f(er)} ${f(er * .7)} ${f(er * 2)} ${f(-er * .1)}" fill="none" stroke="#1a1210" stroke-width="${f(Math.max(.8, r * .08))}" stroke-linecap="round"/>`
+      : `<ellipse cx="${f(eC[0])}" cy="${f(eC[1])}" rx="${f(er * 1.05)}" ry="${f(er * .82)}" fill="${cat ? B.eye : "#3a2414"}"/>` + (cat ? `<ellipse cx="${f(eC[0] + er * .1)}" cy="${f(eC[1])}" rx="${f(er * .28)}" ry="${f(er * .72)}" fill="#0b0808"/>` : `<circle cx="${f(eC[0])}" cy="${f(eC[1])}" r="${f(er * .55)}" fill="#0b0808"/>`) +
+        `<circle cx="${f(eC[0] + er * .35)}" cy="${f(eC[1] - er * .35)}" r="${f(er * .3)}" fill="#fff"/><path d="M${f(eC[0] - er * 1.2)} ${f(eC[1] - er * .7)}q${f(er * 1.2)} ${f(-er * .8)} ${f(er * 2.3)} ${f(-er * .05)}" fill="none" stroke="${H.shade(col, -.45)}" stroke-width="${f(r * .07)}" stroke-linecap="round"/>` +
+        `<g class="${x.o.on && act === "rest" ? P + "blink" : ""}" opacity="0"><path d="M${f(eC[0] - er * 1.1)} ${f(eC[1])}a${f(er * 1.1)} ${f(er * .9)} 0 0 1 ${f(er * 2.2)} 0Z" fill="${col}"/></g>`;
+    const nC = [tip[0] + B.w2 * .45, tip[1] - B.w2 * .55], nr = cat ? B.w2 * .45 : Math.max(2.2, B.w2 * .5);
+    const nose = `<ellipse cx="${f(nC[0])}" cy="${f(nC[1])}" rx="${f(nr * 1.1)}" ry="${f(nr * .8)}" fill="${cat ? "#c9787a" : "#1a1416"}"/><ellipse cx="${f(nC[0] - nr * .2)}" cy="${f(nC[1] - nr * .35)}" rx="${f(nr * .45)}" ry="${f(nr * .22)}" fill="#fff" fill-opacity=".5"/>`;
+    const mouthOpen = act === "play" && x.o.on && !cat;
+    const jawP = [tip[0] - m * .15, tip[1] + B.w2 * .75];
+    const mouth = `<path d="M${f(nC[0] - nr * .3)} ${f(nC[1] + nr * .7)}Q${f(jawP[0])} ${f(jawP[1] + 1)} ${f(Hs[0] + r * .62)} ${f(tip[1] + B.w2 * .45)}" fill="none" stroke="#2a1a14" stroke-width="${f(Math.max(.6, r * .06))}" stroke-linecap="round"/>` +
+      (mouthOpen ? `<path d="M${f(jawP[0] - 1)} ${f(jawP[1] - 1)}q${f(B.w2 * .4)} ${f(B.w2 * 1.6)} ${f(B.w2 * 1.2)} ${f(B.w2 * .2)}" fill="#e07a8a" stroke="#b05a68" stroke-width=".5"/>` : "");
+    const whisk = cat ? `<path d="M${f(tip[0] - 1)} ${f(tip[1] + 1)}l${f(r * .9)} ${f(-r * .12)}M${f(tip[0] - 1)} ${f(tip[1] + 2)}l${f(r * .9)} ${f(r * .1)}M${f(tip[0] - 2)} ${f(tip[1] + 3)}l${f(r * .8)} ${f(r * .3)}" stroke="#fff" stroke-opacity=".75" stroke-width=".45"/>` : "";
+    
+    const earCol = B.pat === "points" ? H.shade(col, -.62) : B.pat === "tri" ? H.shade(col, -.1) : H.shade(col, -.16);
+    let ear = "";
+    if (B.ear === "drop" || B.ear === "long") { const len = B.ear === "long" ? r * 1.55 : r * 1.05;
+      ear = `<path d="M${f(Hs[0] - r * .05)} ${f(Hs[1] - r * .82)}C${f(Hs[0] - r * .75)} ${f(Hs[1] - r * .6)} ${f(Hs[0] - r * .85)} ${f(Hs[1] + len * .55)} ${f(Hs[0] - r * .35)} ${f(Hs[1] + len)}C${f(Hs[0] + r * .05)} ${f(Hs[1] + len * .9)} ${f(Hs[0] + r * .2)} ${f(Hs[1] + len * .2)} ${f(Hs[0] + r * .25)} ${f(Hs[1] - r * .55)}Z" fill="${x.lg([[0, H.shade(earCol, .1)], [1, H.shade(earCol, -.25)]])}"/>` +
+        (B.coat === "curly" ? curls(x, Hs[0] - r * .7, Hs[1] - r * .3, r * .9, len * 1.1, H.shade(earCol, -.3), 6, true) : "") +
+        (B.coat === "long" ? `<path d="M${f(Hs[0] - r * .55)} ${f(Hs[1] + len * .6)}q${f(-r * .1)} ${f(r * .3)} ${f(r * .05)} ${f(r * .45)}" fill="none" stroke="${earCol}" stroke-width="${f(r * .25)}" stroke-dasharray="1.5 1.5"/>` : ""); }
+    else if (B.ear === "rose") ear = "";
+    else { const h = (B.earH || 1.4) * r, wd = B.ear === "bat" ? .62 : B.ear === "cat" ? .55 : .48, base = [Hs[0] - r * .15, Hs[1] - r * .7];
+      const tipP = B.ear === "semi" ? [base[0] + r * .2, base[1] - h * .8] : [base[0] - r * .1, base[1] - h];
+      const tipD = B.ear === "semi" ? `L${f(tipP[0])} ${f(tipP[1])}Q${f(tipP[0] + r * .35)} ${f(tipP[1] + r * .1)} ${f(tipP[0] + r * .45)} ${f(tipP[1] + r * .5)}` : `Q${f(tipP[0] - r * .05)} ${f(tipP[1] - r * .05)} ${f(tipP[0] + r * .08)} ${f(tipP[1] + r * .05)}`;
+      ear = `<path d="M${f(base[0] - r * wd)} ${f(base[1] + r * .25)}Q${f(base[0] - r * wd * .9)} ${f(base[1] - h * .5)} ${f(tipP[0] - r * .06)} ${f(tipP[1] + r * .1)}${tipD}Q${f(base[0] + r * wd * .9)} ${f(base[1] - h * .35)} ${f(base[0] + r * wd)} ${f(base[1] + r * .3)}Z" fill="${x.lg([[0, H.shade(earCol, .08)], [1, H.shade(earCol, -.2)]], 0, 0, 1, 0)}"/>` +
+        `<path d="M${f(base[0] - r * wd * .45)} ${f(base[1] + r * .1)}Q${f(base[0] - r * wd * .3)} ${f(base[1] - h * .45)} ${f(tipP[0])} ${f(tipP[1] + h * .22)}Q${f(base[0] + r * wd * .4)} ${f(base[1] - h * .3)} ${f(base[0] + r * wd * .5)} ${f(base[1] + r * .15)}Z" fill="#d89a9a" opacity="${B.pat === "points" ? .35 : .6}"/>` +
+        (B.coat === "double" ? `<path d="M${f(base[0] - r * wd * .4)} ${f(base[1] + r * .1)}l${f(r * .1)} ${f(-h * .3)}M${f(base[0])} ${f(base[1])}l${f(r * .05)} ${f(-h * .35)}" stroke="#fff" stroke-opacity=".6" stroke-width=".6"/>` : ""); }
+    const earG = `<g class="${x.o.on && act === "rest" ? P + "twitch" : ""}" style="transform-origin:${f(Hs[0])}px ${f(Hs[1] - r * .7)}px">${ear}</g>`;
+    const top = "";
+    const jaw = act === "eat" && x.o.on ? `<g class="${P}chew">${mouth}</g>` : mouth;
+    const earBehind = B.ear === "drop" || B.ear === "long";
+    return (earBehind ? "" : earG) + top + headU + eye + nose + jaw + whisk + (earBehind ? earG : "");
+  }
+  function curls(x, x0, y0, w, h, col, n, dense) {
+    const rr = rnd(Math.round(x0 * 13 + y0 * 7 + n)); let s = "";
+    for (let i = 0; i < n * (dense ? 3 : 4); i++) s += `<circle cx="${f(x0 + rr() * w)}" cy="${f(y0 + rr() * h)}" r="${f(1.4 + rr() * 1.8)}" fill="none" stroke="${col}" stroke-opacity=".38" stroke-width=".7"/>`;
+    return s;
+  }
+
+  
+  function tailPts(B, act, S) {
+    const D = B.D, base = [S.Hc[0] - S.rh * .75, S.Hc[1] - S.rh * .35], T = B.T, cat = !!B.cat;
+    if (B.tail === "stub") return [[base, B.tr], [add(base, [-B.T, -1]), B.tr * .8]];
+    let ang;  
+    const lyingDown = act === "rest" || act === "sleep" || (cat && act === "eat");
+    if (lyingDown) ang = act === "sleep" ? [70, 40, 10, -20] : [40, 20, 5, -5];
+    else if (cat) ang = act === "walk" || act === "play" ? [-60, -85, -100, -125] : act === "eat" ? [30, 50, 60, 55] : [-40, -70, -90, -100];
+    else ({ otter: () => ang = act === "walk" ? [-10, 0, 10, 20] : [25, 40, 55, 65], plume: () => ang = act === "play" ? [-40, -60, -70, -80] : act === "walk" ? [-10, 0, 10, 20] : [20, 35, 45, 55],
+      saber: () => ang = act === "play" ? [-20, -10, 0, 10] : [45, 60, 70, 60], flag: () => ang = [-55, -70, -80, -85], whip: () => ang = act === "play" ? [-30, -40, -45, -50] : [20, 30, 40, 50],
+      curl: () => ang = [-70, -110, -150, -185], pom: () => ang = [-60, -70, -75, -80] })[B.tail]();
+    const pts = [[base, B.tr]]; let p = base;
+    for (let i = 0; i < 4; i++) { const a = 180 - ang[i]; p = pol(p, T / 4, a); pts.push([p, B.tr * (1 - .17 * (i + 1)) + (B.tail === "plume" || B.tail === "saber" || B.tail === "curl" ? B.tr * .25 : 0)]); }
+    if (act === "sleep" && !cat) { const q = [[base, B.tr]]; let pp = base; [100, 70, 20, -5].forEach((a, i) => { pp = pol(pp, T / 4, a); q.push([[pp[0], Math.min(pp[1], -B.tr)], B.tr * (1 - .12 * (i + 1))]); }); return q; }
+    if (cat && act === "sleep") { const q = [[base, B.tr]]; let pp = base; [90, 60, 20, 0, -10].forEach((a) => { pp = pol(pp, T / 5, a); q.push([[pp[0], Math.min(pp[1], -B.tr)], B.tr]); }); return q; }
+    return pts;
+  }
+
+  
+  function animal(x, B, act, col, col2) {
+    const S = skeleton(B, act), D = B.D, cat = !!B.cat, uk = B.id + act;
+    const dk = H.shade(col, -.3), lt = H.shade(col, .25), far = H.shade(col, -.36);
+    const WH = "#f4f0e8", BK = "#1d1a18";
+    const walk = act === "walk";
+    const yTop = Math.min(S.Cc[1], S.Hc[1]) - D * .6;
+    
+    const torso = [cap(S.Cc, S.rc, S.Mid, S.rm), cap(S.Mid, S.rm, S.Hc, S.rh), cap(S.Nb, D * (cat ? .3 : .36), S.Hj, D * (cat ? .22 : .25)), cap(S.Cc, S.rc * .95, S.Nb, D * (cat ? .3 : .36))];
+    const legSet = (t) => S.legs(t);
+    const L0 = legSet(walk ? 0 : null);
+    const legShapes = (lg) => lg.length ? chain(lg) : [];
+    
+    const sockCut = -B.Lg * (cat ? .25 : .55);
+    let pat = "";
+    if (B.pat === "saddle") pat += `<path d="${cap([S.Cc[0] - D * .15, S.Cc[1] - D * .35], D * .32, [S.Hc[0] + D * .05, S.Hc[1] - D * .3], D * .38)}" fill="${BK}" opacity=".9"/>` + `<path d="${cap(S.Nb, D * .2, lerp(S.Nb, S.Hj, .7), D * .12)}" fill="${BK}" opacity=".55" transform="translate(-2 -3)"/>`;
+    if (B.pat === "tri") pat += `<path d="${cap([S.Cc[0] - D * .2, S.Cc[1] - D * .32], D * .3, [S.Hc[0] + D * .15, S.Hc[1] - D * .28], D * .33)}" fill="${BK}"/><path d="${cap([S.Cc[0] + D * .2, S.Cc[1] + D * .3], D * .35, [S.Mid[0], S.Mid[1] + D * .45], D * .2)}" fill="${WH}"/>`;
+    if (B.pat === "husky") pat += `<path d="${cap([S.Cc[0] + D * .1, S.Cc[1] + D * .3], D * .38, [S.Hc[0] + D * .1, S.Hc[1] + D * .38], D * .22)}" fill="${WH}"/><path d="${cap(lerp(S.Nb, S.Hj, .2), D * .22, lerp(S.Nb, S.Hj, .9), D * .14)}" fill="${WH}" transform="translate(4 4)"/>`;
+    if (B.pat === "white" || B.pat === "collie") pat += `<path d="${cap([S.Cc[0] + D * .25, S.Cc[1] + D * .1], D * .36, [S.Mid[0] + D * .2, S.Mid[1] + D * .45], D * .16)}" fill="${WH}"/><path d="${cap(lerp(S.Nb, S.Hj, .1), D * .28, lerp(S.Nb, S.Hj, .85), D * .18)}" fill="${WH}" transform="translate(3 3)"/>` +
+      (B.pat === "collie" ? `<path d="${cap(lerp(S.Nb, S.Hj, .35), D * .42, lerp(S.Nb, S.Hj, .62), D * .33)}" fill="${WH}"/>` : "");
+    if (B.pat === "tabby") { const st = H.shade(col, -.52); for (let i = 0; i < 8; i++) { const xx = S.Hc[0] + (S.Cc[0] - S.Hc[0]) * (i + .3) / 8, yy = lerp(S.Hc, S.Cc, (i + .3) / 8)[1] - D * .55;
+      pat += `<path d="M${f(xx)} ${f(yy)}q${f(D * .1)} ${f(D * .3)} ${f(-D * .05)} ${f(D * .62)}" fill="none" stroke="${st}" stroke-width="${f(D * .09)}" stroke-linecap="round"/>`; }
+      if (!S.lie) pat += `<path d="M${f(S.Hc[0])} ${f(S.Hc[1] - D * .45)}L${f(S.Cc[0])} ${f(S.Cc[1] - D * .5)}" stroke="${st}" stroke-width="${f(D * .12)}" stroke-linecap="round"/>`; }
+    if (B.pat === "points") pat += `<path d="${cap(S.Nb, D * .3, S.Hj, D * .3)}" fill="${H.shade(col, -.25)}" opacity=".5"/>`;
+    if (B.coat === "curly") pat += curls(x, S.Hc[0] - D * .5, yTop, S.Cc[0] - S.Hc[0] + D, D * 1.3, dk, 14);
+    if (B.coat === "double" || B.coat === "long") pat += `<path d="M${f(S.Hc[0] - D * .1)} ${f(S.Hc[1] - S.rh * .95)}Q${f(S.Mid[0])} ${f(S.Mid[1] - S.rm * 1.15)} ${f(S.Cc[0])} ${f(S.Cc[1] - S.rc * .95)}" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="1.6" stroke-dasharray="1.2 2.2"/>`;
+    const over = shadeRect(x, yTop, 0) + glowAt(x, [S.Cc[0] - D * .05, S.Cc[1] - D * .15], D * .42, "#ffffff", .2) + glowAt(x, [S.Hc[0] + D * .05, S.Hc[1] - D * .1], D * .4, "#ffffff", .16) + pat;
+    
+    const sockCol = B.pat === "husky" || B.pat === "tri" || B.pat === "white" || B.pat === "collie" ? WH : B.pat === "points" ? H.shade(col, -.62) : (B.pat === "saddle" ? H.shade(col, .1) : null);
+    const sockClip = clipU(x, "sock" + uk, `<rect x="-400" y="${f(sockCut)}" width="800" height="400"/>`);
+    const legDraw = (lg, isFar, key) => { const sh = legShapes(lg); if (!sh.length) return "";
+      const fillC = isFar ? far : col, g = x.lg([[0, H.shade(fillC, .12)], [.6, fillC], [1, H.shade(fillC, -.22)]], 0, 0, 1, 0);
+      let s = sh.map((d) => `<path d="${d}" fill="${g}"/>`).join("");
+      if (sockCol) s += `<g clip-path="${sockClip}">${sh.map((d) => `<path d="${d}" fill="${isFar ? H.shade(sockCol, -.3) : sockCol}"/>`).join("")}</g>`;
+      return s; };
+    const frames = walk ? [0, .25, .5, .75] : [null];
+    let farLegs = "", nearLegs = "";
+    frames.forEach((t, i) => { const lg = legSet(t), cls = walk ? ` class="${P}fr ${P}fr${i}"` : "";
+      farLegs += `<g${cls}>${legDraw(lg.farF, 1) + legDraw(lg.farH, 1)}</g>`; nearLegs += `<g${cls}>${legDraw(lg.nearH, 0) + legDraw(lg.nearF, 0)}</g>`; });
+    
+    const feather = B.coat === "long" && !S.lie ? (() => { let d = `M${f(S.Cc[0] + D * .1)} ${f(S.Cc[1] + S.rc * .75)}`; const n = 7, x0 = S.Cc[0] + D * .1, x1 = S.Mid[0] - D * .1;
+      for (let i = 0; i < n; i++) { const xa = x0 + (x1 - x0) * i / n, xb = x0 + (x1 - x0) * (i + 1) / n, yb = lerp(S.Cc, S.Mid, (i + 1) / n)[1] + S.rm * .9; d += `Q${f((xa + xb) / 2)} ${f(yb + D * .22 + (i % 2) * 2)} ${f(xb)} ${f(yb)}`; }
+      return `<path d="${d}Z" fill="${col}"/><path d="${d}" fill="none" stroke="${dk}" stroke-opacity=".35" stroke-width=".7"/>`; })() : "";
+    
+    const tp = tailPts(B, act, S), tShapes = chain(tp);
+    if (B.tail === "pom" && !S.lie) { const e = tp[tp.length - 1]; tShapes.push(circ(e[0], D * .22)); }
+    let tailG = unit(x, "tl" + uk, tShapes, x.lg([[0, lt], [1, dk]]), shadeRect(x, yTop - B.T, 0) + (B.pat === "points" ? `<rect x="-300" y="-300" width="600" height="600" fill="${H.shade(col, -.62)}" opacity=".85"/>` : "") +
+      (B.pat === "tabby" ? tp.map((p, i) => i % 1 === 0 ? `<circle cx="${f(p[0][0])}" cy="${f(p[0][1])}" r="${f(p[1] * 1.15)}" fill="none" stroke="${H.shade(col, -.52)}" stroke-width="${f(B.tr * .8)}" stroke-dasharray="${f(B.tr)} ${f(B.tr * 1.6)}"/>` : "").join("") : "") +
+      (B.pat === "saddle" ? `<rect x="-300" y="${f(yTop - B.T)}" width="600" height="${f(B.T * .6)}" fill="${BK}" opacity=".55"/>` : ""));
+    if (B.tip) { const e = tp[tp.length - 1]; tailG += `<circle cx="${f(e[0][0])}" cy="${f(e[0][1])}" r="${f(e[1] * 1.3)}" fill="${WH}"/>`; }
+    if (B.coat === "long" || B.coat === "double") tailG += tShapes.map((d) => `<path d="${d}" fill="none" stroke="${lt}" stroke-width="1.6" stroke-dasharray="1.2 2" opacity=".7"/>`).join("");
+    const tb = tp[0][0], wagOn = x.o.on && (act === "play" || act === "walk" || (act === "rest" && !cat));
+    const tailCls = cat && x.o.on && act !== "sleep" ? "flick" : wagOn ? (act === "play" ? "wagF" : "wag") : "";
+    tailG = `<g class="${tailCls ? P + tailCls : ""}" style="transform-origin:${f(tb[0])}px ${f(tb[1])}px">${tailG}</g>`;
+    
+    const hd = head(x, B, col, dk, lt, act, uk);
+    const headCls = x.o.on ? (act === "eat" ? "dip" : act === "walk" ? "nod" : "") : "";
+    const headG = `<g transform="translate(${f(S.Hj[0])} ${f(S.Hj[1])}) rotate(${S.headA})"><g class="${headCls ? P + headCls : ""}">${hd}</g></g>`;
+    
+    const nA = lerp(S.Nb, S.Hj, .72), dir = [S.Hj[0] - S.Nb[0], S.Hj[1] - S.Nb[1]], dl = Math.hypot(dir[0], dir[1]) || 1;
+    let px = -dir[1] / dl, py = dir[0] / dl; if (py < 0) { px = -px; py = -py; }
+    const nr = D * (cat ? .25 : .29) * (1 - .72 * .3), c1 = [nA[0] - px * nr, nA[1] - py * nr], c2 = [nA[0] + px * nr, nA[1] + py * nr];
+    const lv = x.lv, away = !x.o.on, batC = lv < .2 ? "#ff4a3a" : lv < .4 ? "#ffb347" : "#3ee08f", ts = cat ? .55 : Math.max(.7, Math.min(1.15, D / 30));
+    const tg = add(c2, [px, py], cat ? 2 : 3.5);
+    const collar = `<path d="M${R2(c1)}L${R2(c2)}" stroke="${H.shade(col2, -.35)}" stroke-width="${f(cat ? 2.4 : 3.8)}" stroke-linecap="round"/><path d="M${R2(c1)}L${R2(c2)}" stroke="${col2}" stroke-width="${f(cat ? 1.7 : 2.8)}" stroke-linecap="round"/>` +
+      `<g transform="translate(${R2(tg)}) scale(${f(ts)})"><rect x="-5.5" y="-3.6" width="11" height="9" rx="2.4" fill="${x.lg([[0, "#3a3d44"], [1, "#121316"]])}"/><path d="M-4 -2.6H4" stroke="#fff" stroke-opacity=".35" stroke-width=".7"/>` +
+      `<rect x="-4" y="1.8" width="7" height="2.2" rx=".5" fill="none" stroke="#c9ced5" stroke-width=".5"/><rect x="3.1" y="2.4" width=".7" height="1" fill="#c9ced5"/><rect x="-3.6" y="2.2" width="${f(6.2 * Math.max(.08, lv))}" height="1.4" fill="${batC}"/>` +
+      `<circle cx="3" cy="-.6" r="1.1" fill="${away ? "#ffb347" : "#3ee08f"}"${x.o.anim ? ` class="${P}blinkled"` : ""}/><circle cx="3" cy="-.6" r="2.6" fill="${away ? "#ffb347" : "#3ee08f"}" opacity=".25"/></g>`;
+    
+    let props = "";
+    if (act === "eat") { const bx = S.Hj[0] + Math.cos(S.headA * Math.PI / 180) * B.r * .4 + (cat ? D * .2 : D * .25);
+      props = `<path d="M${f(bx - D * .55)} -1L${f(bx - D * .45)} ${f(-D * .3)}H${f(bx + D * .45)}L${f(bx + D * .55)} -1Z" fill="${x.lg([[0, "#8a9098"], [.4, "#eef0f3"], [1, "#7a8088"]], 0, 0, 1, 0)}"/><ellipse cx="${f(bx)}" cy="${f(-D * .3)}" rx="${f(D * .45)}" ry="${f(D * .07)}" fill="#6e4a2a"/>`; }
+    if (act === "play") { const bx = S.Cc[0] + D * (cat ? 1.2 : 1.35);
+      props = `<g class="${x.o.on ? P + "bounce" : ""}">` + (cat ? `<path d="M${f(bx - 4)} -3q5 -6 10 0q-5 4 -10 0Z" fill="#9a9da3"/><path d="M${f(bx - 4)} -3q-6 2 -10 -2" fill="none" stroke="#c9787a" stroke-width=".8"/><circle cx="${f(bx + 4)}" cy="-4.5" r=".7" fill="#111"/>`
+        : `<circle cx="${f(bx)}" cy="${f(-D * .2)}" r="${f(D * .2)}" fill="${x.rg([[0, "#f3ff8a"], [.6, "#cde43a"], [1, "#8eaa16"]], .38, .34, .7)}"/><path d="M${f(bx - D * .17)} ${f(-D * .26)}Q${f(bx)} ${f(-D * .15)} ${f(bx + D * .06)} ${f(-D * .38)}" fill="none" stroke="#fff" stroke-width=".9"/>`) + `</g>`; }
+    if (act === "sleep" && x.o.on) props = `<g class="${P}zz">` + [0, 1, 2].map((i) => { const zx = S.Hj[0] + D * .2 + i * D * .2, zy = yTop - D * .1 - i * D * .25, z = D * (.1 + i * .04); return `<path d="M${f(zx)} ${f(zy)}h${f(z)}l${f(-z)} ${f(z)}h${f(z)}" fill="none" stroke="#fff" stroke-width="${f(Math.max(1, D * .045))}" stroke-linecap="round" stroke-linejoin="round" opacity="${f(.9 - i * .2)}"/>`; }).join("") + `</g>`;
+    const shadow = `<ellipse cx="${f((S.Cc[0] + S.Hc[0]) / 2 + D * .2)}" cy="0" rx="${f((S.Cc[0] - S.Hc[0]) / 2 + D * 1.05)}" ry="${f(D * .14)}" fill="#000" fill-opacity=".34"/>`;
+    const bodyU = unit(x, "bd" + uk, torso, x.lg([[0, lt], [.55, col], [1, dk]]), over);
+    const breathe = x.o.on ? (act === "sleep" ? "breatheS" : act === "rest" || act === "eat" ? "breathe" : "") : "";
+    const bob = walk && x.o.on ? "bob" : "";
+    return shadow + `<g class="${bob ? P + bob : ""}">` + farLegs + tailG + `<g class="${breathe ? P + breathe : ""}">` + bodyU + feather + `</g>` + nearLegs + collar + headG + `</g>` + props;
+  }
+
+  const COLLAR = ["#e0483e", "#3a6fd8", "#2f8f5e", "#f2a541", "#c47ad8", "#2c2f36"];
+  const OPTS = [
+    { id: "act", name: "Activity", values: [["rest", "Resting"], ["sleep", "Sleeping"], ["walk", "Walking"], ["play", "Playing"], ["eat", "Eating"]] },
+    { id: "zone", name: "Zone", values: [["home", "Home"], ["away", "Away"], ["yard", "Yard"], ["vet", "Vet"], ["daycare", "Daycare"]] },
+  ];
+  function render(o, B) {
+    const x = X(o); x.o = o;
+    const opt = o.opt || {}, act = opt.act || "rest", zone = opt.zone || "home", away = !o.on || zone === "away";
+    const col = o.color || "#c9a274", col2 = o.color2 || COLLAR[0];
+    const D = B.D, wide = B.L + D * 2.2 + B.r * 2 + B.m, tall = B.Lg + D * 1.1 + B.N * .8 + B.r * 2.4;
+    const k = Math.min(B.cat ? 1.9 : 2.2, Math.min(150 / wide, 128 / tall));
+    const back = backdrop(x, zone, act, away);
+    const pet = `<g transform="translate(${f(100 - (B.L * .1 + B.m * .3) * k)} 168) scale(${f(k)})"${away ? ` opacity=".5"` : ""}>${animal(x, B, act, col, col2)}</g>`;
+    const pin = away ? `<g transform="translate(160 26)"><path d="M0 22C-9 11 -10 7 -10 3A10 10 0 0 1 10 3C10 7 9 11 0 22Z" fill="#ffb347" stroke="#7a4a10" stroke-width="1"/><circle cx="0" cy="3" r="4" fill="#fff"/><path d="M-14 26H14" stroke="#000" stroke-opacity=".25" stroke-width="2" stroke-linecap="round"/></g>` : "";
+    return scene(x, back, pet + pin);
+  }
+  const mk = (row) => ({ id: row[0], name: row[1], colors: row[2], picker: true, colorLabel: "Coat", colors2: COLLAR, picker2: true, colorLabel2: "Collar", options: OPTS, render: (o) => render(o, Object.assign({ id: row[0] }, row[3])) });
+  const icons = BREEDS.map(mk).concat(CATS.map(mk));
+
+  const css = `
+.hda-anim .hda-petsfig-blinkled{animation:hda-petsfig-led 1.4s ease-in-out infinite}
+@keyframes hda-petsfig-led{0%,100%{opacity:1}50%{opacity:.2}}
+.hda-anim .hda-petsfig-blink{animation:hda-petsfig-blink 4.6s linear infinite}
+@keyframes hda-petsfig-blink{0%,93%{opacity:0}95%,97%{opacity:1}99%,100%{opacity:0}}
+.hda-anim .hda-petsfig-twitch{animation:hda-petsfig-twitch 6s ease-in-out infinite}
+@keyframes hda-petsfig-twitch{0%,80%,100%{transform:rotate(0deg)}84%{transform:rotate(-9deg)}88%{transform:rotate(3deg)}92%{transform:rotate(0deg)}}
+.hda-anim .hda-petsfig-wag{animation:hda-petsfig-wag .9s ease-in-out infinite alternate}
+.hda-anim .hda-petsfig-wagF{animation:hda-petsfig-wag .26s ease-in-out infinite alternate}
+@keyframes hda-petsfig-wag{0%{transform:rotate(-10deg)}100%{transform:rotate(12deg)}}
+.hda-anim .hda-petsfig-flick{animation:hda-petsfig-flick 3.4s ease-in-out infinite}
+@keyframes hda-petsfig-flick{0%,60%,100%{transform:rotate(0deg)}70%{transform:rotate(-6deg)}80%{transform:rotate(5deg)}90%{transform:rotate(-3deg)}}
+.hda-petsfig-breathe,.hda-petsfig-breatheS{transform-box:fill-box;transform-origin:50% 100%}
+.hda-anim .hda-petsfig-breathe{animation:hda-petsfig-breathe 3s ease-in-out infinite}
+.hda-anim .hda-petsfig-breatheS{animation:hda-petsfig-breathe 5s ease-in-out infinite}
+@keyframes hda-petsfig-breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.01,1.035)}}
+.hda-petsfig-fr{opacity:0}
+.hda-petsfig-fr0{opacity:1}
+.hda-anim .hda-petsfig-fr{animation:hda-petsfig-fr .9s steps(1) infinite}
+.hda-anim .hda-petsfig-fr1{animation-delay:-.675s}
+.hda-anim .hda-petsfig-fr2{animation-delay:-.45s}
+.hda-anim .hda-petsfig-fr3{animation-delay:-.225s}
+@keyframes hda-petsfig-fr{0%{opacity:1}25%,100%{opacity:0}}
+.hda-anim .hda-petsfig-bob{animation:hda-petsfig-bob .45s ease-in-out infinite alternate}
+@keyframes hda-petsfig-bob{0%{transform:translate(0,0)}100%{transform:translate(0,-1px)}}
+.hda-anim .hda-petsfig-nod{animation:hda-petsfig-nod .45s ease-in-out infinite alternate}
+@keyframes hda-petsfig-nod{0%{transform:rotate(0deg)}100%{transform:rotate(3deg)}}
+.hda-anim .hda-petsfig-dip{animation:hda-petsfig-dip 1.4s ease-in-out infinite}
+@keyframes hda-petsfig-dip{0%,100%{transform:rotate(0deg)}40%{transform:rotate(6deg)}60%{transform:rotate(-2deg)}}
+.hda-petsfig-chew{transform-box:fill-box;transform-origin:100% 0}
+.hda-anim .hda-petsfig-chew{animation:hda-petsfig-chew .35s ease-in-out infinite alternate}
+@keyframes hda-petsfig-chew{0%{transform:translate(0,0)}100%{transform:translate(0,.8px)}}
+.hda-anim .hda-petsfig-bounce{animation:hda-petsfig-bounce .55s cubic-bezier(.3,0,.7,1) infinite alternate}
+@keyframes hda-petsfig-bounce{0%{transform:translate(0,0)}100%{transform:translate(0,-10px)}}
+.hda-anim .hda-petsfig-zz{animation:hda-petsfig-zz 3.2s ease-in-out infinite}
+@keyframes hda-petsfig-zz{0%{transform:translate(0,4px);opacity:0}30%{opacity:1}100%{transform:translate(4px,-8px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-petsfig-blinkled,.hda-anim .hda-petsfig-blink,.hda-anim .hda-petsfig-twitch,.hda-anim .hda-petsfig-wag,.hda-anim .hda-petsfig-wagF,.hda-anim .hda-petsfig-flick,.hda-anim .hda-petsfig-breathe,.hda-anim .hda-petsfig-breatheS,.hda-anim .hda-petsfig-fr,.hda-anim .hda-petsfig-bob,.hda-anim .hda-petsfig-nod,.hda-anim .hda-petsfig-dip,.hda-anim .hda-petsfig-chew,.hda-anim .hda-petsfig-bounce,.hda-anim .hda-petsfig-zz{animation:none!important}.hda-anim .hda-petsfig-fr{opacity:0}.hda-anim .hda-petsfig-fr0{opacity:1}}
+`;
+
+  (window.HDA = window.HDA || []).push({
+    id: "petsfig", tab: "Dogs & cats", group: "Home", kind: "device",
+    intro: "Ten dog breeds and four cats, drawn from reference photos, each wearing a smart GPS collar with a status light and a tiny battery bar. Pick the Activity (resting, sleeping, walking, playing, eating) and the Zone (home, yard, vet, daycare, away). Home shows them in a cozy spot; Away fades them with a location pin.",
+    levelLabel: "Collar battery", onWord: "Home", offWord: "Away",
     css, icons,
   });
 })();
@@ -43444,7 +46176,7 @@ ${extra || ""}</defs>`;
   });
 })();
 
-window.HDA_CATALOG = [{"id":"lighting","name":"Lighting","subs":[{"id":"ceiling","name":"Ceiling lights","items":["ceilinglight/dome","ceilinglight/drum","ceilinglight/bowl","ceilinglight/school","ceilinglight/wafer","ceilinglight/can","ceilinglight/cans","ceilinglight/gimbal","ceilinglight/track","ceilinglight/monorail","ceilinglight/panel","ceilinglight/shop","ceilinglight/ring","ceilinglight/stars","ceilinglight/cove","ceilinglight/crystal","ceilinglight/cage","ceilinglight/moroccan","ceilinglight/vent","ceilinglight/skylight"]},{"id":"pendants","name":"Pendants","items":["pendant/globe","pendant/seeded","pendant/dome","pendant/bell","pendant/mushroom","pendant/rattan","pendant/drum","pendant/cage","pendant/prism","pendant/rings","pendant/lantern","pendant/trio","pendant/linear","pendant/concrete","pendant/smoked","pendant/ceramic","pendant/beehive","pendant/box","pendant/island","pendant/artichoke","lights2/globe3","lights2/edison5","bulbs/cord"]},{"id":"chandeliers","name":"Chandeliers","items":["chandelier/crystal","chandelier/candle","chandelier/wagon","chandelier/farmhouse","chandelier/sputnik","chandelier/linear","chandelier/empire","chandelier/halo","chandelier/rings","chandelier/drum","chandelier/beads","chandelier/branch","chandelier/orb","chandelier/bubble","chandelier/raindrop","chandelier/spanish","chandelier/midcentury","chandelier/edison","chandelier/capiz","chandelier/venetian"]},{"id":"wall","name":"Wall lights & sconces","items":["wall/updown","wall/halfmoon","wall/candle","wall/swingarm","wall/picture","wall/globe","wall/edison","wall/shell","wall/alabaster","wall/rattan","wall/gooseneck","wall/coach","wall/cube","wall/jar","wall/flood","wall/step","wall/reading","wall/deco","wall/candelabra","wall/hexagon"]},{"id":"spots","name":"Spot & picture lights","items":["spotlights/track","spotlights/monorail","spotlights/runner","spotlights/plugin","spotlights/cylinder","spotlights/gimbal","spotlights/washer","spotlights/wafer","spotlights/colorspot","spotlights/brasspic","spotlights/ledbar","spotlights/battery","spotlights/museum","spotlights/mirror","spotlights/shelfpuck","spotlights/upcan","spotlights/sconcepair","spotlights/spotbar","spotlights/tripod"]},{"id":"bulbs","name":"Bulbs","items":["bulbs/a19","bulbs/a21","bulbs/br30","bulbs/par38","bulbs/gu10","bulbs/mr16","bulbs/st64","bulbs/g25","bulbs/g40","bulbs/b11","bulbs/t30","lights2/g40","lights2/t45","lights2/candlefil"]},{"id":"mirror","name":"Mirror & vanity lights","items":["mirror/hollywood","mirror/halo","mirror/rect","mirror/band","mirror/capsule","mirror/arch","mirror/bar3","mirror/edison","mirror/linear","mirror/flank","mirror/swing","mirror/trifold","mirror/tabletop","mirror/cabinet","mirror/picture","mirror/ring","mirror/globebar","mirror/pendants","mirror/antifog","mirror/floor"]}]},{"id":"lamps","name":"Lamps & accent lights","subs":[{"id":"floor","name":"Floor lamps","items":["floor/arc","floor/torchiere","floor/tripod-drum","floor/wood-tripod","floor/tree","floor/paper","floor/corner-bar","floor/mid-century","floor/gooseneck","floor/globe","floor/pharmacy","floor/shelf","floor/mushroom","floor/linen-drum","floor/pipe","floor/rattan","floor/ring","floor/spotlight","floor/orbs","floor/pleated"]},{"id":"desk","name":"Desk lamps","items":["desk/architect","desk/banker","desk/monitor-bar","desk/gooseneck","desk/clamp-task","desk/charger","desk/copper-pipe","desk/piano","desk/ring-light","desk/magnifier","desk/arc-slab","desk/mushroom","desk/lantern","desk/robot","desk/clip-on","desk/bauhaus","desk/daylight","desk/shelf-bar","desk/rgb-bars","desk/cube"]},{"id":"nightstand","name":"Nightstand lamps","items":["nightstand/gourd","nightstand/candlestick","nightstand/glass-jug","nightstand/mushroom","nightstand/crystal","nightstand/edison","nightstand/tripod","nightstand/rattan","nightstand/paper","nightstand/tulip","nightstand/tiffany","nightstand/salt","nightstand/sunrise","nightstand/smart-globe","nightstand/moon","nightstand/usb","nightstand/swing-arm","nightstand/cordless","nightstand/lava","nightstand/clamp","speakers2/kids-glow-lamp"]},{"id":"strips","name":"LED strips & panels","items":["ledstrips/toekick","ledstrips/abovecab","ledstrips/tray","ledstrips/crown","ledstrips/stairs","ledstrips/handrail","ledstrips/underbed","ledstrips/headboard","ledstrips/deskedge","ledstrips/mirror","ledstrips/closet","ledstrips/bookcase","ledstrips/panel","ledstrips/garage","ledstrips/eave","ledstrips/deck","ledstrips/pergola","ledstrips/rgbic","ledstrips/cob","ledstrips/smd","bulbs/undercab","bulbs/tvback","bulbs/neon","bulbs/bars","bulbs/hex","bulbs/tri","bulbs/shelf","bulbs/orb"]},{"id":"neon","name":"Neon signs","items":["neon/open","neon/bar","neon/gameroom","neon/gameon","neon/coffee","neon/home","neon/vibes","neon/hello","neon/party","neon/mancave","neon/player","neon/heart","neon/bolt","neon/palm","neon/cactus","neon/beer","neon/cocktail","neon/pizza","neon/rainbow","neon/pixel"]},{"id":"holiday","name":"Holiday trees","items":["lights2/flocked","lights2/tabletop","lights2/pencil","extras/xmastree"]}]},{"id":"fans","name":"Fans","subs":[{"id":"ceiling","name":"Ceiling fans","items":["ceilingfan/classic","ceilingfan/nickel","ceilingfan/ledblack","ceilingfan/hugger","ceilingfan/industrial","ceilingfan/palm","ceilingfan/rattan","ceilingfan/windmill","ceilingfan/propeller","ceilingfan/retract","ceilingfan/orb","ceilingfan/bowl","ceilingfan/twin","ceilingfan/outdoor","ceilingfan/drum","ceilingfan/minimal","ceilingfan/crystal","ceilingfan/airplane","ceilingfan/vintage"]},{"id":"box","name":"Box & table fans","items":["boxfan/classic","boxfan/handle","boxfan/drum","boxfan/tilt","boxfan/circulator","boxfan/desk","boxfan/clip","boxfan/usb","boxfan/deco","boxfan/brass","boxfan/table","boxfan/slim","boxfan/shop","boxfan/bladeless","boxfan/remote","boxfan/wood","boxfan/cube","boxfan/mist","boxfan/camping","boxfan/pullcord"]},{"id":"stand","name":"Stand fans","items":["standfan/classic","standfan/remote","standfan/cross","standfan/chrome","standfan/vintage","standfan/dc7","standfan/bladeless","standfan/misting","standfan/industrial","standfan/circulator","standfan/double","standfan/telescope","standfan/smart","standfan/minimal","standfan/kids","standfan/swivel","standfan/deco","standfan/cordless","standfan/hidden"]},{"id":"tower","name":"Tower fans","items":["towerfan/classic","towerfan/display","towerfan/slim","towerfan/woodgrain","towerfan/pedestal","towerfan/handle","towerfan/wave","towerfan/cylinder","towerfan/slot","towerfan/mini","towerfan/mist","towerfan/smart","towerfan/ceramic","towerfan/twin","towerfan/tall","towerfan/kids","towerfan/aqring","towerfan/retro","towerfan/budget","towerfan/nightlight"]},{"id":"window","name":"Window & wall fans","items":["windowfan/twin","windowfan/slim","windowfan/triple","windowfan/casement","windowfan/boxsash","windowfan/rainguard","windowfan/smart","windowfan/basement","windowfan/autolock","windowfan/wallosc"]},{"id":"exhaust","name":"Exhaust, attic & whole-house fans","items":["windowfan/bath","windowfan/kitchen","windowfan/roundvent","windowfan/shutter","windowfan/shop","windowfan/greenhouse","windowfan/rvvent","windowfan/gable","windowfan/solar","windowfan/wholehouse","evap/gable","evap/solargable","evap/powervent","evap/solar","evap/turbine","evap/wholehouse","evap/ducted","evap/controller"]}]},{"id":"climate","name":"Heating & cooling","subs":[{"id":"thermostats","name":"Thermostats & controls","items":["thermostat/learning","thermostat/square","thermostat/dial","thermostat/programmable","thermostat/touchscreen","thermostat/pill","thermostat/withsensor","thermostat/baseboard","thermostat/splitwall","thermostat/remote","thermostat/ptac","thermostat/radiant","thermostat/humidistat","thermostat/vent","thermostat/puck","thermostat/zone","thermostat/mercury","thermostat/boiler","thermostat/atticfan","thermostat/colorring","speakers/round-learning-thermostat","speakers/frosted-thermostat"]},{"id":"ac","name":"Air conditioners","items":["ac/window","ac/ushape","ac/saddle","ac/portable","ac/dualhose","ac/minisplit","ac/condenser","ac/cassette","ac/console","ac/ptac","ac/wall","ac/central","ac/remote","ac/rv","ac/desk","ac/heatpump","ac/smart","ac/attic","air2/boxy-wall-split","air2/faceted-wall-split","air2/mirror-glass-wall-split"]},{"id":"evap","name":"Evaporative coolers","items":["evap/window","evap/thruwall","evap/downdraft","evap/sidedraft","evap/grille","evap/tower","evap/shop","evap/desk","evap/blower","ac/swamp"]},{"id":"heaters","name":"Space & diesel heaters","items":["heater/oil","heater/cube","heater/tower","heater/dish","heater/quartz","heater/utility","heater/mica","heater/vintage","heater/panel","heater/baseboard","heater/loop","heater/smart","heating/diesel","air2/capsule-diesel-heater","air2/ribbed-top-diesel-heater","air2/portable-box-diesel-heater"]},{"id":"fireplaces","name":"Fireplaces, stoves & fire pits","items":["fireplace/wall","fireplace/insert","fireplace/linear","fireplace/tvstand","fireplace/estove","fireplace/gasstove","fireplace/pittable","fireplace/firebowl","fireplace/woodhearth","heater/insert","heater/linear","heater/stove","heater/bowl","heater/patio","home2/black-pellet-stove","home2/compact-pellet-stove","home2/budget-pellet-stove","home2/cast-iron-wood-stove","home2/steel-wood-stove","heating/pelletstove","heating/woodstove"]},{"id":"radiators","name":"Radiators & towel warmers","items":["heating/panelrad","heating/columnrad","air2/castiron","air2/vertical","heating/towelrail","heater/towel","air2/curved-bar-towel-ladder","air2/freestand"]},{"id":"boilers","name":"Boilers & heat pumps","items":["heating/combi","heating/floorboiler","utility2/wall-combi-boiler","utility2/compact-condensing-boiler","heating/pelletboiler","utility2/hopper-pellet-boiler","utility2/tall-pellet-boiler","utility2/compact-pellet-boiler","heating/gshp","utility2/geothermal-heat-pump","utility2/ground-loop-heat-pump","utility2/slim-geothermal-unit"]},{"id":"hydronic","name":"Underfloor, pumps & tanks","items":["heating/ufh","air2/pumpstation","air2/elecmat","air2/pexloops","heating/circ","utility2/smart-circulator","utility2/classic-circulator","utility2/large-smart-circulator","heating/buffer","utility2/buffer50","utility2/wallbuffer","utility2/stratified","heating/freshwater","utility2/fwswall","utility2/fwscompact","utility2/fwscabinet"]}]},{"id":"air","name":"Air quality","subs":[{"id":"purifiers","name":"Air purifiers","items":["purifier/cylinder","purifier/sleeve","purifier/loop","purifier/ringpanel","purifier/woodcube","purifier/wallpanel","purifier/room","purifier/desk","purifier/planter","purifier/sidetable","purifier/carmini","purifier/lightbar","purifier/pet","purifier/egg","purifier/display","purifier/retro","purifier/ceiling","purifier/column","purifier/window","purifier/cone","air2/loop-purifier-heater","air2/big-dome-purifier"]},{"id":"humidifiers","name":"Humidifiers","items":["humidifier/cleartank","humidifier/teardrop","humidifier/woodbase","humidifier/evaporative","humidifier/warmmist","humidifier/tower","humidifier/turnnozzle","humidifier/usbcup","humidifier/flame","humidifier/cloud","humidifier/ledring","humidifier/console","humidifier/plantpot","humidifier/cordless","humidifier/dual","humidifier/smartring","humidifier/vaporizer","humidifier/glasstank","humidifier/fabricband","humidifier/desksquare"]},{"id":"dehumidifiers","name":"Dehumidifiers","items":["dehumidifier/upright","dehumidifier/compact","dehumidifier/small","dehumidifier/basement","dehumidifier/crawl","dehumidifier/whole","dehumidifier/desiccant","dehumidifier/cube","dehumidifier/pod","dehumidifier/bag","dehumidifier/pump","dehumidifier/ring","dehumidifier/tower","dehumidifier/combo","dehumidifier/rugged","dehumidifier/wall","dehumidifier/laundry","dehumidifier/rv","dehumidifier/drum","dehumidifier/retro"]},{"id":"diffusers","name":"Aroma diffusers","items":["diffuser/woodcone","diffuser/speckled","diffuser/glassdome","diffuser/marble","diffuser/nebulizer","diffuser/reed","diffuser/plugin","diffuser/autospray","diffuser/scentpod","diffuser/candlewarmer","diffuser/waxmelt","diffuser/carvent","diffuser/usbmini","diffuser/saltlamp","diffuser/flame","diffuser/backflow","diffuser/incense","diffuser/bamboo","diffuser/cloud","diffuser/cabinet"]},{"id":"sensors","name":"Air-quality sensors","items":["airsensors/light-bar-box-sensor","airsensors/upright-lcd-air-monitor","airsensors/oval-led-dot-co2-clock","airsensors/round-dot-display-sensor","airsensors/radonpuck","airsensors/radonbar","airsensors/woodface","airsensors/roundedmonitor","airsensors/roomcube","airsensors/einkco2","airsensors/minisquare","airsensors/lcdmeter","airsensors/hygrometer","airsensors/walleink","airsensors/weatherstation","airsensors/round-egg","sensor/air"]},{"id":"ventilation","name":"Ventilation & HRV","items":["air2/upright-hrv-dark-panel","air2/hanging-gray-hrv","air2/ceiling-erv-two-ducts","air2/registers"]}]},{"id":"kitchen","name":"Kitchen","subs":[{"id":"fridges","name":"Fridges","items":["fridgecfg/steel","fridgecfg/glasspanel","fridgecfg/probuilt","fridgecfg/classic","fridge/4-door-flex-with-screen","fridge/4-door-flex-panels","fridge/3-door-panel-fridge","fridge/side-by-side-with-screen","fridge/panel-bottom-freezer","fridge/panel-column-pair","fridge/knock-glass-french-door","fridge/round-ice-4-door","fridge/door-within-door-side-by","fridge/color-glow-french-door","fridge/steel-top-freezer","fridge/gefrench","fridge/classictop","fridge/bottomfr","fridge/basicsbs","fridge/counterdepth","fridge/compact","fridge/builtincol","fridge/builtinfd","fridge/color-panel-glass-door"]},{"id":"freezers","name":"Freezers","items":["kitchen2/7-cu-ft-chest-freezer","kitchen2/5-cu-ft-chest-freezer","kitchen2/3-5-cu-ft-chest-freezer","extras/chestfreezer","kitchen2/13-cu-ft-upright-freezer","kitchen2/garage-ready-upright","kitchen2/compact-upright-freezer","extras/uprightfreezer"]},{"id":"minifridge","name":"Mini fridges, wine & kegs","items":["minifridge/white-cube-fridge","minifridge/3-1-cu-ft-mini","minifridge/retro-mini-fridge","minifridge/2-door-dorm-fridge","minifridge/panel-cube-fridge","minifridge/15-inch-under-counter","minifridge/beverage-center","minifridge/countertop-cooler","minifridge/dual-zone-beverage","minifridge/outdoor-fridge","minifridge/12-bottle-wine-cooler","minifridge/18-bottle-wine-cooler","minifridge/46-bottle-dual-zone","minifridge/wine-column","minifridge/skincare","minifridge/gamer","kitchen2/single-tap-kegerator","kitchen2/dual-tap-kegerator","kitchen2/keg-backbar","extras/kegerator"]},{"id":"ranges","name":"Ranges & cooktops","items":["rangecfg/cfg-classic","rangecfg/cfg-otrglass","range/pro48","range/retro","range/gastop","range/woodstove","range/pizza","range/dome"]},{"id":"ovens","name":"Ovens & microwaves","items":["range/wall","range/wall2","range/combo","range/steam","ovens/classic-otr","ovens/black-glass-otr","ovens/flush-wall-oven","ovens/pro-double-oven","ovens/combo-wall-pro","ovens/speed-oven","ovens/steam-oven","ovens/microwave-drawer","microwave/counter","microwave/drawer","microwave/compact","microwave/combo","microwave/smart","countertop/flip-up-air-fry-oven","countertop/large-air-fry-oven","countertop/stacked-double-oven","countertop/brushed-steel-air-fry-oven","countertop/smart-steel-oven","countertop/steel-air-fry-toaster-oven","countertop/budget-4-slice-oven","countertop/steam-combi-oven","countertop/french-door-oven","countertop/black-air-fry-oven","smallkitchen/toasteroven"]},{"id":"hoods","name":"Range hoods","items":["microwave/pyramid","microwave/glass","microwave/island","microwave/undercab","microwave/mantel","microwave/plaster","microwave/downdraft","microwave/ceiling","microwave/angled","microwave/copper"]},{"id":"dishwashers","name":"Dishwashers","items":["dishwasher/front","dishwasher/hidden","dishwasher/projection","dishwasher/panel","dishwasher/drawer1","dishwasher/drawer2","dishwasher/slim","dishwasher/countertop","dishwasher/portable","dishwasher/glass","dishwasher/retro","dishwasher/smart","dishwasher/third","dishwasher/quiet","dishwasher/autoopen","dishwasher/opendrawer","dishwasher/dial","dishwasher/commercial"]},{"id":"coffee","name":"Coffee & kettles","items":["smallkitchen/drip","kitchen2/12-cup-drip-maker","kitchen2/steel-drip-maker","kitchen2/copper-element-drip-brewer","smallkitchen/pod","kitchen2/classic-pod-brewer","kitchen2/mini-pod-brewer","kitchen2/capsule-coffee-machine","smallkitchen/espresso","smallkitchen/bean","kitchen3/espresso-with-grinder","kitchen3/slim-espresso-machine","smallkitchen/goose","smallkitchen/glasskettle","smallkitchen/retrokettle"]},{"id":"small","name":"Small appliances","items":["smallkitchen/toaster2","smallkitchen/toaster4","kitchen3/steel-2-slice-toaster","smallkitchen/airfryer","smallkitchen/dualfryer","kitchen3/square-basket-air-fryer","kitchen3/round-basket-air-fryer","smallkitchen/multicooker","kitchen3/electric-pressure-cooker","kitchen3/pressure-crisp-cooker","smallkitchen/slowcooker","smallkitchen/rice","kitchen3/pressure-rice-cooker","smallkitchen/mixer","smallkitchen/blender","smallkitchen/bullet","smallkitchen/bread","smallkitchen/waffle"]},{"id":"popcorn","name":"Popcorn & food warmers","items":["popcorn/theater","popcorn/tabletop","popcorn/carnival","popcorn/hotair","popcorn/stovetop","popcorn/electric","popcorn/silicone","popcorn/retro","popcorn/lobby","popcorn/snackcart","countertop/vevor4","countertop/warmer2","countertop/buffet","countertop/drawer","countertop/heatlamp"]}]},{"id":"cleaning","name":"Laundry & cleaning","subs":[{"id":"laundry","name":"Washers & dryers","items":["laundrycfg/cfgscreen","laundrycfg/cfgtop","laundrycfg/cfgcombo"]},{"id":"robots","name":"Robot vacuums","items":["vacuum/lidar","vacuum/topcam","vacuum/dshape","vacuum/square","vacuum/slim","vacuum/selfempty","vacuum/allinone","vacuum/spinmop","vacuum/combo","vacuum/obstacle","vacuum/pethair","vacuum/mini","vacuum/dock","vacuum/stuck","vacuum/window"]},{"id":"vacuums","name":"Stick & upright vacuums","items":["vacuum/stick","vacuum/handheld","floorcare/laser-stick-vacuum","floorcare/cordless-handheld","floorcare/mini-handheld","floorcare/ball-upright-vacuum","floorcare/bagless-upright","floorcare/powered-lift-away","floorcare/classic-upright-vacuum","floorcare/bagged-canister","floorcare/shop-vac-5-gal"]},{"id":"washers","name":"Floor washers & carpet cleaners","items":["vacuum/washer","floorcare/stick-wet-cleaner","floorcare/wet-dry-stick","floorcare/smart-floor-washer","floorcare/multi-surface-washer","floorcare/upright-carpet-cleaner","floorcare/spot-carpet-cleaner","floorcare/rental-carpet-cleaner"]},{"id":"irons","name":"Irons","items":["extras/iron","home3/steam-iron","home3/iron_station","home3/iron_travel"]}]},{"id":"entertainment","name":"Entertainment","subs":[{"id":"tv","name":"TVs & projectors","items":["media/wall-tv","media/console-tv","media/art-tv","media/curved-tv","media/outdoor-tv","media/projector","media/ust"]},{"id":"speakers","name":"Smart speakers","items":["speakers2/tall-cylinder-speaker","speakers2/fabric-puck-speaker","speakers2/small-ball-speaker","speakers2/ball-speaker-with-clock","speakers2/large-ball-speaker","speakers2/half-ball-speaker","speakers2/studio-speaker-drum","speakers2/plug-in-mini-speaker","speakers2/car-voice-puck","speakers2/earbuds-case","speakers/vase-speaker","speakers/fabric-mini-speaker","speakers/mini-speaker-wall-hook","speakers/fabric-smart-speaker","speakers/large-fabric-speaker","speakers/round-smart-speaker","media/cylinder","media/sphere","media/puck"]},{"id":"displays","name":"Smart displays","items":["speakers2/round-alarm-display","speakers2/5-inch-smart-display","speakers2/8-inch-smart-display","speakers2/8-inch-photo-display","speakers2/swivel-smart-display","speakers2/15-inch-wall-display","speakers2/21-inch-wall-display","speakers2/wall-control-panel","speakers/7-inch-smart-display","speakers/10-inch-smart-display","media/display"]},{"id":"audio","name":"Audio & streaming","items":["media/soundbar-tv","media/soundbar-sub","media/bookshelf","media/tower","media/turntable","media/receiver","avr/black-receiver-wide-display","avr/porthole-display-receiver","avr/big-dial-receiver","avr/two-knob-receiver","avr/gloss-black-receiver","avr/slim-silver-receiver","avr/minimal-black-amp","avr/compact","avr/bluemeter","avr/vintage","avr/streamer","avr/separates","media/box","media/stick","speakers2/streaming-stick-remote","speakers/pebble-tv-streamer","speakers/streaming-dongle-remote"]},{"id":"consoles","name":"Game consoles","items":["consoles/big-black-box-console","consoles/glossy-curved-console","consoles/white-slim-console","consoles/black-slim-console","consoles/small-white-console","consoles/black-tower-console","consoles/16-bit-black-console","consoles/white-128-bit-console","consoles2/gray-disc-console","consoles2/mini-round-console","consoles2/black-ridged-console","consoles2/slim-black-console","consoles2/curved-gloss-console","consoles2/top-loader-console","consoles2/wedge-console","consoles2/three-layer-wedge","consoles2/tower-console-white-wings","consoles2/striped-wing-console","consoles3/8-bit-gray-console","consoles3/16-bit-gray-console","consoles3/64-bit-console","consoles3/cube-console","consoles3/slim-white-motion-console","consoles3/tablet-controller-console","consoles3/handheld-hybrid-console","consoles3/hybrid-console-oled","consoles3/handheld-only-console","consoles3/hybrid-console-2nd-gen","media/console"]},{"id":"arcade","name":"Arcade & pinball","items":["arcade/racing","arcade/deluxe","arcade/gun","arcade/fighter","arcade/golf","arcade/maze","arcade/space","arcade/brawler","arcade/tall","arcade/retro","arcade/party","arcade/countertop-cabinet","arcade/wall","arcade/cocktail","arcade/pinem","arcade/pindmd","arcade/pinwide","arcade/pindigital","arcade/pinmini"]}]},{"id":"computers","name":"Computers & network","subs":[{"id":"pcs","name":"Computers & laptops","items":["office/gaming","office/office","office/sff","office/mini","office/square","office/aio","office/ultra-thin-laptop","office/business","office/gaminglap","office/tent","office/budget-laptop"]},{"id":"monitors","name":"Monitors","items":["home4/27-inch-office-monitor","home4/34-inch-curved-monitor","home4/49-inch-super-wide","home4/aluminum-27-inch-display","home4/portable","extras/monitor"]},{"id":"printers","name":"Printers","items":["printers/aio","printers/slim","printers/tank","printers/photo6","printers/dyesub","printers/a3","printers/mono-ink","printers/mono-laser","printers/laser-aio","printers/color-laser","printers/color-mfp","printers/label","printers/receipt"]},{"id":"printers3d","name":"3D printers","items":["printers/enclosed-3d-printer","printers/boxy-enclosed-printer","printers/bed-slinger-3d-printer","printers/mini-3d-printer","printers3d/box-lidar","printers3d/box-solid","printers3d/pro-two","printers3d/large-two","printers3d/large-rack","printers3d/changer9","printers3d/slinger-side","printers3d/slinger-mini","printers3d/slinger-orange","printers3d/corexy-orange","printers3d/toolchanger","printers3d/bigbox-hub","printers3d/slinger-gray","printers3d/box-dark","printers3d/resin-smoke","printers3d/resin-orange","printers3d/kit-corexy","printers/resin","printers/delta","printers/largeformat"]},{"id":"network","name":"Racks, NAS & network","items":["home4/8u-open-frame","home4/open25u","home4/wall12u","home4/cab42u","home4/desktop-mini-rack","extras/rack","home4/nas4","home4/nas8","home4/gw1u","home4/nvr2u","home4/desksw8","extras/router","extras/mesh","speakers/mesh-router","speakers/mesh-point-speaker","speakers/plug-in-hub"]},{"id":"ups","name":"UPS & shredders","items":["office/upssmall","office/upslcd","office/upsrack","office/upsbrick","office/binshred","office/personal"]}]},{"id":"security","name":"Security & access","subs":[{"id":"cameras","name":"Cameras","items":["security/bullet","security/dome","security/turret","security/cube","security/pantilt","security/flood","security/spot","security/battery","security/solar","security/baby","security/ptz","security/dual","speakers/indoor-cam-wired","speakers/battery-cam"]},{"id":"doorbells","name":"Doorbells & chimes","items":["doorbell/tall","doorbell/square","doorbell/wedge","doorbell/package","doorbell/brass","doorbell/lighted","doorbell/intercom","doorbell/gatepost","doorbell/peephole","doorbell/plugin","doorbell/tubes","doorbell/smartchime","doorbell/school","doorbell/twist","doorbell/shopbell","doorbell/knocker","doorbell/monitor","speakers/battery-video-doorbell"]},{"id":"locks","name":"Smart locks","items":["lock/keypad","lock/touch","lock/retrofit","lock/fingerprint","lock/handleset","lock/mortise","lock/video","lock/btpadlock","lock/garage","lock/gate","lock/sliding","lock/office","lock/cylinder","lock/euro","lock/cabinet","lock/safe","lock/shed","lock/strike","lock/card","speakers/touch-deadbolt"]},{"id":"deadbolts","name":"Smart deadbolts","items":["deadbolts/arched-push-button","deadbolts/round-push-button","deadbolts/arched-wi-fi-touch","deadbolts/slim-wi-fi-touch","deadbolts/arched-keypad-lever","deadbolts/arched-touch-lever","deadbolts/slim-touch-lever","lock2/glass-touchscreen","lock2/push-button-keypad","lock2/a2kftouch","lock2/slim-touchscreen","lock2/levertouch","lock2/leverkeypad","lock2/smart-lock-black","lock2/entrance-handle-lock"]},{"id":"alarms","name":"Alarm panels & sirens","items":["safety/slim-white-keypad","safety/round-edge-keypad","safety/classic-alpha-keypad","safety/7-inch-touch-panel","safety/large-touch-panel","safety/camera-hub-panel","safety/command-touchscreen","safety/smart-alarm-panel","safety/wireless-keypad","safety/classic-lcd-keypad","security/keypad","security/touch","security/hub","security/panic","security/fob","security/indoorsiren","security/outsiren","security/garagesiren"]},{"id":"smoke","name":"Smoke & CO alarms","items":["safety/round-smoke-alarm","safety/combo-smoke-and-co","safety/hardwired-smoke-alarm","safety/smart-smoke-co","safety/smoke-listener","safety/nighthawk","safety/heat","speakers/smoke-and-co-alarm","sensor/smoke","sensor/co"]}]},{"id":"controls","name":"Sensors & switches","subs":[{"id":"sensors","name":"Sensors","items":["sensor/pir","sensor/ceiling","sensor/radar","sensor/door","sensor/window","sensor/garage","sensor/glass","sensor/leak","sensor/freezer","sensor/temp","sensor/outdoor","sensor/lux","sensor/washer","sensor/bed","sensor/soil","sensor/button"]},{"id":"switches","name":"Switches & dimmers","items":["switch/toggle","switch/paddle-rocker","switch/red-bar-dimmer","switch/dimmer","switch/rotary","switch/slide","switch/twogang","switch/blue-bar-2-in-1","switch/fan","switch/scene","switch/glass","switch/vintage","switch/remote","switch/display","switch/timer","switch/outlet","switch/lighted","switch/nightlight","switch/button","switch/industrial"]},{"id":"outlets","name":"Outlets","items":["outlets/hidden-plug-outlet","outlets/hidden-plug-light-ring","outlets/hidden-plug-usb-c","outlets/hidden-plug-usb-c-ring","outlets/duplex","outlets/rocker-style-outlet","outlets/usb","outlets/gfci","outlets/smart","outlets/tamper","outlets/tslot","outlets/night","outlets/dryer","outlets/weather","outlets/popup","outlets/floor","outlets/tvbox"]},{"id":"plugs","name":"Smart plugs & strips","items":["plug/mini","plug/round","plug/side","plug/energy","plug/outdoor","plug/inwall","plug/usbc","plug/dimmer","plug/night","plug/lamp","plug/string","plug/heavy","plug/strip","plug/surge","plug/tower","plug/reel","plug/floorbox","plug/popup","plug/undercab"]}]},{"id":"energy","name":"Power & energy","subs":[{"id":"ev","name":"EV chargers","items":["energy/round","energy/slim","energy/pedestal","energy/cord","energy/car","plug/ev"]},{"id":"solar","name":"Solar","items":["energy/roof","energy/ground","utility3/tracker","utility3/carport","utility3/balcony","energy/inverter"]},{"id":"batteries","name":"Home batteries & backup","items":["energy/slab","energy/stack","utility3/flat-wall-battery","utility3/modular-battery","utility3/tall-battery-cabinet","energy/station","energy/generator"]},{"id":"meters","name":"Energy meters","items":["utility3/smartmeter","utility3/in-panel-monitor","utility3/clip-on-energy-monitor","heating/ctmeter"]},{"id":"chargers","name":"Battery chargers","items":["chargers/aa4","chargers/aalcd","chargers/wall2","chargers/univ","chargers/li","chargers/usbc","chargers/camera","chargers/drone","chargers/ebike","chargers/p12","chargers/p18","chargers/rapid","chargers/dual","chargers/six","chargers/rack","chargers/stem","chargers/radio"]}]},{"id":"water","name":"Water & plumbing","subs":[{"id":"heaters","name":"Water heaters","items":["water/gastank","water/elec","water/tankless","water/heatpump","heating/solarthermal","utility3/flatplate","utility3/tubeground","utility3/thermosiphon"]},{"id":"valves","name":"Valves, filters & leak alarms","items":["water/ball","water/main","water/gas","water/softener","water/filter","water/alarm"]},{"id":"sump","name":"Sump pumps","items":["water/sump","water/pedestal","water/sealed","water/backup","water/waterpow"]},{"id":"pumps","name":"Well & utility pumps","items":["water/well","heating/jetpump","yard2/jetpump","yard2/booster","heating/centrifugal","yard2/endsuction","yard2/inline","yard2/diaphragm"]}]},{"id":"outdoor","name":"Outdoor, pool & yard","subs":[{"id":"lights","name":"Outdoor lights","items":["outdoor/coach","outdoor/gooseneck","outdoor/flush","outdoor/post","outdoor/pagoda","outdoor/mushroom","outdoor/treespot","outdoor/flood","outdoor/bistro","outdoor/deckstep","outdoor/bollard","outdoor/solar","outdoor/updown","outdoor/globe","outdoor/pillar","outdoor/well","outdoor/slot","outdoor/hanging","outdoor/eave","outdoor/icicle","outdoor2/brassspike","outdoor2/floodstake"]},{"id":"garage","name":"Garage doors & openers","items":["garage/raised","garage/double","garage/carriage","garage/glass","garage/flush","garage/longpanel","garage/plank","garage/rollup","garage/tiltup","garage/pair","garage/opener","garage/keypad","garage/button"]},{"id":"gates","name":"Gates & barriers","items":["garage/swing","garage/garden","garage/ranch","garage/privacy","garage/iron","garage/slat","garage/slide","outdoor2/slatgate","outdoor2/chainlink","outdoor2/irongate","outdoor2/foldarm","outdoor2/ledarm","outdoor2/skirtarm","extras/boom"]},{"id":"mailboxes","name":"Mailboxes & parcel boxes","items":["doorbell/mailbox","outdoor2/postbox","outdoor2/castbox","outdoor2/parcel","lock/parcel","sensor/mailbox","outdoor2/brassslot","outdoor2/chute","outdoor2/steelplate","extras/mailbox"]},{"id":"sprinklers","name":"Sprinklers & irrigation","items":["sprinklers/controller","sprinklers/hose","sprinklers/popup","sprinklers/smart","sprinklers/dial","sprinklers/touch","sprinklers/outdoor","sprinklers/modular","sprinklers/basic4","sprinklers/hdial","sprinklers/hdual","sprinklers/hhub","sprinklers/valve","sprinklers/rotor","sprinklers/impact","sprinklers/osc","sprinklers/drip","sprinklers/vbox","sprinklers/rain","sprinklers/flowsens"]},{"id":"mowers","name":"Robot mowers","items":["vacuum/mower","yard2/robot-mower-gray","yard2/robot-mower-orange","yard2/wire-free-robot-mower"]},{"id":"grills","name":"Grills & smokers","items":["grill/gas3","grill/gas4","grill/island","grill/kettle","grill/kamado","grill/portable","grill/griddle36","grill/griddle22","grill/builtgrid","grill/pellet","grill/vpellet","grill/offset","grill/bullet","grill/electric","grill/drum","grill/gravity","grill/infrared","grill/rotisserie","grill/santamaria","grill/hibachi"]},{"id":"pool","name":"Pools & pool equipment","items":["pool/inground","pool/above","pool/falls","pool/cover","pool/panel","pool/heater","pool/salt","yard2/variable-speed-pool-pump","yard2/above-ground-filter-pump"]},{"id":"poolrobots","name":"Pool robots","items":["pool/robot","vacuum/pool","yard2/brushed-pool-robot","yard2/pressure-side-pool-cleaner"]},{"id":"spa","name":"Hot tubs & saunas","items":["pool/hottub","yard2/square-acrylic-spa","yard2/inflatable-spa","yard2/cedartub","home2/finnish","home2/cube","heating/barrel","heating/cabin"]}]},{"id":"plants","name":"Plants","subs":[{"id":"houseplants","name":"Houseplants","items":["builder:plantbuilder","plants/monstera","plants/snake","plants/pothos","plants/zz","plants/lily","plants/rubber","plants/pearls","plants/aloe","plants/jade","plants/succulents","plants/cactus","plants/calathea","plants/fern","plants/spider","plants/philodendron","plants/bird","plants/pilea","plants/herbs","plants/airplant","plants/hoya"]},{"id":"flowers","name":"Flowering plants","items":["flowers/orchid","flowers/poinsettia","flowers/violet","flowers/anthurium","flowers/hibiscus","flowers/geranium","flowers/begonia","flowers/kalanchoe","flowers/bromeliad","flowers/tulips","flowers/hydrangea","flowers/rose","flowers/gerbera","flowers/cyclamen","flowers/lavender","flowers/petunia","flowers/mum","flowers/azalea","flowers/amaryllis","flowers/bougainvillea"]},{"id":"trees","name":"Trees","items":["builder:treebuilder","trees/fiddle","trees/olive","trees/kentia","trees/ficus","trees/money","trees/lemon","trees/bonsai","trees/dracaena","trees/norfolk","trees/jmaple","trees/oak","trees/fallmaple","trees/birch","trees/spruce","trees/cherry","trees/palm","trees/willow","trees/apple","trees/aspen","trees/magnolia"]},{"id":"garden","name":"Garden beds & soil","items":["yard2/cedarbed","yard2/galvbed","yard2/elevated","extras/gardenbed"]}]},{"id":"home","name":"Home, pets & fitness","subs":[{"id":"blinds","name":"Blinds & curtains","items":["shades/roller","shades/blackout","shades/cellular","shades/tdbu","shades/roman","shades/wood","shades/mini","shades/vertical","shades/zebra","shades/drapes","shades/sheer","shades/layered","shades/cafe","shades/shutters","shades/skylight","shades/solar","shades/awning","shades/panels","shades/arched","shades/bay","home2/fauxwood","home2/smart-faux-wood-blinds"]},{"id":"shutters","name":"Exterior shutters","items":["extras/rollershutter","home2/alubox","home2/motorized-roller","home2/hurricane","extras/swingshutters","home2/boardbatten","home2/louvered","home2/raisedpanel"]},{"id":"bath","name":"Hair dryers & scales","items":["extras/hairdryer","home3/round-head-hair-dryer","home3/hot-air-brush","home3/hotel_dryer","extras/scale","home3/smart-glass-scale","home3/slim-smart-scale","home3/dial_scale"]},{"id":"pests","name":"Mouse traps","items":["extras/mousetrap","extras/snapsensor","extras/multicatch","extras/clamptrap","home3/electronic-mouse-trap","home3/live_trap"]},{"id":"petfood","name":"Pet feeders & fountains","items":["pets/feeder","home3/tall-pet-feeder","home3/wide-pet-feeder","home3/gravity_feeder","pets/fountain","home3/flower-pet-fountain","home3/tiered-pet-fountain","home3/clear-tank-pet-fountain"]},{"id":"aquariums","name":"Aquariums","items":["pets/aquarium","home3/rimless20","home3/curved-nano-aquarium","home3/tank55"]},{"id":"petcare","name":"Pet care & tech","items":["pets/litter","pets/door","pets/treatcam","pets/birdcam","pets/launcher","pets/bed","pets/collar"]},{"id":"cardio","name":"Cardio machines","items":["fitness/folding-treadmill","fitness/walkpad","fitness/curve","fitness/swivel-screen-bike","fitness/recumbent","fitness/screen-rower","fitness/air-rower","fitness/elliptical","fitness/stair-climber"]},{"id":"strength","name":"Strength & recovery","items":["fitness/wall-strength-trainer","fitness/cable-gym-station","fitness/mirror","fitness/vibe"]}]}];
+window.HDA_CATALOG = [{"id":"lighting","name":"Lighting","subs":[{"id":"ceiling","name":"Ceiling lights","items":["ceilinglight/dome","ceilinglight/drum","ceilinglight/bowl","ceilinglight/school","ceilinglight/wafer","ceilinglight/can","ceilinglight/cans","ceilinglight/gimbal","ceilinglight/track","ceilinglight/monorail","ceilinglight/panel","ceilinglight/shop","ceilinglight/ring","ceilinglight/stars","ceilinglight/cove","ceilinglight/crystal","ceilinglight/cage","ceilinglight/moroccan","ceilinglight/vent","ceilinglight/skylight"]},{"id":"pendants","name":"Pendants","items":["pendant/globe","pendant/seeded","pendant/dome","pendant/bell","pendant/mushroom","pendant/rattan","pendant/drum","pendant/cage","pendant/prism","pendant/rings","pendant/lantern","pendant/trio","pendant/linear","pendant/concrete","pendant/smoked","pendant/ceramic","pendant/beehive","pendant/box","pendant/island","pendant/artichoke","lights2/globe3","lights2/edison5","bulbs/cord"]},{"id":"chandeliers","name":"Chandeliers","items":["chandelier/crystal","chandelier/candle","chandelier/wagon","chandelier/farmhouse","chandelier/sputnik","chandelier/linear","chandelier/empire","chandelier/halo","chandelier/rings","chandelier/drum","chandelier/beads","chandelier/branch","chandelier/orb","chandelier/bubble","chandelier/raindrop","chandelier/spanish","chandelier/midcentury","chandelier/edison","chandelier/capiz","chandelier/venetian"]},{"id":"wall","name":"Wall lights & sconces","items":["wall/updown","wall/halfmoon","wall/candle","wall/swingarm","wall/picture","wall/globe","wall/edison","wall/shell","wall/alabaster","wall/rattan","wall/gooseneck","wall/coach","wall/cube","wall/jar","wall/flood","wall/step","wall/reading","wall/deco","wall/candelabra","wall/hexagon"]},{"id":"spots","name":"Spot & picture lights","items":["spotlights/track","spotlights/monorail","spotlights/runner","spotlights/plugin","spotlights/cylinder","spotlights/gimbal","spotlights/washer","spotlights/wafer","spotlights/colorspot","spotlights/brasspic","spotlights/ledbar","spotlights/battery","spotlights/museum","spotlights/mirror","spotlights/shelfpuck","spotlights/upcan","spotlights/sconcepair","spotlights/spotbar","spotlights/tripod"]},{"id":"bulbs","name":"Bulbs","items":["bulbs/a19","bulbs/a21","bulbs/br30","bulbs/par38","bulbs/gu10","bulbs/mr16","bulbs/st64","bulbs/g25","bulbs/g40","bulbs/b11","bulbs/t30","lights2/g40","lights2/t45","lights2/candlefil"]},{"id":"mirror","name":"Mirror & vanity lights","items":["mirror/hollywood","mirror/halo","mirror/rect","mirror/band","mirror/capsule","mirror/arch","mirror/bar3","mirror/edison","mirror/linear","mirror/flank","mirror/swing","mirror/trifold","mirror/tabletop","mirror/cabinet","mirror/picture","mirror/ring","mirror/globebar","mirror/pendants","mirror/antifog","mirror/floor"]}]},{"id":"lamps","name":"Lamps & accent lights","subs":[{"id":"floor","name":"Floor lamps","items":["floor/arc","floor/torchiere","floor/tripod-drum","floor/wood-tripod","floor/tree","floor/paper","floor/corner-bar","floor/mid-century","floor/gooseneck","floor/globe","floor/pharmacy","floor/shelf","floor/mushroom","floor/linen-drum","floor/pipe","floor/rattan","floor/ring","floor/spotlight","floor/orbs","floor/pleated"]},{"id":"desk","name":"Desk lamps","items":["desk/architect","desk/banker","desk/monitor-bar","desk/gooseneck","desk/clamp-task","desk/charger","desk/copper-pipe","desk/piano","desk/ring-light","desk/magnifier","desk/arc-slab","desk/mushroom","desk/lantern","desk/robot","desk/clip-on","desk/bauhaus","desk/daylight","desk/shelf-bar","desk/rgb-bars","desk/cube"]},{"id":"nightstand","name":"Nightstand lamps","items":["nightstand/gourd","nightstand/candlestick","nightstand/glass-jug","nightstand/mushroom","nightstand/crystal","nightstand/edison","nightstand/tripod","nightstand/rattan","nightstand/paper","nightstand/tulip","nightstand/tiffany","nightstand/salt","nightstand/sunrise","nightstand/smart-globe","nightstand/moon","nightstand/usb","nightstand/swing-arm","nightstand/cordless","nightstand/lava","nightstand/clamp","speakers2/kids-glow-lamp"]},{"id":"strips","name":"LED strips & panels","items":["ledstrips/toekick","ledstrips/abovecab","ledstrips/tray","ledstrips/crown","ledstrips/stairs","ledstrips/handrail","ledstrips/underbed","ledstrips/headboard","ledstrips/deskedge","ledstrips/mirror","ledstrips/closet","ledstrips/bookcase","ledstrips/panel","ledstrips/garage","ledstrips/eave","ledstrips/deck","ledstrips/pergola","ledstrips/rgbic","ledstrips/cob","ledstrips/smd","bulbs/undercab","bulbs/tvback","bulbs/neon","bulbs/bars","bulbs/hex","bulbs/tri","bulbs/shelf","bulbs/orb"]},{"id":"neon","name":"Neon signs","items":["neon/open","neon/bar","neon/gameroom","neon/gameon","neon/coffee","neon/home","neon/vibes","neon/hello","neon/party","neon/mancave","neon/player","neon/heart","neon/bolt","neon/palm","neon/cactus","neon/beer","neon/cocktail","neon/pizza","neon/rainbow","neon/pixel"]},{"id":"holiday","name":"Holiday trees","items":["lights2/flocked","lights2/tabletop","lights2/pencil","extras/xmastree"]}]},{"id":"fans","name":"Fans","subs":[{"id":"ceiling","name":"Ceiling fans","items":["ceilingfan/classic","ceilingfan/nickel","ceilingfan/ledblack","ceilingfan/hugger","ceilingfan/industrial","ceilingfan/palm","ceilingfan/rattan","ceilingfan/windmill","ceilingfan/propeller","ceilingfan/retract","ceilingfan/orb","ceilingfan/bowl","ceilingfan/twin","ceilingfan/outdoor","ceilingfan/drum","ceilingfan/minimal","ceilingfan/crystal","ceilingfan/airplane","ceilingfan/vintage"]},{"id":"box","name":"Box & table fans","items":["boxfan/classic","boxfan/handle","boxfan/drum","boxfan/tilt","boxfan/circulator","boxfan/desk","boxfan/clip","boxfan/usb","boxfan/deco","boxfan/brass","boxfan/table","boxfan/slim","boxfan/shop","boxfan/bladeless","boxfan/remote","boxfan/wood","boxfan/cube","boxfan/mist","boxfan/camping","boxfan/pullcord"]},{"id":"stand","name":"Stand fans","items":["standfan/classic","standfan/remote","standfan/cross","standfan/chrome","standfan/vintage","standfan/dc7","standfan/bladeless","standfan/misting","standfan/industrial","standfan/circulator","standfan/double","standfan/telescope","standfan/smart","standfan/minimal","standfan/kids","standfan/swivel","standfan/deco","standfan/cordless","standfan/hidden"]},{"id":"tower","name":"Tower fans","items":["towerfan/classic","towerfan/display","towerfan/slim","towerfan/woodgrain","towerfan/pedestal","towerfan/handle","towerfan/wave","towerfan/cylinder","towerfan/slot","towerfan/mini","towerfan/mist","towerfan/smart","towerfan/ceramic","towerfan/twin","towerfan/tall","towerfan/kids","towerfan/aqring","towerfan/retro","towerfan/budget","towerfan/nightlight"]},{"id":"window","name":"Window & wall fans","items":["windowfan/twin","windowfan/slim","windowfan/triple","windowfan/casement","windowfan/boxsash","windowfan/rainguard","windowfan/smart","windowfan/basement","windowfan/autolock","windowfan/wallosc"]},{"id":"exhaust","name":"Exhaust, attic & whole-house fans","items":["windowfan/bath","windowfan/kitchen","windowfan/roundvent","windowfan/shutter","windowfan/shop","windowfan/greenhouse","windowfan/rvvent","windowfan/gable","windowfan/solar","windowfan/wholehouse","evap/gable","evap/solargable","evap/powervent","evap/solar","evap/turbine","evap/wholehouse","evap/ducted","evap/controller"]}]},{"id":"climate","name":"Heating & cooling","subs":[{"id":"thermostats","name":"Thermostats & controls","items":["thermostat/learning","thermostat/square","thermostat/dial","thermostat/programmable","thermostat/touchscreen","thermostat/pill","thermostat/withsensor","thermostat/baseboard","thermostat/splitwall","thermostat/remote","thermostat/ptac","thermostat/radiant","thermostat/humidistat","thermostat/vent","thermostat/puck","thermostat/zone","thermostat/mercury","thermostat/boiler","thermostat/atticfan","thermostat/colorring","speakers/round-learning-thermostat","speakers/frosted-thermostat"]},{"id":"ac","name":"Air conditioners","items":["ac/window","ac/ushape","ac/saddle","ac/portable","ac/dualhose","ac/minisplit","ac/condenser","ac/cassette","ac/console","ac/ptac","ac/wall","ac/central","ac/remote","ac/rv","ac/desk","ac/heatpump","ac/smart","ac/attic","air2/boxy-wall-split","air2/faceted-wall-split","air2/mirror-glass-wall-split"]},{"id":"evap","name":"Evaporative coolers","items":["evap/window","evap/thruwall","evap/downdraft","evap/sidedraft","evap/grille","evap/tower","evap/shop","evap/desk","evap/blower","ac/swamp"]},{"id":"heaters","name":"Space & diesel heaters","items":["heater/oil","heater/cube","heater/tower","heater/dish","heater/quartz","heater/utility","heater/mica","heater/vintage","heater/panel","heater/baseboard","heater/loop","heater/smart","heating/diesel","air2/capsule-diesel-heater","air2/ribbed-top-diesel-heater","air2/portable-box-diesel-heater"]},{"id":"fireplaces","name":"Fireplaces, stoves & fire pits","items":["fireplace/wall","fireplace/insert","fireplace/linear","fireplace/tvstand","fireplace/estove","fireplace/gasstove","fireplace/pittable","fireplace/firebowl","fireplace/woodhearth","heater/insert","heater/linear","heater/stove","heater/bowl","heater/patio","home2/black-pellet-stove","home2/compact-pellet-stove","home2/budget-pellet-stove","home2/cast-iron-wood-stove","home2/steel-wood-stove","heating/pelletstove","heating/woodstove"]},{"id":"radiators","name":"Radiators & towel warmers","items":["heating/panelrad","heating/columnrad","air2/castiron","air2/vertical","heating/towelrail","heater/towel","air2/curved-bar-towel-ladder","air2/freestand"]},{"id":"boilers","name":"Boilers & heat pumps","items":["heating/combi","heating/floorboiler","utility2/wall-combi-boiler","utility2/compact-condensing-boiler","heating/pelletboiler","utility2/hopper-pellet-boiler","utility2/tall-pellet-boiler","utility2/compact-pellet-boiler","heating/gshp","utility2/geothermal-heat-pump","utility2/ground-loop-heat-pump","utility2/slim-geothermal-unit"]},{"id":"hydronic","name":"Underfloor, pumps & tanks","items":["heating/ufh","air2/pumpstation","air2/elecmat","air2/pexloops","heating/circ","utility2/smart-circulator","utility2/classic-circulator","utility2/large-smart-circulator","heating/buffer","utility2/buffer50","utility2/wallbuffer","utility2/stratified","heating/freshwater","utility2/fwswall","utility2/fwscompact","utility2/fwscabinet"]}]},{"id":"air","name":"Air quality","subs":[{"id":"purifiers","name":"Air purifiers","items":["purifier/cylinder","purifier/sleeve","purifier/loop","purifier/ringpanel","purifier/woodcube","purifier/wallpanel","purifier/room","purifier/desk","purifier/planter","purifier/sidetable","purifier/carmini","purifier/lightbar","purifier/pet","purifier/egg","purifier/display","purifier/retro","purifier/ceiling","purifier/column","purifier/window","purifier/cone","air2/loop-purifier-heater","air2/big-dome-purifier"]},{"id":"humidifiers","name":"Humidifiers","items":["humidifier/cleartank","humidifier/teardrop","humidifier/woodbase","humidifier/evaporative","humidifier/warmmist","humidifier/tower","humidifier/turnnozzle","humidifier/usbcup","humidifier/flame","humidifier/cloud","humidifier/ledring","humidifier/console","humidifier/plantpot","humidifier/cordless","humidifier/dual","humidifier/smartring","humidifier/vaporizer","humidifier/glasstank","humidifier/fabricband","humidifier/desksquare"]},{"id":"dehumidifiers","name":"Dehumidifiers","items":["dehumidifier/upright","dehumidifier/compact","dehumidifier/small","dehumidifier/basement","dehumidifier/crawl","dehumidifier/whole","dehumidifier/desiccant","dehumidifier/cube","dehumidifier/pod","dehumidifier/bag","dehumidifier/pump","dehumidifier/ring","dehumidifier/tower","dehumidifier/combo","dehumidifier/rugged","dehumidifier/wall","dehumidifier/laundry","dehumidifier/rv","dehumidifier/drum","dehumidifier/retro"]},{"id":"diffusers","name":"Aroma diffusers","items":["diffuser/woodcone","diffuser/speckled","diffuser/glassdome","diffuser/marble","diffuser/nebulizer","diffuser/reed","diffuser/plugin","diffuser/autospray","diffuser/scentpod","diffuser/candlewarmer","diffuser/waxmelt","diffuser/carvent","diffuser/usbmini","diffuser/saltlamp","diffuser/flame","diffuser/backflow","diffuser/incense","diffuser/bamboo","diffuser/cloud","diffuser/cabinet"]},{"id":"sensors","name":"Air-quality sensors","items":["airsensors/light-bar-box-sensor","airsensors/upright-lcd-air-monitor","airsensors/oval-led-dot-co2-clock","airsensors/round-dot-display-sensor","airsensors/radonpuck","airsensors/radonbar","airsensors/woodface","airsensors/roundedmonitor","airsensors/roomcube","airsensors/einkco2","airsensors/minisquare","airsensors/lcdmeter","airsensors/hygrometer","airsensors/walleink","airsensors/weatherstation","airsensors/round-egg","sensor/air"]},{"id":"ventilation","name":"Ventilation & HRV","items":["air2/upright-hrv-dark-panel","air2/hanging-gray-hrv","air2/ceiling-erv-two-ducts","air2/registers"]}]},{"id":"kitchen","name":"Kitchen","subs":[{"id":"fridges","name":"Fridges","items":["fridgecfg/steel","fridgecfg/glasspanel","fridgecfg/probuilt","fridgecfg/classic","fridge/4-door-flex-with-screen","fridge/4-door-flex-panels","fridge/3-door-panel-fridge","fridge/side-by-side-with-screen","fridge/panel-bottom-freezer","fridge/panel-column-pair","fridge/knock-glass-french-door","fridge/round-ice-4-door","fridge/door-within-door-side-by","fridge/color-glow-french-door","fridge/steel-top-freezer","fridge/gefrench","fridge/classictop","fridge/bottomfr","fridge/basicsbs","fridge/counterdepth","fridge/compact","fridge/builtincol","fridge/builtinfd","fridge/color-panel-glass-door"]},{"id":"freezers","name":"Freezers","items":["kitchen2/7-cu-ft-chest-freezer","kitchen2/5-cu-ft-chest-freezer","kitchen2/3-5-cu-ft-chest-freezer","extras/chestfreezer","kitchen2/13-cu-ft-upright-freezer","kitchen2/garage-ready-upright","kitchen2/compact-upright-freezer","extras/uprightfreezer"]},{"id":"minifridge","name":"Mini fridges, wine & kegs","items":["minifridge/white-cube-fridge","minifridge/3-1-cu-ft-mini","minifridge/retro-mini-fridge","minifridge/2-door-dorm-fridge","minifridge/panel-cube-fridge","minifridge/15-inch-under-counter","minifridge/beverage-center","minifridge/countertop-cooler","minifridge/dual-zone-beverage","minifridge/outdoor-fridge","minifridge/12-bottle-wine-cooler","minifridge/18-bottle-wine-cooler","minifridge/46-bottle-dual-zone","minifridge/wine-column","minifridge/skincare","minifridge/gamer","kitchen2/single-tap-kegerator","kitchen2/dual-tap-kegerator","kitchen2/keg-backbar","extras/kegerator"]},{"id":"ranges","name":"Ranges & cooktops","items":["rangecfg/cfg-classic","rangecfg/cfg-otrglass","range/pro48","range/retro","range/gastop","range/woodstove","range/pizza","range/dome"]},{"id":"ovens","name":"Ovens & microwaves","items":["range/wall","range/wall2","range/combo","range/steam","ovens/classic-otr","ovens/black-glass-otr","ovens/flush-wall-oven","ovens/pro-double-oven","ovens/combo-wall-pro","ovens/speed-oven","ovens/steam-oven","ovens/microwave-drawer","microwave/counter","microwave/drawer","microwave/compact","microwave/combo","microwave/smart","countertop/flip-up-air-fry-oven","countertop/large-air-fry-oven","countertop/stacked-double-oven","countertop/brushed-steel-air-fry-oven","countertop/smart-steel-oven","countertop/steel-air-fry-toaster-oven","countertop/budget-4-slice-oven","countertop/steam-combi-oven","countertop/french-door-oven","countertop/black-air-fry-oven","smallkitchen/toasteroven"]},{"id":"hoods","name":"Range hoods","items":["microwave/pyramid","microwave/glass","microwave/island","microwave/undercab","microwave/mantel","microwave/plaster","microwave/downdraft","microwave/ceiling","microwave/angled","microwave/copper"]},{"id":"dishwashers","name":"Dishwashers","items":["dishwasher/front","dishwasher/hidden","dishwasher/projection","dishwasher/panel","dishwasher/drawer1","dishwasher/drawer2","dishwasher/slim","dishwasher/countertop","dishwasher/portable","dishwasher/glass","dishwasher/retro","dishwasher/smart","dishwasher/third","dishwasher/quiet","dishwasher/autoopen","dishwasher/opendrawer","dishwasher/dial","dishwasher/commercial"]},{"id":"coffee","name":"Coffee & kettles","items":["smallkitchen/drip","kitchen2/12-cup-drip-maker","kitchen2/steel-drip-maker","kitchen2/copper-element-drip-brewer","smallkitchen/pod","kitchen2/classic-pod-brewer","kitchen2/mini-pod-brewer","kitchen2/capsule-coffee-machine","smallkitchen/espresso","smallkitchen/bean","kitchen3/espresso-with-grinder","kitchen3/slim-espresso-machine","smallkitchen/goose","smallkitchen/glasskettle","smallkitchen/retrokettle"]},{"id":"small","name":"Small appliances","items":["smallkitchen/toaster2","smallkitchen/toaster4","kitchen3/steel-2-slice-toaster","smallkitchen/airfryer","smallkitchen/dualfryer","kitchen3/square-basket-air-fryer","kitchen3/round-basket-air-fryer","smallkitchen/multicooker","kitchen3/electric-pressure-cooker","kitchen3/pressure-crisp-cooker","smallkitchen/slowcooker","smallkitchen/rice","kitchen3/pressure-rice-cooker","smallkitchen/mixer","smallkitchen/blender","smallkitchen/bullet","smallkitchen/bread","smallkitchen/waffle"]},{"id":"popcorn","name":"Popcorn & food warmers","items":["popcorn/theater","popcorn/tabletop","popcorn/carnival","popcorn/hotair","popcorn/stovetop","popcorn/electric","popcorn/silicone","popcorn/retro","popcorn/lobby","popcorn/snackcart","countertop/vevor4","countertop/warmer2","countertop/buffet","countertop/drawer","countertop/heatlamp"]}]},{"id":"cleaning","name":"Laundry & cleaning","subs":[{"id":"laundry","name":"Washers & dryers","items":["laundrycfg/cfgscreen","laundrycfg/cfgtop","laundrycfg/cfgcombo"]},{"id":"robots","name":"Robot vacuums","items":["vacuum/lidar","vacuum/topcam","vacuum/dshape","vacuum/square","vacuum/slim","vacuum/selfempty","vacuum/allinone","vacuum/spinmop","vacuum/combo","vacuum/obstacle","vacuum/pethair","vacuum/mini","vacuum/dock","vacuum/stuck","vacuum/window"]},{"id":"vacuums","name":"Stick & upright vacuums","items":["vacuum/stick","vacuum/handheld","floorcare/laser-stick-vacuum","floorcare/cordless-handheld","floorcare/mini-handheld","floorcare/ball-upright-vacuum","floorcare/bagless-upright","floorcare/powered-lift-away","floorcare/classic-upright-vacuum","floorcare/bagged-canister","floorcare/shop-vac-5-gal"]},{"id":"washers","name":"Floor washers & carpet cleaners","items":["vacuum/washer","floorcare/stick-wet-cleaner","floorcare/wet-dry-stick","floorcare/smart-floor-washer","floorcare/multi-surface-washer","floorcare/upright-carpet-cleaner","floorcare/spot-carpet-cleaner","floorcare/rental-carpet-cleaner"]},{"id":"irons","name":"Irons","items":["extras/iron","home3/steam-iron","home3/iron_station","home3/iron_travel"]}]},{"id":"entertainment","name":"Entertainment","subs":[{"id":"tv","name":"TVs & projectors","items":["media/wall-tv","media/console-tv","media/art-tv","media/curved-tv","media/outdoor-tv","media/projector","media/ust"]},{"id":"speakers","name":"Smart speakers","items":["speakers2/tall-cylinder-speaker","speakers2/fabric-puck-speaker","speakers2/small-ball-speaker","speakers2/ball-speaker-with-clock","speakers2/large-ball-speaker","speakers2/half-ball-speaker","speakers2/studio-speaker-drum","speakers2/plug-in-mini-speaker","speakers2/car-voice-puck","speakers2/earbuds-case","speakers/vase-speaker","speakers/fabric-mini-speaker","speakers/mini-speaker-wall-hook","speakers/fabric-smart-speaker","speakers/large-fabric-speaker","speakers/round-smart-speaker","media/cylinder","media/sphere","media/puck"]},{"id":"displays","name":"Smart displays","items":["speakers2/round-alarm-display","speakers2/5-inch-smart-display","speakers2/8-inch-smart-display","speakers2/8-inch-photo-display","speakers2/swivel-smart-display","speakers2/15-inch-wall-display","speakers2/21-inch-wall-display","speakers2/wall-control-panel","speakers/7-inch-smart-display","speakers/10-inch-smart-display","media/display"]},{"id":"audio","name":"Audio & streaming","items":["media/soundbar-tv","media/soundbar-sub","media/bookshelf","media/tower","media/turntable","media/receiver","avr/black-receiver-wide-display","avr/porthole-display-receiver","avr/big-dial-receiver","avr/two-knob-receiver","avr/gloss-black-receiver","avr/slim-silver-receiver","avr/minimal-black-amp","avr/compact","avr/bluemeter","avr/vintage","avr/streamer","avr/separates","media/box","media/stick","speakers2/streaming-stick-remote","speakers/pebble-tv-streamer","speakers/streaming-dongle-remote"]},{"id":"consoles","name":"Game consoles","items":["consoles/big-black-box-console","consoles/glossy-curved-console","consoles/white-slim-console","consoles/black-slim-console","consoles/small-white-console","consoles/black-tower-console","consoles/16-bit-black-console","consoles/white-128-bit-console","consoles2/gray-disc-console","consoles2/mini-round-console","consoles2/black-ridged-console","consoles2/slim-black-console","consoles2/curved-gloss-console","consoles2/top-loader-console","consoles2/wedge-console","consoles2/three-layer-wedge","consoles2/tower-console-white-wings","consoles2/striped-wing-console","consoles3/8-bit-gray-console","consoles3/16-bit-gray-console","consoles3/64-bit-console","consoles3/cube-console","consoles3/slim-white-motion-console","consoles3/tablet-controller-console","consoles3/handheld-hybrid-console","consoles3/hybrid-console-oled","consoles3/handheld-only-console","consoles3/hybrid-console-2nd-gen","media/console"]},{"id":"arcade","name":"Arcade & pinball","items":["arcade/racing","arcade/deluxe","arcade/gun","arcade/fighter","arcade/golf","arcade/maze","arcade/space","arcade/brawler","arcade/tall","arcade/retro","arcade/party","arcade/countertop-cabinet","arcade/wall","arcade/cocktail","arcade/pinem","arcade/pindmd","arcade/pinwide","arcade/pindigital","arcade/pinmini"]}]},{"id":"computers","name":"Computers & network","subs":[{"id":"pcs","name":"Computers & laptops","items":["office/gaming","office/office","office/sff","office/mini","office/square","office/aio","office/ultra-thin-laptop","office/business","office/gaminglap","office/tent","office/budget-laptop"]},{"id":"monitors","name":"Monitors","items":["home4/27-inch-office-monitor","home4/34-inch-curved-monitor","home4/49-inch-super-wide","home4/aluminum-27-inch-display","home4/portable","extras/monitor"]},{"id":"printers","name":"Printers","items":["printers/aio","printers/slim","printers/tank","printers/photo6","printers/dyesub","printers/a3","printers/mono-ink","printers/mono-laser","printers/laser-aio","printers/color-laser","printers/color-mfp","printers/label","printers/receipt"]},{"id":"printers3d","name":"3D printers","items":["printers/enclosed-3d-printer","printers/boxy-enclosed-printer","printers/bed-slinger-3d-printer","printers/mini-3d-printer","printers3d/box-lidar","printers3d/box-solid","printers3d/pro-two","printers3d/large-two","printers3d/large-rack","printers3d/changer9","printers3d/slinger-side","printers3d/slinger-mini","printers3d/slinger-orange","printers3d/corexy-orange","printers3d/toolchanger","printers3d/bigbox-hub","printers3d/slinger-gray","printers3d/box-dark","printers3d/resin-smoke","printers3d/resin-orange","printers3d/kit-corexy","printers/resin","printers/delta","printers/largeformat"]},{"id":"network","name":"Racks, NAS & network","items":["home4/8u-open-frame","home4/open25u","home4/wall12u","home4/cab42u","home4/desktop-mini-rack","extras/rack","home4/nas4","home4/nas8","home4/gw1u","home4/nvr2u","home4/desksw8","extras/router","extras/mesh","speakers/mesh-router","speakers/mesh-point-speaker","speakers/plug-in-hub"]},{"id":"ups","name":"UPS & shredders","items":["office/upssmall","office/upslcd","office/upsrack","office/upsbrick","office/binshred","office/personal"]}]},{"id":"security","name":"Security & access","subs":[{"id":"cameras","name":"Cameras","items":["security/bullet","security/dome","security/turret","security/cube","security/pantilt","security/flood","security/spot","security/battery","security/solar","security/baby","security/ptz","security/dual","speakers/indoor-cam-wired","speakers/battery-cam"]},{"id":"doorbells","name":"Doorbells & chimes","items":["doorbell/tall","doorbell/square","doorbell/wedge","doorbell/package","doorbell/brass","doorbell/lighted","doorbell/intercom","doorbell/gatepost","doorbell/peephole","doorbell/plugin","doorbell/tubes","doorbell/smartchime","doorbell/school","doorbell/twist","doorbell/shopbell","doorbell/knocker","doorbell/monitor","speakers/battery-video-doorbell"]},{"id":"locks","name":"Smart locks","items":["lock/keypad","lock/touch","lock/retrofit","lock/fingerprint","lock/handleset","lock/mortise","lock/video","lock/btpadlock","lock/garage","lock/gate","lock/sliding","lock/office","lock/cylinder","lock/euro","lock/cabinet","lock/safe","lock/shed","lock/strike","lock/card","speakers/touch-deadbolt"]},{"id":"deadbolts","name":"Smart deadbolts","items":["deadbolts/arched-push-button","deadbolts/round-push-button","deadbolts/arched-wi-fi-touch","deadbolts/slim-wi-fi-touch","deadbolts/arched-keypad-lever","deadbolts/arched-touch-lever","deadbolts/slim-touch-lever","lock2/glass-touchscreen","lock2/push-button-keypad","lock2/a2kftouch","lock2/slim-touchscreen","lock2/levertouch","lock2/leverkeypad","lock2/smart-lock-black","lock2/entrance-handle-lock"]},{"id":"alarms","name":"Alarm panels & sirens","items":["safety/slim-white-keypad","safety/round-edge-keypad","safety/classic-alpha-keypad","safety/7-inch-touch-panel","safety/large-touch-panel","safety/camera-hub-panel","safety/command-touchscreen","safety/smart-alarm-panel","safety/wireless-keypad","safety/classic-lcd-keypad","security/keypad","security/touch","security/hub","security/panic","security/fob","security/indoorsiren","security/outsiren","security/garagesiren"]},{"id":"smoke","name":"Smoke & CO alarms","items":["safety/round-smoke-alarm","safety/combo-smoke-and-co","safety/hardwired-smoke-alarm","safety/smart-smoke-co","safety/smoke-listener","safety/nighthawk","safety/heat","speakers/smoke-and-co-alarm","sensor/smoke","sensor/co"]}]},{"id":"controls","name":"Sensors & switches","subs":[{"id":"sensors","name":"Sensors","items":["sensor/pir","sensor/ceiling","sensor/radar","sensor/door","sensor/window","sensor/garage","sensor/glass","sensor/leak","sensor/freezer","sensor/temp","sensor/outdoor","sensor/lux","sensor/washer","sensor/bed","sensor/soil","sensor/button"]},{"id":"switches","name":"Switches & dimmers","items":["switch/toggle","switch/paddle-rocker","switch/red-bar-dimmer","switch/dimmer","switch/rotary","switch/slide","switch/twogang","switch/blue-bar-2-in-1","switch/fan","switch/scene","switch/glass","switch/vintage","switch/remote","switch/display","switch/timer","switch/outlet","switch/lighted","switch/nightlight","switch/button","switch/industrial"]},{"id":"outlets","name":"Outlets","items":["outlets/hidden-plug-outlet","outlets/hidden-plug-light-ring","outlets/hidden-plug-usb-c","outlets/hidden-plug-usb-c-ring","outlets/duplex","outlets/rocker-style-outlet","outlets/usb","outlets/gfci","outlets/smart","outlets/tamper","outlets/tslot","outlets/night","outlets/dryer","outlets/weather","outlets/popup","outlets/floor","outlets/tvbox"]},{"id":"plugs","name":"Smart plugs & strips","items":["plug/mini","plug/round","plug/side","plug/energy","plug/outdoor","plug/inwall","plug/usbc","plug/dimmer","plug/night","plug/lamp","plug/string","plug/heavy","plug/strip","plug/surge","plug/tower","plug/reel","plug/floorbox","plug/popup","plug/undercab"]}]},{"id":"energy","name":"Power & energy","subs":[{"id":"ev","name":"EV chargers","items":["energy/round","energy/slim","energy/pedestal","energy/cord","energy/car","plug/ev"]},{"id":"solar","name":"Solar","items":["energy/roof","energy/ground","utility3/tracker","utility3/carport","utility3/balcony","energy/inverter"]},{"id":"batteries","name":"Home batteries & backup","items":["energy/slab","energy/stack","utility3/flat-wall-battery","utility3/modular-battery","utility3/tall-battery-cabinet","energy/station","energy/generator"]},{"id":"meters","name":"Energy meters","items":["utility3/smartmeter","utility3/in-panel-monitor","utility3/clip-on-energy-monitor","heating/ctmeter"]},{"id":"chargers","name":"Battery chargers","items":["chargers/aa4","chargers/aalcd","chargers/wall2","chargers/univ","chargers/li","chargers/usbc","chargers/camera","chargers/drone","chargers/ebike","chargers/p12","chargers/p18","chargers/rapid","chargers/dual","chargers/six","chargers/rack","chargers/stem","chargers/radio"]}]},{"id":"water","name":"Water & plumbing","subs":[{"id":"heaters","name":"Water heaters","items":["water/gastank","water/elec","water/tankless","water/heatpump","heating/solarthermal","utility3/flatplate","utility3/tubeground","utility3/thermosiphon"]},{"id":"valves","name":"Valves, filters & leak alarms","items":["water/ball","water/main","water/gas","water/softener","water/filter","water/alarm"]},{"id":"sump","name":"Sump pumps","items":["water/sump","water/pedestal","water/sealed","water/backup","water/waterpow"]},{"id":"pumps","name":"Well & utility pumps","items":["water/well","heating/jetpump","yard2/jetpump","yard2/booster","heating/centrifugal","yard2/endsuction","yard2/inline","yard2/diaphragm"]}]},{"id":"outdoor","name":"Outdoor, pool & yard","subs":[{"id":"lights","name":"Outdoor lights","items":["outdoor/coach","outdoor/gooseneck","outdoor/flush","outdoor/post","outdoor/pagoda","outdoor/mushroom","outdoor/treespot","outdoor/flood","outdoor/bistro","outdoor/deckstep","outdoor/bollard","outdoor/solar","outdoor/updown","outdoor/globe","outdoor/pillar","outdoor/well","outdoor/slot","outdoor/hanging","outdoor/eave","outdoor/icicle","outdoor2/brassspike","outdoor2/floodstake"]},{"id":"garage","name":"Garage doors & openers","items":["garage/raised","garage/double","garage/carriage","garage/glass","garage/flush","garage/longpanel","garage/plank","garage/rollup","garage/tiltup","garage/pair","garage/opener","garage/keypad","garage/button"]},{"id":"gates","name":"Gates & barriers","items":["garage/swing","garage/garden","garage/ranch","garage/privacy","garage/iron","garage/slat","garage/slide","outdoor2/slatgate","outdoor2/chainlink","outdoor2/irongate","outdoor2/foldarm","outdoor2/ledarm","outdoor2/skirtarm","extras/boom"]},{"id":"mailboxes","name":"Mailboxes & parcel boxes","items":["doorbell/mailbox","outdoor2/postbox","outdoor2/castbox","outdoor2/parcel","lock/parcel","sensor/mailbox","outdoor2/brassslot","outdoor2/chute","outdoor2/steelplate","extras/mailbox"]},{"id":"sprinklers","name":"Sprinklers & irrigation","items":["sprinklers/controller","sprinklers/hose","sprinklers/popup","sprinklers/smart","sprinklers/dial","sprinklers/touch","sprinklers/outdoor","sprinklers/modular","sprinklers/basic4","sprinklers/hdial","sprinklers/hdual","sprinklers/hhub","sprinklers/valve","sprinklers/rotor","sprinklers/impact","sprinklers/osc","sprinklers/drip","sprinklers/vbox","sprinklers/rain","sprinklers/flowsens"]},{"id":"mowers","name":"Robot mowers","items":["vacuum/mower","yard2/robot-mower-gray","yard2/robot-mower-orange","yard2/wire-free-robot-mower"]},{"id":"grills","name":"Grills & smokers","items":["grill/gas3","grill/gas4","grill/island","grill/kettle","grill/kamado","grill/portable","grill/griddle36","grill/griddle22","grill/builtgrid","grill/pellet","grill/vpellet","grill/offset","grill/bullet","grill/electric","grill/drum","grill/gravity","grill/infrared","grill/rotisserie","grill/santamaria","grill/hibachi"]},{"id":"pool","name":"Pools & pool equipment","items":["pool/inground","pool/above","pool/falls","pool/cover","pool/panel","pool/heater","pool/salt","yard2/variable-speed-pool-pump","yard2/above-ground-filter-pump"]},{"id":"poolrobots","name":"Pool robots","items":["pool/robot","vacuum/pool","yard2/brushed-pool-robot","yard2/pressure-side-pool-cleaner"]},{"id":"spa","name":"Hot tubs & saunas","items":["pool/hottub","yard2/square-acrylic-spa","yard2/inflatable-spa","yard2/cedartub","home2/finnish","home2/cube","heating/barrel","heating/cabin"]},{"id":"coops","name":"Chicken coops","items":["coops/backyard","coops/walkin","coops/tractor","coops/raised","coops/plastic","coops/fenced","coops/quail","coops/duckhouse","coops/autodoor","coops/heatwaterer","coops/nipple","coops/feeder","coops/heatpanel","coops/sensor"]}]},{"id":"plants","name":"Plants","subs":[{"id":"houseplants","name":"Houseplants","items":["builder:plantbuilder","plants/monstera","plants/snake","plants/pothos","plants/zz","plants/lily","plants/rubber","plants/pearls","plants/aloe","plants/jade","plants/succulents","plants/cactus","plants/calathea","plants/fern","plants/spider","plants/philodendron","plants/bird","plants/pilea","plants/herbs","plants/airplant","plants/hoya"]},{"id":"flowers","name":"Flowering plants","items":["flowers/orchid","flowers/poinsettia","flowers/violet","flowers/anthurium","flowers/hibiscus","flowers/geranium","flowers/begonia","flowers/kalanchoe","flowers/bromeliad","flowers/tulips","flowers/hydrangea","flowers/rose","flowers/gerbera","flowers/cyclamen","flowers/lavender","flowers/petunia","flowers/mum","flowers/azalea","flowers/amaryllis","flowers/bougainvillea"]},{"id":"trees","name":"Trees","items":["builder:treebuilder","trees/fiddle","trees/olive","trees/kentia","trees/ficus","trees/money","trees/lemon","trees/bonsai","trees/dracaena","trees/norfolk","trees/jmaple","trees/oak","trees/fallmaple","trees/birch","trees/spruce","trees/cherry","trees/palm","trees/willow","trees/apple","trees/aspen","trees/magnolia"]},{"id":"garden","name":"Garden beds & soil","items":["yard2/cedarbed","yard2/galvbed","yard2/elevated","extras/gardenbed"]}]},{"id":"home","name":"Home, pets & fitness","subs":[{"id":"blinds","name":"Blinds & curtains","items":["shades/roller","shades/blackout","shades/cellular","shades/tdbu","shades/roman","shades/wood","shades/mini","shades/vertical","shades/zebra","shades/drapes","shades/sheer","shades/layered","shades/cafe","shades/shutters","shades/skylight","shades/solar","shades/awning","shades/panels","shades/arched","shades/bay","home2/fauxwood","home2/smart-faux-wood-blinds"]},{"id":"shutters","name":"Exterior shutters","items":["extras/rollershutter","home2/alubox","home2/motorized-roller","home2/hurricane","extras/swingshutters","home2/boardbatten","home2/louvered","home2/raisedpanel"]},{"id":"bath","name":"Hair dryers & scales","items":["extras/hairdryer","home3/round-head-hair-dryer","home3/hot-air-brush","home3/hotel_dryer","extras/scale","home3/smart-glass-scale","home3/slim-smart-scale","home3/dial_scale"]},{"id":"pests","name":"Mouse traps","items":["extras/mousetrap","extras/snapsensor","extras/multicatch","extras/clamptrap","home3/electronic-mouse-trap","home3/live_trap"]},{"id":"petfood","name":"Pet feeders & fountains","items":["pets/feeder","home3/tall-pet-feeder","home3/wide-pet-feeder","home3/gravity_feeder","pets/fountain","home3/flower-pet-fountain","home3/tiered-pet-fountain","home3/clear-tank-pet-fountain"]},{"id":"aquariums","name":"Aquariums","items":["pets/aquarium","home3/rimless20","home3/curved-nano-aquarium","home3/tank55"]},{"id":"petcare","name":"Pet care & tech","items":["pets/litter","pets/door","pets/treatcam","pets/birdcam","pets/launcher","pets/bed","pets/collar"]},{"id":"cardio","name":"Cardio machines","items":["fitness/folding-treadmill","fitness/walkpad","fitness/curve","fitness/swivel-screen-bike","fitness/recumbent","fitness/screen-rower","fitness/air-rower","fitness/elliptical","fitness/stair-climber"]},{"id":"strength","name":"Strength & recovery","items":["fitness/wall-strength-trainer","fitness/cable-gym-station","fitness/mirror","fitness/vibe"]}]},{"id":"people","name":"People & pets","subs":[{"id":"people","name":"People","items":["people/man","people/woman","people/oldman","people/oldwoman","people/teenboy","people/teengirl","people/boy","people/girl","people/toddler","people/baby"]},{"id":"dogscats","name":"Dogs & cats","items":["petsfig/labrador","petsfig/golden","petsfig/shepherd","petsfig/frenchie","petsfig/beagle","petsfig/dachshund","petsfig/husky","petsfig/corgi","petsfig/collie","petsfig/poodle","petsfig/tabby","petsfig/blackcat","petsfig/siamese","petsfig/orangecat"]},{"id":"habitats","name":"Reptile & pet habitats","items":["habitats/frontglass","habitats/tallviv","habitats/meshcham","habitats/pvcpython","habitats/pvcdragon","habitats/bioactive","habitats/paludarium","habitats/tortoise","habitats/rack","habitats/leotank","habitats/turtle","habitats/hermit","habitats/tarantula","habitats/axolotl","habitats/birdcage","habitats/hamster","habitats/rabbitpen","habitats/incubator","habitats/brooder"]}]}];
 window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles: wing & slab","consoles3":"Consoles: handheld & family","speakers":"Smart home speakers & displays A","speakers2":"Smart home speakers & displays B","deadbolts":"Smart deadbolts: arched & slim","lock2":"Smart deadbolts: keypad & glass","airsensors:intro":"Sixteen air-quality and climate sensors, from simple light-bar boxes to e-ink and LED-dot monitors, on desks, shelves and walls. The slider is air quality: high is good (green), middle is fair (yellow), low is poor (orange, red). Each one shows it its own way: a light bar, a color ring, segment numbers, LED dots or a comfort face.","consoles:intro":"Block-style consoles from the original big black box to the newest black tower, plus two classic 90s consoles, drawn at real proportions with their controllers. When playing, the power light comes on, the jewel and the tower's top vent glow green, the memory card screen lights up, and the TV washes the wall.","consoles2:intro":"Every console in this family from the first gray disc box to the newest striped tower, drawn from press photos at real proportions with that era's controller. When playing, the real light comes on: green power lights on the first three, the white light bar on the wedge models and the edge strips on the wing towers, plus controller lights, while the TV washes the wall.","consoles3:intro":"Every home console in this family from the 8-bit gray box to the newest hybrid, in release order, drawn from photos at real proportions with their controllers. When playing, the power light comes on, the disc slot glows, handheld and tablet screens show original game scenery, and the TV washes the wall.","speakers2:intro":"Twenty voice-assistant devices drawn from real shapes, from the first tall speaker to the wall control panel. Listening lights the cyan-on-blue ring or light bar and the screens show a clock, weather, photo or home card; the slider is volume, shown as the ring filling white. The color is the device's real finish.","speakers:intro":"Twenty smart home devices on shelves, counters, walls and doors: speakers, smart displays, streamers, mesh Wi-Fi, thermostats, a smoke alarm, cameras, the doorbell, a deadbolt and a plug-in hub. On shows the four breathing dots, ambient screens and status lights; the slider sets volume.","deadbolts:intro":"Electronic deadbolts and levers by model and trim (arched, slim, round and square), redrawn from product photos (outside face only, no logos). On means LOCKED: bolt out, check or padlock lit green, keypad backlit; off means UNLOCKED: bolt in, status dim red. The color is that model's real finishes.","lock2:intro":"Smart deadbolts with glass touchscreens and keypads, redrawn from product photos (outside face only, no logos): keyed and key-free, slim and lever versions, a retrofit, a smart-standard lock, an entrance handle lock and a handleset. On means LOCKED: bolt out, check lit green, digits backlit; off means UNLOCKED: bolt in, red status. The color is that model's real finishes.","countertop:intro":"Real countertop ovens and food warmers. When cooking, the elements glow orange behind the glass, air-fry fans swirl, the rotisserie turns, steam rises and warmer lamps glow; the display shows the temperature (the slider sets it). Warmers let you pick the food; the stacked double oven runs each oven on its own and the flip-up oven can be flipped up.","floorcare:intro":"Twenty vacuums and carpet cleaners: stick vacuums with laser heads, uprights, lift-aways, wet-dry floor washers, carpet cleaners, a rental-style deep cleaner, canisters, a handheld and a shop vac. Cleaning spins the brush roll, swirls the bin, lights the head and shows the battery; the slider sets power.","fridge:intro":"Twenty fridge styles: 4-door flex panels and a screen fridge, knock-glass and color-glow French doors, plus classic top and bottom freezers, side-by-sides, a counter-depth French door and built-in columns. Running shows the dispenser light, displays, the door screen and lit glass panels; the slider sets display brightness.","home4:intro":"Server racks for the home lab (8U open frame, 12U glass wall cabinet, 42U mesh cabinet, 25U 4-post rack, 10-inch mini rack, 4-bay NAS) and desk monitors (27-inch office, 34-inch curved, 49-inch super-wide, aluminum 27-inch, a portable screen). On racks the slider is activity: more port and drive lights blink, faster. On monitors it is screen brightness.","outlets:intro":"In-wall outlets: hidden-plug outlets (plain, light ring, USB-C, USB-C with ring) plus common outlets from a plain duplex to GFCI, smart, floor and pop-up types. On means power on: LEDs and night-lights glow, a plug is in and its lamp is lit. The color is the plate or finish (the light on light-ring models).","printers:intro":"Thirteen home and office printers plus seven 3D printers on a desk (the four filament printers follow the approved lineup drawing). While printing, a page slides out (color pages from color printers, text from mono ones), the inkjet carriage runs back and forth and the status light blinks. The slider is the ink or toner level: on the gauges and the ink-tank windows, and below 25% everything turns amber. On 3D printers the slider is print progress: the part grows, the head moves, the bed glows and the resin plate lifts.","switch:intro":"Twenty wall switches, dimmers and keypads on painted walls. On flips each one to its ON position and lights its status LED in the LED color; dimmers fill their LED bar to the brightness. Plates come in white, ivory, almond, black, stainless, brass and glass by model.","utility2:intro":"Seventeen real boilers, heat pumps, circulators, buffer tanks and fresh-water stations in basements and utility rooms. On means running: displays light, flow moves in the pipes, pumps spin and flues shimmer. The slider is the output: temperatures, gauges and readouts follow it. The wall combi boiler has separate Heating and Hot water switches.","air2/boxy-wall-split":"Boxy wall split","air2/faceted-wall-split":"Faceted wall split","air2/mirror-glass-wall-split":"Mirror-glass wall split","air2/curved-bar-towel-ladder":"Curved-bar towel ladder","air2/capsule-diesel-heater":"Capsule diesel heater","air2/ribbed-top-diesel-heater":"Ribbed-top diesel heater","air2/portable-box-diesel-heater":"Portable box diesel heater","air2/upright-hrv-dark-panel":"Upright HRV, dark panel","air2/hanging-gray-hrv":"Hanging gray HRV","air2/ceiling-erv-two-ducts":"Ceiling ERV, two ducts","air2/loop-purifier-heater":"Loop purifier heater","air2/big-dome-purifier":"Big dome purifier","airsensors/light-bar-box-sensor":"Light-bar box sensor","airsensors/upright-lcd-air-monitor":"Upright LCD air monitor","airsensors/oval-led-dot-co2-clock":"Oval LED-dot CO2 clock","airsensors/round-dot-display-sensor":"Round dot-display sensor","arcade/countertop-cabinet":"Countertop cabinet","avr/black-receiver-wide-display":"Black receiver, wide display","avr/porthole-display-receiver":"Porthole-display receiver","avr/big-dial-receiver":"Big-dial receiver","avr/two-knob-receiver":"Two-knob receiver","avr/gloss-black-receiver":"Gloss-black receiver","avr/slim-silver-receiver":"Slim silver receiver","avr/minimal-black-amp":"Minimal black amp","consoles/big-black-box-console":"Big black box console","consoles/glossy-curved-console":"Glossy curved console","consoles/white-slim-console":"White slim console","consoles/black-slim-console":"Black slim console","consoles/small-white-console":"Small white console","consoles/black-tower-console":"Black tower console","consoles/16-bit-black-console":"16-bit black console","consoles/white-128-bit-console":"White 128-bit console","countertop/flip-up-air-fry-oven":"Flip-up air fry oven","countertop/large-air-fry-oven":"Large air fry oven","countertop/stacked-double-oven":"Stacked double oven","countertop/brushed-steel-air-fry-oven":"Brushed steel air fry oven","countertop/smart-steel-oven":"Smart steel oven","countertop/steel-air-fry-toaster-oven":"Steel air fry toaster oven","countertop/budget-4-slice-oven":"Budget 4-slice oven","countertop/steam-combi-oven":"Steam combi oven","countertop/french-door-oven":"French-door oven","countertop/black-air-fry-oven":"Black air fry oven","speakers2/tall-cylinder-speaker":"Tall cylinder speaker","speakers2/fabric-puck-speaker":"Fabric puck speaker","speakers2/small-ball-speaker":"Small ball speaker","speakers2/ball-speaker-with-clock":"Ball speaker with clock","speakers2/large-ball-speaker":"Large ball speaker","speakers2/half-ball-speaker":"Half-ball speaker","speakers2/studio-speaker-drum":"Studio speaker drum","speakers2/round-alarm-display":"Round alarm display","speakers2/plug-in-mini-speaker":"Plug-in mini speaker","speakers2/car-voice-puck":"Car voice puck","speakers2/5-inch-smart-display":"5-inch smart display","speakers2/8-inch-smart-display":"8-inch smart display","speakers2/8-inch-photo-display":"8-inch photo display","speakers2/swivel-smart-display":"Swivel smart display","speakers2/15-inch-wall-display":"15-inch wall display","speakers2/21-inch-wall-display":"21-inch wall display","speakers2/wall-control-panel":"Wall control panel","speakers2/kids-glow-lamp":"Kids glow lamp","speakers2/streaming-stick-remote":"Streaming stick + remote","speakers2/earbuds-case":"Earbuds case","fitness/connected-treadmill-big":"Connected treadmill, big screen","fitness/folding-treadmill":"Folding treadmill","fitness/heavy-duty-treadmill":"Heavy-duty treadmill","fitness/swivel-screen-bike":"Swivel-screen bike","fitness/studio-bike":"Studio bike","fitness/screen-rower":"Screen rower","fitness/wood-water-rower":"Wood water rower","fitness/air-rower":"Air rower","fitness/stair-climber":"Stair climber","fitness/wall-strength-trainer":"Wall strength trainer","fitness/cable-gym-station":"Cable gym station","floorcare/laser-stick-vacuum":"Laser stick vacuum","floorcare/long-run-stick-vacuum":"Long-run stick vacuum","floorcare/classic-stick-vacuum":"Classic stick vacuum","floorcare/ball-upright-vacuum":"Ball upright vacuum","floorcare/cordless-handheld":"Cordless handheld","floorcare/stick-wet-cleaner":"Stick wet cleaner","floorcare/bagless-upright":"Bagless upright","floorcare/lift-away-upright":"Lift-away upright","floorcare/powered-lift-away":"Powered lift-away","floorcare/wet-dry-stick":"Wet-dry stick","floorcare/smart-floor-washer":"Smart floor washer","floorcare/multi-surface-washer":"Multi-surface washer","floorcare/upright-carpet-cleaner":"Upright carpet cleaner","floorcare/spot-carpet-cleaner":"Spot carpet cleaner","floorcare/rental-carpet-cleaner":"Rental carpet cleaner","floorcare/classic-upright-vacuum":"Classic upright vacuum","floorcare/bagged-canister":"Bagged canister","floorcare/bagless-canister":"Bagless canister","floorcare/mini-handheld":"Mini handheld","floorcare/shop-vac-5-gal":"Shop vac 5 gal","fridge/4-door-flex-with-screen":"4-door flex with screen","fridge/4-door-flex-panels":"4-door flex panels","fridge/3-door-panel-fridge":"3-door panel fridge","fridge/side-by-side-with-screen":"Side-by-side with screen","fridge/panel-bottom-freezer":"Panel bottom freezer","fridge/panel-column-pair":"Panel column pair","fridge/knock-glass-french-door":"Knock-glass French door","fridge/round-ice-4-door":"Round-ice 4-door","fridge/door-within-door-side-by":"Door-within-door side-by-side","fridge/color-glow-french-door":"Color-glow French door","fridge/steel-top-freezer":"Steel top freezer","fridge/color-panel-glass-door":"Color-panel glass door","home2/black-pellet-stove":"Black pellet stove","home2/compact-pellet-stove":"Compact pellet stove","home2/budget-pellet-stove":"Budget pellet stove","home2/cast-iron-wood-stove":"Cast-iron wood stove","home2/steel-wood-stove":"Steel wood stove","home2/motorized-roller":"Motorized roller","home2/smart-faux-wood-blinds":"Smart faux-wood blinds","home3/steam-iron":"Steam iron","home3/round-head-hair-dryer":"Round-head hair dryer","home3/hot-air-brush":"Hot-air brush","home3/smart-glass-scale":"Smart glass scale","home3/slim-smart-scale":"Slim smart scale","home3/tall-pet-feeder":"Tall pet feeder","home3/wide-pet-feeder":"Wide pet feeder","home3/flower-pet-fountain":"Flower pet fountain","home3/tiered-pet-fountain":"Tiered pet fountain","home3/clear-tank-pet-fountain":"Clear-tank pet fountain","home3/curved-nano-aquarium":"Curved nano aquarium","home3/electronic-mouse-trap":"Electronic mouse trap","home4/8u-open-frame":"8U open frame","home4/desktop-mini-rack":"Desktop mini rack","home4/27-inch-office-monitor":"27-inch office monitor","home4/34-inch-curved-monitor":"34-inch curved monitor","home4/49-inch-super-wide":"49-inch super-wide","home4/aluminum-27-inch-display":"Aluminum 27-inch display","kitchen2/7-cu-ft-chest-freezer":"7 cu ft chest freezer","kitchen2/5-cu-ft-chest-freezer":"5 cu ft chest freezer","kitchen2/3-5-cu-ft-chest-freezer":"3.5 cu ft chest freezer","kitchen2/13-cu-ft-upright-freezer":"13 cu ft upright freezer","kitchen2/garage-ready-upright":"Garage-ready upright","kitchen2/compact-upright-freezer":"Compact upright freezer","kitchen2/single-tap-kegerator":"Single-tap kegerator","kitchen2/dual-tap-kegerator":"Dual-tap kegerator","kitchen2/12-cup-drip-maker":"12-cup drip maker","kitchen2/steel-drip-maker":"Steel drip maker","kitchen2/copper-element-drip-brewer":"Copper-element drip brewer","kitchen2/classic-pod-brewer":"Classic pod brewer","kitchen2/mini-pod-brewer":"Mini pod brewer","kitchen2/capsule-coffee-machine":"Capsule coffee machine","kitchen3/espresso-with-grinder":"Espresso with grinder","kitchen3/slim-espresso-machine":"Slim espresso machine","kitchen3/square-basket-air-fryer":"Square basket air fryer","kitchen3/round-basket-air-fryer":"Round basket air fryer","kitchen3/electric-pressure-cooker":"Electric pressure cooker","kitchen3/pressure-crisp-cooker":"Pressure-crisp cooker","kitchen3/express-multicooker":"Express multicooker","kitchen3/fuzzy-logic-rice-cooker":"Fuzzy-logic rice cooker","kitchen3/8-cup-digital-rice-cooker":"8-cup digital rice cooker","kitchen3/pressure-rice-cooker":"Pressure rice cooker","kitchen3/steel-2-slice-toaster":"Steel 2-slice toaster","kitchen3/retro-2-slice-toaster":"Retro 2-slice toaster","lock2/glass-touchscreen":"Glass touchscreen","lock2/push-button-keypad":"Push-button keypad","lock2/touchscreen-plus":"Touchscreen plus","lock2/slim-touchscreen":"Slim touchscreen","lock2/slim-touchscreen-brass":"Slim touchscreen, brass","lock2/retrofit-lock":"Retrofit lock","lock2/smart-lock-white":"Smart lock, white","lock2/smart-lock-black":"Smart lock, black","lock2/entrance-handle-lock":"Entrance handle lock","lock2/slim-handleset":"Slim handleset","minifridge/white-cube-fridge":"White cube fridge","minifridge/3-1-cu-ft-mini":"3.1 cu ft mini","minifridge/retro-mini-fridge":"Retro mini fridge","minifridge/2-door-dorm-fridge":"2-door dorm fridge","minifridge/panel-cube-fridge":"Panel cube fridge","minifridge/15-inch-under-counter":"15-inch under-counter","minifridge/beverage-center":"Beverage center","minifridge/countertop-cooler":"Countertop cooler","minifridge/dual-zone-beverage":"Dual-zone beverage","minifridge/outdoor-fridge":"Outdoor fridge","minifridge/12-bottle-wine-cooler":"12-bottle wine cooler","minifridge/18-bottle-wine-cooler":"18-bottle wine cooler","minifridge/46-bottle-dual-zone":"46-bottle dual-zone","minifridge/wine-column":"Wine column","speakers/vase-speaker":"Vase speaker","speakers/fabric-mini-speaker":"Fabric mini speaker","speakers/mini-speaker-wall-hook":"Mini speaker, wall hook","speakers/fabric-smart-speaker":"Fabric smart speaker","speakers/large-fabric-speaker":"Large fabric speaker","speakers/7-inch-smart-display":"7-inch smart display","speakers/10-inch-smart-display":"10-inch smart display","speakers/pebble-tv-streamer":"Pebble TV streamer","speakers/streaming-dongle-remote":"Streaming dongle + remote","speakers/round-smart-speaker":"Round smart speaker","speakers/mesh-router":"Mesh router","speakers/mesh-point-speaker":"Mesh point speaker","speakers/round-learning-thermostat":"Round learning thermostat","speakers/frosted-thermostat":"Frosted thermostat","speakers/smoke-and-co-alarm":"Smoke & CO alarm","speakers/indoor-cam-wired":"Indoor cam, wired","speakers/battery-cam":"Battery cam","speakers/battery-video-doorbell":"Battery video doorbell","speakers/touch-deadbolt":"Touch deadbolt","speakers/plug-in-hub":"Plug-in hub","consoles3/8-bit-gray-console":"8-bit gray console","consoles3/16-bit-gray-console":"16-bit gray console","consoles3/64-bit-console":"64-bit console","consoles3/cube-console":"Cube console","consoles3/slim-white-motion-console":"Slim white motion console","consoles3/tablet-controller-console":"Tablet-controller console","consoles3/handheld-hybrid-console":"Handheld hybrid console","consoles3/hybrid-console-oled":"Hybrid console, OLED","consoles3/handheld-only-console":"Handheld-only console","consoles3/hybrid-console-2nd-gen":"Hybrid console, 2nd gen","office/ultra-thin-laptop":"Ultra-thin laptop","office/budget-laptop":"Budget laptop","outlets/hidden-plug-outlet":"Hidden plug outlet","outlets/hidden-plug-light-ring":"Hidden plug, light ring","outlets/hidden-plug-usb-c":"Hidden plug, USB-C","outlets/hidden-plug-usb-c-ring":"Hidden plug, USB-C ring","outlets/rocker-style-outlet":"Rocker-style outlet","ovens/steel-otr-glass-touch":"Steel OTR, glass touch","ovens/classic-otr":"Classic OTR","ovens/black-glass-otr":"Black-glass OTR","ovens/low-profile-otr":"Low-profile OTR","ovens/pro-handle-otr":"Pro-handle OTR","ovens/bronze-handle-otr":"Bronze-handle OTR","ovens/single-wall-oven":"Single wall oven","ovens/flush-wall-oven":"Flush wall oven","ovens/pro-double-oven":"Pro double oven","ovens/classic-double-oven":"Classic double oven","ovens/glass-double-oven":"Glass double oven","ovens/combo-wall-glass":"Combo wall, glass","ovens/combo-wall-pro":"Combo wall, pro","ovens/speed-oven":"Speed oven","ovens/steam-oven":"Steam oven","ovens/microwave-drawer":"Microwave drawer","consoles2/gray-disc-console":"Gray disc console","consoles2/mini-round-console":"Mini round console","consoles2/black-ridged-console":"Black ridged console","consoles2/slim-black-console":"Slim black console","consoles2/curved-gloss-console":"Curved gloss console","consoles2/matte-slim-console":"Matte slim console","consoles2/top-loader-console":"Top-loader console","consoles2/wedge-console":"Wedge console","consoles2/rounded-wedge-console":"Rounded wedge console","consoles2/three-layer-wedge":"Three-layer wedge","consoles2/tower-console-white-wings":"Tower console, white wings","consoles2/discless-wing-console":"Discless wing console","consoles2/slim-wing-console":"Slim wing console","consoles2/striped-wing-console":"Striped wing console","printers/enclosed-3d-printer":"Enclosed 3D printer","printers/boxy-enclosed-printer":"Boxy enclosed printer","printers/bed-slinger-3d-printer":"Bed-slinger 3D printer","printers/mini-3d-printer":"Mini 3D printer","safety/slim-white-keypad":"Slim white keypad","safety/round-edge-keypad":"Round-edge keypad","safety/classic-alpha-keypad":"Classic alpha keypad","safety/7-inch-touch-panel":"7-inch touch panel","safety/large-touch-panel":"Large touch panel","safety/camera-hub-panel":"Camera hub panel","safety/command-touchscreen":"Command touchscreen","safety/smart-alarm-panel":"Smart alarm panel","safety/wireless-keypad":"Wireless keypad","safety/classic-lcd-keypad":"Classic LCD keypad","safety/round-smoke-alarm":"Round smoke alarm","safety/speaker-smoke-alarm":"Speaker smoke alarm","safety/combo-smoke-and-co":"Combo smoke & CO","safety/hardwired-smoke-alarm":"Hardwired smoke alarm","safety/smart-smoke-co":"Smart smoke + CO","safety/compact-smoke-alarm":"Compact smoke alarm","safety/alarm-listener-disc":"Alarm listener disc","safety/smoke-listener":"Smoke listener","deadbolts/arched-push-button":"Arched push-button","deadbolts/round-push-button":"Round push-button","deadbolts/arched-touch-alarm":"Arched touch, alarm","deadbolts/arched-touch-deadbolt":"Arched touch deadbolt","deadbolts/slim-touch-deadbolt":"Slim touch deadbolt","deadbolts/arched-wi-fi-touch":"Arched Wi-Fi touch","deadbolts/slim-wi-fi-touch":"Slim Wi-Fi touch","deadbolts/arched-touchscreen":"Arched touchscreen","deadbolts/slim-touchscreen":"Slim touchscreen","deadbolts/square-touchscreen":"Square touchscreen","deadbolts/arched-fingerprint":"Arched fingerprint","deadbolts/slim-fingerprint":"Slim fingerprint","deadbolts/slim-keypad-deadbolt":"Slim keypad deadbolt","deadbolts/arched-keypad-deadbolt":"Arched keypad deadbolt","deadbolts/round-keypad-deadbolt":"Round keypad deadbolt","deadbolts/round-keypad-lever":"Round keypad lever","deadbolts/arched-keypad-lever":"Arched keypad lever","deadbolts/arched-touch-lever":"Arched touch lever","deadbolts/slim-touch-lever":"Slim touch lever","deadbolts/arched-smart-lever":"Arched smart lever","switch/paddle-rocker":"Paddle rocker","switch/red-bar-dimmer":"Red-bar dimmer","switch/blue-bar-2-in-1":"Blue-bar 2-in-1","utility2/wall-combi-boiler":"Wall combi boiler","utility2/compact-condensing-boiler":"Compact condensing boiler","utility2/hopper-pellet-boiler":"Hopper pellet boiler","utility2/tall-pellet-boiler":"Tall pellet boiler","utility2/compact-pellet-boiler":"Compact pellet boiler","utility2/geothermal-heat-pump":"Geothermal heat pump","utility2/ground-loop-heat-pump":"Ground-loop heat pump","utility2/slim-geothermal-unit":"Slim geothermal unit","utility2/smart-circulator":"Smart circulator","utility2/classic-circulator":"Classic circulator","utility2/large-smart-circulator":"Large smart circulator","utility3/flat-wall-battery":"Flat wall battery","utility3/modular-battery":"Modular battery","utility3/tall-battery-cabinet":"Tall battery cabinet","utility3/in-panel-monitor":"In-panel monitor","utility3/clip-on-energy-monitor":"Clip-on energy monitor","yard2/variable-speed-pool-pump":"Variable-speed pool pump","yard2/classic-pool-pump":"Classic pool pump","yard2/above-ground-filter-pump":"Above-ground filter pump","yard2/square-acrylic-spa":"Square acrylic spa","yard2/inflatable-spa":"Inflatable spa","yard2/brushed-pool-robot":"Brushed pool robot","yard2/pressure-side-pool-cleaner":"Pressure-side pool cleaner","yard2/robot-mower-gray":"Robot mower, gray","yard2/robot-mower-orange":"Robot mower, orange","yard2/wire-free-robot-mower":"Wire-free robot mower"};
 /* Device Art Card: a Lovelace card that shows a drawing which follows an entity's state. No external dependencies. */
 (function () {
