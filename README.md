@@ -75,7 +75,7 @@ Almost everything on a drawing can be set. The pictures below show only a few of
 
 **Getting updates:** HACS shows "Update available" for each new version. After updating, reload the page
 (Ctrl+F5, or in the phone app: Settings → Companion App → Debugging → Reset frontend cache). To check your version,
-open the browser console: it shows `DEVICE-ART-CARD v1.1.0`.
+open the browser console: it shows `DEVICE-ART-CARD v1.1.1`.
 
 **Manual**
 1. Copy `dist/ha-device-art.js` to `config/www/`.

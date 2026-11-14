@@ -29350,12 +29350,15 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
     k_winter:   { top: "puffer", bot: "jeans", shoe: "boot", sleeve: "long", pose: "sides", hat: true },
     t_romper:   { top: "romper", bot: "romper", shoe: "kidshoe", sleeve: "short", pose: "sides" },
     t_overalls: { top: "overalls", bot: "overalls", shoe: "kidshoe", sleeve: "short", pose: "sides" },
+    t_tee:      { top: "tee", bot: "shorts", shoe: "kidshoe", sleeve: "short", pose: "sides" },
+    t_pj:       { top: "pj", bot: "pjpants", shoe: "slipper", sleeve: "long", pose: "sides", dino: true },
+    t_hoodie:   { top: "hoodie", bot: "joggers", shoe: "kidshoe", sleeve: "long", pose: "sides" },
   };
   const OUT_M = [["business", "Business suit"], ["casual", "Casual"], ["bizcas", "Business casual"], ["formal", "Formal (tuxedo)"], ["workout", "Workout"], ["night", "Nightwear"], ["outdoor", "Outdoor jacket"], ["hoodie", "Hoodie & joggers"], ["uniform", "Work uniform"]];
   const OUT_F = [["f_casual", "Casual"], ["f_business", "Business (blazer and skirt)"], ["f_bizcas", "Business casual"], ["f_formal", "Formal gown"], ["f_workout", "Workout"], ["f_night", "Nightwear"], ["f_outdoor", "Outdoor jacket"], ["f_hoodie", "Hoodie & joggers"], ["f_uniform", "Work uniform (polo)"]];
   const OUT_KB = [["k_school", "School clothes"], ["k_play", "Play clothes"], ["k_pj", "Pajamas"], ["k_sports", "Sports"], ["k_winter", "Winter"]];
   const OUT_KG = [["k_schoolg", "School clothes"], ["k_playg", "Play clothes"], ["k_pj", "Pajamas"], ["k_sports", "Sports"], ["k_winter", "Winter"]];
-  const OUT_T = [["t_romper", "Romper"], ["t_overalls", "Overalls"]];
+  const OUT_T = [["t_romper", "Romper"], ["t_overalls", "Overalls"], ["t_tee", "T-shirt and shorts"], ["t_pj", "Dinosaur pajamas"], ["t_hoodie", "Little hoodie"]];
   const PANTS = { trousers: 1, jeans: 1, chinos: 1, tuxpants: 1, pjpants: 1, cargo: 1, joggers: 1, leggings: 1, slacks: 1, kidpants: 1, coverall: 1, overalls: 1 };
   const SKIRTS = { pencil: 1, pleated: 1, denimskirt: 1 };
 
@@ -29411,6 +29414,12 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
     
     upper += topGarment(x, of, G);
     if (x.fem && x.age !== "kid" && { tee: 1, tank: 1, pj: 1, hoodie: 1 }[of.top]) upper += line(M([cx - S * .55, ap + 4]) + Q([cx - S * .3, ap + 8], [cx - S * .05, ap + 5]) + M([cc + S * .05, ap + 5]) + Q([cc + S * .32, ap + 8], [cc + S * .55, ap + 4]), .7, su.k, .55);
+    if (of.dino) {
+      
+      const dc = h.shade(su.m, .45), dino = (px, py, s, fl) => `<path transform="translate(${f(px)} ${f(py)}) scale(${f(s * fl)} ${f(s)})" d="M-3 0Q-3 -2.2 0 -2.2Q2 -2.2 2.6 -1Q3.4 -3.6 3.6 -5Q4.4 -5.8 5 -5Q4.8 -4.4 4.2 -4.2Q4 -1.6 3.4 .2L3.4 1.6H2.4V.6H-1.4V1.6H-2.4V.6Q-4 .6 -5.6 -.2Q-4.2 -.2 -3 0Z" fill="${dc}" stroke="${su.k}" stroke-width=".25"/>`;
+      upper += dino(cx - W * .45, ap + 3, .9, 1) + dino(cx + W * .4, belt - 3, .9, -1) + dino(cx - W * .2, belt + 5, .8, 1);
+      legs += dino(lx0 - .5, kn - 3, .8, 1) + dino(rx0 + 3, kn + 6, .8, -1) + dino(lx0, an - 6, .7, -1);
+    }
     if (of.pack) upper += line(M([cx - S + 4, sh + 1]) + Q([cx - S + 2, ap], [cx - S + 4.5, belt - 4]), 2.4, "#2a3a5a") + line(M([cx + S - 4, sh + 1]) + Q([cx + S - 2, ap], [cx + S - 4.5, belt - 4]), 2.4, "#2a3a5a") +
       line(M([cx - S + 4, sh + 1]) + Q([cx - S + 2, ap], [cx - S + 4.5, belt - 4]), .5, OL, .8) + line(M([cx + S - 4, sh + 1]) + Q([cx + S - 2, ap], [cx + S - 4.5, belt - 4]), .5, OL, .8);
     if (of.lanyard) upper += line(M([cx - x.b.Nk - 1, sh - 2]) + L([cc - 1, sh + 14]) + M([cx + x.b.Nk + 1, sh - 2]) + L([cc + 1, sh + 14]), .9, "#2f5fb3") + part(x, rr(cc - 3, sh + 14, 6, 8, 1), "#f4f4f2", rr(cc - 3, sh + 14, 6, 2.6, 1), "#2f5fb3", .7);
@@ -29954,6 +29963,12 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
       line: [Pt(1, -1.7, .44), Pt(.64, 0, .31), Pt(.22, 0, .32), Pt(-.2, 0, .3), Pt(-.62, 0, .32), Pt(-1, 1.7, .44)], lineZ: { n: 1, d: 3.4, v: .25, s: (u) => u > .3 ? 1 : -1.6 },
       cl: [[Pt(0, 0, -.1), Pt(-.25, 0, .12), Pt(-.4, 0, .4)], [Pt(.05, 0, -.1), Pt(.15, 0, .15), Pt(.2, 0, .42)], [Pt(.1, 0, -.1), Pt(.5, 0, .1), Pt(.64, 0, .38)], [Pt(-.05, 0, -.1), Pt(-.6, 0, .08), Pt(-.86, 0, .3)]],
       hi: [[Pt(-.5, 0, .05), Pt(-.3, 0, -.1), Pt(-.05, 0, -.13)], [Pt(-.18, 0, .2), Pt(-.24, 0, .31)]] });
+    if (st === "spiky") return shortMass(x, cx, top, hh, w, { sb: .58, fade: .3, th: (s) => 1.4 + 2.6 * bump(s, 0, .85), n: 8,
+      
+      topZ: { n: 1, d: 3.6, s: (u) => u * 1.4 },
+      line: [Pt(1, -1.6, .42), Pt(.6, 0, .3), Pt(0, 0, .28), Pt(-.6, 0, .3), Pt(-1, 1.6, .42)], lineZ: { n: 2, d: 1, s: () => 0 },
+      cl: [[Pt(-.3, 0, .26), Pt(-.35, 0, .05), Pt(-.45, 0, -.16)], [Pt(.05, 0, .26), Pt(.05, 0, .05), Pt(.08, 0, -.2)], [Pt(.4, 0, .26), Pt(.45, 0, .05), Pt(.55, 0, -.14)]],
+      hi: [[Pt(-.55, 0, .14), Pt(-.3, 0, -.02), Pt(-.05, 0, -.06)]] });
     if (st === "curly") { let tx = ""; for (let i = 0; i < 24; i++) { const u = ((i * 41) % 100) / 100 * 1.8 - .9, v = ((i * 67) % 100) / 100 * .42 - .12, p = Pt(u, 0, v), r = 1.5 * k;
         tx += `<path d="M${f(p[0] - r)} ${f(p[1] + .4)}a${f(r)} ${f(r)} 0 1 1 ${f(r * 1.6)} ${f(-.4 * r)}" fill="none" stroke="${i % 4 ? hp.d : hp.hl}" stroke-width="${i % 4 ? .8 : 1}" stroke-linecap="round"/>`; }
       return shortMass(x, cx, top, hh, w, { sb: .58, fade: .15, th: (s) => 1.2 + 7.2 * bump(s, 0, .8), n: 9, topZ: { n: 1, d: 1.3, round: true },
@@ -30134,7 +30149,7 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
 
   
   const HAIR_TOP = { afro: 11.5, bun: 8, messy: 11.5, curly: 9, long: 3, side: 8, slick: 8, crew: 4, pony: 2.5, buzz: 1.5, receding: 1, bald: 0,
-    fstraight: 3, fwavy: 4, bob: 4, pixie: 6, fbun: 11, fpony: 6, braids: 3, fcurly: 5, updo: 6, perm: 10, pigtails: 3, tuft: 6, fuzz: .5 };
+    spiky: 9, fstraight: 3, fwavy: 4, bob: 4, pixie: 6, fbun: 11, fpony: 6, braids: 3, fcurly: 5, updo: 6, perm: 10, pigtails: 3, tuft: 6, fuzz: .5 };
   const HAIR_W = { pigtails: 10, afro: 6, curly: 1, messy: .5, fcurly: 7, fwavy: 5, fstraight: 4.5, bob: 4.5, perm: 3.5, braids: 3, long: 6, fpony: 6 };
   const LONG = { fstraight: { wave: 0 }, fwavy: { wave: 1.7 }, fcurly: { wave: 2.4, curl: true }, long: { wave: .5, len: 1.45 } };
   const lenFor = (x, st) => LONG[st].len || (x.age === "kid" || x.age === "toddler" ? 1.72 : x.age === "old" ? 1.6 : 1.95);
@@ -30364,7 +30379,7 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
   const HAIR_TB = HAIR_M.filter((a) => a[0] !== "receding" && a[0] !== "bald");
   const HAIR_KB = [["messy", "Messy"], ["side", "Side part"], ["crew", "Crew cut"], ["buzz", "Buzz"], ["curly", "Curly"], ["afro", "Afro"]];
   const HAIR_KG = [["pigtails", "Pigtails"], ["fpony", "Ponytail"], ["bob", "Bob with bangs"], ["braids", "Braids"], ["fstraight", "Long straight"], ["fcurly", "Long curly"], ["afro", "Afro"], ["fbun", "Top bun"]];
-  const HAIR_TOD = [["tuft", "Little tuft"], ["curly", "Curly"], ["pigtails", "Pigtails"], ["bob", "Bob with bangs"], ["afro", "Afro"]];
+  const HAIR_TOD = [["tuft", "Little tuft"], ["crew", "Short crop"], ["buzz", "Buzz"], ["messy", "Messy"], ["curly", "Short curly"], ["side", "Side part"], ["spiky", "Spiky top"], ["afro", "Little afro"], ["pigtails", "Pigtails"], ["bob", "Bob with bangs"]];
   const HAIR_BABY = [["tuft", "Little tuft"], ["fuzz", "Soft fuzz"], ["bald", "Bald"], ["curly", "Curls"]];
   const GRAY = ["#b8b6b0", "#eeece6", "#c9ccd2"].concat(HAIRC.filter((c) => c !== "#b8b6b0"));
   const cfirst = (all, c) => [c].concat(all.filter((v) => v !== c));
@@ -46420,7 +46435,7 @@ window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles
   if (!customElements.get("device-art-card-editor")) customElements.define("device-art-card-editor", DeviceArtCardEditor);
 
   /* version line in the browser console, so anyone can check which release they are running */
-  const VERSION = "1.1.0";
+  const VERSION = "1.1.1";
   console.info("%c DEVICE-ART-CARD %c v" + VERSION + " · " + Object.keys(ITEMS).length + " drawings ", "background:#7c5cff;color:#fff;font-weight:700;border-radius:3px 0 0 3px", "background:#2a1f5c;color:#fff;border-radius:0 3px 3px 0");
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === "device-art-card"))
