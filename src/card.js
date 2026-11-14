@@ -239,7 +239,10 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   if (!customElements.get("device-art-card-editor")) customElements.define("device-art-card-editor", DeviceArtCardEditor);
 
+  /* version line in the browser console, so anyone can check which release they are running */
+  const VERSION = "1.1.0";
+  console.info("%c DEVICE-ART-CARD %c v" + VERSION + " · " + Object.keys(ITEMS).length + " drawings ", "background:#7c5cff;color:#fff;font-weight:700;border-radius:3px 0 0 3px", "background:#2a1f5c;color:#fff;border-radius:0 3px 3px 0");
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === "device-art-card"))
-    window.customCards.push({ type: "device-art-card", name: "Device Art Card", description: "A detailed drawing of your device that follows its state: lights glow, fans spin, screens light up.", preview: true, documentationURL: "" });
+    window.customCards.push({ type: "device-art-card", name: "Device Art Card", description: "A detailed drawing of your device that follows its state: lights glow, fans spin, screens light up.", preview: true, documentationURL: "https://github.com/almulder/ha-device-art" });
 })();
