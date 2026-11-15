@@ -191,7 +191,15 @@ ${extra || ""}</defs>`;
 @keyframes hda-habitats-sway{0%{transform:rotate(-6deg)}100%{transform:rotate(6deg)}}
 `;
   const BG = (s) => `<g class="hda-bg">${s}</g>`;
-  const part = (o, id) => Object.assign({}, o, { on: !!(o.parts && o.parts[id] != null ? o.parts[id] : o.on) });
+  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // Image (no o.mf: a switch follows o.on, a door or drawer o.open, as today) and stays off / closed / blank, never
+  // animated, as a Multi-Function Image (o.mf). The readings (temp, hum) come from o.pval when o.mf, else from the
+  // slider and the Humidity menu (as today). Every door and drawer is its own contact part.
+  const has = (o, k) => !!(o.parts && o.parts[k] != null);
+  const part = (o, id) => Object.assign({}, o, { on: has(o, id) ? !!o.parts[id] : !o.mf && !!o.on });
+  const opened = (o, k) => (has(o, k) ? !!o.parts[k] : !o.mf && !!o.open);
+  const val = (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" && isFinite(+o.pval[k]) ? Math.round(+o.pval[k]) : null);
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const WD = "#9a6a40", BLK = "#26282c", WHT = "#eceef0", GRY = "#7d858d";
   const HUM = [["20", "20%"], ["40", "40%"], ["60", "60%"], ["80", "80%"], ["95", "95%"]];
   const humOpt = (d) => [{ id: "hum", name: "Humidity", values: HUM.filter((x) => x[0] === d).concat(HUM.filter((x) => x[0] !== d)) }];
@@ -206,7 +214,8 @@ ${extra || ""}</defs>`;
       lg(u + "-sub", 1, [[0, "#8a6440"], [1, "#4a321e"]]) + lg(u + "-sand", 1, [[0, "#e6cf9a"], [1, "#b8995e"]]) + lg(u + "-aq", 1, [[0, "#6fc4dc", .75], [1, "#1f5f86", .9]]) +
       lg(u + "-uvb", 1, [[0, "#e6f2ff", .55], [1, "#bcd6ff", 0]]) + rg(u + "-heat", [[0, "#ffb05a", .75], [.5, "#ff7a2a", .3], [1, "#ff6a1a", 0]]) +
       lg(u + "-day", 1, [[0, "#fff8e6", .35], [1, "#fff8e6", .05]]) + lg(u + "-gl2", 0, [[0, "#fff", .14], [.3, "#fff", .02], [.6, "#fff", 0], [1, "#fff", .08]]) +
-      lg(u + "-rock", 1, [[0, "#8d8a84"], [1, "#4f4c47"]]) + lg(u + "-leaf", 1, [[0, "#6fc45a"], [1, "#2f7a2e"]]) + lg(u + "-wdg", 1, [[0, "#c08a58"], [1, "#7a4c28"]]);
+      lg(u + "-rock", 1, [[0, "#8d8a84"], [1, "#4f4c47"]]) + lg(u + "-leaf", 1, [[0, "#6fc45a"], [1, "#2f7a2e"]]) + lg(u + "-wdg", 1, [[0, "#c08a58"], [1, "#7a4c28"]]) +
+      lg(u + "-asp", 1, [[0, "#b89e68"], [1, "#e6d3a2"]]) + lg(u + "-tub", 1, [[0, "#eef1f3"], [1, "#c9d0d6"]]);
   }
   const svgH = (o, body) => svg(o, body, hextra(o));
 
@@ -259,19 +268,22 @@ ${extra || ""}</defs>`;
 
   
   function meter(o, x, y, safe) {
-    const t = tempF(o), h = +((o.opt && o.opt.hum) || 60);
-    const dt = t < safe[0] ? safe[0] - t : t > safe[1] ? t - safe[1] : 0, dh = h < safe[2] ? safe[2] - h : h > safe[3] ? h - safe[3] : 0;
+    // (parts) a reading left out of a Multi-Function Image is blank
+    const t = o.mf ? val(o, "temp") : tempF(o), h = o.mf ? val(o, "hum") : +((o.opt && o.opt.hum) || 60);
+    const dt = t == null ? 0 : t < safe[0] ? safe[0] - t : t > safe[1] ? t - safe[1] : 0, dh = h == null ? 0 : h < safe[2] ? safe[2] - h : h > safe[3] ? h - safe[3] : 0;
     const bad = dt > 5 || dh > 10 ? 2 : dt > 0 || dh > 0 ? 1 : 0, col = ["#7ee08a", AMB, RED][bad];
     const lit = o.on || true;
     return `<path d="${rr(x, y, 34, 18, 2.5)}" fill="#e9ecef"/><path d="${rr(x + 2, y + 2, 30, 14, 1.5)}" fill="#0a0d10"/>` +
-      digits(String(t), x + 4, y + 5, 7, col, "rgba(255,255,255,.05)") + `<circle cx="${x + 16.4}" cy="${y + 5.4}" r=".9" fill="none" stroke="${col}" stroke-width=".6"/>` +
-      digits(String(Math.min(99, h)), x + 19, y + 5, 7, CYAN, "rgba(255,255,255,.05)") + `<path d="M${x + 31.6} ${y + 6}l-1.6 4" stroke="${CYAN}" stroke-width=".6"/><circle cx="${x + 30.2}" cy="${y + 6.2}" r=".5" fill="${CYAN}"/><circle cx="${x + 31.6}" cy="${y + 10}" r=".5" fill="${CYAN}"/>` +
+      (t == null ? "" : digits(String(t), x + 4, y + 5, 7, col, "rgba(255,255,255,.05)") + `<circle cx="${x + 16.4}" cy="${y + 5.4}" r=".9" fill="none" stroke="${col}" stroke-width=".6"/>`) +
+      (h == null ? "" : digits(String(Math.max(0, Math.min(99, h))), x + 19, y + 5, 7, CYAN, "rgba(255,255,255,.05)") + `<path d="M${x + 31.6} ${y + 6}l-1.6 4" stroke="${CYAN}" stroke-width=".6"/><circle cx="${x + 30.2}" cy="${y + 6.2}" r=".5" fill="${CYAN}"/><circle cx="${x + 31.6}" cy="${y + 10}" r=".5" fill="${CYAN}"/>`) +
       (bad ? `<circle cx="${x + 32}" cy="${y + 1.5}" r="2" fill="${col}"${bad === 2 && lit ? ` class="${P}blink"` : ""}/>` : "");
   }
 
   
   function enclosure(o, sp, inner, lights) {
     const u = o.uid, { x, y, w, h } = sp, d = sp.d == null ? 10 : sp.d, dy = d * .6, ix = x + 4, iy = y + 4, iw = w - 8, ih = h - 8, id = `${u}-in${x}${y}`, din = rr(ix, iy, iw, ih, 1);
+    // (parts) front2: the left and right glass doors (dl, dr), each opened on its own (swung out on its outer hinge)
+    const f2 = sp.doors === "front2", dl = f2 && opened(o, "dl"), dr = f2 && opened(o, "dr"), dby = y + h - 16;
     let s = sh(o, x + w / 2 + d / 2, y + h + 2, w * .6, 5);
     if (sp.stand) s += `<path d="M${x - 2} ${y + h}H${x + w + 2}V${y + h + 6}H${x - 2}Z" fill="url(#${u}-v)"/><path d="M${x + 2} ${y + h + 6}V${y + h + 34}M${x + w - 2} ${y + h + 6}V${y + h + 34}" stroke="${pal(o.color).d}" stroke-width="5"/><path d="M${x + 2} ${y + h + 26}H${x + w - 2}" stroke="${pal(o.color).d}" stroke-width="3"/>`;
     s += `<path d="M${x} ${y}L${x + d} ${y - dy}H${x + w + d}L${x + w} ${y}Z" fill="${sp.kind === "pvc" ? `url(#${u}-tp)` : "#20242a"}"/>` + (sp.kind !== "pvc" ? `<path d="M${x + 3} ${y - 1}L${x + d + 2} ${y - dy + 1}H${x + w + d - 3}L${x + w - 2} ${y - 1}Z" fill="url(#${u}-msh)"/>` : "") +
@@ -280,14 +292,17 @@ ${extra || ""}</defs>`;
       (sp.cork ? `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="url(#${u}-cork)" opacity=".85"/>` : "") + inner(ix, iy, iw, ih) +
       lights(ix, iy, iw, ih) + (o.on ? "" : `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="#000" opacity=".5"/>`) + `</g>`;
     if (sp.kind === "mesh") s += `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="url(#${u}-msh)" opacity=".6"/>`;
-    else s += `<path d="${din}" fill="url(#${u}-gl2)"/><path d="M${n1(ix + iw * .62)} ${iy}L${n1(ix + iw * .44)} ${iy + ih}H${n1(ix + iw * .5)}L${n1(ix + iw * .68)} ${iy}Z" fill="#fff" fill-opacity=".05"/>`;
+    else if (!dl && !dr) s += `<path d="${din}" fill="url(#${u}-gl2)"/><path d="M${n1(ix + iw * .62)} ${iy}L${n1(ix + iw * .44)} ${iy + ih}H${n1(ix + iw * .5)}L${n1(ix + iw * .68)} ${iy}Z" fill="#fff" fill-opacity=".05"/>`;
+    else s += [[dl, ix, x + w / 2 - ix], [dr, x + w / 2, ix + iw - x - w / 2]].map(([op, px, pw]) => (op ? "" : `<rect x="${n1(px)}" y="${iy}" width="${n1(pw)}" height="${n1(dby - iy)}" fill="url(#${u}-gl2)"/>`)).join("") +
+      `<rect x="${ix}" y="${n1(dby)}" width="${iw}" height="${n1(iy + ih - dby)}" fill="url(#${u}-gl2)"/>`;
     
     const fc = sp.kind === "pvc" ? `url(#${u}-v)` : `url(#${u}-v)`, t = sp.kind === "pvc" ? 6 : 3;
     s += `<path d="M${x} ${y}H${x + w}V${y + h}H${x}Z M${x + t} ${y + t}V${y + h - t}H${x + w - t}V${y + t}Z" fill="${fc}" fill-rule="evenodd"/>`;
     if (sp.kind === "pvc") s += `<path d="M${x} ${y}H${x + w}V${y + 12}H${x}Z" fill="url(#${u}-v)"/><rect x="${x + 10}" y="${y + 4}" width="${w - 20}" height="4" fill="url(#${u}-msh)"/>` +
       `<path d="M${x + w / 2} ${y + 12}V${y + h - 6}" stroke="${pal(o.color).k}" stroke-width="1.6"/><path d="M${x + 6} ${y + h - 10}H${x + w - 6}" stroke="${pal(o.color).d}" stroke-width="3"/>`;
-    if (sp.doors === "front2") s += `<path d="M${x + w / 2} ${y + 3}V${y + h - 3}" stroke="${pal(o.color).d}" stroke-width="2.4"/><rect x="${x + w / 2 - 5}" y="${y + h * .45}" width="2" height="10" rx="1" fill="#9aa1a9"/><rect x="${x + w / 2 + 3}" y="${y + h * .45}" width="2" height="10" rx="1" fill="#9aa1a9"/>` +
-      `<path d="M${x + 3} ${y + h - 16}H${x + w - 3}" stroke="${pal(o.color).d}" stroke-width="3"/><rect x="${x + 8}" y="${y + h - 14}" width="${w - 16}" height="4" fill="url(#${u}-msh)"/>`;
+    if (sp.doors === "front2") s += (dl && dr ? "" : `<path d="M${x + w / 2} ${y + 3}V${y + h - 3}" stroke="${pal(o.color).d}" stroke-width="2.4"/>`) + (dl ? "" : `<rect x="${x + w / 2 - 5}" y="${y + h * .45}" width="2" height="10" rx="1" fill="#9aa1a9"/>`) + (dr ? "" : `<rect x="${x + w / 2 + 3}" y="${y + h * .45}" width="2" height="10" rx="1" fill="#9aa1a9"/>`) +
+      `<path d="M${x + 3} ${y + h - 16}H${x + w - 3}" stroke="${pal(o.color).d}" stroke-width="3"/><rect x="${x + 8}" y="${y + h - 14}" width="${w - 16}" height="4" fill="url(#${u}-msh)"/>` +
+      (dl ? pane(o, x + 3, y + 3, h - 20, w / 2 * .36, -1) : "") + (dr ? pane(o, x + w - 3, y + 3, h - 20, w / 2 * .36, 1) : "");
     if (sp.kind === "mesh") s += [.33, .66].map((k) => `<path d="M${n1(x + w * k)} ${y}V${y + h}" stroke="${pal(o.color).d}" stroke-width="2"/>`).join("") + `<path d="M${x} ${y + h * .55}H${x + w}" stroke="${pal(o.color).d}" stroke-width="2"/><rect x="${x + w - 12}" y="${y + h * .35}" width="3" height="12" rx="1" fill="#9aa1a9"/>`;
     return s;
   }
@@ -302,20 +317,53 @@ ${extra || ""}</defs>`;
   };
   const lampDome = (o, x, y, on) => `<path d="M${x - 9} ${y}Q${x - 9} ${y - 10} ${x} ${y - 10}Q${x + 9} ${y - 10} ${x + 9} ${y}Z" fill="#2a2e34"/><path d="M${x - 9} ${y}H${x + 9}" stroke="#555" stroke-width="1.4"/>` + (on ? `<ellipse cx="${x}" cy="${y + 1}" rx="6" ry="2" fill="#ffb05a"/><ellipse cx="${x}" cy="${y + 2}" rx="12" ry="4" fill="url(#${o.uid}-heat)"/>` : "");
   const uvbBar = (o, x, y, w, on) => `<rect x="${x}" y="${y - 5}" width="${w}" height="5" rx="1.5" fill="#d9dde2"/><rect x="${x + 3}" y="${y - 1.5}" width="${w - 6}" height="2" rx="1" fill="${on ? "#e6f2ff" : "#7a8590"}"/>` + (on ? `<rect x="${x}" y="${y}" width="${w}" height="3" fill="#bcd6ff" opacity=".5"/>` : "");
-  const pcs = (list) => list.map((p) => ({ id: p[0], name: p[1] }));
-  const ic = (id, name, colors, safe, hum, parts, render) => ({ id, name, colors, picker: true, colorLabel: "Frame", parts: parts.length ? pcs(parts) : undefined, options: humOpt(hum), safe, render });
+  // parts: [id, name, type?] (no type = switch); every drawing with parts also gets its Temperature and Humidity readings
+  const pcs = (list) => list.map((p) => Object.assign({ id: p[0], name: p[1] }, p[2] ? { type: p[2] } : {}, p[3] ? { unit: p[3], min: p[4], max: p[5], def: p[6] } : {}));
+  const reads = (safe, hum) => [["temp", "Temperature", "value", "°F", 60, 105, Math.round((safe[0] + safe[1]) / 2)], ["hum", "Humidity", "value", "%", 10, 99, +hum]];
+  const DOORS2 = [["dl", "Left door", "contact"], ["dr", "Right door", "contact"]];
+  const ic = (id, name, colors, safe, hum, parts, render) => ({ id, name, colors, picker: true, colorLabel: "Frame", parts: parts.length ? pcs(parts.concat(reads(safe, hum))) : undefined, options: humOpt(hum), safe, render });
+  const leaf = (o, x, y, s, c) => leafy(x, y, s, c).replace(/U-leaf/g, o.uid + "-leaf");
+  // a rack tub pulled out, seen from the front and a little above: the aspen bedding, the water bowl and the snake from
+  // above, the tub's front nearer and lower, its shadow on the rack below
+  // (round 2) the front is shallower (seen from above), so with every tub out each one's bedding still shows
+  function tubOut(o, y, r, dim) {
+    const u = o.uid, fy = y + 15, L0 = 40, R0 = 160, L1 = 34, R1 = 166, b = fy + .8, top = `M${L0} ${y + 3}H${R0}L${R1} ${n1(b)}H${L1}Z`;
+    let s = `<path d="${top}" fill="url(#${u}-asp)"/><path d="M${L0} ${y + 3}H${R0}L${R0 + 1.4} ${y + 6.5}H${L0 - 1.4}Z" fill="#000" opacity=".25"/>` +
+      [[52, 9], [66, 12], [118, 8], [130, 13], [74, 7], [124, 11]].map((q) => `<path d="M${q[0]} ${y + q[1]}l3 -.8" stroke="#a88d58" stroke-width=".6"/>`).join("") +
+      `<ellipse cx="146" cy="${n1(y + 10)}" rx="7.5" ry="2.6" fill="#cfd4d9"/><ellipse cx="146" cy="${n1(y + 9.8)}" rx="5.8" ry="1.8" fill="#6fa8c8"/>` +
+      (r % 2 ? `<ellipse cx="62" cy="${n1(y + 10)}" rx="9" ry="3" fill="#6a4a2a"/><path d="M55 ${n1(y + 10)}q7 -4 14 0" fill="#1a120a"/>` : "") + A.python(r % 2 ? 100 : 92, fy - 1.2, .5) +
+      `<path d="M${L1} ${n1(b)}L${L0} ${y + 3}H${R0}L${R1} ${n1(b)}" fill="none" stroke="#f4f6f8" stroke-opacity=".75" stroke-width=".9"/>`;
+    if (dim) s += `<path d="${top}" fill="#000" opacity=".35"/>`;
+    const fh = 13.5;
+    s += `<rect x="33" y="${fy + fh}" width="134" height="3" fill="#000" opacity=".3"/>` +
+      `<path d="${rr(33, fy, 134, fh, 2.2)}" fill="url(#${u}-tub)" opacity=".94"/><path d="${rr(33, fy, 134, fh, 2.2)}" fill="url(#${u}-fx)"/>` +
+      `<path d="M35.5 ${fy + 1}H164.5" stroke="#fff" stroke-opacity=".75"/>` +
+      `<rect x="91" y="${fy + 4}" width="18" height="5" rx="2.5" fill="#3a3f45"/><path d="M93 ${fy + 4.6}H107" stroke="#000" stroke-opacity=".45"/>` +
+      `<rect x="40" y="${fy + 3}" width="18" height="7.5" rx="1" fill="#fff"/><path d="M42 ${fy + 5.4}H55M42 ${fy + 8}H51" stroke="#9aa1a9" stroke-width=".7"/>` +
+      (dim ? `<path d="${rr(33, fy, 134, fh, 2.2)}" fill="#000" opacity=".3"/>` : "");
+    return s;
+  }
+  // a glass door swung open on its hinge (hx), seen from the front: the pane in its frame beside the opening, free edge nearer
+  function pane(o, hx, Y, Hh, ow, dir) {
+    const e = 3, ox = hx + dir * ow, d = `M${n1(hx)} ${n1(Y)}L${n1(ox)} ${n1(Y - e)}V${n1(Y + Hh + e)}L${n1(hx)} ${n1(Y + Hh)}Z`;
+    return `<path d="${d}" fill="#cfe6f5" fill-opacity=".14"/><path d="${d}" fill="url(#${o.uid}-gl2)"/>` +
+      `<path d="M${n1(hx + dir * ow * .62)} ${n1(Y + 3)}L${n1(hx + dir * ow * .4)} ${n1(Y + Hh - 3)}" stroke="#fff" stroke-opacity=".3" stroke-width="1.4"/>` +
+      `<path d="${d}" fill="none" stroke="#c2c8ce" stroke-width="1.7" stroke-linejoin="round"/><path d="M${n1(ox)} ${n1(Y - e)}V${n1(Y + Hh + e)}" stroke="#8d939b" stroke-width="2.4"/>` +
+      `<rect x="${n1(ox - dir * 3 - 1)}" y="${n1(Y + Hh * .42)}" width="2" height="9" rx="1" fill="#e3e6ea"/>`;
+  }
+
   const scene = (o, fy, wall) => room(o, fy, wall || "board");
 
   const icons = [
     
-    ic("frontglass", "Front-opening terrarium", [BLK, WHT, GRY], [75, 88, 60, 80], "60", [["heat", "Heat lamp"], ["uvb", "UVB"], ["mist", "Mister"]], (o) => { const ph = part(o, "heat"), pu = part(o, "uvb"), pm = part(o, "mist");
+    ic("frontglass", "Front-opening terrarium", [BLK, WHT, GRY], [75, 88, 60, 80], "60", [["heat", "Heat lamp"], ["uvb", "UVB"], ["mist", "Mister"]].concat(DOORS2), (o) => { const ph = part(o, "heat"), pu = part(o, "uvb"), pm = part(o, "mist");
       return svgH(o, scene(o, 160) + enclosure(o, { x: 44, y: 60, w: 104, h: 96, kind: "glass", doors: "front2", back: "#2a2420", cork: true },
         (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 10}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${o.uid}-sub)"/>` + branch(ix + 6, iy + 60, ix + iw - 10, iy + 34) + leafy(ix + 14, iy + ih - 10, 1.2).replace(/U-leaf/g, o.uid + "-leaf") + A.gecko(ix + 58, iy + 44, 1.2, "#4cc35a"),
         (ix, iy, iw, ih) => FX.heat(ph, ix + 26, iy, ih) + FX.uvb(pu, ix, iy, iw, ih) + FX.mist(pm, ix + iw - 36, iy)) +
         lampDome(o, 70, 56, ph.on) + uvbBar(o, 96, 57, 40, pu.on) + meter(o, 108, 66, [75, 88, 60, 80])); }),
 
     
-    ic("tallviv", "Tall vivarium", [BLK, WHT, GRY], [70, 80, 60, 80], "80", [["uvb", "UVB"], ["mist", "Mister"], ["day", "Day light"]], (o) => { const pu = part(o, "uvb"), pm = part(o, "mist"), pd = part(o, "day");
+    ic("tallviv", "Tall vivarium", [BLK, WHT, GRY], [70, 80, 60, 80], "80", [["uvb", "UVB"], ["mist", "Mister"], ["day", "Day light"]].concat(DOORS2), (o) => { const pu = part(o, "uvb"), pm = part(o, "mist"), pd = part(o, "day");
       return svgH(o, scene(o, 180) + enclosure(o, { x: 58, y: 34, w: 80, h: 140, kind: "glass", doors: "front2", back: "#22302a", cork: true },
         (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 12}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${o.uid}-sub)"/>` + branch(ix + 4, iy + 90, ix + iw - 4, iy + 50) + branch(ix + iw - 4, iy + 110, ix + 10, iy + 70) +
           leafy(ix + 12, iy + ih - 12, 1.4).replace(/U-leaf/g, o.uid + "-leaf") + leafy(ix + iw - 12, iy + ih - 12, 1.1).replace(/U-leaf/g, o.uid + "-leaf") + A.gecko(ix + 40, iy + 54, 1.1, "#d98a4a"),
@@ -347,7 +395,36 @@ ${extra || ""}</defs>`;
         meter(o, 146, 84, [76, 100, 20, 40])); }),
 
     
-    ic("bioactive", "Bioactive vivarium", [BLK, GRY, WHT], [70, 80, 80, 95], "80", [["day", "Day light"], ["mist", "Mister"], ["pump", "Water pump"]], (o) => { const pd = part(o, "day"), pm = part(o, "mist"), pp = part(o, "pump"), u = o.uid;
+    ic("pvcstack", "Stacked enclosures, 4 doors", [BLK, WHT, GRY, WD], [78, 92, 50, 70], "60",
+      [["d1", "Top left door", "contact"], ["d2", "Top right door", "contact"], ["d3", "Bottom left door", "contact"], ["d4", "Bottom right door", "contact"],
+        ["lights", "Lights"]], (o) => {
+        const u = o.uid, pl = part(o, "lights"), p = pal(o.color), dark = has(o, "lights") ? !pl.on : !o.mf && !o.on;
+        let s = scene(o, 184) + sh(o, 104, 185, 86, 5) + `<path d="M22 170H178V176H22Z" fill="url(#${u}-v)"/><path d="M178 170L188 164V170L178 176Z" fill="url(#${u}-sd)"/><path d="M28 176V184M172 176V184" stroke="${p.k}" stroke-width="4"/>`;
+        const unit = (x, y, w, hh, ids, inner, lights) => {
+          const d = 10, dy = 6, ix = x + 6, iy = y + 12, iw = w - 12, ih = hh - 20, half = iw / 2, cid = `${u}-w${y}`, o1 = opened(o, ids[0]), o2 = opened(o, ids[1]);
+          let t = `<path d="M${x} ${y}L${x + d} ${y - dy}H${x + w + d}L${x + w} ${y}Z" fill="url(#${u}-tp)"/><path d="M${x + w} ${y}L${x + w + d} ${y - dy}V${y + hh - dy}L${x + w} ${y + hh}Z" fill="url(#${u}-sd)"/>` +
+            `<clipPath id="${cid}"><rect x="${ix}" y="${iy}" width="${iw}" height="${ih}"/></clipPath><g clip-path="url(#${cid})"><rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="#211c18"/>` +
+            inner(ix, iy, iw, ih) + lights(ix, iy, iw, ih) + (dark ? `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="#000" opacity=".5"/>` : "") + `</g>`;
+          [[o1, ix], [o2, ix + half]].forEach(([op, px]) => { if (!op) t += `<rect x="${n1(px)}" y="${iy}" width="${n1(half)}" height="${ih}" fill="url(#${u}-gl2)"/><path d="M${n1(px + half * .62)} ${iy}L${n1(px + half * .42)} ${iy + ih}H${n1(px + half * .52)}L${n1(px + half * .72)} ${iy}Z" fill="#fff" fill-opacity=".06"/>`; });
+          const fr = `M${x} ${y}H${x + w}V${y + hh}H${x}Z M${ix} ${iy}V${iy + ih}H${ix + iw}V${iy}Z`;
+          t += `<path d="${fr}" fill="url(#${u}-v)" fill-rule="evenodd"/><path d="${fr}" fill="url(#${u}-fx)" fill-rule="evenodd"/><rect x="${x + 12}" y="${y + 4}" width="${w - 24}" height="4" fill="url(#${u}-msh)"/>` +
+            `<path d="M${ix - 1} ${iy + ih + 2.5}H${ix + iw + 1}" stroke="${p.d}" stroke-width="2"/>`;
+          [[o1, ix, 1], [o2, ix + half, -1]].forEach(([op, px, k]) => { if (!op) t += `<rect x="${n1(px + .8)}" y="${iy + .8}" width="${n1(half - 1.6)}" height="${ih - 1.6}" fill="none" stroke="#c2c8ce" stroke-width="1.5"/><rect x="${n1(k > 0 ? px + half - 5 : px + 3)}" y="${n1(iy + ih * .42)}" width="2" height="9" rx="1" fill="#e3e6ea"/>`; });
+          if (o1) t += pane(o, ix, iy, ih, half * .36, -1);
+          if (o2) t += pane(o, ix + iw, iy, ih, half * .36, 1);
+          return t;
+        };
+        const lower = (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 9}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${u}-sub)"/>` + hide(o, ix + iw - 44, iy + ih - 7, 32, 20) + A.python(ix + 46, iy + ih - 8, 1) +
+          `<ellipse cx="${ix + 86}" cy="${iy + ih - 7}" rx="9" ry="2.6" fill="#cfd4d9"/><ellipse cx="${ix + 86}" cy="${iy + ih - 7.2}" rx="7" ry="1.8" fill="#6fa8c8"/>` + leaf(o, ix + 8, iy + ih - 8, .8, "#3f8a3a");
+        const upper = (ix, iy, iw, ih) => `<rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" fill="url(#${u}-cork)" opacity=".7"/><path d="M${ix} ${iy + ih - 7}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${u}-sub)"/>` +
+          branch(ix + 8, iy + ih - 10, ix + iw - 16, iy + 22) + leaf(o, ix + iw - 14, iy + ih - 7, 1.1) + leaf(o, ix + 16, iy + ih - 7, .9) + A.gecko(ix + iw * .5, iy + 24, 1, "#4cc35a");
+        const lu = (ix, iy, iw, ih) => FX.heat(pl, ix + 34, iy, ih) + FX.uvb(pl, ix, iy, iw, ih) + lampDome(o, ix + 34, iy + 9, pl.on) + uvbBar(o, ix + 62, iy + 5, 60, pl.on) + heat(pl, [ix + 30, ix + 38], iy + 30);
+        const ll = (ix, iy, iw, ih) => FX.heat(pl, ix + 104, iy, ih) + FX.day(pl, ix, iy, iw, ih) + lampDome(o, ix + 104, iy + 9, pl.on);
+        s += unit(24, 104, 152, 66, ["d3", "d4"], lower, ll) + unit(24, 32, 152, 66, ["d1", "d2"], upper, lu);
+        return svgH(o, s + meter(o, 142, 2, [78, 92, 50, 70])); }),
+
+    
+    ic("bioactive", "Bioactive vivarium", [BLK, GRY, WHT], [70, 80, 80, 95], "80", [["day", "Day light"], ["mist", "Mister"], ["pump", "Water pump"]].concat(DOORS2), (o) => { const pd = part(o, "day"), pm = part(o, "mist"), pp = part(o, "pump"), u = o.uid;
       return svgH(o, scene(o, 176) + enclosure(o, { x: 40, y: 48, w: 120, h: 124, kind: "glass", doors: "front2", back: "#121a14" },
         (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 18}H${ix + iw}V${iy + ih}H${ix}Z" fill="#3a2a1e"/><path d="M${ix} ${iy + ih - 18}Q${ix + 30} ${iy + ih - 24} ${ix + 60} ${iy + ih - 18}T${ix + iw} ${iy + ih - 18}" fill="#4f8a3a"/>` +
           `<path d="M${ix} ${iy + 30}Q${ix + 30} ${iy + 20} ${ix + iw} ${iy + 34}V${iy + 44}Q${ix + 50} ${iy + 30} ${ix} ${iy + 44}Z" fill="#3f7a34" opacity=".8"/>` + [[ix + 70, iy + 70, 3], [ix + 100, iy + 40, 2], [ix + 50, iy + 90, 2.4]].map((m) => `<ellipse cx="${m[0]}" cy="${m[1]}" rx="${m[2] * 6}" ry="${m[2] * 3}" fill="#4f9a3a" opacity=".85"/>`).join("") +
@@ -377,16 +454,24 @@ ${extra || ""}</defs>`;
         (o.on ? "" : `<path d="M16 150L28 128H184L172 150Z" fill="#000" opacity=".45"/>`) + meter(o, 130, 152, [70, 95, 30, 60])); }),
 
     
-    ic("rack", "Snake rack", [BLK, WHT, GRY, WD], [78, 92, 50, 70], "60", [["mat", "Heat mat"]], (o) => { const pm = part(o, "mat"), u = o.uid;
-      let s = scene(o, 184) + sh(o, 100, 186, 80, 5) + `<path d="M30 28H170V182H30Z" fill="url(#${u}-v)"/><path d="M170 28L180 22V176L170 182Z" fill="url(#${u}-sd)"/><path d="M30 28L40 22H180L170 28Z" fill="url(#${u}-tp)"/>`;
-      for (let r = 0; r < 5; r++) { const y = 34 + r * 29;
-        s += `<rect x="36" y="${y}" width="128" height="24" fill="#0e1012"/>` + (pm.on ? `<rect x="36" y="${y + 21}" width="128" height="3" fill="#ff6a2a" opacity=".55"/>` : "") +
-          `<path d="${rr(40, y + 2, 120, 21, 2)}" fill="#e8ecef" opacity=".35"/>` + (r % 2 ? A.python(100, y + 20, .55) : "") + `<rect x="92" y="${y + 9}" width="16" height="5" rx="2" fill="#cfd4d9"/>` +
-          (o.on ? "" : `<rect x="36" y="${y}" width="128" height="24" fill="#000" opacity=".35"/>`); }
-      return svgH(o, s + meter(o, 132, 4, [78, 92, 50, 70])); }),
+    ic("rack", "Snake rack", [BLK, WHT, GRY, WD], [78, 92, 50, 70], "60",
+      [["d1", "Drawer 1 (top)", "contact"], ["d2", "Drawer 2", "contact"], ["d3", "Drawer 3", "contact"], ["d4", "Drawer 4", "contact"], ["d5", "Drawer 5 (bottom)", "contact"],
+        ["mat", "Heat mat"]], (o) => {
+        const pm = part(o, "mat"), u = o.uid, dim = !o.mf && !o.on, out = [];
+        let s = scene(o, 184) + sh(o, 100, 186, 80, 5) + `<path d="M30 28H170V182H30Z" fill="url(#${u}-v)"/><path d="M170 28L180 22V176L170 182Z" fill="url(#${u}-sd)"/><path d="M30 28L40 22H180L170 28Z" fill="url(#${u}-tp)"/>`;
+        for (let r = 0; r < 5; r++) {
+          const y = 34 + r * 29;
+          s += `<rect x="36" y="${y}" width="128" height="24" fill="#0e1012"/>` + (pm.on ? `<rect x="36" y="${y + 21}" width="128" height="3" fill="#ff6a2a" opacity=".55"/>` : "");
+          const nm = o.pname && o.pname["d" + (r + 1)];
+          if (nm) s += `<g><title>${esc(nm)}</title>`;
+          if (opened(o, "d" + (r + 1))) { if (nm) s += `<rect x="36" y="${y}" width="128" height="24" fill="#000" opacity="0"/></g>`; s += `<path d="M36 ${y}H164L158 ${y + 4}H42Z" fill="#1d2126"/>` + (pm.on ? `<rect x="42" y="${y + 16}" width="116" height="5" fill="#ff7a2a" opacity=".2"/>` : ""); out.push(r); continue; }
+          s += `<path d="${rr(40, y + 2, 120, 21, 2)}" fill="#e8ecef" opacity=".35"/>` + (r % 2 ? A.python(100, y + 20, .55) : "") + `<rect x="92" y="${y + 9}" width="16" height="5" rx="2" fill="#cfd4d9"/>` +
+            (dim ? `<rect x="36" y="${y}" width="128" height="24" fill="#000" opacity=".35"/>` : "") + (nm ? "</g>" : "");
+        }
+        out.reverse().forEach((r) => { const nm = o.pname && o.pname["d" + (r + 1)]; s += (nm ? `<g><title>${esc(nm)}</title>` : "") + tubOut(o, 34 + r * 29, r, dim) + (nm ? "</g>" : ""); });
+        return svgH(o, s + meter(o, 132, 4, [78, 92, 50, 70])); }),
 
-    
-    ic("leotank", "Leopard gecko tank", [BLK, GRY, WHT], [75, 90, 20, 40], "40", [["mat", "Heat mat"], ["day", "Day light"]], (o) => { const pm = part(o, "mat"), pd = part(o, "day"), u = o.uid;
+        ic("leotank", "Leopard gecko tank", [BLK, GRY, WHT], [75, 90, 20, 40], "40", [["mat", "Heat mat"], ["day", "Day light"]], (o) => { const pm = part(o, "mat"), pd = part(o, "day"), u = o.uid;
       return svgH(o, scene(o, 150) + enclosure(o, { x: 28, y: 80, w: 144, h: 66, kind: "glass", back: "#2a2420" },
         (ix, iy, iw, ih) => `<path d="M${ix} ${iy + ih - 10}H${ix + iw}V${iy + ih}H${ix}Z" fill="url(#${u}-sand)"/>` + hide(o, ix + 10, iy + ih - 8, 34, 22) + rock(o, ix + iw - 40, iy + ih - 8, 30, 14) +
           `<ellipse cx="${ix + 90}" cy="${iy + ih - 8}" rx="9" ry="2.6" fill="#6fa8c8"/>` + A.gecko(ix + 70, iy + ih - 10, 1.25),

@@ -395,6 +395,9 @@
     return s;
   }
   const temp2 = (x) => String(tempC(x));
+  // (multi-function) a boiler's water temperature reading (o.pval.temp) on its display; else today's number
+  const BTEMP = { id: "temp", name: "Water temperature", type: "value", unit: "°", min: 20, max: 90, def: 60 };
+  const tempR = (x, o) => (o.pval && o.pval.temp != null && isFinite(+o.pval.temp) ? String(Math.max(0, Math.min(199, Math.round(+o.pval.temp)))) : temp2(x));
   const WHT = ["#eef0f2", "#c9ccd1", "#2c2f36", "#8e959e", "#e8e2d6"];
   const IRON = ["#2a2b2f", "#5a3a2a", "#7a1f1f", "#2f4f3f", "#d9d1bc"];
   const WOOD = ["#c8925a", "#a8693c", "#e0c08a", "#6b4a30", "#3a2a1e"];
@@ -429,21 +432,24 @@
         valve(x, 74, 166, "#e0483e") + valve(x, 88, 166, "#e0483e") + valve(x, 100, 166, "#f2c94c") + valve(x, 112, 166, "#3a6fd8") + valve(x, 126, 166, "#3a6fd8") +
         cab(x, 62, 24, 76, 124, c, 5) + `<path d="M66 60H134" stroke="${H.shade(c, -.2)}" stroke-width=".6"/>` +
         `<rect x="74" y="92" width="52" height="34" rx="6" fill="${x.lg([[0, "#2a2d33"], [1, "#101216"]])}"/>` +
-        lcd(x, 79, 97, 28, 14, "#7ee7ff") + digits(x, 104, 99, 10, temp2(x), 2, "#bdf3ff") +
+        lcd(x, 79, 97, 28, 14, "#7ee7ff") + digits(x, 104, 99, 10, tempR(x, o), 2, "#bdf3ff") +
         flameIcon(x, 84, 119, .8, pt.heat) + tapIcon(x, 95, 118, .8, pt.dhw) +
         `<circle cx="116" cy="109" r="7" fill="${M.s(x, "#3a3d44")}"/><circle cx="116" cy="109" r="7" fill="none" stroke="${x.on ? "#7ee7ff" : "#4a4e56"}" stroke-width="1" stroke-dasharray="${f(44 * x.lv)} 44" transform="rotate(-90 116 109)"/>` +
         `<rect x="92" y="136" width="16" height="3" rx="1.5" fill="${H.shade(c, -.25)}"/>` + flueHeat(x, 84, 8);
-      return scene(x, back, body); }, { parts: [{ id: "heat", name: "Heating" }, { id: "dhw", name: "Hot water" }] }),
+      return scene(x, back, body); }, { parts: [{ id: "heat", name: "Heating" }, { id: "dhw", name: "Hot water" }, BTEMP] }),
 
+    // (parts) Heating (the heating flow and return run, the flame lights) and Hot water (the hot-water pipes run, the tap
+    // lights), the water temperature on the display. A Device Image is drawn as before.
     ic("compact-condensing-boiler", "Compact condensing boiler", sw(["#eef0f2", "#c9ccd1", "#2c2f36"], "#eef0f2"), "Finish", (o) => { const x = X(o), c = o.color;
+      const mf = !!o.mf, ht = mf && !!(o.parts || {}).heat, hw = mf && !!(o.parts || {}).dhw;
       const back = wallB(x, "cream", 8, 192);
       const body = `<rect x="92" y="8" width="16" height="24" fill="${x.lg([[0, "#c9ccd1"], [.5, "#ffffff"], [1, "#a9aeb5"]], 0, 0, 1, 0)}"/><rect x="88" y="26" width="24" height="5" rx="1" fill="#d5d9de"/>` +
-        wallPipes(x, [72, 88, 112, 128], 140, null, [HOT, null, COLD, null]) + valve(x, 72, 160, "#e0483e") + valve(x, 128, 160, "#3a6fd8") +
+        wallPipes(x, [72, 88, 112, 128], 140, null, mf ? [ht ? HOT : null, hw ? HOT : null, hw ? COLD : null, ht ? COLD : null] : [HOT, null, COLD, null]) + valve(x, 72, 160, "#e0483e") + valve(x, 128, 160, "#3a6fd8") +
         cab(x, 58, 30, 84, 112, c, 10) +
         `<path d="M58 116H142V132Q142 142 132 142H68Q58 142 58 132Z" fill="${x.lg([[0, "#2a2c31"], [1, "#0d0e11"]])}"/><path d="M60 116.5H140" stroke="#fff" stroke-opacity=".25"/>` +
-        `<rect x="86" y="121" width="28" height="12" rx="2" fill="#05070a"/>` + digits(x, 108, 123, 8, temp2(x), 2, "#ffffff") + flameIcon(x, 79, 127, .7, x.on) +
-        led(x, 122, 127, 1, x.on ? "#3ee08f" : "#3ee08f") + `<path d="M64 36Q100 30 136 36" fill="none" stroke="#fff" stroke-opacity=".5"/>` + flueHeat(x, 100, 8);
-      return scene(x, back, body); }),
+        `<rect x="86" y="121" width="28" height="12" rx="2" fill="#05070a"/>` + digits(x, 108, 123, 8, tempR(x, o), 2, "#ffffff") + (mf ? flameIcon(x, 76, 127, .7, ht) + tapIcon(x, 125, 127, .7, hw) : flameIcon(x, 79, 127, .7, x.on) +
+        led(x, 122, 127, 1, x.on ? "#3ee08f" : "#3ee08f")) + `<path d="M64 36Q100 30 136 36" fill="none" stroke="#fff" stroke-opacity=".5"/>` + flueHeat(x, 100, 8);
+      return scene(x, back, body); }, { parts: [{ id: "heat", name: "Heating" }, { id: "dhw", name: "Hot water" }, BTEMP] }),
 
     ic("hopper-pellet-boiler", "Hopper pellet boiler", sw(["#7cc242", "#eef0f2", "#2c2f36", "#c0392b"], "#7cc242"), "Finish", (o) => { const x = X(o), c = o.color;
       const back = basement(x, 166);

@@ -9,6 +9,18 @@
   const SW = [C.black, C.white, C.silver, C.wood, C.gray];
   const sw = (first, extra) => [first].concat(SW.filter((x) => x !== first), extra || []);
   const AIR = "#d6ebff", LEDC = "#7dd3fc", GREEN = "#34d399", AMBER = "#ffbf69";
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
 
   function K(o) {
     const u = o.uid, defs = [], seen = {};
@@ -411,12 +423,17 @@
       const plinth = box(k, cx - 20, 175, 40, 8, 2, 6, sh(c, -0.2), "matte") + [cx - 16, cx + 16].map((fx) => `<rect x="${fx - 3}" y="182" width="6" height="3" rx="1" fill="${C.rubber}"/>`).join("");
       return k.svg(shadow(k, cx + 3, 187, 34) + plinth + osc(k, tw) + air(k, cx, 56, 160, 17)); } });
 
+  // (parts) Fan (the tower turns, air) and Light (the night-light strips, the moon key and the base ring, in the light's
+  // color, dimmed by its level). As a Device Image both follow the one device, as before.
   icons.push({ id: "nightlight", name: "Night-light strip", colors: sw(C.black), picker: true, colorLabel: "Body",
-    render(o) { const k = K(o), c = k.c, kd = kindOf(c), cx = cxx, on = k.on, a = 0.45 + 0.55 * k.lv;
+    parts: [{ id: "fan", name: "Fan" }, { id: "light", name: "Night light" }],
+    render(o) { const k = K(MF.as(o, "fan")), c = k.c, kd = kindOf(c), cx = cxx, on = MF.on(o, "light"), AMBER = MF.col(o, "light", "#ffbf69");
+      const a = 0.45 + 0.55 * Math.max(0.05, Math.min(1, +MF.lv(o, "light") || 0));
+      const TIP = AMBER === "#ffbf69" ? "#fff4dc" : mix(AMBER, "#ffffff", 0.75);
       if (on) k.pre += `<ellipse cx="${cx}" cy="184" rx="58" ry="10" fill="${k.rad("pool", [[0, AMBER, f(0.5 * a)], [1, AMBER, 0]])}"/>`;
       const strip = (sd) => { const x = cx + sd * 13.6;
         return (on ? `<rect x="${x - 2.4}" y="38" width="4.8" height="134" rx="2.4" fill="${AMBER}" fill-opacity="${f(0.22 * a)}"/>` : "") +
-          `<rect x="${x - 0.9}" y="40" width="1.8" height="130" rx=".9" fill="${on ? k.lin("ns", [[0, "#fff4dc"], [0.5, AMBER], [1, "#fff4dc"]], 0, 0, 0, 1) : "#3e4047"}" fill-opacity="${on ? f(a) : 1}"/>`; };
+          `<rect x="${x - 0.9}" y="40" width="1.8" height="130" rx=".9" fill="${on ? k.lin("ns", [[0, TIP], [0.5, AMBER], [1, TIP]], 0, 0, 0, 1) : "#3e4047"}" fill-opacity="${on ? f(a) : 1}"/>`; };
       const moon = `<path d="M${cx + 1.4} 15.2a2.6 2.6 0 1 0 1.6 3.2a2 2 0 1 1 -1.6 -3.2Z" fill="${on ? AMBER : "#6a6f78"}"/>`;
       const tw = cyl(k, "b", cx, 18, 172, 17, 4.4, c, kd) + topBtns(k, cx - 5, 18, 2, 6, "#9aa0aa", 0) + moon +
         cgrille(k, "g", cx, 40, 166, 9, 2.4, "v", { n: 9 }) + strip(-1) + strip(1);

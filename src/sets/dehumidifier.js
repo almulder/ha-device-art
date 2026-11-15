@@ -177,6 +177,18 @@ ${extra || ""}</defs>`;
 `;
 
   const ic = (id, name, first, render, swatches) => ({ id, name, colors: swatches || sw(first), picker: true, colorLabel: "Body", render });
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
 
   const icons = [
     ic("upright", "Classic upright", WH, (o) => { const u = o.uid; return svg(o,
@@ -365,18 +377,22 @@ ${extra || ""}</defs>`;
       area(o, "M122 40L128 36V168L122 172Z", "vs") + hl(77, 38, 77, 176, 1.6, .3) +
       heat(o, 100, 28, { w: 34, h: 24, n: 3 })); }),
 
-    ic("combo", "Purifier combo", WH, (o) => { const u = o.uid, b = rr(40, 44, 120, 136, 14); return svg(o,
+    // (parts) Dehumidify (the compressor: warm air out the top, the tank fills, the humidity readout) and Purify (the filter
+    // panel lit, the air-quality bar); the louvers move with either. A Device Image (no o.mf, no parts) is drawn as before.
+    Object.assign(ic("combo", "Purifier combo", WH, (o0) => { const mf = !!(o0.mf || o0.parts), lv = (k) => { const v = MF.lv(o0, k); return v == null || !isFinite(+v) ? 1 : +v; };
+      const o = mf ? Object.assign({}, o0, { on: MF.on(o0, "dehum"), level: lv("dehum") }) : o0, pu = mf ? Object.assign({}, o0, { on: MF.on(o0, "purify"), level: lv("purify") }) : o0;
+      const fan = mf ? Object.assign({}, o, { on: o.on || pu.on }) : o0, u = o.uid, b = rr(40, 44, 120, 136, 14); return svg(o,
       sh(o, 100, 183, 64, 5) + foot(50, 178, 12) + foot(138, 178, 12) +
-      `<path d="${b}" fill="url(#${u}-c)"/>` + louv(o, 54, 50, 92, 10, 3) +
+      `<path d="${b}" fill="url(#${u}-c)"/>` + louv(fan, 54, 50, 92, 10, 3) +
       `<path d="${rr(52, 66, 96, 50, 6)}" fill="#0e1014"/><path d="${rr(55, 69, 90, 44, 4)}" fill="url(#${u}-pl)"/><path d="${rr(55, 69, 90, 44, 4)}" fill="url(#${u}-edge)" opacity=".6"/>` +
-      (o.on ? "" : `<path d="${rr(55, 69, 90, 44, 4)}" fill="#000" opacity=".18"/>`) +
+      (pu.on ? "" : `<path d="${rr(55, 69, 90, 44, 4)}" fill="#000" opacity=".18"/>`) +
       `<path d="${rr(52, 66, 96, 50, 6)}" fill="url(#${u}-gl)" stroke="#fff" stroke-opacity=".25"/><path d="M60 110L84 70" stroke="#fff" stroke-opacity=".15" stroke-width="7"/>` +
       `<path d="${rr(52, 122, 96, 14, 4)}" fill="#11141a"/>` + lcd(o, 57, 125, 8) +
-      (o.on ? `<g opacity=".25"><rect class="${P}pulse" x="80" y="125.5" width="${n1(20 + 20 * o.level)}" height="7" rx="3.5" fill="${GREEN}"/></g><rect x="82" y="128" width="${n1(16 + 20 * o.level)}" height="2.4" rx="1.2" fill="${GREEN}"/>` : `<rect x="82" y="128" width="30" height="2.4" rx="1.2" fill="#454a52"/>`) +
+      (pu.on ? `<g opacity=".25"><rect class="${P}pulse" x="80" y="125.5" width="${n1(20 + 20 * pu.level)}" height="7" rx="3.5" fill="${GREEN}"/></g><rect x="82" y="128" width="${n1(16 + 20 * pu.level)}" height="2.4" rx="1.2" fill="${GREEN}"/>` : `<rect x="82" y="128" width="30" height="2.4" rx="1.2" fill="#454a52"/>`) +
       led(o, 132, 129, 1.3) + fullLed(o, 140, 129, 1.3) +
       groove("M40 142H160") + tank(o, 14, rr(58, 148, 84, 24, 6), 58, 148, 84, 24, .45, { drops: 3 }) +
       `<path d="M45 60Q45 48 56 47" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>` +
-      heat(o, 100, 50, { w: 84, h: 30, n: 5 })); }),
+      heat(o, 100, 50, { w: 84, h: 30, n: 5 })); }), { parts: [{ id: "dehum", name: "Dehumidify" }, { id: "purify", name: "Purify" }] }),
 
     ic("rugged", "Heavy-duty", YE, (o) => { const u = o.uid; return svg(o,
       sh(o, 104, 184, 70, 6) +

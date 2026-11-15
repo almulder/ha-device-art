@@ -310,48 +310,74 @@
   }
 
   function scapeAndFish(x, X, Y, W, Hh, seed) {
-    const r = rnd(seed || 5), L = x.on ? x.L : .15;
+    const r = rnd(seed || 5), lit = x.aq ? x.aq.light : x.on, L = lit ? x.L : .15;
     let s = `<rect x="${X}" y="${Y}" width="${W}" height="${Hh}" fill="${x.lg([[0, H().mix("#0a2a3a", "#4fb3d9", .25 + .55 * L)], [1, H().mix("#04121c", "#1d6c8c", .2 + .5 * L)]], 0, 0, 0, 1)}"/>`;
     s += `<path d="M${X} ${Y + Hh - 10}Q${X + W * .3} ${Y + Hh - 16} ${X + W * .6} ${Y + Hh - 11}T${X + W} ${Y + Hh - 12}V${Y + Hh}H${X}Z" fill="#c9b48a"/>`;
     s += `<path d="M${X + W * .62} ${Y + Hh - 11}l8 -18l12 -4l8 14l4 8Z" fill="#6d6a64"/><path d="M${X + W * .15} ${Y + Hh - 12}l6 -9l9 2l3 7Z" fill="#7a756c"/>`;
     for (let i = 0; i < 9; i++) { const px = X + 6 + r() * (W - 12), h = Hh * (.3 + r() * .5); s += `<path class="${P}sway" style="animation-delay:${f(-r() * 3)}s" d="M${f(px)} ${Y + Hh - 10}q${f(-4 + r() * 8)} ${f(-h / 2)} ${f(-2 + r() * 4)} ${f(-h)}" fill="none" stroke="${r() > .5 ? "#3fa34d" : "#2d7d3a"}" stroke-width="${f(1.4 + r() * 1.6)}" stroke-linecap="round"/>`; }
     const fishes = [["#ff7a2e", .3, .35], ["#ffd23e", .62, .5], ["#4fd2ff", .45, .22], ["#ff4f6d", .78, .3]];
     fishes.forEach(([c, fx, fy], i) => { const px = X + W * fx, py = Y + Hh * fy; s += `<g class="${x.on ? P + "swim" : ""}" style="animation-delay:${f(-i * 1.3)}s"><path d="M${f(px)} ${f(py)}q5 -3.4 9 0q-4 3.4 -9 0Zm9 0l4 -3v6Z" fill="${c}"/></g>`; });
-    if (x.on) for (let i = 0; i < 5; i++) s += `<circle class="${P}bubble" style="animation-delay:${f(-i * .5)}s" cx="${f(X + W * .88)}" cy="${f(Y + Hh - 14)}" r="${f(1 + i % 2)}" fill="none" stroke="#e6f7ff" stroke-opacity=".8" stroke-width=".6"/>`;
-    if (x.on) s += `<path d="M${X} ${Y}H${X + W}L${X + W * .8} ${Y + Hh}H${X + W * .2}Z" fill="#fff" fill-opacity="${f(.06 * x.L)}"/>`;
+    if (x.aq ? x.aq.filter : x.on) for (let i = 0; i < 5; i++) s += `<circle class="${P}bubble" style="animation-delay:${f(-i * .5)}s" cx="${f(X + W * .88)}" cy="${f(Y + Hh - 14)}" r="${f(1 + i % 2)}" fill="none" stroke="#e6f7ff" stroke-opacity=".8" stroke-width=".6"/>`;
+    if (lit) s += `<path d="M${X} ${Y}H${X + W}L${X + W * .8} ${Y + Hh}H${X + W * .2}Z" fill="#fff" fill-opacity="${f(.06 * x.L)}"/>`;
+    return s + (x.aq ? aqGear(x, X, Y, W, Hh) : "");
+  }
+  // (multi-function) an aquarium's parts: Light (the hood light, the bright water), Filter (the bubbles and the current),
+  // Heater (a glass heater on the back pane, its element glowing) and the water temperature (a stick-on readout).
+  // As a Multi-Function Image a part left out is off; the heater and the readout are drawn only when ticked.
+  function aqMF(x) {
+    if (!x.o.mf) return;
+    const p = x.o.parts || {}, t = x.o.pval && x.o.pval.temp;
+    x.aq = { light: !!p.light, filter: !!p.filter, heater: p.heater != null ? !!p.heater : null, temp: t != null && t !== "" && isFinite(+t) ? Math.round(+t) : null };
+  }
+  function aqGear(x, X, Y, W, Hh) {
+    const a = x.aq; let s = "";
+    if (a.heater !== null) { const hx = X + 9, y0 = Y + 7, y1 = Y + Hh * .66;
+      s += `<rect x="${f(hx - 3)}" y="${f(y0)}" width="6" height="${f(y1 - y0)}" rx="3" fill="#dff4ff" fill-opacity=".22" stroke="#e8f7ff" stroke-opacity=".55" stroke-width=".6"/>` +
+        (a.heater ? `<g class="${P}breath"><rect x="${f(hx - 4.5)}" y="${f(y0 + 8)}" width="9" height="${f(y1 - y0 - 12)}" rx="4.5" fill="#ff7a2a" fill-opacity=".25"/></g><rect x="${f(hx - 1.2)}" y="${f(y0 + 9)}" width="2.4" height="${f(y1 - y0 - 14)}" rx="1.2" fill="#ffb066"/>`
+          : `<rect x="${f(hx - 1.2)}" y="${f(y0 + 9)}" width="2.4" height="${f(y1 - y0 - 14)}" rx="1.2" fill="#5a5f66"/>`) +
+        `<rect x="${f(hx - 3.2)}" y="${f(y0 - 2)}" width="6.4" height="6" rx="1.4" fill="#1d1f23"/><circle cx="${f(hx)}" cy="${f(y0 + 1)}" r="1" fill="${a.heater ? "#ff7a2a" : "#3a3d42"}"/>` +
+        [y0 + 10, y1 - 8].map((cy) => `<circle cx="${f(hx + 4.6)}" cy="${f(cy)}" r="1.8" fill="#e8f7ff" fill-opacity=".35"/>`).join("");
+    }
+    if (a.temp !== null) { const str = String(Math.max(-9, Math.min(199, a.temp))), w = 3, tw = str.length * w * 1.7 + 7, tx = X + W - tw - 6, ty = Y + 6;
+      s += `<rect x="${f(tx)}" y="${f(ty)}" width="${f(tw)}" height="11" rx="2" fill="#0d1014" fill-opacity=".9" stroke="#fff" stroke-opacity=".3" stroke-width=".5"/>` +
+        seg(str, tx + 3, ty + 2.5, w, 6, "#8ff0c8") + `<circle cx="${f(tx + tw - 2.6)}" cy="${f(ty + 3)}" r=".8" fill="none" stroke="#8ff0c8" stroke-width=".5"/>`;
+    }
     return s;
   }
   const roomBack = (x, y, c) => wall(x, c || "#3d4656", sh(c || "#3d4656", -.25), y, 23) + floorWood(x, y, "#6e4d35");
   function rimless(x) {
+    aqMF(x);
     const X = 40, Y = 54, W = 120, Hh = 70;
     let s = shadow(x, 100, Y + Hh + 4, 70, 4, .5);
     s += scapeAndFish(x, X, Y, W, Hh, 11);
     s += `<rect x="${X}" y="${Y}" width="${W}" height="${Hh}" fill="none" stroke="#dff4ff" stroke-opacity=".75" stroke-width="1.4"/><rect x="${X + 2}" y="${Y + 2}" width="${W - 4}" height="${Hh - 4}" fill="none" stroke="#8fd3ff" stroke-opacity=".25"/>`;
     s += `<path d="M${X + 4} ${Y + 4}L${X + 30} ${Y + 4}L${X + 4} ${Y + 40}Z" fill="#fff" fill-opacity=".08"/>`;
     s += `<rect x="${X + 6}" y="${Y - 8}" width="${W - 12}" height="4" rx="2" fill="${plas(x, x.c, true)}"/><path d="M${X + 8} ${Y - 4}V${Y + 2}M${X + W - 8} ${Y - 4}V${Y + 2}" stroke="${x.c}" stroke-width="1.6"/>`;
-    if (x.on) s += `<rect x="${X + 8}" y="${Y - 4.6}" width="${W - 16}" height="1.4" fill="#f4fbff" fill-opacity="${f(.5 + .5 * x.L)}"/>`;
+    if (x.aq ? x.aq.light : x.on) s += `<rect x="${X + 8}" y="${Y - 4.6}" width="${W - 16}" height="1.4" fill="#f4fbff" fill-opacity="${f(.5 + .5 * x.L)}"/>`;
     s += `<path d="${rr(X - 4, Y + Hh, W + 8, 50, 2)}" fill="${x.lg([[0, "#f2f1ee"], [1, "#c9c6bf"]], 0, 0, 0, 1)}"/><path d="M100 ${Y + Hh + 4}V${Y + Hh + 48}" stroke="#000" stroke-opacity=".15"/><circle cx="94" cy="${Y + Hh + 24}" r="1.4" fill="#888"/><circle cx="106" cy="${Y + Hh + 24}" r="1.4" fill="#888"/>`;
     return scene(x, roomBack(x, Y + Hh + 50), s);
   }
   function fluval(x) {
+    aqMF(x);
     const X = 26, Y = 50, W = 148, Hh = 78, k = 14;
     let s = shadow(x, 100, Y + Hh + 8, 84, 5, .55);
     s += `<clipPath id="${x.id("fv")}"><path d="M${X + k} ${Y}H${X + W - k}Q${X + W} ${Y} ${X + W} ${Y + k}V${Y + Hh}H${X}V${Y + k}Q${X} ${Y} ${X + k} ${Y}Z"/></clipPath><g clip-path="url(#${x.id("fv")})">${scapeAndFish(x, X, Y, W, Hh, 21)}</g>`;
     s += `<path d="M${X + k} ${Y}H${X + W - k}Q${X + W} ${Y} ${X + W} ${Y + k}V${Y + Hh}H${X}V${Y + k}Q${X} ${Y} ${X + k} ${Y}Z" fill="none" stroke="${x.c}" stroke-width="3"/>`;
     s += `<rect x="${X - 1}" y="${Y - 7}" width="${W + 2}" height="9" rx="4" fill="${plas(x, x.c, true)}"/><rect x="${X - 2}" y="${Y + Hh - 2}" width="${W + 4}" height="10" rx="2" fill="${plas(x, x.c, true)}"/>`;
-    if (x.on) s += `<rect x="${X + 10}" y="${Y + 1}" width="${W - 20}" height="1.6" fill="#f4fbff" fill-opacity="${f(.5 + .5 * x.L)}"/>`;
+    if (x.aq ? x.aq.light : x.on) s += `<rect x="${X + 10}" y="${Y + 1}" width="${W - 20}" height="1.6" fill="#f4fbff" fill-opacity="${f(.5 + .5 * x.L)}"/>`;
     s += `<path d="M${X + 3} ${Y + 6}Q${X + 6} ${Y + 4} ${X + 14} ${Y + 4}" stroke="#fff" stroke-opacity=".5" fill="none"/><path d="M${X + W - 26} ${Y + 8}V${Y + Hh - 8}" stroke="#fff" stroke-opacity=".08" stroke-width="10"/>`;
     s += led(x, X + W - 10, Y - 2.5, BLU, 1);
     s += `<rect x="${X + 2}" y="${Y + Hh + 8}" width="${W - 4}" height="48" fill="${plas(x, x.c, true)}"/><path d="M100 ${Y + Hh + 10}V${Y + Hh + 54}" stroke="#000" stroke-opacity=".4"/>`;
     return scene(x, roomBack(x, Y + Hh + 56, "#4a4f45"), s);
   }
   function tank55(x) {
+    aqMF(x);
     const X = 22, Y = 58, W = 156, Hh = 62;
     let s = shadow(x, 100, Y + Hh + 6, 88, 5, .55);
     s += scapeAndFish(x, X, Y, W, Hh, 31);
     s += `<rect x="${X}" y="${Y}" width="${W}" height="${Hh}" fill="none" stroke="#bfe6ff" stroke-opacity=".4"/>`;
     s += `<rect x="${X - 2}" y="${Y + Hh - 2}" width="${W + 4}" height="6" fill="#151618"/><path d="${rr(X - 3, Y - 14, W + 6, 15, 3)}" fill="${x.lg([[0, "#3a3c40"], [1, "#0f1012"]], 0, 0, 0, 1)}"/><path d="M${X} ${Y - 12}H${X + W}" stroke="#fff" stroke-opacity=".2"/>`;
-    if (x.on) s += `<rect x="${X + 4}" y="${Y}" width="${W - 8}" height="2" fill="#f4fbff" fill-opacity="${f(.4 + .5 * x.L)}"/>`;
+    if (x.aq ? x.aq.light : x.on) s += `<rect x="${X + 4}" y="${Y}" width="${W - 8}" height="2" fill="#f4fbff" fill-opacity="${f(.4 + .5 * x.L)}"/>`;
     s += `<path d="M${X + W - 22} ${Y - 14}v-10h14v10" fill="#222"/>`;
     s += `<path d="${rr(X, Y + Hh + 4, W, 54, 2)}" fill="${plas(x, x.c, true)}"/><path d="${rr(X + 6, Y + Hh + 10, W / 2 - 9, 42, 2)}" fill="none" stroke="#000" stroke-opacity=".25"/><path d="${rr(100 + 3, Y + Hh + 10, W / 2 - 9, 42, 2)}" fill="none" stroke="#000" stroke-opacity=".25"/><circle cx="96" cy="${Y + Hh + 31}" r="1.4" fill="#d9c08a"/><circle cx="104" cy="${Y + Hh + 31}" r="1.4" fill="#d9c08a"/>`;
     return scene(x, roomBack(x, Y + Hh + 58, "#5a4a3e"), s);
@@ -402,6 +428,9 @@
   add("rimless20", "20 gal rimless", ["#2a2a2d", "#c9ccd0", "#f2f2ef"], "Light", rimless);
   add("curved-nano-aquarium", "Curved nano aquarium", ["#18191b", "#f2f2ef"], "Frame", fluval);
   add("tank55", "55 gal on stand", ["#6e4a2e", "#2a2a2d", "#a37a52", "#f2f2ef"], "Stand", tank55);
+  // (parts) the aquariums: Light, Filter, Heater and the water temperature
+  const AQP = [{ id: "light", name: "Light" }, { id: "filter", name: "Filter" }, { id: "heater", name: "Heater" }, { id: "temp", name: "Water temperature", type: "value", unit: "°", min: 60, max: 90, def: 78 }];
+  icons.forEach((ic) => { if (["rimless20", "curved-nano-aquarium", "tank55"].indexOf(ic.id) >= 0) ic.parts = AQP; });
   add("electronic-mouse-trap", "Electronic mouse trap", ["#1d1e21", "#4a4d52"], "Body", victor);
   add("live_trap", "Live-catch trap", ["#5fbf5a", "#5aa9e6", "#c08a4a", "#9aa3ab"], "Body", liveTrap);
 

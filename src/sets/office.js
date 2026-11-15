@@ -234,6 +234,21 @@
   const lvlCol = (x, c) => x.lv < .2 ? "#ff5a4f" : x.lv < .4 ? "#ffb347" : c;
   const clipU = (x, key, shape) => x.def("c" + key, (id) => `<clipPath id="${id}">${shape}</clipPath>`);
   const always = (x) => Object.assign({}, x, { on: true });
+  // (multi-function) a UPS: o.pval.source (mains / battery / low, a stage) and o.pval.battery (charge %, a reading).
+  // The charge sets the meters (else: low = 12 %); on battery the wall cord goes dead and the power ring turns amber and
+  // blinks, red when low. Without them (a Device Image) the drawing is today's: the slider is the charge.
+  const UPSP = [{ id: "source", name: "Power source", type: "stage", values: [["mains", "Mains"], ["battery", "On battery"], ["low", "Battery low"]], def: "mains" },
+    { id: "battery", name: "Battery", type: "value", unit: "%", min: 0, max: 100, def: 100 }];
+  function upsX(o) {
+    const v = o.pval || {}, src = v.source != null && v.source !== "" ? String(v.source).toLowerCase() : null, b = v.battery != null && v.battery !== "" && isFinite(+v.battery) ? Math.max(0, Math.min(1, +v.battery / 100)) : null;
+    if (src == null && b == null) return X(o);
+    const x = X(Object.assign({}, o, { level: b != null ? b : src === "low" ? .12 : o.level }));
+    x.src = src || "mains"; return x;
+  }
+  const srcCol = (x, d) => (!x.src || x.src === "mains" ? lvlCol(x, d) : x.src === "battery" ? "#ffb347" : "#ff5a4f");
+  const upsIn = (x) => (x.src && x.src !== "mains" ? Object.assign({}, x, { on: false, an: false }) : x);
+  const pwr = (x, cx, cy, rx, ry, w) => ringLed(x, cx, cy, rx, ry, w, srcCol(x, GREEN)) +
+    (x.src && x.src !== "mains" ? `<g class="${P}blink"><ellipse cx="${cx}" cy="${cy}" rx="${f(rx + 2.4)}" ry="${f(ry + 2.4)}" fill="none" stroke="${srcCol(x, GREEN)}" stroke-width="1.2" opacity=".85"/></g>` : "");
 
   function segBar(x, x0, y0, w, h, n, vert, col) {
     col = lvlCol(x, col || GREEN);
@@ -362,20 +377,20 @@
   }
 
   const icons = [
-    ic("upssmall", "Small UPS", sw(BLK, "#2c2f36"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("upssmall", "Small UPS", sw(BLK, "#2c2f36"), "Body", (o) => { const x = upsX(o), c = o.color;
       const back = wallB(x, "blue", 8, 126) + baseB(x, 126, "#7a5638");
       const sk = `matrix(1,-0.27,0,1,0,${(0.27 * 96).toFixed(2)})`;
-      const body = cord(x, [112, 84, 116, 60, 104, 40, 110, 8], 2.6, "#1d1e22", GREEN, 8) +
+      const body = cord(upsIn(x), [112, 84, 116, 60, 104, 40, 110, 8], 2.6, "#1d1e22", GREEN, 8) +
         shadowE(x, 102, 164, 50, 7) +
         `<path d="M96 72L140 60V150L96 162Z" fill="${x.lg([[0, H.shade(c, -.05)], [1, H.shade(c, -.4)]], 0, 0, 1, 0)}"/>` +
         `<path d="M58 72L96 72L140 60L104 60Z" fill="${x.lg([[0, H.shade(c, .2)], [1, H.shade(c, .45)]])}"/>` +
         `<rect x="58" y="72" width="38" height="90" rx="2" fill="${M.v(x, c)}"/><path d="M59 72.5H95" stroke="#fff" stroke-opacity=".45"/>` +
         `<g transform="${sk}">` + [0, 1, 2, 3].map((i) => face(x, 108 + (i % 2) * 20, 92 + Math.floor(i / 2) * 30, .55, "#2a2c31")).join("") + plugHead(x, 108, 90, .55, "#1d1e22") + `</g>` +
-        button(x, 77, 86, 5, H.shade(c, .1)) + ringLed(x, 77, 86, 6.5, 6.5, 1, lvlCol(x, GREEN)) +
+        button(x, 77, 86, 5, H.shade(c, .1)) + pwr(x, 77, 86, 6.5, 6.5, 1) +
         segBar(x, 74.5, 102, 5, 30, 4, true) + vents(64, 140, 26, 4, 4.4);
       return scene(x, back, body); }),
 
-    ic("upslcd", "LCD tower UPS", sw(BLK, "#2c2f36"), "Body", (o) => { const x = X(o), c = o.color, low = x.lv < .2;
+    ic("upslcd", "LCD tower UPS", sw(BLK, "#2c2f36"), "Body", (o) => { const x = upsX(o), c = o.color, low = x.lv < .2 || x.src === "low";
       const back = wallB(x, "gray", 8, 126) + baseB(x, 126, "#7a5638");
       const body = shadowE(x, 106, 168, 54, 7) + box(x, 58, 40, 84, 126, 6, 7, 4, c) +
         `<rect x="58" y="40" width="84" height="126" rx="6" fill="${x.lg([[0, "#fff", .14], [.2, "#fff", 0], [.85, "#000", 0], [1, "#000", .2]], 0, 0, 1, 0)}"/>` +
@@ -383,12 +398,12 @@
         `<path d="M115 66L121 58M115.5 58.5h1M120 65.5h1" stroke="${x.on ? lvlCol(x, "#bdf3ff") : "#4a5260"}" stroke-width="1.3" stroke-linecap="round"/>` +
         segBar(x, 74, 76, 40, 4, 8, false, "#7ee7ff") + glass(x, 68, 52, 64, 32) +
         (x.on && low ? `<g class="${P}blink"><path d="M124 72L129 80H119Z" fill="#ffb347"/><path d="M124 75V77.5" stroke="#1a1a1a" stroke-width="1"/></g>` : "") +
-        button(x, 100, 100, 6, H.shade(c, .12)) + ringLed(x, 100, 100, 7.6, 7.6, 1, lvlCol(x, GREEN)) +
+        button(x, 100, 100, 6, H.shade(c, .12)) + pwr(x, 100, 100, 7.6, 7.6, 1) +
         `<path d="M100 96.5V100M97.6 97.5A3.4 3.4 0 1 0 102.4 97.5" fill="none" stroke="${H.shade(c, .6)}" stroke-width=".9" stroke-linecap="round"/>` +
         [0, 1, 2].map((i) => `<rect x="${78 + i * 16}" y="114" width="12" height="3" rx="1.5" fill="${H.shade(c, -.4)}"/>`).join("") + vents(66, 126, 68, 7, 4.8);
       return scene(x, back, body); }),
 
-    ic("upsrack", "Rack-mount UPS", sw(BLK, "#1b1c20"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("upsrack", "Rack-mount UPS", sw(BLK, "#1b1c20"), "Body", (o) => { const x = upsX(o), c = o.color;
       const back = wallB(x, "gray", 8, 192) + `<rect x="16" y="8" width="168" height="184" fill="#0f1013"/>`;
       let rails = "";
       for (const rx of [22, 172]) { rails += `<rect x="${rx}" y="8" width="6" height="184" fill="${M.steel(x)}"/>`; for (let y = 12; y < 190; y += 5.4) rails += `<rect x="${rx + 1.8}" y="${f(y)}" width="2.4" height="2.4" fill="#1a1b1f"/>`; }
@@ -400,21 +415,21 @@
         ear(96, 32, c) + `<rect x="30" y="96" width="140" height="32" fill="${M.v(x, c)}"/><path d="M30 96.5H170" stroke="#fff" stroke-opacity=".35"/>` +
         vents(36, 101, 40, 5, 4.8) + vents(124, 101, 40, 5, 4.8) +
         lcd(x, 82, 101, 36, 14, lvlCol(x, "#7ee7ff")) + digits(always(x), 112, 104, 8, pct(x), 3, x.on ? lvlCol(x, "#bdf3ff") : "#4a5260") +
-        segBar(x, 84, 119, 32, 3, 6, false) + led(x, 120, 121, 1, "#ffb347", .3) +
+        segBar(x, 84, 119, 32, 3, 6, false) + (x.src && x.src !== "mains" ? `<g class="${P}blink">${led(x, 120, 121, 1.3, srcCol(x, GREEN), .8)}</g>` : led(x, 120, 121, 1, "#ffb347", .3)) +
         `<rect x="30" y="134" width="140" height="22" fill="#18191d"/>` + vents(40, 138, 120, 3, 5.4, "#000") + ear(134, 22, "#18191d");
       return scene(x, back, body); }),
 
-    ic("upsbrick", "Compact UPS", sw(BLK, "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("upsbrick", "Compact UPS", sw(BLK, "#eef0f2"), "Body", (o) => { const x = upsX(o), c = o.color;
       const back = wallB(x, "sage", 8, 116) + baseB(x, 116, "#7a5638");
       const T = `matrix(1,0,-0.667,1,58,96)`;
       let outs = ""; for (let i = 0; i < 8; i++) outs += face(x, 16 + (i % 4) * 22, 7 + Math.floor(i / 4) * 12.5, .36, H.shade(c, -.25));
-      const body = cord(x, [56, 104, 50, 70, 36, 50, 22, 8], 2.4, "#1d1e22", GREEN, 8) + cord(x, [92, 104, 94, 70, 120, 50, 150, 8], 2.4, "#1d1e22", GREEN, 8) +
+      const body = cord(upsIn(x), [56, 104, 50, 70, 36, 50, 22, 8], 2.4, "#1d1e22", GREEN, 8) + cord(x, [92, 104, 94, 70, 120, 50, 150, 8], 2.4, "#1d1e22", GREEN, 8) +
         shadowE(x, 106, 150, 72, 9) +
         `<path d="M58 96H162L146 120H42Z" fill="${x.lg([[0, H.shade(c, .2)], [1, H.shade(c, -.05)]])}"/>` +
         `<path d="M146 120L162 96V114L146 140Z" fill="${M.side(x, c)}"/>` +
         `<rect x="42" y="120" width="104" height="20" rx="2" fill="${M.v(x, H.shade(c, -.1))}"/><path d="M43 120.5H145" stroke="#fff" stroke-opacity=".5"/>` +
         `<g transform="${T}">${outs}${plugHead(x, 16, 6.4, .36, "#1d1e22")}${plugHead(x, 60, 6.4, .36, "#1d1e22")}</g>` +
-        button(x, 56, 130, 4, H.shade(c, .1)) + ringLed(x, 56, 130, 5.2, 5.2, .9, lvlCol(x, GREEN)) +
+        button(x, 56, 130, 4, H.shade(c, .1)) + pwr(x, 56, 130, 5.2, 5.2, .9) +
         [0, 1, 2, 3].map((i) => led(x, 76 + i * 8, 130, 1.3, i < Math.round(x.lv * 4) ? lvlCol(x, GREEN) : "#3a3d44", i < Math.round(x.lv * 4) ? .6 : 0)).join("") +
         vents(114, 125, 26, 3, 4);
       return scene(x, back, body); }),
@@ -585,6 +600,7 @@
 @media (prefers-reduced-motion:reduce){.hda-anim .hda-office-flow,.hda-anim .hda-office-pulse,.hda-anim .hda-office-blink,.hda-anim .hda-office-sweepx,.hda-anim .hda-office-sweepy,.hda-anim .hda-office-spin,.hda-anim .hda-office-rgb,.hda-anim .hda-office-feed,.hda-anim .hda-office-feed2,.hda-anim .hda-office-fall,.hda-anim .hda-office-drop{animation:none!important}}
 `;
 
+  icons.forEach((ic) => { if (["upssmall", "upslcd", "upsrack", "upsbrick"].indexOf(ic.id) >= 0) ic.parts = UPSP; });
   (window.HDA = window.HDA || []).push({
     id: "office", tab: "Computers & office", group: "Home", kind: "device",
     intro: "Seventeen UPS battery backups, desktops, laptops and shredders on real desks and floors. The slider is the battery: UPS screens and LEDs fill with it and warn in amber or red below 20%, laptops show it in the taskbar. On means running: screens show wallpaper, fans spin, RGB keys glow, paper feeds into the shredders.",

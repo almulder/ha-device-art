@@ -99,6 +99,29 @@ body.sheetmode { background: #140b3a !important; }
 .stile .art { aspect-ratio: 1/1; border-radius: 10px; overflow: hidden; }
 .stile .art svg { width: 100%; height: 100%; display: block; }
 .stile span { display: block; font-size: 12px; margin-top: 4px; color: rgba(234,226,255,.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* parts (multi-function) */
+.badge { position: absolute; top: 16px; right: 16px; z-index: 3; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+  background: rgba(20, 11, 58, .82); border: 1px solid rgba(179,157,255,.5); color: var(--acc-text); pointer-events: none; }
+.mode { display: flex; }
+.mode .seg { width: 100%; }
+.mode .seg button { flex: 1; height: 24px; font-size: 11.5px; }
+.pp { border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,.14); }
+.pp > summary { cursor: pointer; padding: 5px 8px; font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; list-style-position: inside; }
+.pp .pl { display: grid; gap: 4px; padding: 2px 8px 8px; }
+.pr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 6px; font-size: 12px; }
+.pr > label { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--t2); }
+.pr > label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr input[type=checkbox] { accent-color: var(--accent-2); margin: 0; flex: none; }
+.pr .pc { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+.pr .pc select { font-size: 11px; height: 22px; max-width: 120px; border-radius: 7px; background: #1d1145; color: var(--text); border: 1px solid var(--line); }
+.pr .pc output { font-size: 11px; color: var(--acc-text); min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+.pr .wide { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; padding-left: 18px; }
+.pr .wide input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent-2); }
+.pr .wide input[type=color] { width: 22px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer; flex: none; }
+.pr.off .pc, .pr.off .wide { opacity: .35; pointer-events: none; }
+.pw.sm { width: 32px; height: 18px; }
+.pw.sm::after { width: 12px; height: 12px; }
+.pw.sm[aria-pressed="true"]::after { left: 17px; }
 </style>
 </head>
 <body>
@@ -106,6 +129,8 @@ body.sheetmode { background: #140b3a !important; }
   <h1>Device Art Card</h1>
   <span class="tg"><span class="hint">Power</span><span class="seg" id="f-on"></span></span>
   <span class="tg"><span class="hint">Scenery</span><span class="seg" id="f-scene"></span></span>
+  <span class="tg"><span class="hint">Show</span><span class="seg" id="f-filter"></span></span>
+  <span class="tg"><span class="hint">Mode</span><span class="seg" id="f-mode"></span></span>
   <input class="q" id="q" type="search" placeholder="Search all names…" aria-label="Search drawing names">
   <span class="counts" id="counts"></span>
 </div>
@@ -115,6 +140,8 @@ body.sheetmode { background: #140b3a !important; }
     <div class="intro" id="intro">
       <b>Every drawing in the card.</b> Pick a category on the left, try the power switch, slider, colors and menus, then press <b>Copy YAML</b> and paste it into a
       manual card in your dashboard. Install the card with HACS (or add <code>ha-device-art.js</code> as a dashboard resource), then set <code>entity</code> to your own device.
+      <br><b>Multi-function drawings</b> (the <b>N parts</b> badge) can follow one entity per part: tick only the parts your device has, open each door or drawer,
+      pick a stage (cycle, mode, state) and set the readings. Switch <b>Mode</b> to <b>One device</b> for the classic single-entity look.
     </div>
     <div id="body"></div>
   </main>
@@ -129,7 +156,8 @@ body.sheetmode { background: #140b3a !important; }
   if (!DA) { $("#body").innerHTML = `<div class="empty">Could not load ../dist/ha-device-art.js. Run <code>node tools/build.mjs</code> first.</div>`; return; }
   const RM = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const P = new URLSearchParams(location.search);
-  const view = { on: P.get("on") !== "0", scene: P.get("scene") !== "0", cat: P.get("cat") || "", sub: P.get("sub") || "", q: "" };
+  const view = { on: P.get("on") !== "0", scene: P.get("scene") !== "0", cat: P.get("cat") || "", sub: P.get("sub") || "", q: "",
+    mfOnly: P.get("filter") === "mf", mf: P.get("mode") !== "one" };
   const LVL = { light: "Brightness", fan: "Speed", plant: "Water" };
   const tiles = new Map(); /* key -> per-tile state */
   let uidN = 0;
@@ -142,16 +170,63 @@ body.sheetmode { background: #140b3a !important; }
     const on = t.on == null ? view.on : t.on;
     const opt = {}; (ic.options || []).forEach((op) => { opt[op.id] = (t.opt && t.opt[op.id]) || op.values[0][0]; });
     (ic.options || []).forEach((op) => { if (op.when && [].concat(op.when.is).indexOf(opt[op.when.opt]) < 0) opt[op.id] = op.values[0][0]; });
-    const parts = {}; (ic.parts || []).forEach((p) => { parts[p.id] = t.parts && t.parts[p.id] != null ? t.parts[p.id] : on; });
-    return { on, opt, parts, level: t.level == null ? 80 : t.level,
+    const mf = hasParts(k) && (t.mf == null ? view.mf : t.mf);
+    // a multi-function drawing turns its light kit on, unless the menu was changed by hand
+    if (mf && (ic.options || []).some((op) => op.id === "kit") && !(t.opt && t.opt.kit)) opt.kit = "light";
+    // one device: only the switch parts (each on its own chip); the doors follow one "open"
+    const parts = {}; (ic.parts || []).forEach((p) => { if (ptype(p) === "switch") parts[p.id] = t.parts && t.parts[p.id] != null ? t.parts[p.id] : on; });
+    // multi-function: has (the parts the device has), ps (switch on / door open), pv (reading / stage), pl (level 0-100), pc (color)
+    const has = {}, ps = {}, pv = {}, pl = {}, pc = {};
+    (ic.parts || []).forEach((p) => {
+      const ty = ptype(p);
+      has[p.id] = !(t.has && t.has[p.id] === false);
+      ps[p.id] = t.ps && t.ps[p.id] != null ? t.ps[p.id] : ty === "switch" ? view.on : false;
+      if (ty === "value") pv[p.id] = t.pv && t.pv[p.id] != null ? t.pv[p.id] : p.def != null ? p.def : p.min != null ? p.min : 0;
+      if (ty === "stage") pv[p.id] = t.pv && t.pv[p.id] != null ? t.pv[p.id] : p.def != null ? p.def : (p.values && p.values[0] ? p.values[0][0] : "");
+      if (t.pl && t.pl[p.id] != null) pl[p.id] = t.pl[p.id];
+      if (t.pc && t.pc[p.id]) pc[p.id] = t.pc[p.id];
+    });
+    return { on, opt, parts, level: t.level == null ? 80 : t.level, mf, open: !!t.open, has, ps, pv, pl, pc,
       color: t.color || (ic.colors && ic.colors[0]) || "#ffd8a8", color2: t.color2 || (ic.colors2 && ic.colors2[0]) || "#e8e2d6" };
+  }
+  /* parts helpers */
+  const ptype = (p) => (p.type === "contact" || p.type === "value" || p.type === "stage" ? p.type : "switch");
+  const hasParts = (k) => { const it = DA.items[k]; return !!(it && it.ic && it.ic.parts && it.ic.parts.length); };
+  const shown = (p, opt) => !p.when || [].concat(p.when.is).indexOf(opt[p.when.opt]) >= 0;
+  const visParts = (k, opt) => (DA.items[k].ic.parts || []).filter((p) => shown(p, opt));
+  const LIGHTY = /light|lamp|glow|led|bulb|screen|display|uv|heat lamp|string|ring|backlight|night/i;
+  const isLight = (p) => ptype(p) === "switch" && LIGHTY.test(p.id + " " + p.name);
+  const isFan = (p) => ptype(p) === "switch" && /fan|blower|speed/i.test(p.id + " " + p.name);
+  /* what DA.render gets for one tile */
+  function renderOpts(k, c) {
+    const it = DA.items[k], base = Object.assign({}, c, { anim: !RM, level: Math.max(.05, c.level / 100), bg: view.scene });
+    if (it.builder) return base;
+    if (!c.mf) { base.mf = false; return base; }
+    const parts = {}, pval = {}, plevel = {}, pcolor = {};
+    (it.ic.parts || []).forEach((p) => {
+      if (!c.has[p.id]) return;
+      const ty = ptype(p);
+      if (ty === "switch" || ty === "contact") parts[p.id] = !!c.ps[p.id];
+      else pval[p.id] = c.pv[p.id];
+      if (c.pl[p.id] != null) plevel[p.id] = Math.max(.05, c.pl[p.id] / 100);
+      if (c.pc[p.id]) pcolor[p.id] = c.pc[p.id];
+    });
+    return Object.assign(base, { mf: true, open: false, parts, pval, plevel, pcolor });
+  }
+  /* the glow behind the drawing: one device = its on; multi-function = any light part that is on */
+  function glowOn(k, c) {
+    if (!c.mf) return c.on;
+    const ps = visParts(k, c.opt).filter((p) => ptype(p) === "switch" && c.has[p.id]);
+    if (!ps.length) return true;
+    const lights = ps.filter(isLight);
+    return (lights.length ? lights : ps).some((p) => c.ps[p.id]);
   }
   function artHTML(k, c) {
     const it = DA.items[k];
-    const svg = DA.render(k, Object.assign({}, c, { anim: !RM, level: Math.max(.05, c.level / 100), bg: view.scene }));
+    const svg = DA.render(k, renderOpts(k, c));
     let glow = "";
     const g = it.ic && it.ic.glow;
-    if (g && c.on) { const H = window.HDAH; glow = `<div class="glow" style="background:radial-gradient(circle at ${g.x * 100}% ${g.y * 100}%, ${H.rgba(c.color, .35 * (.3 + .7 * c.level / 100))}, ${H.rgba(c.color, 0)} ${Math.round(48 * (g.r || 1))}%)"></div>`; }
+    if (g && glowOn(k, c)) { const H = window.HDAH; glow = `<div class="glow" style="background:radial-gradient(circle at ${g.x * 100}% ${g.y * 100}%, ${H.rgba(c.color, .35 * (.3 + .7 * c.level / 100))}, ${H.rgba(c.color, 0)} ${Math.round(48 * (g.r || 1))}%)"></div>`; }
     return glow + (svg || `<div class="empty">No drawing</div>`);
   }
   function yaml(k) {
@@ -165,8 +240,20 @@ body.sheetmode { background: #140b3a !important; }
       const ic = it.ic;
       if (c.color && (!ic.colors || c.color.toLowerCase() !== String(ic.colors[0]).toLowerCase())) L.push(`color: ${q(c.color)}`);
       if ((ic.colors2 || ic.picker2) && c.color2 && (!ic.colors2 || c.color2.toLowerCase() !== String(ic.colors2[0]).toLowerCase())) L.push(`color2: ${q(c.color2)}`);
-      const ch = (ic.options || []).filter((op) => c.opt[op.id] !== op.values[0][0]);
+      const ch = (ic.options || []).filter((op) => c.opt[op.id] !== op.values[0][0] && !(c.mf && op.id === "kit" && c.opt.kit === "light" && !(tiles.get(k).opt && tiles.get(k).opt.kit)));
       if (ch.length) { L.push("options:"); ch.forEach((op) => L.push(`  ${op.id}: ${c.opt[op.id]}`)); }
+      if (c.mf) {
+        const ps = visParts(k, c.opt).filter((p) => c.has[p.id]);
+        L.push("multi_function: true");
+        if (ps.length) {
+          L.push("parts:");
+          ps.forEach((p) => {
+            const ty = ptype(p), slug = p.id.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
+            const dom = ty === "contact" ? "binary_sensor" : ty === "value" || ty === "stage" ? "sensor" : isLight(p) ? "light" : isFan(p) && /fan/i.test(p.id + p.name) ? "fan" : "switch";
+            L.push(`  ${p.id}: ${dom}.your_${slug}${ty === "stage" ? "   # its state is one of: " + (p.values || []).map((v) => v[0]).join(", ") : ""}`);
+          });
+        }
+      }
     }
     if (!view.scene) L.push("scenery: false");
     return L.join("\n") + "\n";
@@ -186,16 +273,46 @@ body.sheetmode { background: #140b3a !important; }
       const ic = it.ic;
       if ((ic.colors && ic.colors.length) || ic.picker) h += `<div class="row"><span class="cl">${esc(ic.colorLabel || "Color")}</span>${dots(ic.colors, c.color, "data-col")}${ic.picker ? `<input type="color" data-pick value="${esc(c.color)}" aria-label="Pick a color">` : ""}</div>`;
       if ((ic.colors2 && ic.colors2.length) || ic.picker2) h += `<div class="row"><span class="cl">${esc(ic.colorLabel2 || "Second color")}</span>${dots(ic.colors2, c.color2, "data-col2")}${ic.picker2 ? `<input type="color" data-pick2 value="${esc(c.color2)}" aria-label="Pick a second color">` : ""}</div>`;
-      const ps = (ic.parts || []).filter((p) => !p.when || [].concat(p.when.is).indexOf(c.opt[p.when.opt]) >= 0);
-      if (ps.length) h += `<div class="row">${ps.map((p) => `<button type="button" class="chip" data-part="${esc(p.id)}" aria-pressed="${c.parts[p.id]}">${esc(p.name)}</button>`).join("")}</div>`;
+      const vp = visParts(k, c.opt);
+      if (vp.length) h += `<div class="mode"><span class="seg">${[["0", "One device"], ["1", "Multi-function"]].map(([v, l]) => `<button type="button" data-tmode="${v}" aria-pressed="${(v === "1") === c.mf}">${l}</button>`).join("")}</span></div>`;
+      if (c.mf && vp.length) h += partsPanel(k, c, vp);
+      else if (vp.length) {
+        const sw = vp.filter((p) => ptype(p) === "switch"), doors = vp.some((p) => ptype(p) === "contact");
+        if (sw.length || doors) h += `<div class="row">${sw.map((p) => `<button type="button" class="chip" data-part="${esc(p.id)}" aria-pressed="${c.parts[p.id]}">${esc(p.name)}</button>`).join("")}`
+          + (doors ? `<button type="button" class="chip" data-open aria-pressed="${c.open}">${c.open ? "Doors open" : "Doors closed"}</button>` : "") + `</div>`;
+      }
       const os = (ic.options || []).filter((op) => !op.when || [].concat(op.when.is).indexOf(c.opt[op.when.opt]) >= 0);
       if (os.length) h += `<div class="row">${os.map((op) => `<label class="opt">${esc(op.name)} <select data-opt="${esc(op.id)}">${op.values.map((v) => `<option value="${esc(v[0])}"${v[0] === c.opt[op.id] ? " selected" : ""}>${esc(v[1])}</option>`).join("")}</select></label>`).join("")}</div>`;
     }
     return h + `<button type="button" class="copy" data-copy>Copy YAML</button>`;
   }
+  /* the parts panel of a multi-function drawing: tick the parts the device has, then set each one */
+  function partsPanel(k, c, vp) {
+    const row = (p) => {
+      const ty = ptype(p), id = esc(p.id), on = c.has[p.id];
+      let ctl = "", wide = "";
+      if (ty === "switch") {
+        ctl = `<button type="button" class="pw sm" data-ps="${id}" aria-pressed="${!!c.ps[p.id]}" aria-label="${esc(p.name)} on or off"></button>`;
+        if (isLight(p) || isFan(p)) wide = `<input type="range" min="5" max="100" value="${c.pl[p.id] != null ? c.pl[p.id] : c.level}" data-pl="${id}" aria-label="${esc(p.name)} ${isLight(p) ? "brightness" : "speed"}">`
+          + (isLight(p) ? `<input type="color" data-pc="${id}" value="${esc(c.pc[p.id] || (/light/i.test(DA.items[k].ic.colorLabel || "") && /^#[0-9a-f]{6}$/i.test(c.color) ? c.color : "#ffd8a8"))}" aria-label="${esc(p.name)} color">` : "");
+      } else if (ty === "contact") {
+        ctl = `<button type="button" class="chip" data-ps="${id}" aria-pressed="${!!c.ps[p.id]}">${c.ps[p.id] ? "Open" : "Closed"}</button>`;
+      } else if (ty === "stage") {
+        ctl = `<select data-pv="${id}" aria-label="${esc(p.name)}">${(p.values || []).map((v) => `<option value="${esc(v[0])}"${String(v[0]) === String(c.pv[p.id]) ? " selected" : ""}>${esc(v[1])}</option>`).join("")}</select>`;
+      } else {
+        const lo = p.min != null ? p.min : 0, hi = p.max != null ? p.max : 100, step = hi - lo > 200 ? Math.round((hi - lo) / 100) : 1;
+        ctl = `<output data-out="${id}">${esc(c.pv[p.id])}${esc(p.unit || "")}</output>`;
+        wide = `<input type="range" min="${lo}" max="${hi}" step="${step}" value="${esc(c.pv[p.id])}" data-pv="${id}" aria-label="${esc(p.name)}">`;
+      }
+      return `<div class="pr${on ? "" : " off"}"><label><input type="checkbox" data-has="${id}"${on ? " checked" : ""}><span title="${esc(p.name)}">${esc(p.name)}</span></label>`
+        + `<span class="pc">${ctl}</span>${wide ? `<span class="wide">${wide}</span>` : ""}</div>`;
+    };
+    const t = tiles.get(k) || {}, open = t.ppOpen != null ? t.ppOpen : vp.length <= 6;
+    return `<details class="pp" data-pp${open ? " open" : ""}><summary>Try the parts · ${vp.length}</summary><div class="pl" style="padding-bottom:0;color:var(--faint);font-size:11px">Tick only the parts your device has.</div><div class="pl">${vp.map(row).join("")}</div></details>`;
+  }
   function tileHTML(k) {
-    const it = DA.items[k];
-    return `<div class="tile" data-k="${esc(k)}"><div class="art ${view.scene ? "" : "hda-nobg"} ${RM ? "" : "hda-anim"}">${artHTML(k, stateOf(k))}</div>`
+    const it = DA.items[k], n = hasParts(k) ? visParts(k, stateOf(k).opt).length : 0;
+    return `<div class="tile" data-k="${esc(k)}">${n ? `<span class="badge">${n} part${n === 1 ? "" : "s"}</span>` : ""}<div class="art ${view.scene ? "" : "hda-nobg"} ${RM ? "" : "hda-anim"}">${artHTML(k, stateOf(k))}</div>`
       + `<div class="nm">${esc(it.name)}</div><div class="key">${esc(k.split("#")[0])}</div><div class="ctls">${controls(k)}</div></div>`;
   }
   /* inject each set's CSS once */
@@ -206,17 +323,29 @@ body.sheetmode { background: #140b3a !important; }
   }
   /* ----- layout ----- */
   const catOf = (id) => DA.catalog.filter((c) => c.id === id)[0];
-  const itemsOf = (sub) => sub.items.filter((k) => DA.items[k]);
+  const itemsOf = (sub) => sub.items.filter((k) => DA.items[k] && (!view.mfOnly || hasParts(k)));
+  const subsOf = (c) => c.subs.filter((s) => itemsOf(s).length);
   function renderSide() {
     $("#side").innerHTML = DA.catalog.map((c) => {
       const n = c.subs.reduce((a, s) => a + itemsOf(s).length, 0), open = c.id === view.cat;
+      if (!n) return "";
       return `<button type="button" class="cat" data-cat="${esc(c.id)}" aria-expanded="${open}">${esc(c.name)} <small>${n}</small></button>`
-        + (open ? `<div class="subs">${c.subs.map((s) => `<a href="?cat=${encodeURIComponent(c.id)}&sub=${encodeURIComponent(s.id)}" data-sub="${esc(s.id)}" class="${s.id === view.sub ? "on" : ""}">${esc(s.name)} <small>${itemsOf(s).length}</small></a>`).join("")}</div>` : "");
+        + (open ? `<div class="subs">${subsOf(c).map((s) => `<a href="?cat=${encodeURIComponent(c.id)}&sub=${encodeURIComponent(s.id)}" data-sub="${esc(s.id)}" class="${s.id === view.sub ? "on" : ""}">${esc(s.name)} <small>${itemsOf(s).length}</small></a>`).join("")}</div>` : "");
     }).join("");
   }
   function renderSegs() {
     $("#f-on").innerHTML = [["1", "On"], ["0", "Off"]].map(([v, l]) => `<button type="button" data-on="${v}" aria-pressed="${(v === "1") === view.on}">${l}</button>`).join("");
     $("#f-scene").innerHTML = [["1", "Show"], ["0", "Hide"]].map(([v, l]) => `<button type="button" data-scene="${v}" aria-pressed="${(v === "1") === view.scene}">${l}</button>`).join("");
+    $("#f-filter").innerHTML = [["0", "All"], ["1", "Multi-function"]].map(([v, l]) => `<button type="button" data-filter="${v}" aria-pressed="${(v === "1") === view.mfOnly}">${l}</button>`).join("");
+    $("#f-mode").innerHTML = [["0", "One device"], ["1", "Multi-function"]].map(([v, l]) => `<button type="button" data-mode="${v}" aria-pressed="${(v === "1") === view.mf}">${l}</button>`).join("");
+  }
+  /* keep the open category and group valid for the current filter */
+  function fixCat() {
+    let c = catOf(view.cat);
+    if (!c || !subsOf(c).length) c = DA.catalog.filter((x) => subsOf(x).length)[0];
+    if (!c) return;
+    view.cat = c.id;
+    if (!subsOf(c).some((s) => s.id === view.sub)) view.sub = subsOf(c)[0].id;
   }
   function renderBody() {
     let keys = [], title = "", sub = "";
@@ -224,15 +353,16 @@ body.sheetmode { background: #140b3a !important; }
     if (card) { const k = DA.resolve(card); if (k) { injectCss([k]); $("#body").innerHTML = `<div class="solo">${tileHTML(k)}</div>`; return; } }
     if (show) return renderShowcase(show);
     if (P.get("sheet") || P.get("pick")) return renderSheet(P.get("sheet") || "", +(P.get("n") || 2));
-    if (view.q) { const q = view.q.toLowerCase(); keys = DA.order.filter((k) => (DA.items[k].name + " " + k).toLowerCase().indexOf(q) >= 0); title = `Search: ${view.q}`; sub = `${keys.length} drawings`; }
+    if (view.q) { const q = view.q.toLowerCase(); keys = DA.order.filter((k) => (!view.mfOnly || hasParts(k)) && (DA.items[k].name + " " + k).toLowerCase().indexOf(q) >= 0); title = `Search: ${view.q}`; sub = `${keys.length} drawings`; }
     else {
+      fixCat();
       const c = catOf(view.cat) || DA.catalog[0]; view.cat = c.id;
       const s = c.subs.filter((x) => x.id === view.sub)[0] || c.subs[0]; view.sub = s.id;
       keys = itemsOf(s); title = `${c.name} · ${s.name}`; sub = `${keys.length} drawings`;
     }
     injectCss(keys);
     $("#body").innerHTML = `<section class="sect"><h2>${esc(title)} <small>${esc(sub)}</small></h2>${keys.length ? `<div class="grid">${keys.map(tileHTML).join("")}</div>` : `<div class="empty">Nothing found.</div>`}</section>`;
-    $("#counts").innerHTML = `<b>${DA.order.length}</b> drawings`;
+    $("#counts").innerHTML = `<b>${DA.order.length}</b> drawings · <b>${DA.order.filter(hasParts).length}</b> multi-function`;
   }
   /* a picture sheet for the README: a few drawings from every subcategory of one category, art and name only */
   function renderSheet(catId, n) {
@@ -268,11 +398,16 @@ body.sheetmode { background: #140b3a !important; }
     const t = e.target.closest("button,a"); if (!t) return;
     if (t.dataset.cat) { view.cat = view.cat === t.dataset.cat ? "" : t.dataset.cat; if (view.cat) { view.sub = catOf(view.cat).subs[0].id; view.q = ""; $("#q").value = ""; } renderSide(); if (view.cat) renderBody(); return; }
     if (t.dataset.sub) { e.preventDefault(); view.sub = t.dataset.sub; view.q = ""; $("#q").value = ""; history.replaceState(null, "", `?cat=${view.cat}&sub=${view.sub}`); renderSide(); renderBody(); window.scrollTo(0, 0); return; }
-    if (t.dataset.on) { view.on = t.dataset.on === "1"; tiles.forEach((s) => { delete s.on; delete s.parts; }); renderSegs(); renderBody(); return; }
+    if (t.dataset.on) { view.on = t.dataset.on === "1"; tiles.forEach((s) => { delete s.on; delete s.parts; delete s.ps; }); renderSegs(); renderBody(); return; }
     if (t.dataset.scene) { view.scene = t.dataset.scene === "1"; renderSegs(); renderBody(); return; }
+    if (t.dataset.filter) { view.mfOnly = t.dataset.filter === "1"; if (!view.q) fixCat(); renderSegs(); renderSide(); renderBody(); return; }
+    if (t.dataset.mode) { view.mf = t.dataset.mode === "1"; tiles.forEach((s) => { delete s.mf; }); renderSegs(); renderBody(); return; }
     const tile = t.closest(".tile"); if (!tile) return;
     const k = tile.dataset.k, s = tiles.get(k) || {}; tiles.set(k, s); const c = stateOf(k);
-    if (t.hasAttribute("data-pw")) { s.on = !c.on; delete s.parts; }
+    if (t.hasAttribute("data-pw")) { s.on = !c.on; delete s.parts; if (c.mf) { s.ps = Object.assign({}, c.ps); visParts(k, c.opt).forEach((p) => { if (ptype(p) === "switch") s.ps[p.id] = s.on; }); } }
+    else if (t.dataset.tmode) s.mf = t.dataset.tmode === "1";
+    else if (t.dataset.ps) { s.ps = Object.assign({}, c.ps); s.ps[t.dataset.ps] = !c.ps[t.dataset.ps]; }
+    else if (t.hasAttribute("data-open")) s.open = !c.open;
     else if (t.dataset.col) s.color = t.dataset.col;
     else if (t.dataset.col2) s.color2 = t.dataset.col2;
     else if (t.dataset.part) { s.parts = Object.assign({}, c.parts); s.parts[t.dataset.part] = !c.parts[t.dataset.part]; }
@@ -286,6 +421,11 @@ body.sheetmode { background: #140b3a !important; }
     if (!tile) return;
     const k = tile.dataset.k, s = tiles.get(k) || {}; tiles.set(k, s);
     if (t.hasAttribute("data-lv")) { s.level = +t.value; const c = stateOf(k); tile.querySelector(".art").innerHTML = artHTML(k, c); return; }
+    if (t.dataset.pl) { s.pl = Object.assign({}, s.pl); s.pl[t.dataset.pl] = +t.value; tile.querySelector(".art").innerHTML = artHTML(k, stateOf(k)); return; }
+    if (t.dataset.pc) { s.pc = Object.assign({}, s.pc); s.pc[t.dataset.pc] = t.value; tile.querySelector(".art").innerHTML = artHTML(k, stateOf(k)); return; }
+    if (t.dataset.pv && t.type === "range") { s.pv = Object.assign({}, s.pv); s.pv[t.dataset.pv] = +t.value;
+      const p = (DA.items[k].ic.parts || []).filter((x) => x.id === t.dataset.pv)[0], out = tile.querySelector(`output[data-out="${CSS.escape(t.dataset.pv)}"]`);
+      if (out) out.textContent = t.value + ((p && p.unit) || ""); tile.querySelector(".art").innerHTML = artHTML(k, stateOf(k)); return; }
     if (t.hasAttribute("data-pick")) s.color = t.value; else if (t.hasAttribute("data-pick2")) s.color2 = t.value;
     else if (t.hasAttribute("data-bpc")) s.pot_color = t.value; else if (t.hasAttribute("data-bfc")) s.color = t.value; else return;
     tile.querySelector(".art").innerHTML = artHTML(k, stateOf(k));
@@ -294,11 +434,19 @@ body.sheetmode { background: #140b3a !important; }
     const t = e.target, tile = t.closest(".tile"); if (!tile) return;
     const k = tile.dataset.k, s = tiles.get(k) || {}; tiles.set(k, s);
     if (t.dataset.opt) { s.opt = Object.assign({}, stateOf(k).opt); s.opt[t.dataset.opt] = t.value; }
+    else if (t.dataset.has) { s.has = Object.assign({}, s.has); s.has[t.dataset.has] = t.checked; }
+    else if (t.dataset.pv && t.tagName === "SELECT") { s.pv = Object.assign({}, s.pv); s.pv[t.dataset.pv] = t.value; }
     else if (t.dataset.bp === "plant") { s.plant = t.value; s.pot = null; s.color = null; }
     else if (t.dataset.bp === "pot") s.pot = t.value || null;
     else return;
     refreshTile(tile);
   });
+  /* remember whether a tile's parts panel is open */
+  document.addEventListener("toggle", (e) => {
+    const d = e.target; if (!d.matches || !d.matches("details[data-pp]")) return;
+    const tile = d.closest(".tile"); if (!tile) return;
+    const s = tiles.get(tile.dataset.k) || {}; tiles.set(tile.dataset.k, s); s.ppOpen = d.open;
+  }, true);
   function copy(yamlText, btn) {
     const done = () => { btn.textContent = "Copied"; btn.classList.add("done"); setTimeout(() => { btn.textContent = "Copy YAML"; btn.classList.remove("done"); }, 1400); };
     const fallback = () => { const ta = document.createElement("textarea"); ta.value = yamlText; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(); } catch (e) { window.prompt("Copy this YAML:", yamlText); } ta.remove(); };

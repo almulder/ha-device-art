@@ -15,12 +15,35 @@
     return "cool";
   }
 
+  // (parts) every unit: Mode, Operating state and Fan speed, each a stage part (o.pval[id] = one of its stage ids), like a
+  // thermostat in Hubitat (thermostatMode, thermostatOperatingState, the fan speed). As a Multi-Function Image (o.mf):
+  // the state picks the air (cooling = cool air, heating = warm, fan only = plain, idle = no air but the display stays
+  // lit); left out, the mode does (auto follows the state, else cool); Mode off = the unit off; the speed sets the air's
+  // pace (low / medium / high; auto = medium). A stage left out is not used; a Device Image is drawn as before.
+  const ACP = [
+    { id: "mode", name: "Mode", type: "stage", values: [["off", "Off"], ["cool", "Cool"], ["heat", "Heat"], ["dry", "Dry"], ["fan", "Fan only"], ["auto", "Auto"]], def: "cool" },
+    { id: "state", name: "Operating state", type: "stage", values: [["idle", "Idle"], ["cooling", "Cooling"], ["heating", "Heating"], ["fan", "Fan only"]], def: "cooling" },
+    { id: "speed", name: "Fan speed", type: "stage", values: [["auto", "Auto"], ["low", "Low"], ["medium", "Medium"], ["high", "High"]], def: "auto" },
+  ];
+  const AIRC = { heat: WARM, dry: DRY, fan: FANG };
+  function mfAC(o) {
+    const pv = o.pval || {}, g = (id) => (pv[id] != null && pv[id] !== "" ? String(pv[id]) : null);
+    const md = g("mode"), stt = g("state"), spd = g("speed"), base = o.color || ICE;
+    let mode = stt === "cooling" ? "cool" : stt === "heating" ? "heat" : stt === "fan" ? "fan" : md && md !== "auto" && md !== "off" ? md : md === "auto" ? "cool" : modeOf(base);
+    const off = md === "off", idle = !off && stt === "idle";
+    const on = !off && !idle && (md != null || stt != null || !!o.on);
+    const c = mode === "cool" ? (modeOf(base) === "cool" ? base : ICE) : AIRC[mode];
+    const lv = spd ? { low: 0.33, medium: 0.66, high: 1, auto: 0.66 }[spd] || 0.66 : Math.max(0.05, Math.min(1, +(o.plevel && o.plevel.fan != null ? o.plevel.fan : o.level) || 0.66));
+    return { on, idle: idle && !!o.on, lv, c, mode };
+  }
+
   function K(o) {
     const u = o.uid, defs = [], seen = {}; let n = 0;
     const st = (a) => a.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] == null ? "" : ` stop-opacity="${s[2]}"`}/>`).join("");
-    const c = o.color || ICE;
+    const mx = o.mf || o.parts ? mfAC(o) : null;
+    const c = mx ? mx.c : o.color || ICE;
     const k = {
-      u, o, on: !!o.on, lv: Math.max(0.05, Math.min(1, +o.level || 0)), c, mode: modeOf(c),
+      u, o, on: mx ? mx.on : !!o.on, lv: mx ? mx.lv : Math.max(0.05, Math.min(1, +o.level || 0)), c, mode: mx ? mx.mode : modeOf(c), idle: mx ? mx.idle : false,
       def(nm, s) { if (!seen[nm]) { seen[nm] = 1; defs.push(s); } return `url(#${u}-${nm})`; },
       lin(nm, a, x1 = 0, y1 = 0, x2 = 1, y2 = 0) { return k.def(nm, `<linearGradient id="${u}-${nm}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${st(a)}</linearGradient>`); },
       linU(nm, a, x1, y1, x2, y2) { return k.def(nm, `<linearGradient id="${u}-${nm}" gradientUnits="userSpaceOnUse" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${st(a)}</linearGradient>`); },
@@ -105,7 +128,7 @@
   function display(k, x, y, w, h, q = {}) {
     const col = dispCol(k);
     let s = R(x - 0.8, y - 0.8, w + 1.6, h + 1.6, 2, "#9aa0a6", ` opacity=".5"`) + R(x, y, w, h, 1.6, k.lin("dsp", [[0, "#05070b"], [1, "#1a2028"]], 0, 0, 0, 1));
-    if (k.on) {
+    if (k.on || k.idle) {
       const str = q.str != null ? q.str : temp(k) + "°", dh = h * (q.dh || 0.6), gw = q.glyph ? dh * 1.2 : 0, tw = digW(dh, str) + gw;
       const x0 = x + (w - tw) / 2 + gw, y0 = y + (h - dh) / 2;
       s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.6" fill="${k.rad("dgl" + col.slice(1), [[0, col, 0.35], [1, col, 0]])}"/>` + digits(x0, y0, dh, str, col);
@@ -114,7 +137,7 @@
     return s + `<path d="M${f(x + 1)} ${f(y + h - 1)}L${f(x + w * 0.45)} ${f(y + 1)}H${f(x + w * 0.62)}L${f(x + 1 + w * 0.17)} ${f(y + h - 1)}Z" fill="#fff" opacity=".07"/>`;
   }
   function led(k, x, y, col, r = 1.3, q = {}) {
-    if (!k.on && !q.always) return `<circle cx="${x}" cy="${y}" r="${r}" fill="#20252b"/><circle cx="${f(x - r * 0.3)}" cy="${f(y - r * 0.3)}" r="${f(r * 0.35)}" fill="#fff" opacity=".25"/>`;
+    if (!k.on && !k.idle && !q.always) return `<circle cx="${x}" cy="${y}" r="${r}" fill="#20252b"/><circle cx="${f(x - r * 0.3)}" cy="${f(y - r * 0.3)}" r="${f(r * 0.35)}" fill="#fff" opacity=".25"/>`;
     return `<circle cx="${x}" cy="${y}" r="${f(r * 4)}" fill="${k.rad("lh" + col.slice(1), [[0, col, 0.7], [0.4, col, 0.2], [1, col, 0]])}"/><circle class="${P}pulse" cx="${x}" cy="${y}" r="${r}" fill="${col}"/><circle cx="${f(x - r * 0.3)}" cy="${f(y - r * 0.3)}" r="${f(r * 0.4)}" fill="#fff" opacity=".8"/>`;
   }
   function button(k, x, y, r = 2.2, c = WH) { return `<circle cx="${x}" cy="${f(y + 0.6)}" r="${r}" fill="#000" opacity=".25"/><circle cx="${x}" cy="${y}" r="${r}" fill="${k.rad("bt" + c.slice(1), [[0, sh(c, 0.4)], [1, sh(c, -0.25)]], 0.35, 0.3, 0.8)}"/>`; }
@@ -413,7 +436,7 @@
       if (k.on) b += R(4, 46, 122, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M4 50H126L122 58H8Z" fill="${k.lin("flp3", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>`; else b += line("M6 48H124", "#000", 0.3, 0.9);
       b += air(k, 64, 60, 100, { len: 36, sp: 22, cu: 5, n: 3 + Math.round(k.lv) });
       b += `<rect x="80" y="92" width="84" height="84" rx="16" fill="#000" opacity=".3" transform="translate(2 3)"/>` + box(k, 80, 90, 84, 84, 16, B) + R(88, 98, 68, 68, 11, k.lin("cg", [[0, "#1d232b"], [1, "#07090c"]], 0, 0, 0, 1));
-      if (k.on) { const col = dispCol(k), t = temp(k) + "", tw = digW(26, t); b += `<circle cx="122" cy="132" r="32" fill="${k.rad("cgl" + col.slice(1), [[0, col, 0.22], [1, col, 0]])}"/>` + digits(122 - tw / 2 - 2, 116, 26, t, col) + `<circle cx="${f(122 + tw / 2 + 2)}" cy="118" r="2.2" fill="none" stroke="${col}" stroke-width="1.4"/>` + glyph(k, 104, 155, 6, col) + `<rect x="114" y="154" width="${f(24 * k.lv + 4)}" height="2.4" rx="1.2" fill="${col}"/><rect x="114" y="154" width="28" height="2.4" rx="1.2" fill="${col}" opacity=".2"/>`; }
+      if (k.on || k.idle) { const col = dispCol(k), t = temp(k) + "", tw = digW(26, t); b += `<circle cx="122" cy="132" r="32" fill="${k.rad("cgl" + col.slice(1), [[0, col, 0.22], [1, col, 0]])}"/>` + digits(122 - tw / 2 - 2, 116, 26, t, col) + `<circle cx="${f(122 + tw / 2 + 2)}" cy="118" r="2.2" fill="none" stroke="${col}" stroke-width="1.4"/>` + glyph(k, 104, 155, 6, col) + `<rect x="114" y="154" width="${f(24 * k.lv + 4)}" height="2.4" rx="1.2" fill="${col}"/><rect x="114" y="154" width="28" height="2.4" rx="1.2" fill="${col}" opacity=".2"/>`; }
       b += `<path d="M88 112L114 98H156V106L88 140Z" fill="#fff" opacity=".05"/>` + `<circle cx="122" cy="94" r="1.6" fill="#1a1f25"/>`;
       if (k.on) for (let i = 0; i < 3; i++) b += `<path class="${P}chase" style="animation-delay:-${f((2 - i) * 0.4)}s" d="M${f(100 - i * 9)} ${f(86 - i * 6)}A${14 + i * 10} ${14 + i * 10} 0 0 1 ${f(126 - i * 2)} ${f(80 - i * 10)}" fill="none" stroke="#e6b3ff" stroke-opacity=".75" stroke-width="1.6" stroke-linecap="round" transform="rotate(-18 122 94)"/>`;
       return k.svg(b); } });
@@ -468,7 +491,7 @@
       if (k.on) b += `<g class="${P}vane" style="animation-duration:6s"><rect x="134" y="56" width="22" height="44" fill="${k.c}" opacity=".08"/></g>`;
       b += sill(k, 8, 128, 184) + floor(k, 178);
       b += `<g transform="rotate(-8 60 160)"><rect x="40" y="132" width="40" height="66" rx="7" fill="#15181d"/><rect x="43" y="138" width="34" height="56" rx="4" fill="${k.lin("ph", [[0, "#1f2a3c"], [1, "#0c1220"]], 0, 0, 0, 1)}"/>`;
-      if (k.on) { const col = dispCol(k), t = temp(k) + "", tw = digW(14, t); b += `<circle cx="60" cy="160" r="12" fill="none" stroke="${col}" stroke-opacity=".25" stroke-width="2.4"/><path d="M60 148A12 12 0 ${k.lv > 0.5 ? 1 : 0} 1 ${f(60 + 12 * Math.sin(k.lv * 6.28))} ${f(160 - 12 * Math.cos(k.lv * 6.28))}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/>` + digits(60 - tw / 2, 153, 14, t, col) + `<rect x="48" y="180" width="24" height="6" rx="3" fill="${col}" opacity=".85"/>`; }
+      if (k.on || k.idle) { const col = dispCol(k), t = temp(k) + "", tw = digW(14, t); b += `<circle cx="60" cy="160" r="12" fill="none" stroke="${col}" stroke-opacity=".25" stroke-width="2.4"/><path d="M60 148A12 12 0 ${k.lv > 0.5 ? 1 : 0} 1 ${f(60 + 12 * Math.sin(k.lv * 6.28))} ${f(160 - 12 * Math.cos(k.lv * 6.28))}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/>` + digits(60 - tw / 2, 153, 14, t, col) + `<rect x="48" y="180" width="24" height="6" rx="3" fill="${col}" opacity=".85"/>`; }
       else b += `<circle cx="60" cy="160" r="12" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="2.4"/>`;
       b += `<path d="M43 150L77 140V146L43 168Z" fill="#fff" opacity=".06"/></g>`;
       if (k.on) for (let i = 0; i < 3; i++) b += `<path class="${P}chase" style="animation-delay:-${f((2 - i) * 0.4)}s" d="M${f(92 - i * 3)} ${f(124 - i * 6)}a${8 + i * 6} ${8 + i * 6} 0 0 1 ${f(10 + i * 7)} ${f(-4 - i * 4)}" fill="none" stroke="#c4b5fd" stroke-width="1.6" stroke-linecap="round" transform="rotate(10 100 120)"/>`;
@@ -487,10 +510,12 @@
       b += fx("M130 104C160 104 170 120 196 120") + fx("M118 92C140 80 160 64 196 64") + fx("M60 104C34 108 20 124 2 126");
       b += shadow(k, 92, 140, 56, 4, 0.6) + box3(k, 46, 90, 82, 48, 12, 10, B, 2) + R(52, 96, 48, 36, 1, "none", ` stroke="#000" stroke-opacity=".3" stroke-width=".8"`) + `<circle cx="56" cy="100" r="1.2" fill="#555"/><circle cx="96" cy="100" r="1.2" fill="#555"/><circle cx="56" cy="128" r="1.2" fill="#555"/><circle cx="96" cy="128" r="1.2" fill="#555"/>`;
       b += R(104, 98, 18, 30, 1, "#15181c") + rotor(k, 113, 113, 7, { n: 6, col: "#9aa0a6" }) + led(k, 70, 112, "#34d399", 1.2) + led(k, 78, 112, k.on ? "#fbbf24" : "#fbbf24", 1.2);
-      b += R(64, 104, 24, 4, 1, "#fff", ` opacity=".7"`) + R(64, 116, 24, 10, 1, "#0b0e12") + (k.on ? `<rect x="66" y="118" width="${f(20 * k.lv)}" height="6" fill="${dispCol(k)}" opacity=".85"/>` : "");
+      b += R(64, 104, 24, 4, 1, "#fff", ` opacity=".7"`) + R(64, 116, 24, 10, 1, "#0b0e12") + (k.on || k.idle ? `<rect x="66" y="118" width="${f(20 * k.lv)}" height="6" fill="${dispCol(k)}" opacity=".85"/>` : "");
       if (k.on) { const col = k.c, d = k.dur(2.4, 1.4); [[[150, 109], [170, 116], [190, 120]], [[140, 80], [162, 70], [186, 65]], [[40, 110], [22, 120], [6, 125]]].forEach((pts) => pts.forEach((p, i) => {
         b += `<circle class="${P}chase" style="animation-duration:${d}s;animation-delay:-${f(d - (i * d) / 3)}s" cx="${p[0]}" cy="${p[1]}" r="3.2" fill="${col}"/>`; })); }
       return k.svg(b); } });
+
+  icons.forEach((i) => { i.parts = ACP; });
 
   (window.HDA = window.HDA || []).push({
     id: "ac", tab: "Air conditioners", group: "Air", kind: "device",

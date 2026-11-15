@@ -277,6 +277,18 @@
 
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {});
   const BODY = ["#eef0f2", "#2c2f36", "#9fc5b8", "#e8c9a6", "#8fb4d9"];
+  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // Image (no o.mf, as today) and stays off / closed / blank, never animated, as a Multi-Function Image (o.mf). A value
+  // part's reading is o.pval[id] (a number), a stage part's value o.pval[id] (one of its stage ids). Pieces that exist
+  // only as parts (the aquarium's heater and thermometer, the pet door's mode arrows) are drawn only when o.mf.
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    val: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" && isFinite(+o.pval[k]) ? Math.round(+o.pval[k]) : null),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k) }),
+  };
+  const lit = (x, k) => Object.assign({}, x, { on: true, L: k == null ? .8 : k });
 
   const icons = [
     ic("feeder", "Automatic feeder", sw(BODY, "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
@@ -316,7 +328,11 @@
         led(x, 128, 151, 1.2, lvlCol(x, "#7ee7ff"));
       return scene(x, back, body); }),
 
-    ic("litter", "Self-cleaning litter", sw(["#eef0f2", "#2c2f36", "#8e959e", "#c9b99a", "#6d8fb3"], "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("litter", "Self-cleaning litter", sw(["#eef0f2", "#2c2f36", "#8e959e", "#c9b99a", "#6d8fb3"], "#eef0f2"), "Body", (o) => {
+      // (parts) State: cycling turns the drum (as on today); ready = a green light, full = amber (the drawer handle too),
+      // error = a blinking red light; left out = the drum still, the light off
+      const st = o.mf ? MF.st(o, "state") : null, x = X(o.mf ? Object.assign({}, o, { on: st === "cycling" }) : o), c = o.color;
+      const scol = { ready: GREEN, cycling: "#7ee7ff", full: "#ffb547", error: "#ff5a4f" }[st];
       const back = wallB(x, "lav", 8, 142) + baseB(x, 142, "#8a6142");
       const cp = clipU(x, "open", `<circle cx="96" cy="100" r="30"/>`);
       let ribs = `<circle cx="96" cy="100" r="44" fill="none"/>`;
@@ -330,11 +346,15 @@
         (x.on ? `<g class="${P}spin" style="animation-duration:${(5 - 3 * x.lv).toFixed(2)}s">${ribs}</g>` : "") + `</g>` +
         `<path d="M70 86A30 30 0 0 1 112 74" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="2"/>` +
         (x.on ? `<path class="${P}pulse" d="M80 46Q100 41 120 46" fill="none" stroke="#7ee7ff" stroke-opacity="${a2(.5 + .5 * x.L)}" stroke-width="3" stroke-linecap="round"/>` : `<path d="M80 46Q100 41 120 46" fill="none" stroke="${H.shade(c, -.3)}" stroke-width="3" stroke-linecap="round"/>`) +
-        box(x, 38, 140, 124, 30, 10, 0, 3, H.shade(c, -.12)) + `<path d="M50 156H150" stroke="#000" stroke-opacity=".3"/><rect x="88" y="159" width="24" height="4" rx="2" fill="${H.shade(c, -.45)}"/>` +
-        button(x, 140, 148, 3, "#d5d9de") + led(x, 130, 148, 1.1, "#7ee7ff");
-      return scene(x, back, body); }),
+        box(x, 38, 140, 124, 30, 10, 0, 3, H.shade(c, -.12)) + `<path d="M50 156H150" stroke="#000" stroke-opacity=".3"/><rect x="88" y="159" width="24" height="4" rx="2" fill="${st === "full" ? "#ffb547" : H.shade(c, -.45)}"/>` +
+        button(x, 140, 148, 3, "#d5d9de") + (!o.mf ? led(x, 130, 148, 1.1, "#7ee7ff") : !scol ? led(Object.assign({}, x, { on: false }), 130, 148, 1.1, "#7ee7ff") :
+          st === "error" ? `<g class="${P}blink">${led(lit(x), 130, 148, 1.1, scol)}</g>` : led(lit(x), 130, 148, 1.1, scol));
+      return scene(x, back, body); }, { parts: [{ id: "state", name: "State", type: "stage", values: [["ready", "Ready"], ["cycling", "Cycling"], ["full", "Drawer full"], ["error", "Error"]], def: "ready" }] }),
 
-    ic("door", "Smart pet door", sw(["#eef0f2", "#2c2f36", "#8a6142", "#9aa1aa", "#c9b99a"], "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("door", "Smart pet door", sw(["#eef0f2", "#2c2f36", "#8a6142", "#9aa1aa", "#c9b99a"], "#eef0f2"), "Body", (o) => {
+      // (parts) Mode: locked = the latch bar, a red light and a shut padlock; in / out / both = unlocked, arrows on the
+      // display show the way; left out = unlocked, no arrows. Flap (contact): open = the flap swung up (a pet going through).
+      const md = o.mf ? MF.st(o, "mode") : null, x = X(o.mf ? Object.assign({}, o, { on: md !== "locked" }) : o), c = o.color, fo = o.mf && MF.on(o, "flap");
       const wood = "#7d5a3e";
       const back = `<rect x="8" y="8" width="184" height="168" fill="${x.lg([[0, H.shade(wood, .1)], [1, H.shade(wood, -.25)]], 0, 0, 1, 0)}"/>` +
         `<rect x="28" y="16" width="144" height="58" rx="3" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="3"/><rect x="30" y="18" width="140" height="54" rx="2" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1.5"/>` +
@@ -345,13 +365,16 @@
         box(x, 56, 86, 88, 86, 12, 2, 3, c) +
         `<rect x="66" y="96" width="68" height="66" rx="7" fill="${H.shade(c, -.4)}"/>` +
         `<g clip-path="${cp}"><rect x="68" y="98" width="64" height="62" fill="${x.lg([[0, "#9ccbe8"], [.55, "#cfe6c4"], [.56, "#5d8a46"], [1, "#3f6a30"]])}"/>` +
-        `<g class="${x.on ? P + "swing" : ""}">${flap}</g></g>` +
+        (o.mf ? (fo ? `<g transform="translate(0 100) scale(1 .42) translate(0 -100)">${flap}</g>` : flap) : `<g class="${x.on ? P + "swing" : ""}">${flap}</g>`) + `</g>` +
         (x.on ? "" : `<rect x="74" y="153" width="52" height="5" rx="2.5" fill="${M.steel(x)}"/><rect x="74" y="153" width="52" height="5" rx="2.5" fill="none" stroke="#000" stroke-opacity=".3"/>`) +
         box(x, 80, 72, 40, 18, 7, 2, 2, c) +
         `<rect x="86" y="77" width="28" height="8" rx="4" fill="#0e1014"/>` + led(x.on ? x : Object.assign({}, x, { on: true, L: .7 }), 92, 81, 1.4, x.on ? GREEN : "#ff5a4f") +
         (x.on ? `<path d="M104 83V80A3 3 0 0 1 110 79" fill="none" stroke="#bff5d6" stroke-width="1.2"/><rect x="103" y="80.5" width="5" height="3.5" rx=".8" fill="#bff5d6"/>`
-          : `<path d="M104 80V78.5A2.4 2.4 0 0 1 109 78.5V80" fill="none" stroke="#ffb3ae" stroke-width="1.2"/><rect x="103" y="80" width="7" height="4" rx=".8" fill="#ffb3ae"/>`);
-      return scene(x, back, body); }),
+          : `<path d="M104 80V78.5A2.4 2.4 0 0 1 109 78.5V80" fill="none" stroke="#ffb3ae" stroke-width="1.2"/><rect x="103" y="80" width="7" height="4" rx=".8" fill="#ffb3ae"/>`) +
+        (md && md !== "locked" ? `<rect x="84" y="162.5" width="32" height="7" rx="3.5" fill="#0e1014"/>` +
+          (md === "in" || md === "both" ? `<path d="M88 166H97M94.5 164L97 166L94.5 168" fill="none" stroke="#bff5d6" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>` : "") +
+          (md === "out" || md === "both" ? `<path d="M112 166H103M105.5 164L103 166L105.5 168" fill="none" stroke="#bff5d6" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>` : "") : "");
+      return scene(x, back, body); }, { parts: [{ id: "mode", name: "Mode", type: "stage", values: [["both", "In & out"], ["in", "In only"], ["out", "Out only"], ["locked", "Locked"]], def: "both" }, { id: "flap", name: "Flap", type: "contact" }] }),
 
     ic("treatcam", "Treat camera", sw(["#eef0f2", "#2c2f36", "#9fc5b8", "#f2c6a8", "#8e959e"], "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
       const back = wallB(x, "sage", 8, 126) + baseB(x, 126, "#7a5638");
@@ -369,7 +392,10 @@
         `<rect x="88" y="146" width="24" height="3" rx="1.5" fill="${H.shade(c, -.25)}"/>`;
       return scene(x, back, body); }),
 
-    ic("aquarium", "Aquarium", sw(["#bfe3ff", "#ffffff", "#7ad3ff", "#c4a8ff", "#ffd8a8", "#7ef0c0"], "#bfe3ff"), "Light", (o) => { const x = X(o), c = o.color;
+    ic("aquarium", "Aquarium", sw(["#bfe3ff", "#ffffff", "#7ad3ff", "#c4a8ff", "#ffd8a8", "#7ef0c0"], "#bfe3ff"), "Light", (o) => {
+      // (parts) Light = the hood light and its rays, Filter = the bubbles, Heater = a glass heater in the back corner (glows
+      // orange when on), Temperature = a stick-on thermometer on the glass; heater and thermometer only when ticked (o.mf)
+      const x = X(MF.as(o, "light")), c = o.color, xf = MF.as(o, "filter"), hh = o.mf && MF.has(o, "heater"), ho = hh && MF.on(o, "heater"), wt = o.mf ? MF.val(o, "temp") : null;
       const back = wallB(x, "navy", 8, 192);
       const top = x.on ? H.mix(H.mix(c, "#1a6a96", .5), "#0c2a3d", 1 - x.lv * .8) : "#0f1c26", bot = x.on ? "#0b2638" : "#070e14";
       const cp = clipU(x, "tank", `<rect x="26" y="50" width="148" height="90"/>`);
@@ -379,7 +405,7 @@
       const plant = (bx, h, col, dl) => `<g class="${P}sway" style="animation-delay:${dl}s"><path d="M${bx} 134C${bx - 6} ${134 - h * .4} ${bx + 6} ${134 - h * .7} ${bx - 2} ${134 - h}" fill="none" stroke="${col}" stroke-width="3.2" stroke-linecap="round"/>
 <path d="M${bx} 134C${bx + 7} ${134 - h * .35} ${bx + 2} ${134 - h * .6} ${bx + 7} ${134 - h * .85}" fill="none" stroke="${H.shade(col, .25)}" stroke-width="2.4" stroke-linecap="round"/></g>`;
       let bub = "";
-      if (x.on) for (let i = 0; i < 6; i++) bub += `<circle class="${P}bubble" cx="${f(150 + (i % 2) * 3)}" cy="132" r="${f(1.2 + (i % 3) * .7)}" fill="none" stroke="#e6f7ff" stroke-opacity=".8" stroke-width=".8" style="animation-delay:${(-i * .45).toFixed(2)}s"/>`;
+      if (xf.on) for (let i = 0; i < 6; i++) bub += `<circle class="${P}bubble" cx="${f(150 + (i % 2) * 3)}" cy="132" r="${f(1.2 + (i % 3) * .7)}" fill="none" stroke="#e6f7ff" stroke-opacity=".8" stroke-width=".8" style="animation-delay:${(-i * .45).toFixed(2)}s"/>`;
       const rays = x.on ? `<path d="M40 52L28 140H80L64 52ZM94 52L86 140H134L116 52ZM142 52L140 140H174V60Z" fill="${x.lg([[0, c, .35], [1, c, 0]])}" opacity="${a2(.3 + .7 * x.L)}"/>` : "";
       const body = `<rect x="18" y="140" width="164" height="52" fill="${x.lg([[0, "#4a3426"], [1, "#2c1e15"]])}"/>` + woodB(x, 192, "#5d4330") +
         `<rect x="24" y="146" width="74" height="46" rx="2" fill="none" stroke="#000" stroke-opacity=".35"/><rect x="102" y="146" width="74" height="46" rx="2" fill="none" stroke="#000" stroke-opacity=".35"/><rect x="88" y="162" width="3" height="12" rx="1.5" fill="${M.steel(x)}"/><rect x="109" y="162" width="3" height="12" rx="1.5" fill="${M.steel(x)}"/>` +
@@ -388,14 +414,18 @@
         `<g clip-path="${cp}">${rays}<path d="M26 128Q60 122 100 126T174 124V140H26Z" fill="${x.lg([[0, "#b49a72"], [1, "#6d5a40"]])}"/>` + dots(23, 70, 26, 124, 148, 16, 1, .4) +
         `<path d="M112 132Q116 112 132 114Q144 118 142 134Z" fill="${x.lg([[0, "#7d8188"], [1, "#3c3f45"]])}"/>` +
         plant(44, 58, "#3d9a4a", 0) + plant(58, 40, "#5bb85a", -.6) + plant(166, 64, "#2f8a43", -1.2) + plant(92, 30, "#78c26a", -.3) +
+        (hh ? `<rect x="157" y="62" width="7" height="58" rx="3.5" fill="#dfe9ef" fill-opacity=".28" stroke="#cfe0ea" stroke-opacity=".6" stroke-width=".8"/><rect x="158.8" y="70" width="3.4" height="44" rx="1.7" fill="${ho ? "#ff8a3a" : "#5a4a44"}"/>` +
+          (ho ? `<rect x="153" y="66" width="15" height="52" rx="7" fill="#ff7a2a" opacity=".22"/>` : "") + `<rect x="156.5" y="58" width="8" height="7" rx="1.5" fill="#20242a"/><circle cx="160.5" cy="61.5" r="1" fill="${ho ? "#ff8a3a" : "#3a3f46"}"/>` : "") +
         fish(78, 84, 1, "#ff8a3d", 5, 0, false) + fish(124, 98, .85, "#4da3ff", 6.5, -2, true) + fish(104, 70, .7, "#ffd84d", 4.4, -1, false) + bub +
         `<path d="M26 56H174" stroke="#fff" stroke-opacity="${x.on ? .45 : .15}" stroke-width="1"/></g>` +
         `<path d="M32 60L46 60L34 134H32Z" fill="#fff" fill-opacity=".08"/><rect x="26" y="50" width="148" height="90" fill="none" stroke="#9fb3c4" stroke-opacity=".4" stroke-width="1.4"/>` +
         `<rect x="24" y="136" width="152" height="5" fill="#111317"/>` +
         `<rect x="20" y="38" width="160" height="13" rx="3" fill="${x.lg([[0, "#3a3d44"], [1, "#121316"]])}"/><path d="M24 40H176" stroke="#fff" stroke-opacity=".25"/>` +
         `<rect x="28" y="49" width="144" height="2.4" rx="1.2" fill="${x.on ? H.mix(c, "#fff", .5) : "#2a2d34"}"/>` +
-        (x.on ? `<rect x="28" y="47" width="144" height="7" rx="3.5" fill="${c}" opacity="${a2(.45 * x.L)}"/>` : "") + led(x, 168, 44.5, 1, c);
-      return scene(x, back, body); }, { glow: { x: .5, y: .27, r: .9 }, cast: "down" }),
+        (x.on ? `<rect x="28" y="47" width="144" height="7" rx="3.5" fill="${c}" opacity="${a2(.45 * x.L)}"/>` : "") + led(x, 168, 44.5, 1, c) +
+        (wt != null ? `<rect x="34" y="112" width="30" height="13" rx="2" fill="#0a0d10" fill-opacity=".85" stroke="#9fb3c4" stroke-opacity=".5" stroke-width=".6"/>` +
+          (`<text x="49" y="121.6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="8" font-weight="700" fill="${wt < 72 ? "#7dd3fc" : wt > 84 ? "#ff5a4f" : "#7ee08a"}">${wt}°</text>`) : "");
+      return scene(x, back, body); }, { glow: { x: .5, y: .27, r: .9 }, cast: "down", parts: [{ id: "light", name: "Light" }, { id: "filter", name: "Filter" }, { id: "heater", name: "Heater" }, { id: "temp", name: "Water temperature", type: "value", unit: "°F", min: 60, max: 90, def: 78 }] }),
 
     ic("bed", "Heated pet bed", sw(["#b9876a", "#8a9aa8", "#c75b5b", "#e6dcc6", "#4f6b8a"], "#b9876a"), "Fabric", (o) => { const x = X(o), c = o.color;
       const back = wallB(x, "clay", 8, 104) + baseB(x, 104, "#8a6142");

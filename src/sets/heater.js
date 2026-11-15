@@ -160,6 +160,34 @@
 
   const ic = (id, name, first, render, list) => ({ id, name, colors: sw(first, list), picker: true, colorLabel: "Body", render });
   const fi = (id, name, first, render) => ({ id, name, colors: fsw(first), picker: true, colorLabel: "Flame", render });
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
+  // (parts) an electric fireplace: Flame (the flame effect: on, level = brightness, color = o.pcolor.flame, else the
+  // drawing's flame color) and Heat (the fan heater: its vent glows, heat shimmer rises). A Device Image (no o.mf, no
+  // parts) is drawn exactly as before; as a Multi-Function Image the vent is drawn and each part follows its own state.
+  const FH = [{ id: "flame", name: "Flame" }, { id: "heat", name: "Heat" }];
+  const vent = (o, x, y, w, h, n) => { const on = o.on, u = o.uid; let sl = "";
+    for (let i = 1; i < n; i++) sl += `M${n1(x + w * i / n)} ${n1(y + .8)}V${n1(y + h - .8)}`;
+    return `<path d="${rr(x - 1, y - 1, w + 2, h + 2, 1.6)}" fill="#000" fill-opacity=".45"/><path d="${rr(x, y, w, h, 1.2)}" fill="${on ? "#5a1e0c" : "#0d0e11"}"/>` +
+      (on ? `<g opacity="${g2(o, .9)}"><path class="${P}pulse" d="${rr(x, y, w, h, 1.2)}" fill="url(#${u}-hh)"/></g>` : "") +
+      `<path d="${sl}" stroke="${on ? "#ff9a4a" : "#3a3f47"}" stroke-opacity="${on ? .55 : 1}" stroke-width="1.1"/>`; };
+  const fh = (render, heatFx) => (o) => {
+    if (!o.mf && !o.parts) return render(o);
+    const fo = Object.assign({}, o, { on: MF.on(o, "flame"), level: MF.lv(o, "flame") == null ? 1 : MF.lv(o, "flame"), color: MF.col(o, "flame", o.color) });
+    const ho = Object.assign({}, o, { on: MF.on(o, "heat"), level: MF.lv(o, "heat") == null ? 1 : MF.lv(o, "heat") });
+    return render(fo).replace(/<\/svg>$/, heatFx(ho) + "</svg>");
+  };
+  const mfi = (id, name, first, render, heatFx) => Object.assign(fi(id, name, first, fh(render, heatFx)), { parts: FH });
   const RAIL = ["#c9ced4", "#2f3237", "#c9a34e", "#eceff1", "#8a6a4a"];
   const MET = ["#9aa1a9", "#3b4049", "#8a6a4a", "#5f7a5a", "#eceff1"];
   const INDU = ["#d9a62e", "#b8352c", "#7b838c", "#3b4049", "#4f7a4f"];
@@ -256,7 +284,7 @@
       `<path d="M150 138C152 156 168 158 172 170" fill="none" stroke="#e6e8eb" stroke-opacity=".5" stroke-width="2"/><path d="${rr(166, 164, 12, 10, 2)}" fill="#e7e9ec" fill-opacity=".4"/>` +
       floorGlow(o, 100, 182, 70, 8) + shimmer(o, 100, 42, 116, 34, 6)); }),
 
-    fi("insert", "Fireplace insert", "#ff8a2a", (o) => { const u = o.uid, ib = rr(52, 82, 96, 72, 2); return svg(o,
+    mfi("insert", "Fireplace insert", "#ff8a2a", (o) => { const u = o.uid, ib = rr(52, 82, 96, 72, 2); return svg(o,
       `<rect x="22" y="44" width="156" height="128" fill="url(#${u}-ls)"/><rect x="22" y="44" width="156" height="128" fill="url(#${u}-fx)"/><rect x="22" y="44" width="156" height="128" fill="#000" fill-opacity=".15"/>` +
       `<path d="${rr(14, 32, 172, 13, 2)}" fill="url(#${u}-mw)"/><path d="${rr(14, 32, 172, 13, 2)}" fill="url(#${u}-gr)"/><path d="M16 33.2H184" stroke="#fff" stroke-opacity=".35"/><rect x="18" y="45" width="164" height="3" fill="#000" fill-opacity=".35"/>` +
       `<path d="${rr(44, 74, 112, 88, 3)}" fill="url(#${u}-bk)"/>` + `<path d="${ib}" fill="url(#${u}-dk)"/>` +
@@ -265,9 +293,9 @@
       flames(o, 62, 138, 140, 50, 6) + log(o, 60, 146, 128, 140, 5) + log(o, 140, 147, 78, 141, 4.5) + bed(o, 56, 146, 152, 1, 3) +
       glass(o, ib, 52, 82, 96, 72) + `<path d="${ib}" fill="none" stroke="#000" stroke-opacity=".6" stroke-width="1.4"/>` +
       `<rect x="10" y="170" width="180" height="10" fill="url(#${u}-ls)"/><path d="M10 170H190" stroke="#fff" stroke-opacity=".3"/>` + floorGlow(o, 100, 172, 70, 8, 1) +
-      sh(o, 100, 184, 92, 4)); }),
+      sh(o, 100, 184, 92, 4)); }, (o) => vent(o, 62, 76.4, 76, 4.4, 16) + shimmer(o, 100, 74, 84, 26, 5)),
 
-    fi("stove", "Stove heater", "#ff8a2a", (o) => { const u = o.uid, win = "M74 136V100Q74 86 100 86Q126 86 126 100V136Z"; return svg(o,
+    mfi("stove", "Stove heater", "#ff8a2a", (o) => { const u = o.uid, win = "M74 136V100Q74 86 100 86Q126 86 126 100V136Z"; return svg(o,
       `<path d="${rr(28, 170, 144, 10, 2)}" fill="#2a2d33"/><path d="M30 170.6H170" stroke="#fff" stroke-opacity=".18"/>` + floorGlow(o, 100, 172, 72, 10, 1) +
       `<rect x="92" y="4" width="16" height="52" fill="url(#${u}-bk)"/><rect x="89" y="40" width="22" height="5" rx="1" fill="url(#${u}-bk)"/>` +
       `<path d="M62 156Q60 168 56 172M138 156Q140 168 144 172" stroke="#15171b" stroke-width="6" stroke-linecap="round"/>` +
@@ -278,14 +306,15 @@
       flames(o, 80, 120, 128, 38, 4) + log(o, 78, 132, 116, 128, 4) + log(o, 122, 133, 86, 129, 3.6) + sparks(o, [[92, 116], [104, 120, 1.2], [110, 112], [98, 122]]) +
       glass(o, win, 74, 86, 52, 50) + `<path d="${win}" fill="none" stroke="#000" stroke-opacity=".7" stroke-width="1.6"/>` +
       `<path d="M138 98V124" stroke="#15171b" stroke-width="4" stroke-linecap="round"/><path d="M138 98V124" stroke="url(#${u}-st)" stroke-width="2" stroke-dasharray="1.6 1" stroke-linecap="round"/>` +
-      `<path d="M62 70H138" stroke="#fff" stroke-opacity=".12"/>` + hl(58, 72, 58, 150, 1.8, .2)); }),
+      `<path d="M62 70H138" stroke="#fff" stroke-opacity=".12"/>` + hl(58, 72, 58, 150, 1.8, .2)); }, (o) => vent(o, 76, 144.6, 48, 5, 10) + shimmer(o, 100, 52, 100, 30, 4)),
 
-    fi("linear", "Linear wall fire", "#4da3ff", (o) => { const u = o.uid, ib = rr(18, 84, 164, 42, 2); return svg(o, wall(176) + wallGlow(o, 14, 20, 172, 58, 1) +
+    mfi("linear", "Linear wall fire", "#4da3ff", (o) => { const u = o.uid, ib = rr(18, 84, 164, 42, 2); return svg(o, wall(176) + wallGlow(o, 14, 20, 172, 58, 1) +
       `<path d="${rr(14, 82, 176, 56, 4)}" fill="#000" fill-opacity=".35"/><path d="${rr(12, 78, 176, 54, 4)}" fill="url(#${u}-bkv)"/>` + `<path d="${ib}" fill="url(#${u}-dk)"/>` +
       (o.on ? `<g opacity="${g2(o, .7)}"><rect class="${P}pulse" x="18" y="84" width="164" height="42" fill="url(#${u}-fg)"/></g>` : "") +
       flames(o, 24, 176, 118, 30, 11, 1.8) + bed(o, 22, 180, 124, 2, 7) +
       glass(o, ib, 18, 84, 164, 42) + `<path d="${ib}" fill="none" stroke="#000" stroke-opacity=".6" stroke-width="1.2"/><path d="M14 79.2H186" stroke="#fff" stroke-opacity=".3"/>` +
-      led(o, 172, 129.5, o.color) + `<rect x="162" y="128" width="4" height="3" rx="1" fill="#5a5f67"/>` + floorGlow(o, 100, 178, 88, 10, 1)); }),
+      led(o, 172, 129.5, o.color) + `<rect x="162" y="128" width="4" height="3" rx="1" fill="#5a5f67"/>` + floorGlow(o, 100, 178, 88, 10, 1)); },
+      (o) => vent(o, 30, 79.6, 118, 3.2, 30) + shimmer(o, 89, 77, 110, 30, 6)),
 
     ic("patio", "Patio heater", GR, (o) => { const u = o.uid, em = rr(86, 46, 28, 30, 3); let dots = "";
       if (o.on) for (let i = 0; i < 9; i++) dots += `<circle class="${P}emb" cx="${89 + (i * 7) % 22}" cy="${50 + (i * 11) % 24}" r="1" fill="#ffe0a0" style="animation-delay:-${(i * .4).toFixed(1)}s"/>`;

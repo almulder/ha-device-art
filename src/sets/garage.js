@@ -17,7 +17,7 @@
   function ctx(o) {
     const u = o.uid, on = !!o.on, lv = o.level == null ? 1 : o.level;
     return { o, u, on, lv, op: on ? Math.max(.12, Math.min(1, lv)) : 0, c: o.color || WHT, p: pal(o.color || WHT),
-      id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, n: 0 };
+      id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, n: 0, lt: on, mf: false };
   }
 
   function defs(x, extra) {
@@ -175,7 +175,7 @@ ${extra || ""}</defs>`;
     let o = `<rect x="${X - 6}" y="${Y - 6}" width="${W + 12}" height="${Hh + 6}" fill="${tr}"/><path d="M${X - 6} ${Y + Hh}V${Y - 6}H${X + W + 6}" fill="none" stroke="#fff" stroke-opacity=".35"/>
 <path d="M${X + W + 6} ${Y - 6}V${Y + Hh}" stroke="#000" stroke-opacity=".3"/><rect x="${X - 1.6}" y="${Y - 1.6}" width="${W + 3.2}" height="${Hh + 1.6}" fill="#000" fill-opacity=".5"/>
 <clipPath id="${k}"><rect x="${X}" y="${Y}" width="${W}" height="${Hh}"/></clipPath><g clip-path="url(#${k})">`;
-    if (op > 0) o += interior(x, X, Y, W, Hh, s.car, s.carCol);
+    if (op > 0) o += interior(x, X, Y, W, Hh, s.car, s.carCol) + (x.mf && !x.lt ? `<rect x="${X}" y="${Y}" width="${W}" height="${Hh}" fill="#000" opacity=".55"/>` : "");
     if (s.mode === "tilt") {
       const sy = 1 - op * .86;
       o += `<g transform="translate(${X} ${Y}) scale(1 ${sy.toFixed(3)})"><g class="${cls}">${s.door}<rect width="${W}" height="${Hh}" fill="#000" opacity="${f(op * .5)}"/></g></g>`;
@@ -186,7 +186,7 @@ ${extra || ""}</defs>`;
       if (op > 0) o += `<rect x="${X}" y="${f(dy + Hh)}" width="${W}" height="8" fill="${x.url("dn")}" opacity=".75"/>`;
     }
     o += `</g><rect x="${X}" y="${Y}" width="${W}" height="3" fill="#000" fill-opacity=".35"/>`;
-    if (op > 0) o += `<path d="M${X} ${Y + Hh}H${X + W}L${X + W + 24} 192H${X - 24}Z" fill="${x.url("spill")}" opacity="${f(.3 + .5 * op)}"/>`;
+    if (op > 0) o += `<path d="M${X} ${Y + Hh}H${X + W}L${X + W + 24} 192H${X - 24}Z" fill="${x.url("spill")}" opacity="${f((.3 + .5 * op) * (x.mf && !x.lt ? .3 : 1))}"/>`;
     o += eye(X - 3.5, Y + Hh - 7, LEDG) + eye(X + W + 3.5, Y + Hh - 7, x.on ? AMB : "#c08a3a");
     if (s.beacon !== false) o += beacon(x, X + W / 2, Y - 13);
     return o;
@@ -222,7 +222,7 @@ ${extra || ""}</defs>`;
     let s = secBase(x, W, Hh, rows, key); const m = W * .05, gx = W * .028, pw = (W - 2 * m - (cols - 1) * gx) / cols, sh = Hh / rows, ph = sh * .6;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const px = m + c * (pw + gx), py = r * sh + sh * .2;
-      s += win && r === 0 ? pane(x, px, py, pw, ph, false) : rp(px, py, pw, ph);
+      s += win && r === 0 ? pane(x, px, py, pw, ph, !!(x.mf && x.lt)) : rp(px, py, pw, ph);
     }
     return s + sheen(x, W, Hh);
   }
@@ -256,7 +256,7 @@ ${extra || ""}</defs>`;
     let s = `<rect width="${W}" height="${Hh}" fill="${x.url("fin")}"/>`; const rows = 4, cols = 4, fw = 3.4, sh = Hh / rows, pw = (W - fw * (cols + 1)) / cols, ph = sh - fw * 2;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const px = fw + c * (pw + fw), py = r * sh + fw;
-      s += `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${x.url("fr")}"/>${x.on ? `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${WARM}" opacity=".45"/>` : ""}
+      s += `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${x.url("fr")}"/>${x.lt ? `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${WARM}" opacity=".45"/>` : ""}
 <path d="M${f(px)} ${f(py)}H${f(px + pw)}M${f(px)} ${f(py)}V${f(py + ph)}" stroke="#000" stroke-opacity=".35"/><rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph * .45)}" fill="#fff" opacity=".18"/><path d="M${f(px + pw * .1)} ${f(py + ph)}L${f(px + pw * .55)} ${f(py)}" stroke="#fff" stroke-opacity=".18" stroke-width="3"/>`;
     }
     for (let r = 1; r < rows; r++) s += `<path d="M0 ${f(r * sh)}H${W}" stroke="#000" stroke-opacity=".6"/>`;
@@ -378,14 +378,25 @@ ${extra || ""}</defs>`;
   const yard = (...a) => BGW(yard_(...a));
   const boards = (...a) => BGW(boards_(...a));
   const icons = [];
-  const G = (id, name, colors, colorLabel, fn) => icons.push({ id, name, colors, picker: true, colorLabel, render(o) { return fn(ctx(o)); } });
+  // (parts) Multi-Function: each door / gate is its own part (a contact: open = up / swung or slid open) and the Light (a
+  // switch: the opener light inside, lanterns and sconces, a door's windows) is another. o.mf = only the ticked parts in o.parts:
+  // a door left out stays closed, the light off (an open door then shows a dim garage). Side-by-side: d1 + d2 (n258 pilot).
+  // A Device Image (no o.mf) is exactly today's (on = open, the lights follow it); a device contact (o.open) lifts the door.
+  function mfx(x, o) {
+    if (!o.mf) { if (o.open === true && !x.on) { x.on = true; x.op = 1; } return x; }
+    const p = o.parts || {}, sub = (k, n0) => { const y = Object.create(x); y.on = !!p[k]; y.op = y.on ? 1 : 0; y.n = n0; return y; };
+    x.mf = true; x.lt = !!p.light; x.on = !!(p.door || p.gate || p.d1 || p.d2); x.op = x.on ? 1 : 0;
+    if (p.d1 != null || p.d2 != null) { x.d1 = sub("d1", 100); x.d2 = sub("d2", 300); }
+    return x;
+  }
+  const G = (id, name, colors, colorLabel, fn) => icons.push({ id, name, colors, picker: true, colorLabel, render(o) { return fn(mfx(ctx(o), o)); } });
   const DOOR = "Door", GATE = "Gate";
 
   G("raised", "Raised panel", [WHT, ALM, SND, BRZ, BLK], DOOR, (x) => {
     const X = 42, Y = 62, W = 116, Hh = 96;
     return svg(x, wall(x, "siding", "#7c8a96") + eave(x, 34, "#e9e7e1") + drive(x, Y + Hh) +
       bay(x, { X, Y, W, H: Hh, door: doorRaised(x, W, Hh, 4, 4), car: "sedan", carCol: "#8a2329" }) +
-      lantern(x, 24, 96, x.on) + lantern(x, 176, 96, x.on) + bush(x, 16, 184, 13) + bush(x, 186, 186, 12));
+      lantern(x, 24, 96, x.lt) + lantern(x, 176, 96, x.lt) + bush(x, 16, 184, 13) + bush(x, 186, 186, 12));
   });
   G("double", "Two-car raised", [ALM, WHT, SND, BRZ, BLK], DOOR, (x) => {
     const X = 22, Y = 66, W = 156, Hh = 90;
@@ -396,13 +407,13 @@ ${extra || ""}</defs>`;
     const X = 40, Y = 60, W = 120, Hh = 98;
     return svg(x, wall(x, "stucco", "#c8b79a") + eave(x, 32, "#5a3b26", "#3d3330") + drive(x, Y + Hh) +
       bay(x, { X, Y, W, H: Hh, door: doorCarriage(x, W, Hh), car: "sedan", carCol: "#c9ccd0", trim: "#5c4130" }) +
-      lantern(x, 22, 94, x.on) + lantern(x, 178, 94, x.on) + bush(x, 18, 186, 12) + bush(x, 184, 185, 13));
+      lantern(x, 22, 94, x.lt) + lantern(x, 178, 94, x.lt) + bush(x, 18, 186, 12) + bush(x, 184, 185, 13));
   });
   G("glass", "Frosted glass", [BLK, CHA, "#b9bec3", BRZ, WHT], DOOR, (x) => {
     const X = 34, Y = 54, W = 132, Hh = 104;
     let slats = ""; for (let xx = 8; xx < 192; xx += 5) slats += `<rect x="${xx}" y="8" width="3.6" height="22" fill="${xx % 10 ? "#9a6a43" : "#8a5c38"}"/>`;
     return svg(x, BGW(wall_(x, "panel", "#3b3f45") + slats + `<rect x="8" y="30" width="184" height="10" fill="${x.url("dn")}" opacity=".7"/>`) +
-      (x.on ? `<path d="M40 30L28 70H172L160 30Z" fill="${x.url("cone")}" opacity=".35"/>` : "") + `<path d="M38 29.5H162" stroke="${x.on ? "#fff3d0" : "#5b5f66"}" stroke-width="2"/>` +
+      (x.lt ? `<path d="M40 30L28 70H172L160 30Z" fill="${x.url("cone")}" opacity=".35"/>` : "") + `<path d="M38 29.5H162" stroke="${x.lt ? "#fff3d0" : "#5b5f66"}" stroke-width="2"/>` +
       drive(x, Y + Hh) + bay(x, { X, Y, W, H: Hh, door: doorGlass(x, W, Hh), car: "sedan", carCol: "#e7e7e4", trim: "#2a2d31" }) + bush(x, 16, 184, 10) + bush(x, 186, 184, 10));
   });
   G("flush", "Flush modern", [CHA, BLK, WHT, BRZ, SND], DOOR, (x) => {
@@ -410,18 +421,18 @@ ${extra || ""}</defs>`;
     return svg(x, BGW(wall_(x, "stucco", "#e4e1da", 8, 192, 7) + `<rect x="8" y="8" width="184" height="18" fill="#2c2e33"/><rect x="8" y="26" width="184" height="12" fill="${x.url("dn")}" opacity=".5"/>` +
       `<rect x="164" y="40" width="22" height="118" fill="#8f6440"/>${grainV(3, 164, 40, 22, 118, 2)}<path d="M164 40v118" stroke="#000" stroke-opacity=".3"/>`) +
       drive(x, Y + Hh) + bay(x, { X, Y, W, H: Hh, door: doorFlush(x, W, Hh), car: "sedan", carCol: "#1f5f9c", trim: "#dcd9d2" }) +
-      BGW(`<rect x="168" y="78" width="14" height="4" rx="1" fill="#1b1c1e"/>${x.on ? `<path d="M168 82L160 120H190L182 82Z" fill="${x.url("cone")}" opacity=".7"/>` : ""}`));
+      BGW(`<rect x="168" y="78" width="14" height="4" rx="1" fill="#1b1c1e"/>${x.lt ? `<path d="M168 82L160 120H190L182 82Z" fill="${x.url("cone")}" opacity=".7"/>` : ""}`));
   });
   G("longpanel", "Long panel", [WHT, ALM, SND, "#7c7f82", BRZ], DOOR, (x) => {
     const X = 38, Y = 60, W = 124, Hh = 98;
     return svg(x, wall(x, "siding", "#b9ab92", 8, 120) + wall(x, "stone", "#8b8070", 120, 192, 17) + eave(x, 34, "#f0eee8", "#3d3a36") + drive(x, Y + Hh) +
-      bay(x, { X, Y, W, H: Hh, door: doorLong(x, W, Hh), car: "suv", carCol: "#2d3136" }) + lantern(x, 22, 96, x.on) + lantern(x, 178, 96, x.on));
+      bay(x, { X, Y, W, H: Hh, door: doorLong(x, W, Hh), car: "suv", carCol: "#2d3136" }) + lantern(x, 22, 96, x.lt) + lantern(x, 178, 96, x.lt));
   });
   G("plank", "Cedar plank", [CDR, WAL, "#c79a6a", "#8b8b84", BLK], DOOR, (x) => {
     const X = 40, Y = 60, W = 120, Hh = 98;
     return svg(x, wall(x, "batten", "#e3e2dd") + eave(x, 32, "#1f2023", "#26272a") + drive(x, Y + Hh) +
       bay(x, { X, Y, W, H: Hh, door: doorPlank(x, W, Hh), car: "suv", carCol: "#6b7b5a", trim: "#1f2023" }) +
-      BGW(`<rect x="20" y="70" width="5" height="18" rx="1" fill="#1b1c1e"/><rect x="175" y="70" width="5" height="18" rx="1" fill="#1b1c1e"/>${x.on ? `<path d="M20 88L14 118H31L25 88ZM175 88L169 118H186L180 88Z" fill="${x.url("cone")}" opacity=".8"/><path d="M20 70L15 50H30L25 70ZM175 70L170 50H185L180 70Z" fill="${WARM}" opacity=".18"/>` : ""}`) +
+      BGW(`<rect x="20" y="70" width="5" height="18" rx="1" fill="#1b1c1e"/><rect x="175" y="70" width="5" height="18" rx="1" fill="#1b1c1e"/>${x.lt ? `<path d="M20 88L14 118H31L25 88ZM175 88L169 118H186L180 88Z" fill="${x.url("cone")}" opacity=".8"/><path d="M20 70L15 50H30L25 70ZM175 70L170 50H185L180 70Z" fill="${WARM}" opacity=".18"/>` : ""}`) +
       bush(x, 17, 186, 11) + bush(x, 184, 186, 11));
   });
   G("rollup", "Roll-up sheet", [GAL, WHT, "#3f6d8f", RED, BLK, ALM], DOOR, (x) => {
@@ -435,13 +446,14 @@ ${extra || ""}</defs>`;
     const X = 36, Y = 64, W = 128, Hh = 92;
     return svg(x, wall(x, "brick", "#9c6a4c", 8, 192, 9) + eave(x, 40, "#d9d2c3", "#45403a") + drive(x, Y + Hh) +
       bay(x, { X, Y, W, H: Hh, door: doorTilt(x, W, Hh), mode: "tilt", car: "sedan", carCol: "#a8742e", trim: "#eae4d6" }) +
-      lantern(x, 21, 100, x.on) + lantern(x, 179, 100, x.on) + bush(x, 15, 186, 12) + bush(x, 186, 186, 12));
+      lantern(x, 21, 100, x.lt) + lantern(x, 179, 100, x.lt) + bush(x, 15, 186, 12) + bush(x, 186, 186, 12));
   });
   G("pair", "Side-by-side", [WHT, ALM, SND, "#6c7176", BLK], DOOR, (x) => {
     const Y = 70, W = 74, Hh = 86;
+    if (!x.d1) x.d1 = x.d2 = x;
     return svg(x, wall(x, "siding", "#56606a") + eave(x, 36, "#f2f1ec", "#2e2c2b") + drive(x, Y + Hh) +
-      bay(x, { X: 18, Y, W, H: Hh, door: doorRaised(x, W, Hh, 4, 4, true), car: "sedan", carCol: "#b8bec4" }) +
-      bay(x, { X: 108, Y, W, H: Hh, door: doorRaised(x, W, Hh, 4, 4, true), car: "suv", carCol: "#5a2430" }) + lantern(x, 100, 98, x.on));
+      bay(x.d1, { X: 18, Y, W, H: Hh, door: doorRaised(x.d1, W, Hh, 4, 4, true), car: "sedan", carCol: "#b8bec4" }) +
+      bay(x.d2, { X: 108, Y, W, H: Hh, door: doorRaised(x.d2, W, Hh, 4, 4, true), car: "suv", carCol: "#5a2430" }) + lantern(x, 100, 98, x.lt));
   });
 
   G("swing", "Swing gate", [BLK, BRZ, "#3f4b3f", WHT, GAL], GATE, (x) => {
@@ -504,7 +516,7 @@ ${extra || ""}</defs>`;
     let s = "";
     for (let v = 3; v < Hh - 4; v += 8.4) { s += `<path d="${qd(m, 2.5, v, W - 2.5, v + 6.4)}" fill="${h.shade(x.c, r() * .14 - .07 - x.op * .2)}"/><path d="${ln(m, 2.5, v + 6.2, W - 2.5, v + 6.2)}" stroke="#fff" stroke-opacity=".22" stroke-width=".7"/><path d="${ln(m, 4, v + 3.4, W - 6, v + 3)}" stroke="#2a1606" stroke-opacity=".2" stroke-width=".5"/>`; }
     const fr = qd(m, 0, 0, 2.5, Hh) + qd(m, W - 2.5, 0, W, Hh) + qd(m, 0, Hh - 2.5, W, Hh) + qd(m, 0, 0, W, 2.5);
-    const lights = (cx) => `<rect x="${cx - 2.5}" y="112" width="5" height="12" rx="1" fill="#1b1c1e"/>${x.on ? `<path d="M${cx - 2.5} 124L${cx - 8} 150H${cx + 8}L${cx + 2.5} 124ZM${cx - 2.5} 112L${cx - 7} 92H${cx + 7}L${cx + 2.5} 112Z" fill="${x.url("cone")}" opacity=".8"/>` : ""}`;
+    const lights = (cx) => `<rect x="${cx - 2.5}" y="112" width="5" height="12" rx="1" fill="#1b1c1e"/>${x.lt ? `<path d="M${cx - 2.5} 124L${cx - 8} 150H${cx + 8}L${cx + 2.5} 124ZM${cx - 2.5} 112L${cx - 7} 92H${cx + 7}L${cx + 2.5} 112Z" fill="${x.url("cone")}" opacity=".8"/>` : ""}`;
     return svg(x, yard(x, hz, { drive: true, far: "house" }) + gshadow(x, m, W) + `<g class="${swingCls(x, 1)}">${s}<path d="${fr}" fill="#1e2023"/></g>` +
       pillar(x, 8, 38, 96, gy + 2, "render") + pillar(x, 158, 34, 96, gy + 2, "render") + `<path d="M8 120H46M8 146H46M158 120H192M158 146H192" stroke="#000" stroke-opacity=".18"/><path d="M8 121H46M8 147H46M158 121H192M158 147H192" stroke="#fff" stroke-opacity=".4"/><rect x="16" y="128" width="22" height="9" rx="1" fill="#2a2c30"/><text x="27" y="135" font-size="6.4" font-family="Arial,Helvetica,sans-serif" font-weight="700" text-anchor="middle" fill="#d9c49a">214</text>` + lights(27) + lights(175) +
       `<rect x="160" y="132" width="8" height="12" rx="1.5" fill="#25272a"/><circle cx="164" cy="135.5" r="1.2" fill="${x.on ? AMB : LEDG}"${x.on ? ` class="${P}blink"` : ""}/>`);
@@ -544,7 +556,7 @@ ${extra || ""}</defs>`;
     let door = "", kn = "";
     for (let i = 0; i < 4; i++) { const a = pt2(d0 + i * L / 4 + 1), b = pt2(d0 + (i + 1) * L / 4 - 1); const seg = `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}`; door += `<path d="${seg}" stroke="#1d1e20" stroke-width="10"/><path d="${seg}" stroke="${x.p.d}" stroke-width="8.4"/><path d="${seg}" stroke="${x.p.m}" stroke-width="5"/><path d="${seg}" stroke="${x.p.l}" stroke-width="1.6" transform="translate(-2 -1)" opacity=".9"/>`; const k = pt2(d0 + (i + 1) * L / 4); if (i < 3) kn += `<circle cx="${f(k[0])}" cy="${f(k[1])}" r="2.4" fill="#2c2e31"/><circle cx="${f(k[0])}" cy="${f(k[1])}" r="1" fill="#d8dcdf"/>`; }
     const tp = pt2(d0 + L - 4), tx = Math.min(166, Math.max(84, tp[0] - 6));
-    const lit = x.on;
+    const lit = x.lt;
     return svg(x, BGW(`${lg(x.id("dw"), [[0, "#7a736a"], [1, "#3e3a35"]], 0, 0, 0, 1)}<rect x="8" y="8" width="184" height="184" fill="${x.url("dw")}"/><rect x="8" y="8" width="184" height="26" fill="#9a948a"/><path d="M8 34H192" stroke="#000" stroke-opacity=".3"/><rect x="8" y="34" width="184" height="10" fill="${x.url("dn")}" opacity=".5"/>`) +
       `<path d="M30 34v8M70 34v8" stroke="#55595e" stroke-width="2"/>` +
       `<path d="M181 192V70A14 14 0 0 0 167 56H60" fill="none" stroke="#5a5f64" stroke-width="3"/><path d="M181 192V70A14 14 0 0 0 167 56H60" fill="none" stroke="#c4c9cd" stroke-width="1"/>` +
@@ -552,7 +564,7 @@ ${extra || ""}</defs>`;
       BGW(`<path d="M8 160Q40 148 70 152Q96 156 112 176L118 192H8Z" fill="#3d4f63"/><path d="M8 160Q40 148 70 152Q96 156 112 176" fill="none" stroke="#9fb4c8" stroke-opacity="${lit ? .8 : .3}" stroke-width="1.4"/><path d="M20 162Q44 154 64 157" stroke="#fff" stroke-opacity="${lit ? .35 : .1}" stroke-width="3" fill="none"/>`) +
       door + kn +
       `<rect x="74" y="44" width="100" height="4.4" fill="url(#${x.u}-chr)"/><rect x="172" y="40" width="5" height="12" fill="#55595e"/>` +
-      `<path d="M76 42.6H170" stroke="#1d1e20" stroke-width="1.6" stroke-dasharray="3 2" class="${lit ? P + "belt" : ""}"/><path d="M76 49.8H170" stroke="#1d1e20" stroke-width="1.6" stroke-dasharray="3 2" class="${lit ? P + "belt2" : ""}"/>` +
+      `<path d="M76 42.6H170" stroke="#1d1e20" stroke-width="1.6" stroke-dasharray="3 2" class="${x.on ? P + "belt" : ""}"/><path d="M76 49.8H170" stroke="#1d1e20" stroke-width="1.6" stroke-dasharray="3 2" class="${x.on ? P + "belt2" : ""}"/>` +
       `<rect x="${f(tx - 7)}" y="41.5" width="14" height="10" rx="2" fill="#3a3d41"/><path d="M${f(tx - 5)} 42.5h10" stroke="#fff" stroke-opacity=".3"/><path d="M${f(tx)} 51C${f(tx + 4)} 60 ${f(tp[0] - 6)} ${f(tp[1] + 2)} ${f(tp[0] - 2)} ${f(tp[1] + 4)}" fill="none" stroke="#6c7176" stroke-width="2.6"/>` +
       `<path d="${rr(22, 46, 54, 30, 7)}" fill="#000" opacity=".4" filter="${x.url("bl")}" transform="translate(2 4)"/><path d="${rr(22, 46, 54, 30, 7)}" fill="#e8e9e6"/><path d="${rr(22, 46, 54, 30, 7)}" fill="${x.url("sh")}"/><path d="M28 47.5H70" stroke="#fff" stroke-opacity=".9"/>` +
       `<path d="${rr(30, 72, 38, 8, 3)}" fill="${lit ? "#fff3cf" : "#b9bdbf"}"/>${lit ? `<ellipse class="${P}glow" cx="49" cy="78" rx="40" ry="18" fill="${x.url("lp")}"/>` : ""}<circle cx="70" cy="54" r="1.6" fill="${lit ? AMB : LEDG}"${lit ? ` class="${P}blink"` : ""}/><path d="M30 60h24M30 64h24" stroke="#000" stroke-opacity=".12"/>`);
@@ -589,6 +601,14 @@ ${extra || ""}</defs>`;
       `<path d="${rr(70, 122, 16, 22, 3)}" fill="${x.p.d}"/><path d="${rr(71, 123, 14, 20, 3)}" fill="${x.url("fin")}"/><rect x="75" y="131" width="6" height="5" rx="1" fill="${x.p.k}" opacity=".7"/><path d="M76 131v-2a2 2 0 0 1 4 0v2" fill="none" stroke="${x.p.k}" stroke-opacity=".7"/>` +
       `<circle cx="86" cy="70" r="1.6" fill="${lit ? AMB : LEDG}"${lit ? ` class="${P}blink"` : ""}/>` +
       BGW(`<path d="${rr(16, 84, 18, 30, 2.5)}" fill="#ecebe6"/><path d="${rr(20, 88, 10, 22, 1.5)}" fill="#dcdad3"/><path d="M20 99h10" stroke="#000" stroke-opacity=".2"/><path d="${rr(16, 84, 18, 30, 2.5)}" fill="none" stroke="#000" stroke-opacity=".25"/>`));
+  });
+
+  const LIGHT = { id: "light", name: "Light", type: "switch" }, ct = (id, name) => ({ id, name, type: "contact" });
+  const GP = { raised: 1, double: 1, carriage: 1, glass: 1, flush: 1, longpanel: 1, plank: 1, rollup: 1, tiltup: 1, opener: 1, swing: 2, garden: 2, ranch: 2, privacy: 2, iron: 2, slide: 2, slat: 3, pair: 4 };
+  icons.forEach((ic) => {
+    const k = GP[ic.id]; if (!k) return;
+    ic.parts = k === 1 ? [ct("door", "Door"), ic.id === "opener" ? Object.assign({}, LIGHT, { name: "Opener light" }) : LIGHT] : k === 2 ? [ct("gate", "Gate")] : k === 3 ? [ct("gate", "Gate"), LIGHT]
+      : [ct("d1", "Left door"), ct("d2", "Right door"), LIGHT];
   });
 
   const css = `

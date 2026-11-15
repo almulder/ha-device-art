@@ -13,13 +13,15 @@
   let K = .34;
   let PT = null;
   const sub = (o, v) => Object.assign({}, o, { on: !!v });
+  // (parts) o.mf = a Multi-Function Image: o.parts holds only the ticked parts, a part left out is off (a Device Image: o.on, as today)
   function mkPT(o) {
-    const p = o.parts || {}, has = (k) => p[k] != null, g = (k, d) => sub(o, has(k) ? p[k] : d == null ? o.on : d);
+    const p = o.parts || {}, has = (k) => p[k] != null, on0 = o.mf ? false : o.on, g = (k, d) => sub(o, has(k) ? p[k] : d == null ? on0 : d);
     const t = { oven: g("oven"), grid: g("grid"), mw: g("mw") };
     t.oven2 = has("oven2") ? g("oven2") : t.oven;
-    t.cook = has("cook") ? g("cook") : (has("front") || has("back")) ? sub(o, p.front || p.back) : sub(o, o.on);
+    if (o.mf && p.light) { t.oven = Object.assign({}, t.oven, { _lt: true }); t.oven2 = Object.assign({}, t.oven2, { _lt: true }); }
+    t.cook = has("cook") ? g("cook") : (has("front") || has("back")) ? sub(o, p.front || p.back) : sub(o, on0);
     t.front = has("front") ? g("front") : t.cook; t.back = has("back") ? g("back") : t.cook;
-    t.bs = [1, 2, 3, 4, 5, 6, 7].map((i) => has("b" + i) ? g("b" + i) : sub(o, o.on));
+    t.bs = [1, 2, 3, 4, 5, 6, 7].map((i) => has("b" + i) ? g("b" + i) : sub(o, on0));
     return t;
   }
   const metal = (o) => { const c = String(o.color || "").toLowerCase(); return c === SS ? 1 : c === BSS ? 2 : 0; };
@@ -258,7 +260,7 @@ ${extra || ""}</defs>`;
     s += `<path d="M${x} ${n1(r1)}H${x + w}M${x} ${n1(r2)}H${x + w}" stroke="#2a2e34" stroke-width="1.4"/><path d="M${x} ${n1(r1 - .7)}H${x + w}M${x} ${n1(r2 - .7)}H${x + w}" stroke="#fff" stroke-opacity="${on ? ".55" : ".1"}" stroke-width=".6"/>`;
     if (kind) s += dish(kind, cx, dy - .6, w).replace(/PERF/g, `${u}-perf`);
     if (on && cool) s += steam(o, cx, y + h * .9, w * .8, 4, .9);
-    if (!on) s += `<path d="${d}" fill="#020304" opacity=".88"/>`;
+    if (!on) s += o._lt ? `<path d="${d}" fill="#fff1c8" opacity=".3"/><path d="${d}" fill="#000" opacity=".15"/>` : `<path d="${d}" fill="#020304" opacity=".88"/>`;
     else s += `<path d="${d}" fill="#000" opacity="${(.45 - .45 * o.level).toFixed(2)}"/>`;
     s += `</g><path d="${d}" fill="url(#${u}-gl)" opacity="${on ? ".35" : ".75"}"/><path d="M${n1(x + w * .62)} ${y}L${n1(x + w * .46)} ${y + h}H${n1(x + w * .52)}L${n1(x + w * .68)} ${y}Z" fill="#fff" fill-opacity="${on ? ".04" : ".07"}"/>` +
       `<path d="${d}" fill="none" stroke="#000" stroke-opacity=".6"/>`;
@@ -622,8 +624,8 @@ ${extra || ""}</defs>`;
     co: [["cook", "Cooktop"], ["oven", "Oven"]],
     dbl: [["back", "Back burners"], ["front", "Front burners"], ["oven", "Upper oven"], ["oven2", "Lower oven"]],
     pro48: [["back", "Back burners"], ["front", "Front burners"], ["grid", "Griddle"], ["oven", "Ovens"]],
-    wall2: [["oven", "Upper oven"], ["oven2", "Lower oven"]],
-    combo: [["mw", "Microwave"], ["oven", "Oven"]],
+    wall2: [["ud", "Upper door", "contact"], ["ld", "Lower door", "contact"], ["oven", "Upper oven"], ["oven2", "Lower oven"], ["light", "Oven light"]],
+    combo: [["md", "Microwave door", "contact"], ["od", "Oven door", "contact"], ["mw", "Microwave"], ["oven", "Oven"], ["light", "Oven light"]],
     gastop: [["b1", "Left back"], ["b2", "Right back"], ["b4", "Left front"], ["b5", "Right front"], ["b3", "Center", { opt: "burners", is: "5" }], ["b6", "Center front", { opt: "burners", is: "6" }], ["b7", "Center back", { opt: "burners", is: "6" }]],
     indtop: [["b1", "Left back"], ["b2", "Right back"], ["b3", "Left front"], ["b4", "Right front"]],
     rangetop: [["cook", "Burners"], ["grid", "Charbroiler"]],
@@ -631,8 +633,48 @@ ${extra || ""}</defs>`;
   const KIND = { electric: "fb", coil: "fb", gas: "fb", slidein: "fb", pro36: "fb", pro48: "pro48", double: "dbl", induction: "fb", retro: "co", french: "co",
     wall2: "wall2", combo: "combo", gastop: "gastop", indtop: "indtop", rangetop: "rangetop" };
   icons.forEach((ic) => { const k = KIND[ic.id]; if (!k) return;
-    ic.parts = PARTS[k].map((q) => Object.assign({ id: q[0], name: q[1] }, q[2] ? { when: q[2] } : {}));
+    ic.parts = PARTS[k].map((q) => Object.assign({ id: q[0], name: q[1] }, typeof q[2] === "string" ? { type: q[2] } : q[2] ? { when: q[2] } : {}));
     const R = ic.render; ic.render = (o) => { const prev = PT; PT = mkPT(o); try { return R(o); } finally { PT = prev; } }; });
+  // (parts) the double wall oven and the oven combo: each door its own contact (a Device Image: the device's contact o.open).
+  // An open oven door shows the cavity (the element glowing with the heat, lit by the heat or the Oven light) and the door
+  // folded down below it; the microwave door swings open to the left.
+  function rgCav(o, X, Y, W, H, heat, lit, mw, k) {
+    const bx = X + W * .1, bw = W * .8, by = Y + H * .1, bh = H * .78, cid = `${o.uid}-rc${k}`;
+    let s = `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="#1d2129"/><rect x="${n1(bx)}" y="${n1(by)}" width="${n1(bw)}" height="${n1(bh)}" fill="#272c36"/>` +
+      `<path d="M${X} ${Y}L${n1(bx)} ${n1(by)}V${n1(by + bh)}L${X} ${Y + H}Z" fill="#2e3440"/><path d="M${X + W} ${Y}L${n1(bx + bw)} ${n1(by)}V${n1(by + bh)}L${X + W} ${Y + H}Z" fill="#232831"/>` +
+      `<path d="M${X} ${Y + H}L${n1(bx)} ${n1(by + bh)}H${n1(bx + bw)}L${X + W} ${Y + H}Z" fill="#15181e"/>`;
+    if (mw) s += `<ellipse cx="${n1(X + W / 2)}" cy="${n1(by + bh - 2)}" rx="${n1(bw * .36)}" ry="${n1(bh * .08)}" fill="#dfe4ea" fill-opacity=".7"/>`;
+    else s += `<path d="M${n1(bx + 3)} ${n1(by + 3)}${[1, 2, 3, 4, 5, 6].map((i) => `L${n1(bx + 3 + (bw - 6) * i / 6.5)} ${n1(by + (i % 2 ? 6 : 3))}`).join("")}" fill="none" stroke="${heat ? "#ff5a1a" : "#4a505a"}" stroke-width="1.3"/>` +
+      [.55, .82].map((q) => `<path d="M${X + 2} ${n1(Y + H * q)}H${X + W - 2}" stroke="#a9b0b8" stroke-width=".9"/>`).join("") +
+      `<path d="M${n1(X + W / 2 - 15)} ${n1(Y + H * .55)}l3 -6h24l3 6z" fill="#3f4652"/><ellipse cx="${n1(X + W / 2)}" cy="${n1(Y + H * .55 - 7)}" rx="8" ry="3.6" fill="#b5622a"/>` +
+      (heat ? `<ellipse cx="${n1(X + W / 2)}" cy="${n1(by + 4)}" rx="${n1(bw / 2)}" ry="${n1(H * .3)}" fill="#ff7a2a" opacity=".22"/>` : "");
+    s += lit || heat ? `<ellipse cx="${n1(X + W / 2)}" cy="${n1(Y + 3)}" rx="${n1(W * .5)}" ry="${n1(H * .7)}" fill="#fff1c8" opacity=".22"/><rect x="${n1(bx + bw - 8)}" y="${n1(by + 1)}" width="4" height="3" rx="1" fill="#fff4d6"/>` : `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="#05060a" opacity=".4"/>`;
+    return `<clipPath id="${cid}"><rect x="${X}" y="${Y}" width="${W}" height="${H}"/></clipPath><g clip-path="url(#${cid})">${s}</g><rect x="${X + .4}" y="${Y + .4}" width="${W - .8}" height="${H - .8}" fill="none" stroke="#5d656d" stroke-width=".7"/>`;
+  }
+  function rgDrop(o, X, Yb, W) {
+    const dp = Math.min(16, 196 - Yb), g = 6, d = `M${X} ${Yb}H${X + W}L${X + W + g} ${Yb + dp}H${X - g}Z`, gl = `M${X + 12} ${Yb + 2}H${X + W - 12}L${X + W - 8} ${Yb + dp - 3}H${X + 8}Z`;
+    return `<ellipse cx="${X + W / 2}" cy="${Math.min(198, Yb + dp + 2)}" rx="${W / 2 + 10}" ry="2.4" fill="#000" opacity=".3"/><path d="${d}" fill="#3a3f46"/><path d="${gl}" fill="#14171c"/>` +
+      `<rect x="${X - g}" y="${Yb + dp}" width="${W + 2 * g}" height="3.4" rx="1" fill="url(#${o.uid}-st)"/><path d="M${X - g} ${Yb + dp + 3.4}H${X + W + g}" stroke="#000" stroke-opacity=".5" stroke-width=".6"/>`;
+  }
+  function rgSwing(X, Y, H) {
+    const ow = 26, e = 4, d = `M${X} ${Y}L${X - ow} ${Y - e}V${Y + H + e}L${X} ${Y + H}Z`;
+    return `<path d="${d}" fill="#c9ced4"/><path d="${d}" fill="#000" opacity=".22"/><path d="M${n1(X - 4)} ${Y + 5}L${X - 22} ${Y + 2}V${Y + H - 2}L${n1(X - 4)} ${Y + H - 5}Z" fill="#0d0f13" opacity=".8"/>`;
+  }
+  // door id, rect [X, Y, W, H], kind ("mw" = side-hinged), heat part
+  const RDOORS = { wall2: [["ud", [46, 31, 108, 59], "", "oven"], ["ld", [46, 94, 108, 70], "", "oven2"]], combo: [["md", [46, 24, 80, 46], "mw", "mw"], ["od", [48, 85, 104, 77], "", "oven"]] };
+  icons.forEach((ic) => {
+    const ds = RDOORS[ic.id]; if (!ds) return;
+    const R = ic.render;
+    ic.render = (o) => {
+      const p = o.parts || {}, op = ds.filter((d) => (o.mf ? !!p[d[0]] : !!o.open));
+      if (!op.length) return R(o);
+      const heat = (k) => (o.mf ? !!p[k] : p[k] != null ? !!p[k] && !!o.on : !!o.on), lit = !!o.mf && !!p.light;
+      let add = "";
+      op.forEach((d, i) => { const r = d[1]; add += rgCav(o, r[0], r[1], r[2], r[3], heat(d[3]), lit && d[2] !== "mw", d[2] === "mw", i); });
+      op.slice().sort((a, b) => b[1][1] - a[1][1]).forEach((d) => { const r = d[1]; add += d[2] === "mw" ? rgSwing(r[0], r[1], r[3]) : rgDrop(o, r[0], r[1] + r[3], r[2]); });
+      return R(o).replace(/<\/svg>$/, add + "</svg>");
+    };
+  });
   const OPTS = {
     pro48: [{ id: "type", name: "Type", values: [["free", "Freestanding"], ["slide", "Slide-in"]] }],
     gastop: [{ id: "fuel", name: "Fuel", values: [["gas", "Gas"], ["electric", "Electric"], ["induction", "Induction"]] }, { id: "burners", name: "Burners", values: [["5", "5"], ["4", "4"], ["6", "6"]] }],

@@ -4,7 +4,22 @@
   const R = Math.PI / 180;
   const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
 
+  // (multi-function) parts: Power (switch), Mute (switch), Volume (value, %) and, where the drawing has a display,
+  // Input (stage). o.parts holds only the parts the owner ticked; as a Device Image (no o.mf) the drawing is exactly as
+  // today (on = playing, the slider = the volume). As a Multi-Function Image (o.mf): on = the Power part (left out =
+  // on), the volume = o.pval.volume (left out = "--" on the display), Mute = a muted-speaker sign on the display and
+  // the meters at rest, Input = the source's short name on the display.
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    val: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" && isFinite(+o.pval[k]) ? +o.pval[k] : null),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+  };
   function ctx(o) {
+    if (o.mf) {
+      const c = o.color || "#232428", on = MF.has(o, "power") ? !!o.parts.power : true, v = MF.val(o, "volume"), lv = v == null ? 0 : Math.max(0, Math.min(1, v / 100));
+      return { c, on, lv, L: on ? .55 + .45 * lv : 0, id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, n: 0,
+        mf: true, nov: v == null, mute: MF.has(o, "mute") && !!o.parts.mute, inp: MF.st(o, "input") };
+    }
     const c = o.color || "#232428", on = !!o.on, lv = o.level == null ? .6 : Math.max(0, Math.min(1, o.level));
     return { c, on, lv, L: on ? .55 + .45 * lv : 0, id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, n: 0 };
   }
@@ -17,6 +32,8 @@
   const anim = (cls, dur, delay) => `class="${P}${cls}" style="animation-duration:${f(dur)}s;animation-delay:${(delay || 0).toFixed(2)}s"`;
   const dB = (lv) => (Math.round((-80 + 80 * lv) * 2) / 2).toFixed(1);
   const num = (lv, max) => String(Math.round(lv * (max || 100)));
+  // the volume as shown: a Multi-Function Image without a Volume reading shows dashes
+  const vd = (x) => (x.nov ? "--" : dB(+x.lv)), vn = (x, max) => (x.nov ? "--" : num(x.lv, max));
 
   const WHITE = "#d8ecff", CYAN = "#8fe6ff", AMBER = "#ffb347", BLUE = "#59b4ff", WARM = "#ffcf7a";
 
@@ -134,30 +151,55 @@ ${o2.bars ? (() => { let b = ""; for (let i = 0; i < 10; i++) b += `<rect x="${f
     for (let i = 0; i <= 10; i++) { const a = (-50 + i * 10) * R, r1 = len * .78, r2 = len * (i % 5 ? .86 : .9);
       ticks += `<path d="M${f(px + r1 * Math.sin(a))} ${f(py - r1 * Math.cos(a))}L${f(px + r2 * Math.sin(a))} ${f(py - r2 * Math.cos(a))}" stroke="${i > 7 ? "#ff5a5a" : (lit ? "#0b1830" : "#6b7280")}" stroke-width="${i % 5 ? .8 : 1.2}"/>`; }
     const arc = `M${f(px - len * .82 * Math.sin(50 * R))} ${f(py - len * .82 * Math.cos(50 * R))}A${f(len * .82)} ${f(len * .82)} 0 0 1 ${f(px + len * .82 * Math.sin(50 * R))} ${f(py - len * .82 * Math.cos(50 * R))}`;
-    const base = lit ? -45 + 70 * x.lv : -50;
+    const base = lit && !x.mute ? -45 + 70 * x.lv : -50;
     const needle = `<path d="M${f(px)} ${f(py)}L${f(px)} ${f(py - len * .92)}" stroke="${o2.needle || "#101216"}" stroke-width="1" stroke-linecap="round"/><path d="M${f(px)} ${f(py)}L${f(px)} ${f(py + len * .92)}" stroke="none"/>`;
     return `<clipPath id="${cid}"><path d="${rrp(X, Y, W, Hh, 2)}"/></clipPath>
 <path d="${rrp(X - 1.5, Y - 1.5, W + 3, Hh + 3, 3)}" fill="#000" fill-opacity=".7"/>
 <g clip-path="url(#${cid})"><rect x="${X}" y="${Y}" width="${W}" height="${Hh}" fill="${face}"/>
 ${lit ? `<ellipse cx="${px}" cy="${Y + Hh * .55}" rx="${W * .55}" ry="${Hh * .6}" fill="#fff" opacity=".35"/>` : ""}
 <path d="${arc}" fill="none" stroke="${lit ? "#0b1830" : "#6b7280"}" stroke-width=".8"/>${ticks}
-<g transform="rotate(${f(base)} ${f(px)} ${f(py)})"><g ${lit ? anim("swing", .9 + delay * .3, -delay) : ""}>${needle}</g></g>
+<g transform="rotate(${f(base)} ${f(px)} ${f(py)})"><g ${lit && !x.mute ? anim("swing", .9 + delay * .3, -delay) : ""}>${needle}</g></g>
 <rect x="${X}" y="${Y}" width="${W}" height="${Hh * .4}" fill="${x.url("gloss")}"/></g>`;
   }
   const name = (d) => Object.assign({ picker: true, colorLabel: "Finish" }, d);
+  // (parts) where each drawing shows the input (x, y, anchor, size, color; null = no display for it) and the mute sign
+  const INPUTS = [["tv", "TV", "TV"], ["bluray", "Blu-ray", "BD"], ["game", "Game", "GAME"], ["stream", "Streaming", "NET"], ["cd", "CD", "CD"], ["phono", "Phono", "PHONO"], ["tuner", "Tuner", "TUNER"], ["aux", "Aux", "AUX"]];
+  const OV = {
+    "black-receiver-wide-display": { inp: [56, 96, "start", 4.2, WHITE], mute: [141, 93.5, 1] },
+    "porthole-display-receiver": { inp: [100, 113.6, "middle", 3.2, "#bfe4ff"], mute: [100, 98.6, .7] },
+    "big-dial-receiver": { inp: [104, 97.4, "start", 2.6, WHITE], mute: [147, 98, .7] },
+    "two-knob-receiver": { inp: [40, 98.5, "start", 4.2, "#a8ecff"], mute: [118, 95.5, 1] },
+    "gloss-black-receiver": { inp: [60, 99, "start", 4, AMBER], mute: [133, 97, 1] },
+    "slim-silver-receiver": { inp: [69, 106.6, "start", 3.6, "#f2f6ff"], mute: [127, 104.5, .6] },
+    "minimal-black-amp": { inp: [89, 115, "start", 3.4, "#ffffff"], mute: [135, 103.5, .7] },
+    compact: { inp: [67, 121.6, "start", 3.6, WHITE], mute: [108, 119, .7] },
+    bluemeter: { inp: null, mute: [100, 119.5, .8] },
+    vintage: { inp: null, mute: [141, 137, .7] },
+    streamer: { inp: [74, 132, "start", 3.4, "#e8f6ff"], mute: [91, 110.5, .6] },
+    separates: { inp: [61.5, 80.2, "start", 2.6, WHITE], mute: [106, 77, .7] },
+  };
+  const muteSign = (cx, cy, s, col) => `<g transform="translate(${cx} ${cy}) scale(${s})"><path d="M-4.6 -1.6H-2.6L0 -4V4L-2.6 1.6H-4.6Z" fill="${col}"/><path d="M1.6 -2L5 2M5 -2L1.6 2" stroke="${col}" stroke-width="1.1" stroke-linecap="round"/></g>`;
+  function over(x, id) {
+    const c = OV[id]; if (!x.mf || !x.on || !c) return "";
+    let s = "";
+    const inp = c.inp && x.inp ? INPUTS.find((v) => v[0] === x.inp) : null;
+    if (inp) s += `<text x="${c.inp[0]}" y="${c.inp[1]}" text-anchor="${c.inp[2]}" font-family="Arial,Helvetica,sans-serif" font-size="${c.inp[3]}" font-weight="700" letter-spacing="${c.inp[3] < 3 ? 0 : .3}" fill="${c.inp[4]}" opacity=".9">${inp[2]}</text>`;
+    if (x.mute) s += muteSign(c.mute[0], c.mute[1], c.mute[2], "#ff6a5a");
+    return s;
+  }
   const BLK = "#232428", SIL = "#c9ccd0", CHA = "#d6c49e", GPH = "#55585e", GLD = "#b89a5e";
 
   const icons = [
      name({ id: "black-receiver-wide-display", name: "Black receiver, wide display", colors: [BLK, SIL, GPH], render(o) {
       const x = ctx(o), dm = x.c === BLK || x.c === GPH ? "dark" : "metal";
       const B = chassis(x, 14, 74, 172, 70, { vents: true }) +
-        `${glowAt(x, 100, 96, 50, 16)}${disp(x, 52, 86, 96, 20, WHITE, dB(x.lv), 9, { bars: true, sy: 89 })}
+        `${glowAt(x, 100, 96, 50, 16)}${disp(x, 52, 86, 96, 20, WHITE, vd(x), 9, { bars: true, sy: 89 })}
 ${x.on ? `<rect x="62" y="101" width="30" height="1.6" rx=".8" fill="${WHITE}" opacity=".55"/><rect x="108" y="101" width="22" height="1.6" rx=".8" fill="${WHITE}" opacity=".4"/>` : ""}
 ${[62, 72, 82, 92, 102, 112, 122, 132].map((cx) => pill(x, cx, 113, 6, 2.8, dm === "dark")).join("")}
 ${knob(x, 34, 102, 14, null, dm)}${knob(x, 166, 102, 15, x.lv, dm)}
 ${btn(x, 26, 134, 3, dm === "dark")}${sled(x, 35, 134)}<circle cx="48" cy="134" r="2.6" fill="#0b0b0d"/><circle cx="58" cy="134" r="2" fill="#0b0b0d"/>
 <rect x="150" y="132" width="16" height="1.6" rx=".8" fill="#000" fill-opacity=".4"/>`;
-      return scene(x, { body: B, wall: "living", glow: [100, 96] });
+      return scene(x, { body: B + over(x, "black-receiver-wide-display"), wall: "living", glow: [100, 96] });
     } }),
 
      name({ id: "porthole-display-receiver", name: "Porthole-display receiver", colors: [BLK, CHA, SIL], render(o) {
@@ -169,55 +211,55 @@ ${dk("M38 80V142M162 80V142", .45, 1.2)}${hl("M39 80V142M161 80V142", .14, .8)}
 ${lit ? `<circle cx="100" cy="106" r="30" fill="url(#${x.id("port")})" opacity="${(x.L * .85).toFixed(2)}"/>` : ""}
 <circle cx="100" cy="106" r="15" fill="#000" fill-opacity=".6"/><circle cx="100" cy="106" r="14" fill="${x.url("glass")}"/>
 <circle cx="100" cy="106" r="14" fill="none" stroke="${lit ? col : "#3a3f48"}" stroke-width="1.8" opacity="${lit ? .95 : .7}"/>
-${lit ? `<circle cx="100" cy="106" r="12" fill="${col}" opacity=".08"/>${seg7(dB(x.lv), 100 - segW(dB(x.lv), 5.5) / 2, 103.5, 5.5, col, .06)}` : ""}
+${lit ? `<circle cx="100" cy="106" r="12" fill="${col}" opacity=".08"/>${seg7(vd(x), 100 - segW(vd(x), 5.5) / 2, 103.5, 5.5, col, .06)}` : ""}
 <circle cx="100" cy="106" r="14" fill="url(#${x.id("pgl")})"/>
 ${knob(x, 58, 108, 12, null, km)}${knob(x, 142, 108, 12, x.lv, km)}${sled(x, 100, 134, col)}`;
-      return scene(x, { body: B, wall: "warm", glow: [100, 106], extra: rg(x.id("port"), [[0, col, .7], [.5, col, .2], [1, col, 0]]) + rg(x.id("pgl"), [[0, "#fff", 0], [.7, "#fff", 0], [.85, "#fff", .14], [1, "#fff", 0]], .4, .35, .7) });
+      return scene(x, { body: B + over(x, "porthole-display-receiver"), wall: "warm", glow: [100, 106], extra: rg(x.id("port"), [[0, col, .7], [.5, col, .2], [1, col, 0]]) + rg(x.id("pgl"), [[0, "#fff", 0], [.7, "#fff", 0], [.85, "#fff", .14], [1, "#fff", 0]], .4, .35, .7) });
     } }),
 
      name({ id: "big-dial-receiver", name: "Big-dial receiver", colors: [BLK, "#3d3f44", SIL], render(o) {
       const x = ctx(o), dm = x.c === SIL ? "metal" : "dark";
       const B = chassis(x, 14, 76, 172, 70, { r: 2, vents: true, face: x.c === BLK ? "blkface" : "face" }) +
         `<path d="${rrp(16, 78, 168, 40, 2)}" fill="${x.url("gloss")}" opacity=".5"/>
-${glowAt(x, 126, 98, 34, 14)}${disp(x, 102, 90, 50, 16, WHITE, dB(x.lv), 8, { marks: false })}
+${glowAt(x, 126, 98, 34, 14)}${disp(x, 102, 90, 50, 16, WHITE, vd(x), 8, { marks: false })}
 ${[106, 116, 126, 136].map((cx) => pill(x, cx, 114, 7, 2.6, dm === "dark")).join("")}
 ${knob(x, 72, 102, 21, x.lv, dm)}${knob(x, 168, 104, 8, null, dm)}
 ${btn(x, 26, 134, 3.2, dm === "dark")}${sled(x, 36, 134)}<rect x="48" y="132" width="9" height="4" rx="1" fill="#0b0b0d"/><circle cx="66" cy="134" r="2.6" fill="#0b0b0d"/>
 <path d="M16 126H184" stroke="#fff" stroke-opacity=".06"/>`;
-      return scene(x, { body: B, wall: "slate", glow: [126, 98] });
+      return scene(x, { body: B + over(x, "big-dial-receiver"), wall: "slate", glow: [126, 98] });
     } }),
 
      name({ id: "two-knob-receiver", name: "Two-knob receiver", colors: [BLK, SIL, GPH], render(o) {
       const x = ctx(o), col = "#a8ecff";
       let grid = ""; for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) grid += pill(x, 136 + c * 8.6, 86 + r * 6.4, 6, 3, true);
       const B = chassis(x, 14, 74, 172, 70, { vents: true }) +
-        `${glowAt(x, 82, 96, 50, 14)}${disp(x, 36, 86, 92, 19, col, num(x.lv, 80), 10, { bars: true })}
+        `${glowAt(x, 82, 96, 50, 14)}${disp(x, 36, 86, 92, 19, col, vn(x, 80), 10, { bars: true })}
 ${[46, 58, 70, 82, 94, 106].map((cx) => pill(x, cx, 112, 8, 3, true)).join("")}${grid}
 ${btn(x, 24, 88, 2.8, true)}${sled(x, 24, 96)}
 ${knob(x, 160, 124, 14, x.lv, "dark")}${knob(x, 30, 128, 5.5, null, "dark")}${knob(x, 46, 128, 5.5, null, "dark")}<circle cx="62" cy="130" r="2.4" fill="#0b0b0d"/>`;
-      return scene(x, { body: B, wall: "navy", glow: [82, 96] });
+      return scene(x, { body: B + over(x, "two-knob-receiver"), wall: "navy", glow: [82, 96] });
     } }),
 
      name({ id: "gloss-black-receiver", name: "Gloss-black receiver", colors: [BLK, SIL, GPH], render(o) {
       const x = ctx(o), dm = x.c === SIL ? "metal" : "dark";
       const ring = (cx) => `<circle cx="${cx}" cy="104" r="17.4" fill="none" stroke="${x.url("chrome")}" stroke-width="1.6"/>`;
       const B = chassis(x, 14, 78, 172, 66, { r: 4, vents: true }) +
-        `${glowAt(x, 100, 97, 46, 14, "hA")}${disp(x, 56, 88, 88, 18, AMBER, dB(x.lv), 9.5, { bars: true })}
+        `${glowAt(x, 100, 97, 46, 14, "hA")}${disp(x, 56, 88, 88, 18, AMBER, vd(x), 9.5, { bars: true })}
 ${[60, 71, 82, 93, 104, 115, 126, 137].map((cx) => pill(x, cx, 113, 6, 2.6, dm === "dark")).join("")}
 ${ring(34)}${ring(166)}${knob(x, 34, 104, 15, null, dm)}${knob(x, 166, 104, 15, x.lv, dm)}
 ${btn(x, 24, 86, 2.4, dm === "dark")}${sled(x, 32, 86)}<circle cx="28" cy="134" r="2.6" fill="#0b0b0d"/><circle cx="40" cy="134" r="2" fill="#0b0b0d"/>
 <rect x="92" y="126" width="16" height="1.6" rx=".8" fill="#000" fill-opacity=".45"/>`;
-      return scene(x, { body: B, wall: "living", glow: [100, 97] });
+      return scene(x, { body: B + over(x, "gloss-black-receiver"), wall: "living", glow: [100, 97] });
     } }),
 
      name({ id: "slim-silver-receiver", name: "Slim silver receiver", colors: [BLK, SIL, GPH], render(o) {
       const x = ctx(o), dm = x.c === SIL ? "metal" : "dark";
       const B = chassis(x, 14, 94, 172, 50, { r: 2, vents: true, depth: 8 }) +
-        `${glowAt(x, 100, 104, 40, 8)}${disp(x, 66, 100, 68, 9, "#f2f6ff", num(x.lv, 74), 5, { marks: false })}
+        `${glowAt(x, 100, 104, 40, 8)}${disp(x, 66, 100, 68, 9, "#f2f6ff", vn(x, 74), 5, { marks: false })}
 <path d="M16 118H184" stroke="#000" stroke-opacity=".35"/><path d="M16 119H184" stroke="#fff" stroke-opacity=".08"/>
 ${btn(x, 26, 131, 2.8, dm === "dark")}${sled(x, 35, 131)}<circle cx="48" cy="131" r="2.6" fill="#0b0b0d"/><rect x="58" y="129" width="9" height="4" rx="1" fill="#0b0b0d"/>
 ${knob(x, 140, 131, 7.5, null, dm)}${knob(x, 163, 130, 10.5, x.lv, dm)}`;
-      return scene(x, { body: B, wall: "sage", glow: [100, 104] });
+      return scene(x, { body: B + over(x, "slim-silver-receiver"), wall: "sage", glow: [100, 104] });
     } }),
 
      name({ id: "minimal-black-amp", name: "Minimal black amp", colors: ["#4a4c52", BLK, SIL], render(o) {
@@ -226,22 +268,22 @@ ${knob(x, 140, 131, 7.5, null, dm)}${knob(x, 163, 130, 10.5, x.lv, dm)}`;
         `<path d="${rrp(18, 76, 164, 66, 4)}" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="1.2"/>
 ${glowAt(x, 112, 100, 44, 22)}<path d="${rrp(84, 85, 58, 32, 2.4)}" fill="#000" fill-opacity=".7"/><path d="${rrp(85, 86, 56, 30, 2)}" fill="#04050a"/>
 ${lit ? `<rect x="89" y="90" width="16" height="16" rx="1" fill="url(#${x.id("art")})"/><rect x="108" y="91" width="28" height="2" rx="1" fill="#fff" opacity=".8"/><rect x="108" y="95.5" width="20" height="1.6" rx=".8" fill="#fff" opacity=".45"/>
-${seg7(dB(x.lv), 108, 100, 7, "#ffffff", 0)}<rect x="89" y="110" width="48" height="1.4" rx=".7" fill="#fff" opacity=".15"/><rect x="89" y="110" width="${f(48 * x.lv)}" height="1.4" rx=".7" fill="#8fd2ff"/>` : ""}
+${seg7(vd(x), 108, 100, 7, "#ffffff", 0)}<rect x="89" y="110" width="48" height="1.4" rx=".7" fill="#fff" opacity=".15"/><rect x="89" y="110" width="${f(48 * x.lv)}" height="1.4" rx=".7" fill="#8fd2ff"/>` : ""}
 <path d="${rrp(85, 86, 56, 13, 2)}" fill="${x.url("gloss")}"/>
 ${knob(x, 58, 102, 18, x.lv, "metal")}${knob(x, 160, 102, 6.5, null, "metal")}
 ${[66, 75, 84, 93, 102, 111, 120, 129].map((cx) => pill(x, cx, 125, 6.5, 2.6, true)).join("")}
 ${sled(x, 26, 102)}`;
-      return scene(x, { body: B, wall: "slate", glow: [112, 100], extra: lg(x.id("art"), [[0, "#ffb05a"], [.5, "#d2507a"], [1, "#3b4bb3"]], 0, 0, 1, 1) });
+      return scene(x, { body: B + over(x, "minimal-black-amp"), wall: "slate", glow: [112, 100], extra: lg(x.id("art"), [[0, "#ffb05a"], [.5, "#d2507a"], [1, "#3b4bb3"]], 0, 0, 1, 1) });
     } }),
 
 
      name({ id: "compact", name: "Slim receiver", colors: [BLK, SIL, CHA, GPH], render(o) {
       const x = ctx(o);
       const B = chassis(x, 36, 106, 128, 38, { r: 3, depth: 6, vents: true }) +
-        `${glowAt(x, 92, 118, 32, 10)}${disp(x, 64, 113, 50, 12, WHITE, num(x.lv), 7, { marks: false })}
+        `${glowAt(x, 92, 118, 32, 10)}${disp(x, 64, 113, 50, 12, WHITE, vn(x), 7, { marks: false })}
 ${knob(x, 142, 125, 11, x.lv, x.c === BLK ? "dark" : "metal")}${btn(x, 46, 120, 2.6, x.c === BLK)}${sled(x, 46, 132)}
 ${[64, 74, 84].map((cx) => pill(x, cx, 131, 7, 2.8, x.c === BLK)).join("")}<circle cx="104" cy="133" r="2" fill="#0b0b0d"/>`;
-      return scene(x, { body: B, wall: "warm", glow: [92, 118] });
+      return scene(x, { body: B + over(x, "compact"), wall: "warm", glow: [92, 118] });
     } }),
 
      name({ id: "bluemeter", name: "Blue-meter amp", colors: [SIL, BLK, GPH], render(o) {
@@ -254,7 +296,7 @@ ${meter(x, 48, 83, 48, 30, MB, 0)}${meter(x, 104, 83, 48, 30, MB, .37)}
 <path d="M44 124H156" stroke="#000" stroke-opacity=".35" stroke-width=".8"/><path d="M60 128H140" stroke="#000" stroke-opacity=".25" stroke-width=".6"/>
 ${[58, 78, 122, 142].map((cx) => knob(x, cx, 136, 4.6, null, "dark")).join("")}${knob(x, 100, 136, 6, x.lv, "dark")}
 ${sled(x, 156, 136, MB)}${handle(24)}${handle(169)}`;
-      return scene(x, { body: B, wall: "navy", glow: [100, 98], shelfKind: "rack" });
+      return scene(x, { body: B + over(x, "bluemeter"), wall: "navy", glow: [100, 98], shelfKind: "rack" });
     } }),
 
      name({ id: "vintage", name: "Vintage receiver", colors: ["#6e4326", "#8a5a32", "#4a2b19", "#a8774a", "#2b2522"], render(o) {
@@ -277,34 +319,34 @@ ${[36, 56, 76, 96, 116].map((cx) => knob(x, cx, 128, 6, null, "metal")).join("")
 ${[128, 134].map((cx) => `<rect x="${cx}" y="124" width="3" height="7" rx="1" fill="${x.url("chrome")}"/>`).join("")}
 <circle cx="26" cy="136" r="2.2" fill="#0b0b0d"/>
 ${lit ? `<circle cx="172" cy="137" r="1.5" fill="#ff6a3a"/><circle cx="172" cy="137" r="4" fill="${x.url("hA")}"/>` : `<circle cx="172" cy="137" r="1.4" fill="#3a2a22"/>`}`;
-      return scene(x, { body: B, wall: "warm", glow: [100, 100, "hA"], extra: lg(x.id("alu"), [[0, "#f2f3f5"], [.1, "#d4d7dc"], [.6, "#bfc3c9"], [1, "#868b93"]], 0, 0, 0, 1) + lg(x.id("dial"), [[0, "#fff0cc"], [.5, "#ffd890"], [1, "#e6a54a"]], 0, 0, 0, 1) });
+      return scene(x, { body: B + over(x, "vintage"), wall: "warm", glow: [100, 100, "hA"], extra: lg(x.id("alu"), [[0, "#f2f3f5"], [.1, "#d4d7dc"], [.6, "#bfc3c9"], [1, "#868b93"]], 0, 0, 0, 1) + lg(x.id("dial"), [[0, "#fff0cc"], [.5, "#ffd890"], [1, "#e6a54a"]], 0, 0, 0, 1) });
     } }),
 
      name({ id: "streamer", name: "Network receiver", colors: [BLK, SIL, CHA, GPH], render(o) {
       const x = ctx(o), lit = x.on;
-      let bars = ""; for (let i = 0; i < 8; i++) { const hgt = 3 + ((i * 37) % 7); bars += `<rect x="${64 + i * 3}" y="${118 - hgt}" width="2" height="${hgt}" fill="#9fe0ff" ${anim("eq", .5 + (i % 3) * .17, -i * .11)}/>`; }
+      let bars = ""; for (let i = 0; i < 8; i++) { const hgt = 3 + ((i * 37) % 7); bars += x.mute ? `<rect x="${64 + i * 3}" y="117" width="2" height="1" fill="#9fe0ff"/>` : `<rect x="${64 + i * 3}" y="${118 - hgt}" width="2" height="${hgt}" fill="#9fe0ff" ${anim("eq", .5 + (i % 3) * .17, -i * .11)}/>`; }
       const B = chassis(x, 20, 98, 160, 46, { r: 3, vents: true }) +
         `<path d="${rrp(32, 105, 64, 32, 2)}" fill="#000" fill-opacity=".7"/><path d="${rrp(33, 106, 62, 30, 1.5)}" fill="#05060a"/>
 ${lit ? `<rect x="36" y="109" width="22" height="22" rx="1" fill="url(#${x.id("art")})"/><circle cx="47" cy="120" r="5" fill="#000" fill-opacity=".25"/>
 <g opacity="${(.6 + .4 * x.L).toFixed(2)}">${bars}</g><rect x="62" y="124" width="30" height="1.4" rx=".7" fill="#fff" opacity=".2"/><rect x="62" y="124" width="${f(30 * x.lv)}" height="1.4" rx=".7" fill="#9fe0ff"/>
-${seg7(num(x.lv), 62, 127.5, 5, "#e8f6ff", 0)}<ellipse cx="64" cy="121" rx="40" ry="20" fill="${x.url("hW")}" opacity="${(x.L * .25).toFixed(2)}"/>` : ""}
+${seg7(vn(x), 62, 127.5, 5, "#e8f6ff", 0)}<ellipse cx="64" cy="121" rx="40" ry="20" fill="${x.url("hW")}" opacity="${(x.L * .25).toFixed(2)}"/>` : ""}
 <path d="${rrp(33, 106, 62, 13, 1.5)}" fill="${x.url("gloss")}"/>
 ${knob(x, 152, 121, 13, x.lv, x.c === BLK ? "dark" : "metal")}${[110, 120].map((cx) => btn(x, cx, 114, 2.4, x.c === BLK)).join("")}
 ${sled(x, 110, 130)}<circle cx="122" cy="130" r="2" fill="#0b0b0d"/>`;
-      return scene(x, { body: B, wall: "sage", glow: [64, 121], extra: lg(x.id("art"), [[0, "#ff7a59"], [.5, "#c2418c"], [1, "#3b3bb3"]], 0, 0, 1, 1) });
+      return scene(x, { body: B + over(x, "streamer"), wall: "sage", glow: [64, 121], extra: lg(x.id("art"), [[0, "#ff7a59"], [.5, "#c2418c"], [1, "#3b3bb3"]], 0, 0, 1, 1) });
     } }),
 
      name({ id: "separates", name: "Separates stack", colors: [SIL, BLK, CHA, GPH], render(o) {
       const x = ctx(o), dark = x.c === BLK ? "dark" : "metal";
       const B = chassis(x, 24, 62, 152, 32, { r: 2, depth: 6, feet: true }) +
-        `${glowAt(x, 88, 77, 30, 10)}${disp(x, 60, 70, 54, 14, WHITE, dB(x.lv), 8, { marks: false })}
+        `${glowAt(x, 88, 77, 30, 10)}${disp(x, 60, 70, 54, 14, WHITE, vd(x), 8, { marks: false })}
 ${knob(x, 150, 78, 11, x.lv, dark)}${knob(x, 40, 78, 7, null, dark)}${sled(x, 126, 84)}${btn(x, 126, 74, 2.2, dark === "dark")}` +
         `<rect x="8" y="98" width="184" height="3.5" fill="${x.url("rackt")}"/><rect x="8" y="101.5" width="184" height="3" fill="#000" fill-opacity=".5"/>` +
         chassis(x, 24, 112, 152, 34, { r: 2, depth: 6 }) +
         `<path d="${rrp(54, 115, 92, 25, 2)}" fill="#05070c"/>${meter(x, 58, 117.5, 40, 20, "#ffd28a", .1)}${meter(x, 102, 117.5, 40, 20, "#ffd28a", .45)}
 ${glowAt(x, 100, 126, 56, 16, "hA", .5)}${btn(x, 36, 127, 3.2, dark === "dark")}${sled(x, 164, 127, "#ffd28a")}
 <path d="${rrp(26, 115, 4, 28, 2)}" fill="${x.url("chrome")}"/><path d="${rrp(170, 115, 4, 28, 2)}" fill="${x.url("chrome")}"/>`;
-      return scene(x, { body: B, wall: "slate", shelfKind: "rack", glow: [100, 110] });
+      return scene(x, { body: B + over(x, "separates"), wall: "slate", shelfKind: "rack", glow: [100, 110] });
     } }),
   ];
 
@@ -327,4 +369,7 @@ ${glowAt(x, 100, 126, 56, 16, "hA", .5)}${btn(x, 36, 127, 3.2, dark === "dark")}
 @media (prefers-reduced-motion:reduce){.hda-anim .hda-avr-swing,.hda-anim .hda-avr-eq{animation:none}}`,
     icons,
   });
+  icons.forEach((ic) => { const c = OV[ic.id]; if (!c) return;
+    ic.parts = [{ id: "power", name: "Power" }, { id: "mute", name: "Mute" }, { id: "volume", name: "Volume", type: "value", unit: "%", min: 0, max: 100, def: 40 }]
+      .concat(c.inp ? [{ id: "input", name: "Input", type: "stage", values: INPUTS.map((v) => [v[0], v[1]]), def: "tv" }] : []); });
 })();

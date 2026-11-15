@@ -7,6 +7,18 @@
   const sw = (a) => [a].concat(SW.filter((c) => c !== a));
   const lum = (c) => { const x = H.hx(c); return (x[0] * 0.3 + x[1] * 0.59 + x[2] * 0.11) / 255; };
   const TR = "#f2efe8", AIR = "#d6ecff", WARM = "#ffd9b0";
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
 
   function K(o) {
     const u = o.uid, defs = [], seen = {}; let n = 0;
@@ -283,21 +295,37 @@
       b += `<g${k.on ? ` class="${P}osc"` : ""}>${head}</g>` + radial(k, 132, 96, 42, "in", [150, 115, 80], { len: 16 });
       return k.svg(b); } });
 
+  // (parts) the bath fan: Fan, Light (a frosted lens under the louvers, lights the tiles) and Night light (the lens glows
+  // dim amber). The lens is drawn only as a Multi-Function Image or with a light part ticked; a Device Image is as before.
   icons.push({ id: "bath", name: "Bath exhaust", colors: sw(WH), picker: true, colorLabel: "Body",
-    render(o) { const k = K(o), c = k.c;
+    parts: [{ id: "fan", name: "Fan" }, { id: "light", name: "Light" }, { id: "night", name: "Night light" }],
+    render(o) { const k = K(MF.as(o, "fan")), c = k.c, lens = o.mf || MF.has(o, "light") || MF.has(o, "night");
+      const lt = lens && MF.on(o, "light"), nl = lens && !lt && MF.on(o, "night"), lc = MF.col(o, "light", "#fff1d6"), la = lt ? f(0.35 + 0.65 * Math.max(0.05, Math.min(1, +MF.lv(o, "light") || 1))) : 1;
       const tile = k.pat("tile", 16, 8, `<rect width="16" height="8" fill="#dfe8ea"/><rect width="15.2" height="7.2" x=".4" y=".4" rx="1" fill="#eef4f5"/><rect width="16" height="8" x="-8" y="8" fill="none"/>`);
       let b = wall(k, "#8fa5a9") + `<rect class="hda-bg" x="10" y="128" width="180" height="60" rx="4" fill="${tile}" opacity=".85"/><rect class="hda-bg" x="10" y="128" width="180" height="60" rx="4" fill="${k.lin("tg", [[0, "#000", 0.1], [1, "#000", 0.4]], 0, 0, 0, 1)}"/><rect class="hda-bg" x="10" y="126" width="180" height="3" fill="#e9eef0"/>` +
         BG(frame(k, 20, 30, 62, 92, 6) + view(k, "dawn", 26, 36, 50, 80, { frost: 1, seed: 2 }) + rail(k, 26, 73, 50, 5) + sill(k, 16, 120, 70));
       b += shadow(k, 136, 100, 40, 4, 0.5) + box(k, 98, 24, 76, 74, 7, c) + `<rect x="105" y="31" width="62" height="56" rx="2" fill="#0d0f13"/>` +
         `<g ${k.clip(rr(105, 31, 62, 56, 2))}>${rotor(k, 136, 59, 26, 5, blade(k, 26, "#bfc5cc"), { rev: true, disc: "#bfc5cc" })}</g>`;
       for (let i = 0; i < 8; i++) { const y = 33 + i * 7; b += `<rect x="105" y="${y}" width="62" height="4.2" fill="${pv(k, c)}"/><path d="M105 ${f(y + 4.2)}h62" stroke="#000" stroke-opacity=".4"/>`; }
+      if (lens) {
+        const g = lt ? lc : "#ffb45c";
+        if (lt) b += `<path d="M110 98L150 98L176 186L84 186Z" fill="${k.lin("bcone", [[0, g, 0.42], [1, g, 0]], 0, 0, 0, 1)}" opacity="${la}"/>` +
+          `<ellipse cx="130" cy="150" rx="46" ry="24" fill="${k.rad("btile", [[0, g, 0.3], [1, g, 0]])}" opacity="${la}"/>`;
+        if (lt || nl) b += `<ellipse cx="130" cy="93" rx="${lt ? 30 : 22}" ry="${lt ? 10 : 7}" fill="${k.rad("bhalo", [[0, g, lt ? 0.75 : 0.55], [1, g, 0]])}"${lt ? ` opacity="${la}"` : ""}/>`;
+        b += R(108, 89.2, 44, 6, 3, lt ? k.lin("blens", [[0, "#fff"], [0.5, sh(lc, 0.55)], [1, lc]], 0, 0, 0, 1) : nl ? k.lin("bnite", [[0, "#ffe2b8"], [1, "#f0a050"]], 0, 0, 0, 1) : k.lin("boff", [[0, "#f4f6f8"], [1, "#c3c9d0"]], 0, 0, 0, 1),
+          ` stroke="${sh(c, -0.3)}" stroke-opacity=".55" stroke-width=".7"`) + hl(111, 90.6, 149, 90.6, lt ? 0.9 : 0.6, 0.8);
+      }
       b += `<path d="M105 31h62v56h-62Z" fill="none" stroke="#000" stroke-opacity=".3"/>` + led(k, 164, 92, "#38bdf8", 1.6) +
         `<path d="M156 89.5c-1.2 1.8 -1.8 2.6 -1.8 3.5a1.8 1.8 0 0 0 3.6 0c0 -.9 -.6 -1.7 -1.8 -3.5Z" fill="${k.on ? "#7dd3fc" : sh(c, -0.35)}"/>`;
       if (k.on) b += steam(k, 120, 150, 0, 30) + steam(k, 142, 160, 1, 34) + steam(k, 162, 152, 2, 28) + [105, 85, 65].map((a, i) => stream(k, 112 + i * 24, 128, a - 180, 14, i)).join("");
       return k.svg(b); } });
 
+  // (parts) the kitchen fan: Fan and Light (a lamp under the box, lights the counter). The lamp is drawn only as a
+  // Multi-Function Image or with the Light part ticked; a Device Image is as before.
   icons.push({ id: "kitchen", name: "Kitchen exhaust", colors: sw(BE), picker: true, colorLabel: "Body",
-    render(o) { const k = K(o), c = k.c;
+    parts: [{ id: "fan", name: "Fan" }, { id: "light", name: "Light" }],
+    render(o) { const k = K(MF.as(o, "fan")), c = k.c, lamp = o.mf || MF.has(o, "light"), lt = lamp && MF.on(o, "light");
+      const lc = MF.col(o, "light", "#ffe7c2"), la = lt ? f(0.35 + 0.65 * Math.max(0.05, Math.min(1, +MF.lv(o, "light") || 1))) : 1;
       const tile = k.pat("ktile", 12, 12, `<rect width="12" height="12" fill="#c9d6cf"/><rect x=".5" y=".5" width="11" height="11" rx="1" fill="${k.lin("kt", [[0, "#e6efe9"], [1, "#b9c8bf"]], 0, 0, 1, 1)}"/>`);
       let b = wall(k, "#b39d80") + `<rect class="hda-bg" x="10" y="116" width="180" height="56" fill="${tile}"/><rect class="hda-bg" x="10" y="116" width="180" height="56" fill="${k.lin("ktg", [[0, "#000", 0.25], [0.3, "#000", 0], [1, "#000", 0.15]], 0, 0, 0, 1)}"/>` +
         `<rect class="hda-bg" x="6" y="170" width="188" height="10" rx="2" fill="${k.lin("ctr", [[0, "#5d5a57"], [0.25, "#8d8883"], [1, "#3a3836"]], 0, 0, 0, 1)}"/>` + BG(drop(k, 8, 180, 184, 8, 0.6) +
@@ -308,6 +336,12 @@
         fan(k, 70, 59, 30, c, { shroud: false, n: 4, bc: "#c9ced4", rings: [0.5, 0.75, 0.97], sp: 24, sw: 0.7, wide: 1 }) +
         `<path d="M102 94V126" stroke="#c9b27a" stroke-width="1.1" stroke-dasharray="1.6 .9"/><circle cx="102" cy="128.5" r="2.6" fill="${metal(k, "#c9a25a")}"/>` +
         `<path d="M44 162h44l-3 8H47Z" fill="${metal(k, "#9aa0a7")}"/><rect x="88" y="163" width="16" height="2.4" rx="1.2" fill="#2f3136"/><ellipse cx="66" cy="162" rx="22" ry="2.4" fill="#3a3f45"/>`;
+      if (lamp) {
+        if (lt) b += `<path d="M62 101L78 101L104 168L36 168Z" fill="${k.lin("kcone", [[0, lc, 0.45], [1, lc, 0]], 0, 0, 0, 1)}" opacity="${la}"/>` +
+          `<ellipse cx="70" cy="166" rx="40" ry="7" fill="${k.rad("kpool", [[0, lc, 0.55], [1, lc, 0]])}" opacity="${la}"/><ellipse cx="70" cy="100" rx="22" ry="7" fill="${k.rad("khalo", [[0, lc, 0.8], [1, lc, 0]])}" opacity="${la}"/>`;
+        b += `<path d="M58 97.4h24l-2.2 3.6h-19.6Z" fill="${metal(k, "#9aa0a7")}"/>` +
+          `<ellipse cx="70" cy="101" rx="9.6" ry="2.2" fill="${lt ? k.rad("klens", [[0, "#fff"], [0.6, sh(lc, 0.5)], [1, lc]]) : k.lin("koff", [[0, "#eef0f2"], [1, "#a9b0b8"]], 0, 0, 0, 1)}"/>`;
+      }
       if (k.on) b += steam(k, 58, 156, 0, 40) + steam(k, 70, 154, 1.3, 44) + steam(k, 80, 157, 2.2, 38) + radial(k, 70, 59, 36, "out", [70, 110, 160, 20]);
       return k.svg(b); } });
 

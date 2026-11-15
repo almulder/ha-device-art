@@ -408,17 +408,24 @@ ${[-3, 0, 3].map((a) => `<path d="M${a} -57 V-39" stroke="#fff" stroke-opacity="
       return svg(x, { bg, light, fx });
     } }),
 
-    base({ id: "updown", name: "Up/down cylinder", colors: [DAY, WARM, SOFT, ICE, VIOLET], cast: "both", glow: { x: .45, y: .5, r: 1.1 }, render(o) {
+    // (parts) Multi-Function: the up light and the down light are their own parts (switches); o.mf = only the ticked ones in
+    // o.parts, each with its own brightness (o.plevel); one light color (o.pcolor.up, else .down, else the device's). A light
+    // left out stays dark. A Device Image (no o.mf) is exactly today's: both lights follow the device.
+    base({ id: "updown", name: "Up/down cylinder", colors: [DAY, WARM, SOFT, ICE, VIOLET], cast: "both", glow: { x: .45, y: .5, r: 1.1 },
+      parts: [{ id: "up", name: "Up light", type: "switch" }, { id: "down", name: "Down light", type: "switch" }], render(o) {
+      const mf = !!o.mf, pp = o.parts || {}, pl = o.plevel || {}, pc = o.pcolor || {};
+      if (mf) o = Object.assign({}, o, { on: !!(pp.up || pp.down), color: pc.up || pc.down || o.color, level: Math.max(pp.up ? (pl.up == null ? o.level == null ? 1 : o.level : pl.up) : 0, pp.down ? (pl.down == null ? o.level == null ? 1 : o.level : pl.down) : 0) });
       const x = ctx(o), r = rnd(77), cx = 90;
+      const lx = (k) => { if (!mf) return x; const y = Object.assign({}, x), lv = pl[k] == null ? o.level : pl[k]; y.on = !!pp[k]; y.L = y.on ? .3 + .7 * lv : 0; y.op = (q) => Math.min(1, q * y.L).toFixed(2); return y; }, xu = lx("up"), xd = lx("down");
       let stuc = `<rect x="8" y="8" width="184" height="160" fill="#34343a"/>`;
       for (let i = 0; i < 160; i++) stuc += `<circle cx="${f(8 + r() * 184)}" cy="${f(8 + r() * 160)}" r="${f(.3 + r() * 1)}" fill="${r() > .5 ? "#000" : "#fff"}" fill-opacity="${(.05 + r() * .08).toFixed(2)}"/>`;
       let grav = `<rect x="8" y="168" width="184" height="24" fill="#2c2b2a"/>`; for (let i = 0; i < 60; i++) grav += `<circle cx="${f(8 + r() * 184)}" cy="${f(170 + r() * 22)}" r="${f(.8 + r() * 1.4)}" fill="${r() > .5 ? "#a39e95" : "#555"}" fill-opacity=".5"/>`;
       const agave = (ax, ay) => [-70, -45, -20, 0, 20, 45, 70].map((a, i) => `<path d="M${ax} ${ay} q${f(Math.sin(a * Math.PI / 180) * 10)} -14 ${f(Math.sin(a * Math.PI / 180) * 26)} ${f(-Math.cos(a * Math.PI / 180) * 26)} q-3 10 ${f(-Math.sin(a * Math.PI / 180) * 20)} ${f(Math.cos(a * Math.PI / 180) * 22)} Z" fill="${H.mix("#5c7f7a", "#3e5c58", i % 2)}"/>`).join("");
       const bg = stuc + `<rect x="140" y="8" width="52" height="160" fill="#4a4d55"/>${[34, 62, 90, 118, 146].map((y) => `<path d="M140 ${y} H192" stroke="#000" stroke-opacity=".4" stroke-width="1.4"/><path d="M140 ${y + 1.2} H192" stroke="#fff" stroke-opacity=".08"/>`).join("")}<rect x="134" y="8" width="6" height="160" fill="#26262b"/>` + grav + agave(40, 176);
-      const light = beam(x, cx, 82, 7, 26, 8, .95) + beam(x, cx, 122, 7, 26, 170, .95) + glo(x, cx, 100, 30, 70, .3) + pool(x, cx, 172, 34, 6, .9);
+      const light = beam(xu, cx, 82, 7, 26, 8, .95) + beam(xd, cx, 122, 7, 26, 170, .95) + (mf ? glo(xu, cx, 82, 30, 40, .3) + glo(xd, cx, 118, 30, 40, .3) : glo(x, cx, 100, 30, 70, .3)) + pool(xd, cx, 172, 34, 6, .9);
       const fx = drop(x, `<rect x="${cx - 10}" y="80" width="20" height="44" rx="2"/>`, 3, 4, .5) + `<rect x="${cx - 10}" y="80" width="20" height="44" rx="2" fill="${x.url("chr")}"/><rect x="${cx - 10.5}" y="99" width="21" height="3" fill="#2a2d35"/>
-<ellipse cx="${cx}" cy="80" rx="10" ry="1.6" fill="${x.on ? x.hot : "#2a2d35"}" ${x.on ? `opacity="${(.6 + .4 * x.L).toFixed(2)}"` : ""}/><ellipse cx="${cx}" cy="124" rx="10" ry="1.6" fill="${x.on ? x.hot : "#2a2d35"}" ${x.on ? `opacity="${(.6 + .4 * x.L).toFixed(2)}"` : ""}/>
-${glo(x, cx, 79, 16, 5, 1)}${glo(x, cx, 125, 16, 5, 1)}`;
+<ellipse cx="${cx}" cy="80" rx="10" ry="1.6" fill="${xu.on ? x.hot : "#2a2d35"}" ${xu.on ? `opacity="${(.6 + .4 * xu.L).toFixed(2)}"` : ""}/><ellipse cx="${cx}" cy="124" rx="10" ry="1.6" fill="${xd.on ? x.hot : "#2a2d35"}" ${xd.on ? `opacity="${(.6 + .4 * xd.L).toFixed(2)}"` : ""}/>
+${glo(xu, cx, 79, 16, 5, 1)}${glo(xd, cx, 125, 16, 5, 1)}`;
       return svg(x, { bg, light, fx });
     } }),
 

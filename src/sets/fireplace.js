@@ -128,8 +128,10 @@ ${lg(fg, [[0, h.shade(floor, -.35)], [1, h.shade(floor, .05)]], 0, 0, 0, 1)}<rec
   }
   function shimmer(x, X, Y, W) {
     if (!x.heat && !x.blower) return "";
-    let s = `<rect x="${X}" y="${Y - 1}" width="${W}" height="2" fill="#ff7a3a" opacity=".55"/>`;
-    for (let i = 0; i < 4; i++) { const sx = X + W * (.15 + i * .22); s += `<path class="${P}shim" style="animation-delay:${(i * .35).toFixed(2)}s" d="M${f(sx)} ${Y - 2}q-2.4 -5 0 -10t0 -10" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="1"/>`; }
+    // (multi-function) as its own part the heater reads plainly: a warm haze over the vent and brighter shimmer
+    const mf = !!x.o.mf;
+    let s = (mf ? `<ellipse class="${P}glow" cx="${f(X + W / 2)}" cy="${Y - 7}" rx="${f(W / 2 + 4)}" ry="10" fill="#ff8a3a" opacity=".2"/>` : "") + `<rect x="${X}" y="${Y - 1}" width="${W}" height="2" fill="#ff7a3a" opacity="${mf ? ".8" : ".55"}"/>`;
+    for (let i = 0; i < 4; i++) { const sx = X + W * (.15 + i * .22); s += `<path class="${P}shim" style="animation-delay:${(i * .35).toFixed(2)}s" d="M${f(sx)} ${Y - 2}q-2.4 -5 0 -10t0 -10" fill="none" stroke="${mf ? "#ffd2a8" : "#fff"}" stroke-opacity="${mf ? ".55" : ".2"}" stroke-width="${mf ? "1.3" : "1"}"/>`; }
     return s;
   }
   function firebox(x, X, Y, W, H, inner) {

@@ -280,10 +280,37 @@
   const glass = (x, x0, y0, w, h) => `<path d="M${f(x0 + 2)} ${f(y0 + 1.5)}H${f(x0 + w * .7)}L${f(x0 + w * .45)} ${f(y0 + h - 1.5)}H${f(x0 + 2)}Z" fill="#fff" fill-opacity=".07"/>`;
   const watts = (x) => x.on ? Math.round(2 + 1498 * Math.pow(x.lv, 1.25)) : 0;
 
+  // ---------- (parts) Multi-Function: each outlet its own switch part (o1..oN), plus USB / light / power where drawn ----------
+  // A Device Image (no o.mf, no parts) is drawn exactly as before. As a Multi-Function Image (o.mf) o.parts holds only the
+  // ticked parts (true = on); a part left out is drawn off and never animated, every outlet shows its own little LED, and
+  // the drawing's own light (master LED, rocker, ring) is on when any switch part is on. o.pval.power = a power reading (W).
+  const MFM = (o) => !!(o.mf || o.parts);
+  const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
+  const tick = (o, k) => !!(o.parts && o.parts[k] != null);
+  const sub = (x, on) => (on === x.on ? x : Object.assign({}, x, { on, an: on && x.o.anim, L: on ? .35 + .65 * x.lv : 0 }));
+  const outs = (n, more) => Array.from({ length: n }, (_, i) => ({ id: "o" + (i + 1), name: "Outlet " + (i + 1), type: "switch" })).concat(more || []);
+  const USB = { id: "usb", name: "USB ports", type: "switch" }, LIGHT = { id: "light", name: "Light", type: "switch" };
+  const EVST = { id: "state", name: "Charging state", type: "stage", values: [["idle", "Idle"], ["connected", "Plugged in"], ["charging", "Charging"], ["done", "Charged"]], def: "charging" };
+  const PARTS = {
+    strip: outs(4, [USB]), surge: outs(6), tower: outs(6, [USB]), reel: outs(2), floorbox: outs(2), popup: outs(2), undercab: outs(4, [LIGHT]),
+    outdoor: outs(2), inwall: [{ id: "o1", name: "Top outlet", type: "switch" }, { id: "o2", name: "Bottom outlet", type: "switch" }],
+    usbc: [{ id: "outlet", name: "Outlet", type: "switch" }, USB], night: [{ id: "outlet", name: "Outlet", type: "switch" }, { id: "light", name: "Night light", type: "switch" }],
+    energy: [{ id: "outlet", name: "Outlet", type: "switch" }, { id: "power", name: "Power", type: "value", unit: "W", min: 0, max: 1800, def: 60 }],
+    ev: [EVST],
+  };
+  // the drawing's own on as a Multi-Function Image: any of its switch parts on (a stage drawing: its stage decides)
+  const anyOn = (o, ps) => { const sw = ps.filter((p) => !p.type || p.type === "switch"); if (!sw.length) return !!o.on;
+    let t = 0, a = 0; sw.forEach((p) => { if (tick(o, p.id)) { t = 1; if (o.parts[p.id]) a = 1; } }); return t ? !!a : !o.mf && !!o.on; };
+  // a small status LED per outlet, only drawn as a Multi-Function Image
+  const oled = (x, o, k, cx, cy, r, col) => (o.mf ? led(sub(x, pon(o, k)), cx, cy, r || 1, col || "#34d399", .7) : "");
+  const stv = (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null);
+
   const NO_REG = { heavy: 1, ev: 1 };
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label,
-    render: (o) => { REG = !NO_REG[id] && o.opt && o.opt.region || "us"; try { return render(o); } finally { REG = "us"; } } },
-    NO_REG[id] ? {} : { options: [REG_OPT] }, extra || {});
+    render: (o) => { REG = !NO_REG[id] && o.opt && o.opt.region || "us";
+      if (PARTS[id] && MFM(o)) o = Object.assign({}, o, { on: anyOn(o, PARTS[id]) });
+      try { return render(o); } finally { REG = "us"; } } },
+    NO_REG[id] ? {} : { options: [REG_OPT] }, PARTS[id] ? { parts: PARTS[id] } : {}, extra || {});
 
   const icons = [
     ic("mini", "Mini smart plug", sw(LEDS, "#4da3ff"), "LED", (o) => { const x = X(o);
@@ -321,12 +348,15 @@
       return scene(x, back, body); }),
 
     ic("energy", "Energy monitor plug", sw(["#7dd3fc", "#f2f6ff", "#34d399", "#ffb347", "#ff5257"], "#7dd3fc"), "Display", (o) => { const x = X(o);
+      // (parts) the readout: o.pval.power when the Power part is ticked, else (Device Image) today's watts from the slider
+      const xd = o.mf ? sub(x, x.on || tick(o, "power")) : x, pw = stv(o, "power");
+      const rd = !o.mf ? watts(x) : tick(o, "power") && pw != null ? Math.max(0, Math.min(9999, Math.round(+pw || 0))) : "";
       const back = tileB(x, 8, 152) + counterB(x, 152, "#c9cbd2");
       const body = plateT(x, 100, 92, 1.0) +
         box(x, 70, 48, 60, 78, 10, 2, 5, "#2f3239") +
         `<path d="M76 54Q100 48 124 54" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1.2" stroke-linecap="round"/>` +
-        lcd(x, 77, 58, 46, 20, x.led) + digits(x, 113, 62, 12, watts(x), 4, x.led) +
-        `<path d="M114.5 69L116 74L117.4 70.5L118.8 74L120.3 69" fill="none" stroke="${x.on ? H.mix(x.led, "#fff", .25) : "#fff"}" stroke-opacity="${x.on ? 1 : .08}" stroke-width=".9" stroke-linejoin="round"/>` +
+        lcd(xd, 77, 58, 46, 20, x.led) + digits(xd, 113, 62, 12, rd, 4, x.led) +
+        `<path d="M114.5 69L116 74L117.4 70.5L118.8 74L120.3 69" fill="none" stroke="${xd.on ? H.mix(x.led, "#fff", .25) : "#fff"}" stroke-opacity="${xd.on ? 1 : .08}" stroke-width=".9" stroke-linejoin="round"/>` +
         glass(x, 77, 58, 46, 20) +
         button(x, 92, 88, 3.4, "#3d4048") + led(x, 108, 88, 1.3) +
         holes(x, 100, 108, .82) + plugHead(x, 100, 110, .9, "#e8e8ec") +
@@ -345,41 +375,42 @@
         `<rect x="72.5" y="106" width="23" height="31" rx="5.4" fill="${rub}"/><path d="M75 113H93M75 118H93M75 123H93M75 128H93" stroke="#fff" stroke-opacity=".08"/><path d="M73 107H95" stroke="#fff" stroke-opacity=".25"/>` +
         holes(x, 116, 121, .78) +
         `<path d="M104 106Q116 92 128 106L128 103Q116 88 104 103Z" fill="${rub}"/>` +
-        plugHead(x, 116, 123, .9, "#e8792c") +
-        cord(x, [116, 135, 116, 156, 128, 166, 146, 174, 164, 182, 176, 194, 186, 206], 4, "#e8792c", "#34d399");
+        plugHead(x, 116, 123, .9, "#e8792c") + oled(x, o, "o1", 93, 143.5, .9) + oled(x, o, "o2", 125, 143.5, .9) +
+        cord(sub(x, pon(o, "o2")), [116, 135, 116, 156, 128, 166, 146, 174, 164, 182, 176, 194, 186, 206], 4, "#e8792c", "#34d399");
       return scene(x, back, body); }),
 
     ic("inwall", "In-wall smart outlet", sw(LEDS, "#f2f6ff"), "LED", (o) => { const x = X(o);
       const back = wallB(x, "navy");
-      const bar = (y) => `<rect x="88.5" y="${y - 2.2}" width="23" height="4.4" rx="2.2" fill="#14161b"/>` + (x.on ? `<g class="${P}pulse"><rect x="86" y="${y - 3}" width="28" height="7" rx="3.5" fill="${M.halo(x, x.led)}" opacity="${a2(.9 * x.L)}"/></g><rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#fff", .5)}"/>`
+      const bar = (y) => `<rect x="88.5" y="${y - 2.2}" width="23" height="4.4" rx="2.2" fill="#14161b"/>` + (pon(o, y < 100 ? "o1" : "o2") ? `<g class="${P}pulse"><rect x="86" y="${y - 3}" width="28" height="7" rx="3.5" fill="${M.halo(x, x.led)}" opacity="${a2(.9 * x.L)}"/></g><rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#fff", .5)}"/>`
         : `<rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#15161b", .7)}"/>`);
       const inner = bar(66) + bar(134) + `<rect x="95" y="97.5" width="10" height="5" rx="1.6" fill="#000" fill-opacity=".25"/><rect x="95" y="97" width="10" height="5" rx="1.6" fill="${M.v(x, "#e4e6ea")}"/>`;
       const body = spot(x, 100, 100, 60, 70, x.led, .22) + plateD(x, 100, 100, 1.45, "#eef0f2", inner) +
         plugHead(x, 100, 121, 1.1, "#3a3d45") +
-        cord(x, [100, 135, 100, 156, 112, 170, 132, 178, 152, 186, 170, 188, 200, 196], 4, "#3a3d45", x.led);
+        cord(sub(x, pon(o, "o2")), [100, 135, 100, 156, 112, 170, 132, 178, 152, 186, 170, 188, 200, 196], 4, "#3a3d45", x.led);
       return scene(x, back, body); }),
 
     ic("usbc", "USB-C outlet", sw(["#eef0f2", "#e6dcc6", "#2c2f36", "#9aa1aa", "#c9d2dc"], "#eef0f2"), "Body", (o) => { const x = X(o, { body: o.color, led: "#4da3ff" });
       const back = tileB(x, 8, 140, "#cfd8d4") + counterB(x, 140, "#8f7a64");
       const ports = `<rect x="88" y="76.5" width="9" height="5" rx=".8" fill="#0b0c10"/><rect x="89.4" y="77.6" width="6.2" height="1.6" fill="#5a6070"/>
-<rect x="103" y="76.6" width="10" height="4.4" rx="2.2" fill="#0b0c10"/><rect x="105" y="78.2" width="6" height="1.2" rx=".6" fill="#5a6070"/>` + led(x, 100, 70.5, .9, "#4da3ff");
-      const scr = x.on ? x.lg([[0, "#0d2a24"], [1, "#071612"]]) : "#0b0c10", lvl = Math.round(10 + 32 * x.lv);
+<rect x="103" y="76.6" width="10" height="4.4" rx="2.2" fill="#0b0c10"/><rect x="105" y="78.2" width="6" height="1.2" rx=".6" fill="#5a6070"/>` + led(sub(x, pon(o, "outlet")), 100, 70.5, .9, "#4da3ff");
+      const u = sub(x, pon(o, "usb")), scr = u.on ? x.lg([[0, "#0d2a24"], [1, "#071612"]]) : "#0b0c10", lvl = Math.round(10 + 32 * x.lv);
       const body = plateD(x, 100, 79, 1.0, x.body, ports) +
         `<rect x="128" y="96" width="34" height="54" rx="5" fill="#000" fill-opacity=".35" transform="rotate(-6 145 150)"/>` +
         `<g transform="rotate(-8 145 146)"><rect x="128" y="92" width="32" height="56" rx="5" fill="${x.lg([[0, "#4a4e58"], [1, "#1a1c22"]], 0, 0, 1, 0)}"/>
 <rect x="130" y="94" width="28" height="52" rx="3.6" fill="${scr}"/>` +
-        (x.on ? `<rect x="138" y="${f(132 - lvl * .5)}" width="12" height="${f(lvl * .5 + 4)}" rx="1.4" fill="#34d399" opacity=".85"/><rect x="138" y="106" width="12" height="30" rx="1.6" fill="none" stroke="#9ff5cf" stroke-opacity=".7"/><rect x="141.5" y="104" width="5" height="2" fill="#9ff5cf" opacity=".7"/>
+        (u.on ? `<rect x="138" y="${f(132 - lvl * .5)}" width="12" height="${f(lvl * .5 + 4)}" rx="1.4" fill="#34d399" opacity=".85"/><rect x="138" y="106" width="12" height="30" rx="1.6" fill="none" stroke="#9ff5cf" stroke-opacity=".7"/><rect x="141.5" y="104" width="5" height="2" fill="#9ff5cf" opacity=".7"/>
 <path d="M145 112L141 121H145L143 129L149 118H145L147 112Z" fill="#fff" opacity=".95"/><g class="${P}pulse"><rect x="130" y="94" width="28" height="52" rx="3.6" fill="${x.rg([[0, "#34d399", .3], [1, "#34d399", 0]])}"/></g>` : "") +
         `<path d="M131 95L148 95L134 145H131Z" fill="#fff" fill-opacity=".06"/></g>` +
         `<rect x="104.5" y="81" width="7" height="9" rx="1.8" fill="#e8e8ec"/><rect x="104.5" y="81" width="3" height="9" rx="1.2" fill="#fff" fill-opacity=".6"/>` +
-        cord(x, [108, 90, 108, 112, 120, 152, 138, 152, 146, 152, 146, 150, 146, 147], 2, "#f1f1f4", "#34d399", 10);
+        cord(u, [108, 90, 108, 112, 120, 152, 138, 152, 146, 152, 146, 150, 146, 147], 2, "#f1f1f4", "#34d399", 10);
       return scene(x, back, body); }),
 
     ic("strip", "Smart power strip", sw(LEDS, "#4da3ff"), "LED", (o) => { const x = X(o); const n = x.on ? Math.max(1, Math.round(x.lv * 4)) : 0;
       const back = wallB(x, "gray", 8, 92) + `<rect x="8" y="92" width="184" height="100" fill="${x.lg([[0, "#5a3f2b"], [1, "#8d6646"]])}"/>` +
         `<path d="M8 92.6H192" stroke="#000" stroke-opacity=".5" stroke-width="1.4"/>` + [104, 118, 136, 158, 184].map((y, i) => `<path d="M8 ${y}C60 ${y - 2} 120 ${y + 3} 192 ${y - 1}" fill="none" stroke="#2a180b" stroke-opacity="${(.15 + i * .03).toFixed(2)}" stroke-width=".7"/>`).join("");
       let outs = "";
-      [46, 76, 106, 136].forEach((cx, i) => { const lit = i < n;
+      const lt = (i) => (MFM(o) ? pon(o, "o" + (i + 1)) : i < n);
+      [46, 76, 106, 136].forEach((cx, i) => { const lit = lt(i);
         outs += `<rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="#000" fill-opacity=".12"/>` +
           (lit ? `<g class="${P}pulse"><rect x="${cx - 13}" y="117" width="26" height="30" rx="6" fill="none" stroke="${x.led}" stroke-opacity="${a2(.45 * x.L)}" stroke-width="3"/></g><rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="none" stroke="${H.mix(x.led, "#fff", .4)}" stroke-width="1"/>`
             : `<rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="none" stroke="#9aa0aa" stroke-opacity=".5" stroke-width=".8"/>`) +
@@ -387,16 +418,16 @@
       const body = `<rect x="22" y="122" width="158" height="42" rx="14" fill="#000" fill-opacity=".3"/>` +
         box(x, 22, 104, 154, 48, 13, 0, 6, "#eef0f2") + outs +
         `<rect x="155" y="118" width="12" height="5.4" rx="1" fill="#0b0c10"/><rect x="156.4" y="119.2" width="9" height="1.6" fill="#5a6070"/><rect x="155" y="127" width="12" height="5.4" rx="1" fill="#0b0c10"/><rect x="156.4" y="128.2" width="9" height="1.6" fill="#5a6070"/>
-<rect x="155.4" y="137" width="11" height="4.4" rx="2.2" fill="#0b0c10"/>` +
+<rect x="155.4" y="137" width="11" height="4.4" rx="2.2" fill="#0b0c10"/>` + oled(x, o, "usb", 161, 147, .9) +
         cord(x, [24, 132, 14, 132, 10, 124, 4, 112], 3.6, "#e4e4ea") +
         plugHead(x, 46, 133, .9, "#2d3037", 90) + plugHead(x, 106, 133, .9, "#e9e9ee", 90) +
-        cord(x, [54, 133, 64, 133, 62, 96, 60, 70, 58, 44, 70, 20, 66, 0], 3.2, "#2d3037", n > 0 ? x.led : null) +
-        cord(x, [114, 133, 124, 133, 122, 98, 126, 70, 130, 44, 120, 22, 128, 0], 3.2, "#e9e9ee", n > 2 ? x.led : null);
+        cord(x, [54, 133, 64, 133, 62, 96, 60, 70, 58, 44, 70, 20, 66, 0], 3.2, "#2d3037", lt(0) ? x.led : null) +
+        cord(x, [114, 133, 124, 133, 122, 98, 126, 70, 130, 44, 120, 22, 128, 0], 3.2, "#e9e9ee", lt(2) ? x.led : null);
       return scene(x, back, body); }),
 
     ic("surge", "Surge protector", sw(["#ff5257", "#ffb347", "#34d399", "#4da3ff", "#f2f6ff"], "#ff5257"), "Switch light", (o) => { const x = X(o);
       const back = wallB(x, "cream", 8, 34) + baseB(x, 34, "carpet");
-      let outs = ""; for (let i = 0; i < 6; i++) { const cx = 60 + i * 20; outs += `<g transform="rotate(-90 ${cx} 120)">${face(x, cx, 120, .72, "#e9eaee")}</g>`; }
+      let outs = ""; for (let i = 0; i < 6; i++) { const cx = 60 + i * 20; outs += `<g transform="rotate(-90 ${cx} 120)">${face(x, cx, 120, .72, "#e9eaee")}</g>` + oled(x, o, "o" + (i + 1), cx, 106.6, .9); }
       const rocker = x.on ? `<g class="${P}pulse"><rect x="22" y="104" width="22" height="32" rx="6" fill="${M.halo(x, x.led)}" opacity="${a2(.9 * x.L)}"/></g><rect x="28" y="110" width="10" height="20" rx="2" fill="${x.lg([[0, H.mix(x.led, "#fff", .55)], [1, x.led]])}"/><rect x="29" y="111" width="8" height="7" rx="1.4" fill="#fff" opacity=".6"/>`
         : `<rect x="28" y="110" width="10" height="20" rx="2" fill="${x.lg([[0, H.mix(x.led, "#222", .55)], [1, H.mix(x.led, "#000", .8)]])}"/><rect x="29" y="122" width="8" height="7" rx="1.4" fill="#fff" opacity=".12"/>`;
       const body = `<g transform="rotate(-10 100 120)">` +
@@ -406,25 +437,26 @@
         `<rect x="18" y="102" width="168" height="5" rx="2.5" fill="#fff" fill-opacity=".12"/>` +
         `<rect x="26" y="108" width="14" height="24" rx="3" fill="#0e0f13"/>` + rocker + outs + led(x, 178, 112, 1.2, "#34d399") + led(x, 178, 126, 1.2, "#34d399", .6) +
         plugHead(x, 80, 120, .82, "#e9e9ee", 90) + plugHead(x, 140, 120, .82, "#2d3037", 90) +
-        cord(x, [87, 120, 96, 120, 98, 140, 92, 160, 86, 180, 90, 196, 84, 214], 3, "#e9e9ee", x.led) +
-        cord(x, [147, 120, 156, 120, 158, 98, 156, 80, 154, 62, 166, 48, 172, 30], 3, "#2d3037", x.led) + `</g>`;
+        cord(sub(x, pon(o, "o2")), [87, 120, 96, 120, 98, 140, 92, 160, 86, 180, 90, 196, 84, 214], 3, "#e9e9ee", x.led) +
+        cord(sub(x, pon(o, "o5")), [147, 120, 156, 120, 158, 98, 156, 80, 154, 62, 166, 48, 172, 30], 3, "#2d3037", x.led) + `</g>`;
       return scene(x, back, body); }),
 
     ic("tower", "Power tower", sw(BODY, "#2c2f36"), "Body", (o) => { const x = X(o, { body: o.color, led: "#4da3ff" }); const p = pal(x.body);
       const back = wallB(x, "lav", 8, 132) + `<rect x="8" y="132" width="184" height="60" fill="${x.lg([[0, "#b9b6c0"], [1, "#e4e1ea"]])}"/><path d="M8 132.6H192" stroke="#000" stroke-opacity=".45" stroke-width="1.4"/>`;
       const lf = `M66 54L100 64V176L66 166Z`, rf = `M100 64L132 54V166L100 176Z`, tp = `M66 54L100 64L132 54L98 45Z`;
       let o2 = "";
-      [80, 108, 136].forEach((y) => { o2 += `<g transform="translate(83 ${y}) skewY(16) scale(.78 1)">${face(x, 0, 0, .78, H.shade(x.body, .12))}</g>`;
-        o2 += `<g transform="translate(116 ${y}) skewY(-17) scale(.7 1)">${face(x, 0, 0, .78, H.shade(x.body, -.05))}</g>`; });
+      [80, 108, 136].forEach((y, i) => { o2 += `<g transform="translate(83 ${y}) skewY(16) scale(.78 1)">${face(x, 0, 0, .78, H.shade(x.body, .12))}${oled(x, o, "o" + (i + 1), 0, -12.4, 1.1)}</g>`;
+        o2 += `<g transform="translate(116 ${y}) skewY(-17) scale(.7 1)">${face(x, 0, 0, .78, H.shade(x.body, -.05))}${oled(x, o, "o" + (i + 4), 0, -12.4, 1.1)}</g>`; });
       const body = `<ellipse cx="100" cy="176" rx="44" ry="8" fill="${M.shadow(x)}"/>` +
         `<path d="${lf}" fill="${x.lg([[0, p.l], [1, p.m]], 0, 0, 1, 0)}"/><path d="${rf}" fill="${x.lg([[0, p.d], [1, p.k]], 0, 0, 1, 0)}"/>` +
         `<path d="${tp}" fill="${x.lg([[0, H.shade(x.body, .55)], [1, H.shade(x.body, .2)]])}"/>` +
         `<path d="M100 64V176" stroke="#fff" stroke-opacity=".35" stroke-width=".9"/><path d="M66 54V166" stroke="#fff" stroke-opacity=".25"/>` + o2 +
         `<path d="M77 54.6L83 56.4L86 55.4L80 53.6Z" fill="#0b0c10"/><path d="M90 57.6L96 59.4L99 58.4L93 56.6Z" fill="#0b0c10"/><path d="M106 59.8L112 58L114.6 58.8L108.6 60.6Z" fill="#0b0c10"/>` +
+        (o.mf && pon(o, "usb") ? `<g class="${P}pulse" fill="#34d399" fill-opacity=".5" stroke="#9ff5cf" stroke-width=".6" stroke-linejoin="round"><path d="M77 54.6L83 56.4L86 55.4L80 53.6Z"/><path d="M90 57.6L96 59.4L99 58.4L93 56.6Z"/><path d="M106 59.8L112 58L114.6 58.8L108.6 60.6Z"/></g>` : "") +
         (x.on ? `<g class="${P}pulse"><path d="${tp}" fill="none" stroke="#4da3ff" stroke-opacity="${a2(.35 * x.L)}" stroke-width="6" stroke-linejoin="round"/></g><path d="${tp}" fill="none" stroke="${H.mix("#4da3ff", "#fff", .45)}" stroke-width="1.3" stroke-linejoin="round"/>`
           : `<path d="${tp}" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="1" stroke-linejoin="round"/>`) +
         `<g transform="translate(83 108) skewY(16)">${plugHead(x, 0, 0, .78, "#e9e9ee")}</g>` +
-        cord(x, [83, 122, 83, 140, 70, 156, 48, 160, 28, 164, 18, 176, 4, 178], 3, "#e9e9ee", "#4da3ff") +
+        cord(sub(x, pon(o, "o2")), [83, 122, 83, 140, 70, 156, 48, 160, 28, 164, 18, 176, 4, 178], 3, "#e9e9ee", "#4da3ff") +
         cord(x, [128, 168, 140, 172, 160, 172, 176, 166, 186, 162, 194, 156, 204, 156], 3.4, H.shade(x.body, -.1));
       return scene(x, back, body); }),
 
@@ -460,17 +492,17 @@
         cord(x, [92, 126, 92, 150, 110, 156, 130, 160, 152, 164, 166, 180, 178, 204], 3.4, "#3a3d45", x.led);
       return scene(x, back, body); }),
 
-    ic("night", "Night-light plug", ["#ffc477", "#fff1d6", "#a5d8ff", "#c4b5fd", "#7ee8c4"], "Light", (o) => { const x = X(o); const c = x.led;
+    ic("night", "Night-light plug", ["#ffc477", "#fff1d6", "#a5d8ff", "#c4b5fd", "#7ee8c4"], "Light", (o) => { const x0 = X(o), x = sub(x0, pon(o, "light")), xo = sub(x0, pon(o, "outlet")); const c = x.led;
       const back = wallB(x, "cream", 8, 164) + baseB(x, 164, "#7a5538");
       const pool = x.on ? `<path d="M80 152L40 192H160L120 152Z" fill="${x.lg([[0, c, .5], [1, c, 0]])}" opacity="${a2(x.L)}"/><ellipse cx="100" cy="166" rx="56" ry="8" fill="${M.halo(x, c)}" opacity="${a2(.7 * x.L)}"/>` : "";
       const lens = x.on ? x.rg([[0, "#ffffff"], [.45, H.mix(c, "#fff", .5)], [1, c]], .5, .25, .9) : x.lg([[0, "#e9e8ee"], [1, "#b7b5c0"]]);
-      const body = pool + plateT(x, 100, 92, 1.0) + spot(x, 100, 150, 46, 30, c, .55) +
+      const body = pool + plateT(xo, 100, 92, 1.0) + spot(x, 100, 150, 46, 30, c, .55) +
         box(x, 80, 92, 40, 60, 9, 2, 4, "#eef0f2") +
         `<path d="M80 130H120V143Q120 152 111 152H89Q80 152 80 143Z" fill="${lens}"/>` +
         (x.on ? `<g class="${P}breath"><ellipse cx="100" cy="146" rx="26" ry="12" fill="${M.halo(x, c)}" opacity="${a2(.7 * x.L)}"/></g>` : "") +
         `<path d="M80 130H120" stroke="#000" stroke-opacity=".2"/><path d="M84 134Q100 132 116 134" fill="none" stroke="#fff" stroke-opacity=".6" stroke-linecap="round"/>` +
         holes(x, 100, 112, .78) + `<circle cx="112" cy="99" r="1.8" fill="#16171c"/><circle cx="111.5" cy="98.5" r=".6" fill="#fff" fill-opacity=".5"/>` +
-        led(x, 88, 99, 1, "#4da3ff");
+        led(xo, 88, 99, 1, "#4da3ff");
       return scene(x, back, body); }, { glow: { x: .5, y: .72, r: .7 }, cast: "down" }),
 
     ic("reel", "Cord reel", ["#e8792c", "#d93b3b", "#f2c230", "#3f9a5a", "#2c2f36"], "Cord", (o) => { const x = X(o, { body: o.color, led: "#34d399" }); const cc = x.body;
@@ -486,7 +518,7 @@
         `<path d="M40 168H138" stroke="${M.steel(x)}" stroke-width="5" stroke-linecap="round"/>` +
         `<path d="M88 112L120 84" stroke="#a8aeb6" stroke-width="4" stroke-linecap="round"/><rect x="116" y="70" width="8" height="18" rx="4" fill="${M.h(x, "#2a2c32")}"/>` +
         box(x, 46, 140, 44, 26, 5, 2, 3, "#2c2f36") +
-        `<g transform="rotate(-90 58 153)">${holes(x, 58, 153, .6)}</g><g transform="rotate(-90 76 153)">${holes(x, 76, 153, .6)}</g>` + led(x, 86, 145, 1.1, "#34d399");
+        `<g transform="rotate(-90 58 153)">${holes(x, 58, 153, .6)}</g><g transform="rotate(-90 76 153)">${holes(x, 76, 153, .6)}</g>` + led(x, 86, 145, 1.1, "#34d399") + oled(x, o, "o1", 58, 145, .8) + oled(x, o, "o2", 76, 145, .8);
       return scene(x, back, body); }),
 
     ic("floorbox", "Floor box outlet", ["#c9a35a", "#c6ccd4", "#2c2f36", "#7a5536", "#e9ebee"], "Lid", (o) => { const x = X(o, { body: o.color, led: "#4da3ff" }); const mc = x.body;
@@ -495,12 +527,12 @@
         `<path d="M50 96L150 96L162 152L38 152Z" fill="${M.metal(x, mc)}"/><path d="M56 101L144 101L154 147L46 147Z" fill="${x.lg([[0, "#0a0b0e"], [1, "#24262c"]])}"/>` +
         `<path d="M64 104L136 104L144 144L56 144Z" fill="${x.lg([[0, "#d9dbe0"], [1, "#a9acb5"]])}"/>` +
         `<g transform="translate(78 124) scale(1 .62)">${face(x, 0, 0, 1, "#eceef1")}</g><g transform="translate(122 124) scale(1 .62)">${face(x, 0, 0, 1, "#eceef1")}</g>` +
-        led(x, 100, 124, 1.2, "#4da3ff") + `<path d="M50 96L150 96" stroke="#fff" stroke-opacity=".5"/>` +
+        led(x, 100, 124, 1.2, "#4da3ff") + oled(x, o, "o1", 78, 110, .9) + oled(x, o, "o2", 122, 110, .9) + `<path d="M50 96L150 96" stroke="#fff" stroke-opacity=".5"/>` +
         `<path d="M50 96L150 96L144 40L56 40Z" fill="${x.lg([[0, H.shade(mc, -.5)], [.6, H.shade(mc, -.15)], [1, H.shade(mc, .25)]])}"/><path d="M50 96L150 96L144 40L56 40Z" fill="${M.metal(x, mc)}" opacity=".45"/>` +
         `<path d="M60 46L140 46L144 90L56 90Z" fill="none" stroke="#000" stroke-opacity=".25"/><rect x="88" y="40" width="24" height="7" rx="2" fill="#000" fill-opacity=".45"/>` +
         `<path d="M50 96.5H150" stroke="#000" stroke-opacity=".5" stroke-width="1.6"/>` +
         plugHead(x, 122, 125, .82, "#2d3037") +
-        cord(x, [122, 135, 124, 150, 140, 156, 162, 166, 180, 176, 192, 172, 206, 176], 3.4, "#2d3037", "#4da3ff");
+        cord(sub(x, pon(o, "o2")), [122, 135, 124, 150, 140, 156, 162, 166, 180, 176, 192, 172, 206, 176], 3.4, "#2d3037", "#4da3ff");
       return scene(x, back, body); }),
 
     ic("popup", "Counter pop-up", ["#c8cdd4", "#2c2f36", "#eef0f2", "#9a7a52", "#7d8794"], "Body", (o) => { const x = X(o, { body: o.color, led: "#4da3ff" }); const bc = x.body;
@@ -509,31 +541,32 @@
       const body = `<ellipse cx="102" cy="160" rx="40" ry="10" fill="${M.shadow(x)}"/>` +
         `<ellipse cx="100" cy="156" rx="32" ry="9" fill="${M.metal(x, bc)}"/><ellipse cx="100" cy="155" rx="25" ry="6.5" fill="#0d0e12"/>` +
         `<path d="M77 56V154A23 6.5 0 0 0 123 154V56Z" fill="${cyl}"/>` +
-        `<g transform="translate(100 88) scale(.86 1)">${face(x, 0, 0, .95, H.shade(bc, .05))}</g><g transform="translate(100 122) scale(.86 1)">${face(x, 0, 0, .95, H.shade(bc, .05))}</g>` +
+        `<g transform="translate(100 88) scale(.86 1)">${face(x, 0, 0, .95, H.shade(bc, .05))}</g><g transform="translate(100 122) scale(.86 1)">${face(x, 0, 0, .95, H.shade(bc, .05))}</g>` + oled(x, o, "o1", 116.5, 88, .9) + oled(x, o, "o2", 116.5, 122, .9) +
         `<ellipse cx="100" cy="56" rx="23" ry="6.5" fill="${x.lg([[0, H.shade(bc, .5)], [1, H.shade(bc, -.15)]])}"/>` +
         ringLed(x, 100, 56, 20, 5.3, 1.3, "#4da3ff") + `<ellipse cx="100" cy="55" rx="14" ry="3.4" fill="${M.metal(x, bc)}" opacity=".8"/>` +
         `<path d="M82 64V148" stroke="#fff" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round"/>` +
         plugHead(x, 100, 123.5, .86, "#2d3037") +
-        cord(x, [100, 135, 100, 146, 120, 150, 140, 158, 160, 166, 176, 160, 204, 166], 3.2, "#2d3037", "#4da3ff");
+        cord(sub(x, pon(o, "o2")), [100, 135, 100, 146, 120, 150, 140, 158, 160, 166, 176, 160, 204, 166], 3.2, "#2d3037", "#4da3ff");
       return scene(x, back, body); }),
 
     ic("undercab", "Under-cabinet strip", sw(LEDS, "#f2f6ff"), "LED", (o) => { const x = X(o);
       const back = tileB(x, 52, 150, "#dfe2dc") + counterB(x, 150, "#3d3f46") +
         `<rect x="8" y="8" width="184" height="46" fill="${x.lg([[0, "#8a6040"], [1, "#5a3c26"]])}"/><path d="M8 50H192" stroke="#000" stroke-opacity=".35" stroke-width="2"/><path d="M100 8V50" stroke="#000" stroke-opacity=".4" stroke-width="1.4"/>
 <rect x="14" y="14" width="80" height="32" rx="2" fill="none" stroke="#000" stroke-opacity=".25"/><rect x="106" y="14" width="80" height="32" rx="2" fill="none" stroke="#000" stroke-opacity=".25"/><rect x="84" y="36" width="10" height="3" rx="1.5" fill="${M.steel(x)}"/><rect x="106" y="36" width="10" height="3" rx="1.5" fill="${M.steel(x)}"/>`;
-      const wash = x.on ? `<path d="M24 70L8 150H192L176 70Z" fill="${x.lg([[0, x.led, .55], [1, x.led, 0]])}" opacity="${a2(.85 * x.L)}"/>` : "";
-      let outs = ""; [56, 84, 112, 140].forEach((cx) => { outs += `<g transform="rotate(-90 ${cx} 62)">${holes(x, cx, 62, .6)}</g>`; });
+      const lx = sub(x, pon(o, "light")), k3 = sub(x, pon(o, "o3"));
+      const wash = lx.on ? `<path d="M24 70L8 150H192L176 70Z" fill="${x.lg([[0, x.led, .55], [1, x.led, 0]])}" opacity="${a2(.85 * lx.L)}"/>` : "";
+      let outs = ""; [56, 84, 112, 140].forEach((cx, i) => { outs += `<g transform="rotate(-90 ${cx} 62)">${holes(x, cx, 62, .6)}</g>` + oled(x, o, "o" + (i + 1), cx, 54.6, .8); });
       const kettle = `<ellipse cx="146" cy="168" rx="24" ry="5" fill="${M.shadow(x)}"/><rect x="124" y="156" width="44" height="10" rx="4" fill="${M.h(x, "#2c2f36")}"/>` +
-        (x.on ? `<g class="${P}pulse"><rect x="126" y="162" width="40" height="3" rx="1.5" fill="#4da3ff"/><rect x="120" y="158" width="52" height="11" rx="5" fill="${M.halo(x, "#4da3ff")}" opacity="${a2(.8 * x.L)}"/></g>` : "") +
+        (k3.on ? `<g class="${P}pulse"><rect x="126" y="162" width="40" height="3" rx="1.5" fill="#4da3ff"/><rect x="120" y="158" width="52" height="11" rx="5" fill="${M.halo(x, "#4da3ff")}" opacity="${a2(.8 * x.L)}"/></g>` : "") +
         `<path d="M128 156L131 116Q146 108 161 116L164 156Z" fill="${M.h(x, "#c8cdd4")}"/><path d="M134 154L136 120" stroke="#fff" stroke-opacity=".6" stroke-width="2" stroke-linecap="round"/>` +
         `<path d="M161 122Q176 124 172 140Q169 150 162 150" fill="none" stroke="#2c2f36" stroke-width="5" stroke-linecap="round"/><path d="M131 122L118 114" stroke="${M.steel(x)}" stroke-width="5" stroke-linecap="round"/>` +
         `<ellipse cx="146" cy="114" rx="11" ry="3" fill="#2c2f36"/><rect x="143" y="108" width="6" height="5" rx="2" fill="#2c2f36"/>`;
       const body = wash + `<rect x="28" y="50" width="144" height="22" rx="4" fill="#000" fill-opacity=".3" transform="translate(1 3)"/>` +
         `<rect x="28" y="50" width="144" height="22" rx="4" fill="${M.v(x, "#c9ccd3")}"/><path d="M30 51.5H170" stroke="#fff" stroke-opacity=".6"/>` + outs +
-        (x.on ? `<rect x="32" y="69.4" width="136" height="2.2" rx="1.1" fill="${H.mix(x.led, "#fff", .5)}"/>` : `<rect x="32" y="69.4" width="136" height="2.2" rx="1.1" fill="#6b6e78"/>`) +
+        (lx.on ? `<rect x="32" y="69.4" width="136" height="2.2" rx="1.1" fill="${H.mix(x.led, "#fff", .5)}"/>` : `<rect x="32" y="69.4" width="136" height="2.2" rx="1.1" fill="#6b6e78"/>`) +
         led(x, 160, 60, 1.1) + kettle +
         plugHead(x, 112, 62, .66, "#2c2f36", -90) +
-        cord(x, [119, 62, 126, 62, 128, 80, 122, 104, 116, 128, 120, 150, 128, 160], 2.6, "#2c2f36", x.led, 10);
+        cord(k3, [119, 62, 126, 62, 128, 80, 122, 104, 116, 128, 120, 150, 128, 160], 2.6, "#2c2f36", x.led, 10);
       return scene(x, back, body); }),
 
     ic("string", "String-light plug", ["#ffc477", "#fff1d6", "#ff9a4a", "#a5d8ff", "#ff8fb1"], "Bulbs", (o) => { const x = X(o); const c = x.led;
@@ -569,21 +602,24 @@
         cord(x, [160, 116, 150, 116, 146, 120, 144, 128], 2.2, "#f0eee8");
       return scene(x, back, body); }, { glow: { x: .84, y: .4, r: .8 }, cast: "both" }),
 
-    ic("ev", "EV charger", sw(["#34d399", "#4da3ff", "#f2f6ff", "#ffb347", "#c4b5fd"], "#34d399"), "LED", (o) => { const x = X(o);
+    ic("ev", "EV charger", sw(["#34d399", "#4da3ff", "#f2f6ff", "#ffb347", "#c4b5fd"], "#34d399"), "LED", (o) => {
+      // (parts) the Charging state stage (Multi-Function): idle = no car (ring dark, standby LED), plugged in = ring dimly lit,
+      // charging = today's on look (ring fills with the slider, sweep, power along the cord), charged = full ring, still
+      const st = o.mf ? stv(o, "state") : null, x = X(st ? Object.assign({}, o, { on: st !== "idle" }) : o), chg = st ? st === "charging" : x.on;
       const back = wallB(x, "garage", 8, 172) + `<path d="M64 8V172M136 8V172" stroke="#000" stroke-opacity=".12"/>` + concreteB(x, 172, "#6c6f75");
-      const segs = 30, lit = x.on ? Math.max(1, Math.round(x.lv * segs)) : 0; let ring = "";
+      const segs = 30, lit = st === "done" ? segs : st === "connected" ? 0 : x.on ? Math.max(1, Math.round(x.lv * segs)) : 0; let ring = "";
       for (let i = 0; i < segs; i++) { const a0 = (i / segs) * Math.PI * 2 - Math.PI / 2, a1 = a0 + Math.PI * 2 / segs * .7, r = 17;
         const d = `M${f(96 + Math.cos(a0) * r)} ${f(76 + Math.sin(a0) * r)}A${r} ${r} 0 0 1 ${f(96 + Math.cos(a1) * r)} ${f(76 + Math.sin(a1) * r)}`;
-        ring += `<path d="${d}" fill="none" stroke="${i < lit ? H.mix(x.led, "#fff", .3) : "#2a2d34"}" stroke-width="3" stroke-linecap="round"/>`; }
-      const sweep = x.on ? `<g class="${P}spin" style="animation-duration:${(3.6 - 2 * x.lv).toFixed(2)}s"><circle cx="96" cy="76" r="20" fill="none"/><path d="M96 59A17 17 0 0 1 112 70" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="3.2" stroke-linecap="round"/></g>` : "";
-      const body = cord(x, [100, 132, 102, 160, 126, 170, 150, 168, 176, 166, 186, 180, 206, 186], 6.5, "#24262c", x.led, 12) +
+        ring += `<path d="${d}" fill="none" stroke="${i < lit ? H.mix(x.led, "#fff", .3) : st === "connected" ? H.mix(x.led, "#2a2d34", .62) : "#2a2d34"}" stroke-width="3" stroke-linecap="round"/>`; }
+      const sweep = chg ? `<g class="${P}spin" style="animation-duration:${(3.6 - 2 * x.lv).toFixed(2)}s"><circle cx="96" cy="76" r="20" fill="none"/><path d="M96 59A17 17 0 0 1 112 70" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="3.2" stroke-linecap="round"/></g>` : "";
+      const body = cord(chg ? x : sub(x, false), [100, 132, 102, 160, 126, 170, 150, 168, 176, 166, 186, 180, 206, 186], 6.5, "#24262c", x.led, 12) +
         `<path d="M154 74V84" stroke="${M.steel(x)}" stroke-width="3"/><path d="M146 84H170Q172 84 172 86V90H146Z" fill="${M.h(x, "#3a3d45")}"/>` +
         `<path d="M150 90C142 128 172 138 170 92" fill="none" stroke="#1c1d22" stroke-width="6.5"/><path d="M156 90C150 124 176 132 166 90" fill="none" stroke="#2c2e35" stroke-width="6.5"/><path d="M152 92C147 120 166 128 168 96" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1.4"/>` +
         box(x, 62, 30, 68, 104, 16, 3, 5, "#eef0f2") +
         `<rect x="70" y="40" width="52" height="72" rx="11" fill="${x.lg([[0, "#20232a"], [1, "#0f1115"]])}"/><path d="M73 44Q96 38 119 44" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.4" stroke-linecap="round"/>` +
-        (x.on ? `<g class="${P}pulse"><circle cx="96" cy="76" r="24" fill="${M.halo(x, x.led)}" opacity="${a2(.7 * x.L)}"/></g>` : "") + ring + sweep +
+        (x.on && st !== "connected" ? `<g class="${P}pulse"><circle cx="96" cy="76" r="24" fill="${M.halo(x, x.led)}" opacity="${a2(.7 * x.L)}"/></g>` : "") + ring + sweep +
         `<path d="M93 70L90 78H95L93 84L101 74H96L98 70Z" fill="${x.on ? "#fff" : "#4a4e58"}"/>` +
-        led(x, 96, 104, 1.1) + `<rect x="88" y="124" width="16" height="10" rx="3" fill="${M.h(x, "#2c2f36")}"/>`;
+        led(st === "idle" ? sub(x, true) : x, 96, 104, 1.1) + `<rect x="88" y="124" width="16" height="10" rx="3" fill="${M.h(x, "#2c2f36")}"/>`;
       return scene(x, back, body); }),
   ];
 

@@ -292,6 +292,16 @@ ${DEF.join("")}</defs>`;
     return s;
   }
   const pillow = (o, x, y, a, c) => `<g transform="rotate(${a} ${x} ${y})"><path d="M${x - 13} ${y - 11}Q${x} ${y - 14} ${x + 13} ${y - 11}Q${x + 15} ${y} ${x + 13} ${y + 11}Q${x} ${y + 14} ${x - 13} ${y + 11}Q${x - 15} ${y} ${x - 13} ${y - 11}Z" fill="${mat(o, c, "v")}"/><path d="M${x - 13} ${y - 11}Q${x} ${y - 14} ${x + 13} ${y - 11}Q${x + 15} ${y} ${x + 13} ${y + 11}Q${x} ${y + 14} ${x - 13} ${y + 11}Q${x - 15} ${y} ${x - 13} ${y - 11}Z" fill="url(#${o.uid}-fab)"/><path d="M${x - 9} ${y - 7}Q${x} ${y - 1} ${x + 9} ${y - 7}" fill="none" stroke="#000" stroke-opacity=".18"/></g>`;
+  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // Image (no o.mf: every part follows o.on and the slider is the volume, exactly as today) and stays off, never
+  // animated, as a Multi-Function Image (o.mf). A reading (volume, %) is o.pval.volume when o.mf (left out = no bar).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    vol: (o) => (!o.mf ? o.level : o.pval && o.pval.volume != null && isFinite(+o.pval.volume) ? Math.max(0, Math.min(1, +o.pval.volume / 100)) : null),
+    as: (o, k, lv) => Object.assign({}, o, { on: MF.on(o, k) }, lv === undefined ? {} : { level: lv == null ? 0 : lv }),
+  };
+  const OFF = { on: false };
   const dropShadow = (x, y, w, h, op) => `<rect x="${x + 3}" y="${y + 4}" width="${w}" height="${h}" rx="2" fill="#000" opacity="${op || .32}"/>`;
 
   const icons = [
@@ -359,64 +369,69 @@ ${DEF.join("")}</defs>`;
     {
       id: "projector", name: "Projector & screen", colors: ["#f0f0ee", "#1c1e22", "#8e949b", "#4a5058"], picker: true, colorLabel: "Finish",
       render(o) {
-        const u = o.uid, c = o.color;
+        // (parts) Projector (the lamp, the beam, the picture) and Screen (on = rolled down); the picture shows when both are on
+        const u = o.uid, c = o.color, pp = MF.as(o, "projector"), ps = MF.as(o, "screen"), pb = Object.assign({}, o, { on: pp.on && ps.on });
         DEF.push(lg(u + "-bm", 0, [[0, "#fff", .55], [1, "#bfd0ff", .03]]) + lg(u + "-scr", 0, [[0, "#d9dadc"], [.5, "#f6f6f4"], [1, "#dcdddf"]]));
-        const scrn = o.on ? `<rect x="54" y="22" width="136" height="97" fill="url(#${u}-scr)"/><rect x="56" y="26" width="132" height="78" fill="#111"/>` + scr(o, 58, 28, 128, 72, "mountains", 1) +
+        const scrn = ps.on ? `<rect x="54" y="22" width="136" height="97" fill="url(#${u}-scr)"/>` + (pp.on ? `<rect x="56" y="26" width="132" height="78" fill="#111"/>` + scr(o, 58, 28, 128, 72, "mountains", 1) : `<rect x="56" y="26" width="132" height="78" fill="#e9eaec"/><rect x="56" y="26" width="132" height="78" fill="url(#${u}-scr)" opacity=".5"/>`) +
           `<rect x="52" y="118" width="140" height="3.6" rx="1.8" fill="url(#${u}-chrome)"/><circle cx="122" cy="125.5" r="2.6" fill="none" stroke="#c9ccd1" stroke-width="1.2"/>`
           : `<rect x="52" y="22" width="140" height="3.6" rx="1.8" fill="url(#${u}-chrome)"/><circle cx="122" cy="29.5" r="2.6" fill="none" stroke="#c9ccd1" stroke-width="1.2"/>`;
-        return svg(o, room(o, 176) + bias(o, "mountains", 122, 64, 92, 62, .55) + G(`<rect width="200" height="12" fill="#fff" fill-opacity=".1"/><rect y="12" width="200" height="1.2" fill="#000" fill-opacity=".35"/>`) +
+        return svg(o, room(o, 176) + bias(pb, "mountains", 122, 64, 92, 62, .55) + G(`<rect width="200" height="12" fill="#fff" fill-opacity=".1"/><rect y="12" width="200" height="1.2" fill="#000" fill-opacity=".35"/>`) +
           `<rect x="50" y="13.5" width="144" height="8.5" rx="4.2" fill="${mat(o, "#e4e6ea", "v")}"/><rect x="50" y="13.5" width="5" height="8.5" rx="2" fill="#9aa0a8"/><rect x="189" y="13.5" width="5" height="8.5" rx="2" fill="#9aa0a8"/>` + scrn +
-          (o.on ? `<path d="M46 27.5L186 28V100L46 32.5Z" fill="url(#${u}-bm)" opacity=".3" class="${P}beam"/>` : "") +
+          (pp.on ? `<path d="M46 27.5L186 28V100L46 32.5Z" fill="url(#${u}-bm)" opacity=".3" class="${P}beam"/>` : "") +
           `<rect x="24" y="0" width="4" height="20" fill="#2a2d33"/><rect x="17" y="19" width="18" height="3" rx="1" fill="#2a2d33"/>` +
           `<rect x="5" y="22" width="44" height="17" rx="4.5" fill="${mat(o, c, "v")}"/>` + tex(o, c, R(7, 23, 40, 15)) + `<path d="M10 27h14M10 30h14M10 33h14" stroke="#000" stroke-opacity=".35" stroke-width="1"/>` +
           `<circle cx="42" cy="30.5" r="6.2" fill="#15171b"/><circle cx="42" cy="30.5" r="4.4" fill="url(#${u}-cone)"/>` +
-          (o.on ? `<circle cx="44" cy="30.5" r="9" fill="url(#${u}-hz)"/><circle cx="42.6" cy="30.5" r="2.4" fill="#fff"/>` : `<circle cx="41" cy="29.4" r="1.2" fill="#fff" opacity=".35"/>`) + led(o, 30, 35.5, "#7cf0a0") +
-          osd(o, 64, 90, 40) + G(
+          (pp.on ? `<circle cx="44" cy="30.5" r="9" fill="url(#${u}-hz)"/><circle cx="42.6" cy="30.5" r="2.4" fill="#fff"/>` : `<circle cx="41" cy="29.4" r="1.2" fill="#fff" opacity=".35"/>`) + led(pp, 30, 35.5, "#7cf0a0") +
+          osd(o.mf ? OFF : o, 64, 90, 40) + G(
           `<path d="M-4 200V178C-4 170 2 166 10 166H190C198 166 204 170 204 178V200Z" fill="${mat(o, "#3a3f4a", "v")}"/><path d="M-4 200V178C-4 170 2 166 10 166H190C198 166 204 170 204 178V200Z" fill="url(#${u}-fab)"/>` +
           `<path d="M66 168V200M134 168V200" stroke="#000" stroke-opacity=".35" stroke-width="1.2"/><path d="M8 167.5H192" stroke="#fff" stroke-opacity=".18"/>` +
           pillow(o, 34, 170, -8, "#c98a5a") + pillow(o, 164, 170, 7, "#d8cbb4") + pillow(o, 148, 172, -4, "#5d7a8c")));
-      }
+      }, parts: [{ id: "projector", name: "Projector" }, { id: "screen", name: "Screen" }]
     },
     {
       id: "ust", name: "Short-throw projector", colors: ["#f0f0ee", "#1c1e22", "#5a6068", "#c9b49a"], picker: true, colorLabel: "Finish",
       render(o) {
-        const u = o.uid, c = o.color;
+        // (parts) Projector and Screen (a rising screen: ticked and off = lowered into the cabinet, the picture faint on the
+        // wall; left out = always up, as today)
+        const u = o.uid, c = o.color, pp = MF.as(o, "projector"), up = MF.has(o, "screen") ? !!o.parts.screen : true;
         DEF.push(lg(u + "-bmu", 1, [[0, "#c9ffe8", .05], [1, "#fff", .55]]));
-        return svg(o, room(o, 178) + bias(o, "aurora", 100, 58, 104, 62, .55) +
-          `<rect x="14" y="12" width="172" height="90" rx="1" fill="#14161b"/><rect x="16" y="14" width="168" height="86" fill="#2a2e35"/><rect x="16" y="14" width="168" height="86" fill="url(#${u}-ref)" opacity=".5"/>` +
-          (o.on ? scr(o, 16, 14, 168, 86, "aurora", 1) + `<path d="M86 134H114L184 100H16Z" fill="url(#${u}-bmu)" opacity=".42" class="${P}beam"/>` : "") +
+        return svg(o, room(o, 178) + bias(pp, "aurora", 100, 58, 104, 62, .55) +
+          (up ? `<rect x="14" y="12" width="172" height="90" rx="1" fill="#14161b"/><rect x="16" y="14" width="168" height="86" fill="#2a2e35"/><rect x="16" y="14" width="168" height="86" fill="url(#${u}-ref)" opacity=".5"/>` : "") +
+          (pp.on ? (up ? scr(o, 16, 14, 168, 86, "aurora", 1) : `<g opacity=".4">${scr(o, 16, 14, 168, 86, "aurora", 1)}</g>`) + `<path d="M86 134H114L184 100H16Z" fill="url(#${u}-bmu)" opacity=".42" class="${P}beam"/>` : "") +
           cabinet(o, 24, 152, 152, 20, "#b8875a", { doors: 3, leg: 6 }) + sh(o, 100, 149, 46, 3.5) +
           `<rect x="56" y="131" width="88" height="18" rx="5" fill="${mat(o, c, "v")}"/>` + tex(o, c, R(58, 132, 84, 16)) +
           `<rect x="58" y="139" width="84" height="9" rx="3.5" fill="${mat(o, H().shade(c, -.12), "v")}"/><rect x="58" y="139" width="84" height="9" rx="3.5" fill="url(#${u}-fab)"/>` +
-          `<rect x="80" y="132.5" width="40" height="3.8" rx="1.6" fill="#07090c"/>` + (o.on ? `<ellipse cx="100" cy="134" rx="22" ry="5" fill="url(#${u}-hz)"/><rect x="82" y="133.2" width="36" height="2" rx="1" fill="#eafff6"/>` : `<rect x="81" y="133" width="18" height="1" fill="#fff" opacity=".2"/>`) +
-          led(o, 136, 135, "#7cf0a0") + osd(o, 24, 86, 46));
-      }
+          `<rect x="80" y="132.5" width="40" height="3.8" rx="1.6" fill="#07090c"/>` + (pp.on ? `<ellipse cx="100" cy="134" rx="22" ry="5" fill="url(#${u}-hz)"/><rect x="82" y="133.2" width="36" height="2" rx="1" fill="#eafff6"/>` : `<rect x="81" y="133" width="18" height="1" fill="#fff" opacity=".2"/>`) +
+          led(pp, 136, 135, "#7cf0a0") + osd(o.mf ? OFF : o, 24, 86, 46));
+      }, parts: [{ id: "projector", name: "Projector" }, { id: "screen", name: "Screen" }]
     },
     {
       id: "soundbar-tv", name: "Soundbar & TV", colors: FAB, picker: true, colorLabel: "Fabric",
       render(o) {
-        const u = o.uid, c = o.color, lit = Math.round(o.level * 5);
+        // (parts) TV (the picture), Sound (the soundbar's lights and sound waves), Volume (the bar's dots and the TV's bar)
+        const u = o.uid, c = o.color, vl = MF.vol(o), pt = MF.as(o, "tv"), ps = MF.as(o, "sound", vl), lit = Math.round(ps.level * 5);
         let dots = "";
-        for (let i = 0; i < 5; i++) dots += o.on && i < lit ? `<circle cx="${90 + i * 5}" cy="126" r="2.4" fill="#fff" opacity=".3"/><circle cx="${90 + i * 5}" cy="126" r="1" fill="#fff"/>` : `<circle cx="${90 + i * 5}" cy="126" r=".9" fill="#000" opacity=".35"/>`;
-        return svg(o, room(o, 174) + bias(o, "dunes", 100, 72, 104, 60, .6) + dropShadow(26, 24, 148, 84) + tv(o, 26, 24, 148, 84, "dunes", { col: "#1b1d21" }) + osd(o, 34, 96, 44) +
+        for (let i = 0; i < 5; i++) dots += ps.on && i < lit ? `<circle cx="${90 + i * 5}" cy="126" r="2.4" fill="#fff" opacity=".3"/><circle cx="${90 + i * 5}" cy="126" r="1" fill="#fff"/>` : `<circle cx="${90 + i * 5}" cy="126" r=".9" fill="#000" opacity=".35"/>`;
+        return svg(o, room(o, 174) + bias(pt, "dunes", 100, 72, 104, 60, .6) + dropShadow(26, 24, 148, 84) + tv(pt, 26, 24, 148, 84, "dunes", { col: "#1b1d21" }) + osd(vl == null ? OFF : Object.assign({}, pt, { level: vl }), 34, 96, 44) +
           `<rect x="34" y="120" width="136" height="13" rx="6" fill="#000" opacity=".3"/><rect x="32" y="116" width="136" height="13" rx="6" fill="${mat(o, c, "v")}"/><rect x="32" y="116" width="136" height="13" rx="6" fill="url(#${u}-fab)"/><rect x="32" y="116" width="136" height="13" rx="6" fill="url(#${u}-fx)"/>` +
           `<path d="M38 116.8H162" stroke="#fff" stroke-opacity=".3" stroke-width=".8"/><rect x="84" y="122.5" width="32" height="7" rx="3.5" fill="#000" opacity=".2"/>` + dots +
-          waves(o, 30, 122.5, "l", CY, .85) + waves(o, 170, 122.5, "r", CY, .85) + plant(o, 176, 174, 1.15));
-      }
+          waves(ps, 30, 122.5, "l", CY, .85) + waves(ps, 170, 122.5, "r", CY, .85) + plant(o, 176, 174, 1.15));
+      }, parts: [{ id: "tv", name: "TV" }, { id: "sound", name: "Soundbar" }, { id: "volume", name: "Volume", type: "value", unit: "%", min: 0, max: 100, def: 30 }]
     },
     {
       id: "soundbar-sub", name: "Soundbar & sub", colors: FAB, picker: true, colorLabel: "Fabric",
       render(o) {
-        const u = o.uid, c = o.color, lit = Math.round(o.level * 5);
+        // (parts) TV, Sound (the soundbar), Sub (the subwoofer's cone and light), Volume (the bar's dots, the TV's bar)
+        const u = o.uid, c = o.color, vl = MF.vol(o), pt = MF.as(o, "tv"), ps = MF.as(o, "sound", vl), pw = MF.as(o, "sub", vl), lit = Math.round(ps.level * 5);
         let dots = "";
-        for (let i = 0; i < 5; i++) dots += o.on && i < lit ? `<circle cx="${62 + i * 5}" cy="117" r="2.2" fill="#fff" opacity=".3"/><circle cx="${62 + i * 5}" cy="117" r=".9" fill="#fff"/>` : `<circle cx="${62 + i * 5}" cy="117" r=".8" fill="#000" opacity=".35"/>`;
-        return svg(o, room(o, 178) + bias(o, "mountains", 80, 10, 100, 58, .6) + tv(o, 6, -30, 148, 76, "mountains", { col: "#1b1d21" }) + osd(o, 14, 34, 42) +
+        for (let i = 0; i < 5; i++) dots += ps.on && i < lit ? `<circle cx="${62 + i * 5}" cy="117" r="2.2" fill="#fff" opacity=".3"/><circle cx="${62 + i * 5}" cy="117" r=".9" fill="#fff"/>` : `<circle cx="${62 + i * 5}" cy="117" r=".8" fill="#000" opacity=".35"/>`;
+        return svg(o, room(o, 178) + bias(pt, "mountains", 80, 10, 100, 58, .6) + tv(pt, 6, -30, 148, 76, "mountains", { col: "#1b1d21" }) + osd(vl == null ? OFF : Object.assign({}, pt, { level: vl }), 14, 34, 42) +
           cabinet(o, 10, 124, 120, 40, "#5e3f28", { doors: 2, leg: 14 }) + sh(o, 70, 121, 54, 3) +
           `<path d="M22 108L26 104H114L118 108Z" fill="${mat(o, H().shade(c, .15), "t")}"/><rect x="20" y="107.5" width="100" height="13" rx="5.5" fill="${mat(o, c, "v")}"/><rect x="20" y="107.5" width="100" height="13" rx="5.5" fill="url(#${u}-fab)"/><rect x="20" y="107.5" width="100" height="13" rx="5.5" fill="url(#${u}-fx)"/>` + dots +
           sh(o, 164, 178, 30, 4) + `<path d="M140 132L146 126H190L186 132Z" fill="${mat(o, H().shade(c, .12), "t")}"/><path d="M186 132L190 126V172L186 178Z" fill="${H().shade(c, -.45)}"/>` +
-          `<rect x="140" y="132" width="46" height="46" rx="2" fill="${mat(o, c, "v")}"/><rect x="140" y="132" width="46" height="46" rx="2" fill="url(#${u}-fab)"/>` + cone(o, 163, 152, 15, 1) +
-          `<rect x="150" y="171" width="26" height="3" rx="1.5" fill="#07080a"/>` + led(o, 182, 136, "#7cf0a0") + waves(o, 70, 103, "u", CY, .9));
-      }
+          `<rect x="140" y="132" width="46" height="46" rx="2" fill="${mat(o, c, "v")}"/><rect x="140" y="132" width="46" height="46" rx="2" fill="url(#${u}-fab)"/>` + cone(pw, 163, 152, 15, 1) +
+          `<rect x="150" y="171" width="26" height="3" rx="1.5" fill="#07080a"/>` + led(pw, 182, 136, "#7cf0a0") + waves(ps, 70, 103, "u", CY, .9));
+      }, parts: [{ id: "tv", name: "TV" }, { id: "sound", name: "Soundbar" }, { id: "sub", name: "Subwoofer" }, { id: "volume", name: "Volume", type: "value", unit: "%", min: 0, max: 100, def: 30 }]
     },
     {
       id: "cylinder", name: "Speaker cylinder", colors: FAB, picker: true, colorLabel: "Fabric",

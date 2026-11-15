@@ -174,7 +174,8 @@ ${extra || ""}</defs>`;
   const SS = "#c4c9ce", BSS = "#4e5156", WH = "#eef0f1", BK = "#232529", MWH = "#efece4", MBK = "#2e2e30", SL = "#6f716c", FPS = "#b9bec4";
   const metal = (o) => { const c = String(o.color).toLowerCase(); return c === SS || c === BSS || c === FPS ? 1 : 0; };
   const sub = (o, v) => Object.assign({}, o, { on: !!v });
-  const part = (o, id) => sub(o, o.parts && o.parts[id] != null ? o.parts[id] : o.on);
+  // (parts) o.mf = a Multi-Function Image: o.parts holds only the ticked parts, a part left out is off (a Device Image: o.on, as today)
+  const part = (o, id) => sub(o, o.parts && o.parts[id] != null ? o.parts[id] : o.mf ? false : o.on);
   const L = (o, k) => n1((o.on ? .35 + .65 * o.level : 0) * (k == null ? 1 : k));
 
   function oextra(o) {
@@ -214,19 +215,24 @@ ${extra || ""}</defs>`;
       `<path d="M${n1(x + w * .55)} ${y}L${n1(x + w * .4)} ${y + h}H${n1(x + w * .48)}L${n1(x + w * .63)} ${y}Z" fill="#fff" fill-opacity=".05"/><path d="${d}" fill="none" stroke="#000" stroke-opacity=".7"/>`;
     return s;
   }
-  function owin(o, x, y, w, h, dish, cool) {
-    const u = o.uid, id = u + "-ow" + x + "-" + y, d = rr(x, y, w, h, 2), cx = x + w / 2, ry = y + h * .74;
-    let s = `<clipPath id="${id}"><path d="${d}"/></clipPath><path d="${d}" fill="#050607"/><g clip-path="url(#${id})">`;
-    if (o.on) s += `<g opacity="${L(o)}"><path class="${P}glow" d="${d}" fill="${cool ? "#bfe6ff" : `url(#${u}-ovg)`}" ${cool ? 'fill-opacity=".45"' : ""}/></g>` +
-      (cool ? "" : `<path d="M${x + 4} ${y + 4}${[1, 2, 3, 4, 5, 6].map((i) => `L${n1(x + 4 + (w - 8) * i / 6.5)} ${y + (i % 2 ? 7 : 4)}`).join("")}" fill="none" stroke="#ff5a1a" stroke-width="1.4"/>`);
-    s += `<path d="M${x} ${n1(ry)}H${x + w}M${x} ${n1(y + h * .45)}H${x + w}" stroke="${o.on ? "#fff" : "#2a2e34"}" stroke-opacity="${o.on ? .55 : 1}" stroke-width="1"/>`;
+  function dishAt(dish, cx, ry) {
+    let s = "";
     if (dish === "roast") s += `<path d="M${n1(cx - 14)} ${n1(ry - 3)}H${n1(cx + 14)}L${n1(cx + 12)} ${n1(ry)}H${n1(cx - 12)}Z" fill="#3a3f45"/><ellipse cx="${cx}" cy="${n1(ry - 7)}" rx="10" ry="6" fill="#b5622a"/><ellipse cx="${cx - 2}" cy="${n1(ry - 9)}" rx="5" ry="2.6" fill="#e09a52"/>`;
     if (dish === "cookie") s += `<rect x="${n1(cx - 18)}" y="${n1(ry - 1.5)}" width="36" height="1.5" fill="#8f969e"/>` + [-13, -6.5, 0, 6.5, 13].map((dd) => `<ellipse cx="${n1(cx + dd)}" cy="${n1(ry - 3)}" rx="2.6" ry="1.3" fill="#c98a3e"/>`).join("");
     if (dish === "pizza") s += `<ellipse cx="${cx}" cy="${n1(ry - 1.5)}" rx="16" ry="3" fill="#d9a35a"/><ellipse cx="${cx}" cy="${n1(ry - 1.9)}" rx="13" ry="2.3" fill="#c43a22"/>`;
     if (dish === "bread") s += `<path d="M${n1(cx - 12)} ${n1(ry - 1)}C${n1(cx - 12)} ${n1(ry - 12)} ${n1(cx + 12)} ${n1(ry - 12)} ${n1(cx + 12)} ${n1(ry - 1)}Z" fill="#c07a34"/>`;
     if (dish === "veg") s += `<rect x="${n1(cx - 17)}" y="${n1(ry - 3)}" width="34" height="3" fill="#c9ced4"/>` + ["#3f9a4a", "#e8662a", "#3f9a4a", "#f2c84a", "#e8662a"].map((c, i) => `<ellipse cx="${n1(cx - 12 + i * 6)}" cy="${n1(ry - 4.5)}" rx="2.6" ry="1.6" fill="${c}"/>`).join("");
+    return s;
+  }
+  function owin(o, x, y, w, h, dish, cool, lt) {
+    const u = o.uid, id = u + "-ow" + x + "-" + y, d = rr(x, y, w, h, 2), cx = x + w / 2, ry = y + h * .74;
+    let s = `<clipPath id="${id}"><path d="${d}"/></clipPath><path d="${d}" fill="#050607"/><g clip-path="url(#${id})">`;
+    if (o.on) s += `<g opacity="${L(o)}"><path class="${P}glow" d="${d}" fill="${cool ? "#bfe6ff" : `url(#${u}-ovg)`}" ${cool ? 'fill-opacity=".45"' : ""}/></g>` +
+      (cool ? "" : `<path d="M${x + 4} ${y + 4}${[1, 2, 3, 4, 5, 6].map((i) => `L${n1(x + 4 + (w - 8) * i / 6.5)} ${y + (i % 2 ? 7 : 4)}`).join("")}" fill="none" stroke="#ff5a1a" stroke-width="1.4"/>`);
+    s += `<path d="M${x} ${n1(ry)}H${x + w}M${x} ${n1(y + h * .45)}H${x + w}" stroke="${o.on ? "#fff" : "#2a2e34"}" stroke-opacity="${o.on ? .55 : 1}" stroke-width="1"/>`;
+    s += dishAt(dish, cx, ry);
     if (o.on && cool) s += steam(o, cx, ry - 6, w * .6, 4);
-    s += (o.on ? `<path d="${d}" fill="#000" opacity="${n1(.4 - .4 * o.level)}"/>` : `<path d="${d}" fill="#020304" opacity=".86"/>`) + `</g>` +
+    s += (o.on ? `<path d="${d}" fill="#000" opacity="${n1(.4 - .4 * o.level)}"/>` : lt ? `<path d="${d}" fill="#fff1c8" opacity=".34"/><path d="${d}" fill="#000" opacity=".12"/>` : `<path d="${d}" fill="#020304" opacity=".86"/>`) + `</g>` +
       `<path d="M${n1(x + w * .6)} ${y}L${n1(x + w * .45)} ${y + h}H${n1(x + w * .52)}L${n1(x + w * .67)} ${y}Z" fill="#fff" fill-opacity="${o.on ? .04 : .07}"/><path d="${d}" fill="none" stroke="#000" stroke-opacity=".6"/>`;
     return s;
   }
@@ -304,19 +310,53 @@ ${extra || ""}</defs>`;
       if (sp.knob) s += `<circle cx="${x2 - 14}" cy="${y + ch / 2 + 1}" r="${ch * .36}" fill="url(#${u}-tbv)"/><circle cx="${x2 - 14}" cy="${y + ch / 2 + 1}" r="${ch * .36}" fill="none" stroke="#000" stroke-opacity=".4"/>`;
     }
     const dy = y + ch + 1, dh = h - ch - 3, full = sp.door === "glass";
+    if (sp.open) return s + ovCav(q, sp, x1 + 2, dy, w - 4, dh) + `<path d="M${x1 + 2} ${y + 1}H${x2 - 2}" stroke="#fff" stroke-opacity=".3"/>`;
     if (full) s += glass(o, rr(x1 + 2, dy, w - 4, dh, 1.5));
     const wx = x1 + (full ? 10 : 12), ww = w - (full ? 20 : 24), wy = dy + (sp.handle === "none" ? 6 : 12), wh = dh - (sp.handle === "none" ? 12 : 18);
-    s += kind === "microwave-drawer" ? `<path d="${rr(wx, wy, ww, wh, 2)}" fill="#000" opacity=".25"/>` : kind === "mw" ? mwin(q, wx, wy, ww, wh, full) : owin(q, wx, wy, ww, wh, sp.dish, kind === "steam");
+    s += kind === "microwave-drawer" ? `<path d="${rr(wx, wy, ww, wh, 2)}" fill="#000" opacity=".25"/>` : kind === "mw" ? mwin(q, wx, wy, ww, wh, full) : owin(q, wx, wy, ww, wh, sp.dish, kind === "steam", sp.lt);
     if (sp.handle === "vbar") s += vbar(o, x2 - 14, dy + 6, dy + dh - 6);
     else if (sp.handle !== "none") s += hbar(o, x1 + 12, x2 - 12, dy + 7, sp.handle);
     return s + `<path d="M${x1 + 2} ${y + 1}H${x2 - 2}" stroke="#fff" stroke-opacity=".3"/>`;
   }
   const gaps = (o, x1, x2, t, b) => `<g class="hda-bg">${gaps0(o, x1, x2, t, b)}</g>`;
   const gaps0 = (o, x1, x2, t, b) => [[4, t - 6], [b + 6, 170]].filter((g) => g[1] - g[0] > 16).map((g) => `<path d="${rr(x1 - 6, g[0], x2 - x1 + 12, g[1] - g[0], 1.5)}" fill="none" stroke="#000" stroke-opacity=".35"/><path d="${rr(x1, g[0] + 6, x2 - x1, g[1] - g[0] - 12, 1)}" fill="none" stroke="#000" stroke-opacity=".2"/><rect x="${(x1 + x2) / 2 - 12}" y="${g[0] < 50 ? g[1] - 8 : g[0] + 5}" width="24" height="2.4" rx="1.2" fill="url(#${o.uid}-tbv)"/>`).join("");
-  const wallIcon = (o, units, x1, x2) => svgO(o, tallScene(o, x1, x2) + gaps(o, x1, x2, Math.min.apply(null, units.map((u) => u.y)), Math.max.apply(null, units.map((u) => u.y + u.h))) + units.map((un) => unit(o, part(o, un.part || "x"), x1, x2, un.y, un.h, un)).join(""));
+  // (parts) an open door (un.dc: its contact part; a Device Image: the device's contact o.open) shows the lit cavity, an oven
+  // door folded down below it, a microwave door swung open to the left. The Oven light part lights the window and the cavity.
+  function ovCav(q, sp, X, Y, W, H) {
+    const bx = X + W * .1, bw = W * .8, by = Y + H * .1, bh = H * .78, heat = q.on, mw = sp.kind === "mw", lit = heat || (!mw && sp.lt);
+    let s = `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="#1d2129"/><rect x="${n1(bx)}" y="${n1(by)}" width="${n1(bw)}" height="${n1(bh)}" fill="#272c36"/>` +
+      `<path d="M${X} ${Y}L${n1(bx)} ${n1(by)}V${n1(by + bh)}L${X} ${Y + H}Z" fill="#2e3440"/><path d="M${X + W} ${Y}L${n1(bx + bw)} ${n1(by)}V${n1(by + bh)}L${X + W} ${Y + H}Z" fill="#232831"/>` +
+      `<path d="M${X} ${Y + H}L${n1(bx)} ${n1(by + bh)}H${n1(bx + bw)}L${X + W} ${Y + H}Z" fill="#15181e"/>`;
+    if (mw) s += `<ellipse cx="${n1(X + W / 2)}" cy="${n1(by + bh - 2)}" rx="${n1(bw * .36)}" ry="${n1(bh * .07)}" fill="#dfe4ea" fill-opacity=".7"/>`;
+    else s += `<path d="M${n1(bx + 3)} ${n1(by + 3)}${[1, 2, 3, 4, 5, 6].map((i) => `L${n1(bx + 3 + (bw - 6) * i / 6.5)} ${n1(by + (i % 2 ? 6 : 3))}`).join("")}" fill="none" stroke="${heat ? "#ff5a1a" : "#4a505a"}" stroke-width="1.3"/>` +
+      [.55, .82].map((k) => `<path d="M${X + 2} ${n1(Y + H * k)}H${X + W - 2}" stroke="#a9b0b8" stroke-width=".9"/>`).join("") + dishAt(sp.dish, X + W / 2, Y + H * .55) +
+      (heat ? `<ellipse cx="${n1(X + W / 2)}" cy="${n1(by + 4)}" rx="${n1(bw / 2)}" ry="${n1(H * .3)}" fill="#ff7a2a" opacity=".22"/>` : "");
+    s += lit ? `<ellipse cx="${n1(X + W / 2)}" cy="${n1(Y + 3)}" rx="${n1(W * .5)}" ry="${n1(H * .7)}" fill="#fff1c8" opacity=".22"/><rect x="${n1(bx + bw - 8)}" y="${n1(by + 1)}" width="4" height="3" rx="1" fill="#fff4d6"/>` : `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="#05060a" opacity=".4"/>`;
+    const cid = `${q.uid}-oc${Math.round(Y)}`;
+    return `<clipPath id="${cid}"><rect x="${X}" y="${Y}" width="${W}" height="${H}"/></clipPath><g clip-path="url(#${cid})">${s}</g>` + `<rect x="${X + .4}" y="${Y + .4}" width="${W - .8}" height="${H - .8}" fill="none" stroke="#5d656d" stroke-width=".7"/>`;
+  }
+  function ovDoor(o, un, x1, x2) {
+    const u = o.uid, ch = un.ch == null ? 12 : un.ch, dy = un.y + ch + 1, dh = un.h - ch - 3, X = x1 + 2, W = x2 - x1 - 4;
+    if (un.kind === "mw") { const ow = W * .3, e = 4, d = `M${X} ${dy}L${n1(X - ow)} ${dy - e}V${dy + dh + e}L${X} ${dy + dh}Z`;
+      return `<path d="${d}" fill="#c9ced4"/><path d="${d}" fill="#000" opacity=".22"/><path d="M${n1(X - ow * .15)} ${dy + 6}L${n1(X - ow * .85)} ${dy + 3}V${dy + dh - 3}L${n1(X - ow * .15)} ${dy + dh - 6}Z" fill="#0d0f13" opacity=".8"/>` +
+        `<path d="M${n1(X - ow)} ${dy - e}l-3 1v${dh + 2 * e - 2}l3 1z" fill="url(#${u}-v)"/>`; }
+    const Yb = dy + dh, dp = Math.min(16, 196 - Yb), g = 6, d = `M${X} ${Yb}H${X + W}L${X + W + g} ${Yb + dp}H${X - g}Z`, gl = `M${X + 12} ${Yb + 2}H${X + W - 12}L${X + W - 8} ${Yb + dp - 3}H${X + 8}Z`;
+    return `<ellipse cx="${X + W / 2}" cy="${Math.min(198, Yb + dp + 2)}" rx="${W / 2 + 10}" ry="2.4" fill="#000" opacity=".3"/><path d="${d}" fill="#3a3f46"/>` +
+      `<path d="${gl}" fill="#14171c"/><path d="${gl}" fill="url(#${u}-gls)" opacity=".5"/>` +
+      `<rect x="${X - g}" y="${Yb + dp}" width="${W + 2 * g}" height="3.4" rx="1" fill="url(#${u}-v)"/><path d="M${X - g} ${Yb + dp + 3.4}H${X + W + g}" stroke="#000" stroke-opacity=".5" stroke-width=".6"/>`;
+  }
+  const wallIcon = (o, units, x1, x2) => {
+    const p = o.parts || {}, op = (id) => !!id && (o.mf ? !!p[id] : !!o.open), lt = !!o.mf && !!p.light;
+    const us = units.map((un) => (un.dc ? Object.assign({}, un, { lt, open: op(un.dc) }) : un));
+    return svgO(o, tallScene(o, x1, x2) + gaps(o, x1, x2, Math.min.apply(null, us.map((u) => u.y)), Math.max.apply(null, us.map((u) => u.y + u.h))) + us.map((un) => unit(o, part(o, un.part || "x"), x1, x2, un.y, un.h, un)).join("") +
+      us.filter((un) => un.open).sort((a, b) => b.y - a.y).map((un) => ovDoor(o, un, x1, x2)).join(""));
+  };
 
-  const ic = (id, name, colors, render, parts) => ({ id, name, colors, picker: true, colorLabel: "Finish", render, parts: parts ? parts.map((p) => ({ id: p[0], name: p[1] })) : undefined });
+  const ic = (id, name, colors, render, parts) => ({ id, name, colors, picker: true, colorLabel: "Finish", render, parts: parts ? parts.map((p) => Object.assign({ id: p[0], name: p[1] }, p[2] ? { type: p[2] } : {})) : undefined });
   const OTRP = [["mw", "Microwave"], ["light", "Light"], ["fan", "Fan"]];
+  // (parts) each oven's door its own contact, each oven's heat, the oven light (o.mf: a Multi-Function Image)
+  const DBLP = [["ud", "Upper door", "contact"], ["ld", "Lower door", "contact"], ["oven", "Upper oven"], ["oven2", "Lower oven"], ["light", "Oven light"]];
+  const CMBP = [["md", "Microwave door", "contact"], ["od", "Oven door", "contact"], ["mw", "Microwave"], ["oven", "Oven"], ["light", "Oven light"]];
   const STD = [SS, BSS, WH, BK, FPS];
 
   const icons = [
@@ -329,11 +369,11 @@ ${extra || ""}</defs>`;
 
     ic("single-wall-oven", "Single wall oven", [SS, BSS, BK, WH], (o) => wallIcon(o, [{ y: 46, h: 104, ch: 16, dish: "roast", handle: "hbar", door: "glass" }], 42, 158)),
     ic("flush-wall-oven", "Flush wall oven", [SS, BK, BSS], (o) => wallIcon(o, [{ y: 46, h: 104, ch: 14, dish: "bread", handle: "hbar", knob: true }], 42, 158)),
-    ic("pro-double-oven", "Pro double oven", [SS, BSS, WH, BK], (o) => wallIcon(o, [{ y: 12, h: 78, ch: 14, dish: "cookie", handle: "ka", part: "oven" }, { y: 94, h: 74, ch: 0, dish: "roast", handle: "ka", part: "oven2" }], 42, 158), [["oven", "Upper oven"], ["oven2", "Lower oven"]]),
-    ic("classic-double-oven", "Classic double oven", [SS, WH, BK, FPS], (o) => wallIcon(o, [{ y: 12, h: 78, ch: 12, dish: "pizza", handle: "hbar", part: "oven" }, { y: 94, h: 74, ch: 0, dish: "bread", handle: "hbar", part: "oven2" }], 42, 158), [["oven", "Upper oven"], ["oven2", "Lower oven"]]),
-    ic("glass-double-oven", "Glass double oven", [BSS, SS, BK, WH], (o) => wallIcon(o, [{ y: 12, h: 78, ch: 13, dish: "veg", handle: "hbar", door: "glass", part: "oven" }, { y: 94, h: 74, ch: 0, dish: "roast", handle: "hbar", door: "glass", part: "oven2" }], 42, 158), [["oven", "Upper oven"], ["oven2", "Lower oven"]]),
-    ic("combo-wall-glass", "Combo wall, glass", [SS, BSS, BK], (o) => wallIcon(o, [{ y: 12, h: 66, ch: 12, kind: "mw", handle: "hbar", door: "glass", part: "mw" }, { y: 82, h: 86, ch: 12, dish: "pizza", handle: "hbar", part: "oven" }], 42, 158), [["mw", "Microwave"], ["oven", "Oven"]]),
-    ic("combo-wall-pro", "Combo wall, pro", [SS, BSS, WH, BK], (o) => wallIcon(o, [{ y: 12, h: 66, ch: 12, kind: "mw", handle: "ka", part: "mw" }, { y: 82, h: 86, ch: 12, dish: "roast", handle: "ka", part: "oven" }], 42, 158), [["mw", "Microwave"], ["oven", "Oven"]]),
+    ic("pro-double-oven", "Pro double oven", [SS, BSS, WH, BK], (o) => wallIcon(o, [{ y: 12, h: 78, ch: 14, dish: "cookie", handle: "ka", part: "oven", dc: "ud" }, { y: 94, h: 74, ch: 0, dish: "roast", handle: "ka", part: "oven2", dc: "ld" }], 42, 158), DBLP),
+    ic("classic-double-oven", "Classic double oven", [SS, WH, BK, FPS], (o) => wallIcon(o, [{ y: 12, h: 78, ch: 12, dish: "pizza", handle: "hbar", part: "oven", dc: "ud" }, { y: 94, h: 74, ch: 0, dish: "bread", handle: "hbar", part: "oven2", dc: "ld" }], 42, 158), DBLP),
+    ic("glass-double-oven", "Glass double oven", [BSS, SS, BK, WH], (o) => wallIcon(o, [{ y: 12, h: 78, ch: 13, dish: "veg", handle: "hbar", door: "glass", part: "oven", dc: "ud" }, { y: 94, h: 74, ch: 0, dish: "roast", handle: "hbar", door: "glass", part: "oven2", dc: "ld" }], 42, 158), DBLP),
+    ic("combo-wall-glass", "Combo wall, glass", [SS, BSS, BK], (o) => wallIcon(o, [{ y: 12, h: 66, ch: 12, kind: "mw", handle: "hbar", door: "glass", part: "mw", dc: "md" }, { y: 82, h: 86, ch: 12, dish: "pizza", handle: "hbar", part: "oven", dc: "od" }], 42, 158), CMBP),
+    ic("combo-wall-pro", "Combo wall, pro", [SS, BSS, WH, BK], (o) => wallIcon(o, [{ y: 12, h: 66, ch: 12, kind: "mw", handle: "ka", part: "mw", dc: "md" }, { y: 82, h: 86, ch: 12, dish: "roast", handle: "ka", part: "oven", dc: "od" }], 42, 158), CMBP),
     ic("speed-oven", "Speed oven", [SS, BSS, BK, WH], (o) => wallIcon(o, [{ y: 34, h: 74, ch: 14, kind: "speed", dish: "pizza", handle: "hbar", door: "glass", knob: true }, { y: 112, h: 56, ch: 0, kind: "microwave-drawer", handle: "hbar", door: "glass" }].map((un, i) => i ? Object.assign(un, { h: 30 }) : un), 42, 158)),
     ic("steam-oven", "Steam oven", [SS, BK, BSS], (o) => wallIcon(o, [{ y: 40, h: 88, ch: 14, kind: "steam", dish: "veg", handle: "hbar", door: "glass" }], 42, 158)),
 
@@ -350,7 +390,7 @@ ${extra || ""}</defs>`;
 
   (window.HDA = window.HDA || []).push({
     id: "ovens", tab: "Wall ovens & OTR microwaves", group: "Appliances", kind: "device",
-    intro: "Sixteen real models: over-the-range microwaves, single and double wall ovens, microwave-oven combos, a speed oven, a steam oven and a microwave drawer. OTR microwaves have separate Microwave, Light and Fan chips: the light shines on the cooktop, the fan pulls the steam up through the vent, and the microwave lights its window with the plate turning. Double ovens and combos switch each cavity on its own.",
+    intro: "Sixteen real models: over-the-range microwaves, single and double wall ovens, microwave-oven combos, a speed oven, a steam oven and a microwave drawer. OTR microwaves have separate Microwave, Light and Fan chips: the light shines on the cooktop, the fan pulls the steam up through the vent, and the microwave lights its window with the plate turning. Double ovens and combos switch each cavity on its own; as a Multi-Function Image each door is its own contact (open shows the cavity, the door folded down) with an oven light.",
     
     css: css2, icons,
   });

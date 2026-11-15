@@ -322,6 +322,28 @@
   }
 
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {});
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
+  // a part's view of the drawing: the same x (its gradients land in the same defs) with its own on
+  const sub = (x, on) => { const y = Object.create(x); y.on = on; y.an = on && x.o.anim; y.L = on ? .35 + .65 * x.lv : 0; return y; };
+  const mfOn = (o) => !!(o.mf || o.parts);
+  // a boiler's two calls: Heat (space heating: a radiator mark) and Hot water (domestic hot water: a tap mark)
+  const BOIL = [{ id: "heat", name: "Heat" }, { id: "dhw", name: "Hot water" }];
+  const radMark = (x, cx, cy, on) => { const c = on ? "#ff9a4a" : "#3a404a"; let s = `<path d="M${f(cx - 3.4)} ${f(cy + 2.4)}H${f(cx + 3.4)}" stroke="${c}" stroke-width=".7"/>`;
+    for (let i = 0; i < 4; i++) s += `<rect x="${f(cx - 3.2 + i * 1.8)}" y="${f(cy - 2.4)}" width="1.2" height="4.4" rx=".5" fill="${c}"/>`; return s; };
+  const tapMark = (x, cx, cy, on) => { const c = on ? "#6cc4ff" : "#3a404a";
+    return `<path d="M${f(cx - 3)} ${f(cy - 1.6)}H${f(cx + 1.2)}Q${f(cx + 2.6)} ${f(cy - 1.6)} ${f(cx + 2.6)} ${f(cy)}V${f(cy + .6)}" fill="none" stroke="${c}" stroke-width="1.1"/><path d="M${f(cx - 1)} ${f(cy - 3.2)}V${f(cy - 1.6)}M${f(cx - 2.2)} ${f(cy - 3.2)}H${f(cx + .2)}" stroke="${c}" stroke-width=".8"/>` +
+      (on ? `<circle cx="${f(cx + 2.6)}" cy="${f(cy + 2.2)}" r=".7" fill="${c}"/>` : ""); };
   const COP = "#c8794a", HOT = "#ff7a3a", COLD = "#5ab0ff";
   const tempC = (x) => Math.round(30 + 50 * x.lv);
   const shadowE = (x, cx, cy, rx, ry, k) => `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${M.shadow(x)}" opacity="${k || .8}"/>`;
@@ -400,9 +422,12 @@
         `<path d="M88 100V130" stroke="${M.steel(x)}" stroke-width="2.4" stroke-linecap="round"/>` + vents(48, 146, 50, 3, 5);
       return scene(x, back, body); }),
 
-    ic("combi", "Combi boiler", sw(WHT, "#eef0f2"), "Finish", (o) => { const x = X(o), c = o.color;
+    // (parts) Heat (the heating flow pipe runs, the radiator mark lights) and Hot water (the hot-water and cold-in pipes run,
+    // the tap mark lights); the burner flame shows while either runs. A Device Image is drawn as before.
+    ic("combi", "Combi boiler", sw(WHT, "#eef0f2"), "Finish", (o) => { const mf = mfOn(o), ht = MF.on(o, "heat"), hw = MF.on(o, "dhw");
+      const x = X(mf ? Object.assign({}, o, { on: ht || hw }) : o), c = o.color, xh = mf ? sub(x, ht) : x, xw = mf ? sub(x, hw) : x;
       const back = wallB(x, "cream", 8, 192);
-      const pipes = [66, 82, 100, 118, 134].map((px, i) => pipe(x, [px, 136, px, 156, px, 170, px, 196], 4.2, COP, i === 1 || i === 2 ? HOT : i === 3 ? COLD : null, 6)).join("") +
+      const pipes = [66, 82, 100, 118, 134].map((px, i) => pipe(i === 1 ? xh : i === 2 || i === 3 ? xw : x, [px, 136, px, 156, px, 170, px, 196], 4.2, COP, i === 1 || i === 2 ? HOT : i === 3 ? COLD : null, 6)).join("") +
         valve(x, 66, 152, "#e0483e") + valve(x, 82, 152, "#e0483e") + valve(x, 118, 152, "#3a6fd8") + valve(x, 134, 152, "#e0483e");
       const body = `<rect x="94" y="8" width="12" height="22" fill="${x.lg([[0, "#c9ccd1"], [.5, "#ffffff"], [1, "#a9aeb5"]], 0, 0, 1, 0)}"/><rect x="92" y="18" width="16" height="3" fill="#b0b5bc"/>` +
         pipes + `<rect x="62" y="132" width="78" height="8" fill="#1d1e22" fill-opacity=".6"/>` +
@@ -411,24 +436,27 @@
         `<rect x="70" y="92" width="60" height="16" rx="5" fill="${x.lg([[0, "#22252c"], [1, "#0e1014"]])}"/>` + digits(x, 102, 95, 10, temp2(x), 2, "#ffd9a0") +
         `<circle cx="104.5" cy="96" r="1.1" fill="none" stroke="${x.on ? "#ffd9a0" : "#30363f"}" stroke-width=".6"/>` +
         (x.on ? `<path d="M118 106C114 103 116 99 119 96C119 99 122 100 121 104Z" fill="#ff8a3a"/>` : `<path d="M118 106C114 103 116 99 119 96C119 99 122 100 121 104Z" fill="#30363f"/>`) +
-        `<circle cx="78" cy="100" r="1.4" fill="${H.shade(c, -.3)}"/>` + gauge(x, 86, 122, 5, x.on ? .5 : .1) + button(x, 116, 122, 3.6, H.shade(c, .1));
-      return scene(x, back, body); }),
+        (mf ? radMark(x, 76, 97, ht) + tapMark(x, 77, 104, hw) : `<circle cx="78" cy="100" r="1.4" fill="${H.shade(c, -.3)}"/>`) + gauge(x, 86, 122, 5, x.on ? .5 : .1) + button(x, 116, 122, 3.6, H.shade(c, .1));
+      return scene(x, back, body); }, { parts: BOIL }),
 
-    ic("floorboiler", "Floor gas boiler", sw(["#2f6a5a", "#3a5a8a", "#c9ccd1", "#2c2f36", "#8a2a2a"], "#2f6a5a"), "Finish", (o) => { const x = X(o), c = o.color;
+    // (parts) Heat (the heating flow and return run, the pump spins, the radiator lamp lights) and Hot water (the tap lamp
+    // lights: the boiler fires for the tank); the burner fires while either runs. A Device Image is drawn as before.
+    ic("floorboiler", "Floor gas boiler", sw(["#2f6a5a", "#3a5a8a", "#c9ccd1", "#2c2f36", "#8a2a2a"], "#2f6a5a"), "Finish", (o) => { const mf = mfOn(o), ht = MF.on(o, "heat"), hw = MF.on(o, "dhw");
+      const x = X(mf ? Object.assign({}, o, { on: ht || hw }) : o), c = o.color, xh = mf ? sub(x, ht) : x;
       const back = basement(x, 166);
       const body = shadowE(x, 96, 172, 60, 7) +
         pipe(x, [96, 56, 96, 30, 96, 20, 96, 6], 10, "#9aa1aa") + `<path d="M84 56H108L104 46H88Z" fill="${M.steel(x)}"/>` +
-        pipe(x, [126, 60, 126, 40, 140, 30, 170, 30, 186, 30, 196, 30, 206, 30], 5, COP, HOT, 9) +
-        pipe(x, [150, 166, 150, 120, 150, 100, 160, 80, 170, 60, 180, 50, 206, 50], 5, COP, COLD, 9) +
-        `<rect x="142" y="116" width="16" height="10" rx="2" fill="#2a2c31"/><rect x="138" y="100" width="24" height="18" rx="4" fill="${M.h(x, "#c0392b")}"/>` + fanCap(x, 150, 109, 6, "#c0392b") +
+        pipe(xh, [126, 60, 126, 40, 140, 30, 170, 30, 186, 30, 196, 30, 206, 30], 5, COP, HOT, 9) +
+        pipe(xh, [150, 166, 150, 120, 150, 100, 160, 80, 170, 60, 180, 50, 206, 50], 5, COP, COLD, 9) +
+        `<rect x="142" y="116" width="16" height="10" rx="2" fill="#2a2c31"/><rect x="138" y="100" width="24" height="18" rx="4" fill="${M.h(x, "#c0392b")}"/>` + fanCap(xh, 150, 109, 6, "#c0392b") +
         box(x, 46, 60, 92, 106, 3, 6, 4, c) + `<rect x="46" y="60" width="92" height="106" rx="3" fill="${x.lg([[0, "#fff", .18], [.25, "#fff", 0], [1, "#000", .25]], 0, 0, 1, 0)}"/>` +
         `<path d="M46 104H138" stroke="#000" stroke-opacity=".35"/>` + gauge(x, 64, 82, 8, x.on ? .35 + .5 * x.lv : .2) +
         box(x, 100, 70, 30, 24, 2, 2, 2, "#8e959e") + `<circle cx="115" cy="82" r="6" fill="${M.s(x, "#d5d9de")}"/><path d="M115 82L${f(115 + Math.cos(-2.3 + 3 * x.lv) * 5)} ${f(82 + Math.sin(-2.3 + 3 * x.lv) * 5)}" stroke="#2a2d33" stroke-width="1.2"/>` +
-        vents(54, 112, 40, 6, 5.4) +
+        vents(54, 112, 40, 6, 5.4) + (mf ? `<path d="${"M100 96.4h30v6.4h-30Z"}" fill="#1a1c21" rx="1"/>` + radMark(x, 107, 99.6, ht) + tapMark(x, 123, 100, hw) : "") +
         `<rect x="104" y="124" width="22" height="16" rx="2" fill="#0e0f12"/><g clip-path="${clipU(x, "fb", `<rect x="104" y="124" width="22" height="16" rx="2"/>`)}">` +
         (x.on ? `<rect x="104" y="124" width="22" height="16" fill="${x.rg([[0, "#ff8a3a", .9], [1, "#401a0a", .3]])}"/>` + [0, 1, 2, 3].map((i) => `<path class="${P}flick" style="animation-delay:${-i * .2}s" d="M${107 + i * 5} 140Q${108 + i * 5} ${133 - 4 * x.lv} ${109 + i * 5} ${130 - 4 * x.lv}Q${110 + i * 5} 134 ${111 + i * 5} 140Z" fill="#5ab0ff"/>`).join("") : "") + `</g>` +
         `<path d="M106 126L112 126L107 138H106Z" fill="#fff" fill-opacity=".14"/>`;
-      return scene(x, back, body); }),
+      return scene(x, back, body); }, { parts: BOIL }),
 
     ic("panelrad", "Panel radiator", sw(["#eef0f2", "#2c2f36", "#8e959e", "#3a5a7a", "#d9d1bc"], "#eef0f2"), "Finish", (o) => { const x = X(o), c = o.color;
       const back = wallB(x, "blue", 8, 160) + `<rect x="20" y="8" width="160" height="58" fill="${x.lg([[0, "#8fb8dc"], [1, "#d6e8f5"]])}"/><path d="M100 8V62" stroke="#eef0f2" stroke-width="3"/><rect x="14" y="62" width="172" height="8" rx="1" fill="${M.v(x, "#eef0f2")}"/>` + baseB(x, 160, "#8a6142");
@@ -492,19 +520,24 @@
         `<rect x="130" y="102" width="6" height="16" rx="2" fill="${M.steel(x)}"/><circle cx="144" cy="90" r="4" fill="${M.s(x, H.shade(c, .2))}"/>`;
       return scene(x, back, body); }),
 
-    ic("ufh", "Underfloor manifold", sw(["#c9ccd1", "#c9a24a", "#2c2f36", "#eef0f2"], "#c9ccd1"), "Finish", (o) => { const x = X(o), c = o.color;
+    // (parts) five zone loops z1..z5 (an actuator each): an open loop flows (its pipes run, its flow meter rises, its actuator
+    // lamp lights); the feed valves and gauges show while any zone is open. A Device Image is drawn as before.
+    ic("ufh", "Underfloor manifold", sw(["#c9ccd1", "#c9a24a", "#2c2f36", "#eef0f2"], "#c9ccd1"), "Finish", (o) => { const mf = mfOn(o), zs = [1, 2, 3, 4, 5].map((i) => MF.on(o, "z" + i));
+      const x = X(mf ? Object.assign({}, o, { on: zs.some(Boolean) }) : o), c = o.color;
       const back = wallB(x, "gray", 8, 192) + `<rect x="18" y="20" width="164" height="172" fill="${x.lg([[0, "#d8dade"], [1, "#b8bcc2"]])}"/><rect x="18" y="20" width="164" height="172" fill="none" stroke="#000" stroke-opacity=".3"/>`;
       let top = "", bot = "", loops = "";
-      for (let i = 0; i < 5; i++) { const px = 66 + i * 22;
-        loops += pipe(x, [px, 66, px, 120, px - 4, 160, px - 6, 196], 4.6, "#e8e8e6", HOT, 7) + pipe(x, [px + 8, 130, px + 8, 150, px + 6, 170, px + 4, 196], 4.6, "#e8e8e6", COLD, 5);
-        const fh = 4 + 14 * x.lv;
+      for (let i = 0; i < 5; i++) { const px = 66 + i * 22, xz = mf ? sub(x, zs[i]) : x;
+        loops += pipe(xz, [px, 66, px, 120, px - 4, 160, px - 6, 196], 4.6, "#e8e8e6", HOT, 7) + pipe(xz, [px + 8, 130, px + 8, 150, px + 6, 170, px + 4, 196], 4.6, "#e8e8e6", COLD, 5);
+        if (mf && zs[i]) loops += `<path d="M${px} 66V120L${px - 4} 160L${px - 6} 196" fill="none" stroke="#ff7a2a" stroke-opacity=".5" stroke-width="2.6" stroke-linejoin="round"/>` +
+          `<path d="M${px + 8} 130V150L${px + 6} 170L${px + 4} 196" fill="none" stroke="#3a8fff" stroke-opacity=".4" stroke-width="2.6" stroke-linejoin="round"/>`;
+        const fh = mf && !zs[i] ? 4 : 4 + 14 * x.lv;
         top += `<rect x="${px - 4}" y="28" width="8" height="24" rx="3" fill="${x.lg([[0, "#ffffff", .6], [1, "#cfe8ff", .35]], 0, 0, 1, 0)}" stroke="#fff" stroke-opacity=".6" stroke-width=".5"/><rect x="${px - 2.4}" y="${f(48 - fh)}" width="4.8" height="3" rx="1" fill="#e0483e"/><rect x="${px - 5}" y="22" width="10" height="7" rx="2" fill="${M.v(x, "#d93a30")}"/><rect x="${px - 3}" y="52" width="6" height="6" fill="${M.metal(x, c)}"/>`;
-        bot += `<rect x="${px + 3}" y="104" width="10" height="16" rx="2" fill="${M.v(x, "#eef0f2")}"/><rect x="${px + 4}" y="100" width="8" height="5" rx="2" fill="${M.v(x, "#3a6fd8")}"/>` + (x.on ? `<circle cx="${px + 8}" cy="114" r="1" fill="#3ee08f"/>` : ""); }
+        bot += `<rect x="${px + 3}" y="104" width="10" height="16" rx="2" fill="${M.v(x, "#eef0f2")}"/><rect x="${px + 4}" y="100" width="8" height="5" rx="2" fill="${M.v(x, "#3a6fd8")}"/>` + (xz.on ? `<circle cx="${px + 8}" cy="114" r="1" fill="#3ee08f"/>` : ""); }
       const body = loops + `<rect x="40" y="58" width="134" height="10" rx="5" fill="${M.metal(x, c)}"/><rect x="40" y="120" width="134" height="10" rx="5" fill="${M.metal(x, c)}"/>` +
         `<path d="M40 60H174M40 122H174" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/>` + top + bot +
         `<rect x="26" y="50" width="12" height="90" rx="2" fill="${M.steel(x)}"/>` + pipe(x, [8, 63, 20, 63, 26, 63, 40, 63], 6, COP, HOT, 4) + pipe(x, [8, 125, 20, 125, 26, 125, 40, 125], 6, COP, COLD, 4) +
         valve(x, 30, 63, "#e0483e", x.on ? 0 : 90) + valve(x, 30, 125, "#3a6fd8", x.on ? 0 : 90) + gauge(x, 180, 63, 7, .35 + .5 * x.lv) + gauge(x, 180, 125, 7, .3 + .3 * x.lv);
-      return scene(x, back, body); }),
+      return scene(x, back, body); }, { parts: [1, 2, 3, 4, 5].map((i) => ({ id: "z" + i, name: "Zone " + i })) }),
 
     ic("circ", "Circulator pump", sw(PUMP, "#c0392b"), "Finish", (o) => { const x = X(o), c = o.color;
       const back = wallB(x, "gray", 8, 192) + `<rect x="8" y="8" width="184" height="184" fill="${x.lg([[0, "#000", .1], [1, "#000", .3]])}"/>`;
@@ -557,7 +590,13 @@
         `<rect x="118" y="124" width="26" height="24" rx="3" fill="${x.lg([[0, "#eef0f2"], [1, "#b8bcc2"]])}"/>` + lcd(x, 121, 127, 20, 10, "#7ee7ff") + digits(x, 139, 129, 6, temp2(x), 2, "#bdf3ff") + led(x, 131, 143, .9, "#3ee08f");
       return scene(x, back, body); }),
 
-    ic("solarthermal", "Solar thermal collector", sw(["#c9ccd1", "#2c2f36", "#eef0f2", "#8e959e"], "#c9ccd1"), "Finish", (o) => { const x = X(o), c = o.color;
+    // (parts) a solar water heater: State (heating / idle / vacation, a stage: sunlit while heating), the circulation pump
+    // (a switch: the hot pipe flows; without it the Heating stage does) and the water temperature (a reading on a small
+    // readout on the header: orange heating, white idle, blue vacation). Without parts: today's drawing.
+    ic("solarthermal", "Solar thermal collector", sw(["#c9ccd1", "#2c2f36", "#eef0f2", "#8e959e"], "#c9ccd1"), "Finish", (o) => {
+      const sv = o.pval || {}, spp = o.parts || {}, sst = sv.state != null && sv.state !== "" ? String(sv.state).toLowerCase() : null, stp = sv.temp != null && sv.temp !== "" && isFinite(+sv.temp) ? Math.round(+sv.temp) : null;
+      const SM = o.mf || sst != null || stp != null, spump = spp.pump != null && (o.mf || sst == null) ? !!spp.pump : sst != null ? sst === "heating" : !o.mf && !!o.on;
+      const x = X(SM ? Object.assign({}, o, { on: sst != null ? sst === "heating" : spump }) : o), c = o.color;
       const roof = (() => { let s = `<path d="M8 110L192 80V192H8Z" fill="${x.lg([[0, "#6e6862"], [1, "#3d3935"]])}"/>`;
         for (let i = 1; i < 12; i++) { const y = 110 + i * 8.5, y2 = 80 + i * 8.5; s += `<path d="M8 ${f(y)}L192 ${f(y2)}" stroke="#16130f" stroke-opacity=".6" stroke-width="1.4"/>`; }
         return s + `<path d="M8 110L192 80" stroke="#8a8078" stroke-width="3"/>`; })();
@@ -569,9 +608,13 @@
       const body = `<path d="M${P2(b0)}L${P2(b1)}L${f(b1[0] + 4)} ${f(b1[1] + 8)}L${f(b0[0] + 4)} ${f(b0[1] + 8)}Z" fill="#000" fill-opacity=".35"/>` + tubes +
         `<path d="M${P2(b0)}L${P2(b1)}" stroke="${M.steel(x)}" stroke-width="3"/>` +
         `<path d="M${f(h0[0] - 4)} ${f(h0[1] - 2)}L${f(h1[0] + 4)} ${f(h1[1] - 2)}L${f(h1[0] + 4)} ${f(h1[1] + 8)}L${f(h0[0] - 4)} ${f(h0[1] + 8)}Z" fill="${x.lg([[0, H.shade(c, .4)], [1, H.shade(c, -.3)]])}"/>` +
-        pipe(x, [h1[0] + 4, h1[1] + 3, 184, 62, 190, 80, 196, 100, 200, 120, 204, 140, 208, 160], 4, COP, HOT, 8) +
-        glint(x, clipU(x, "ttube", `<path d="M${P2(A(0, 0))}L${P2(A(1, 0))}L${P2(A(1, 1))}L${P2(A(0, 1))}Z"/>`), 40, 58, 140, 100);
-      return scene(x, back, body); }),
+        pipe(SM ? sub(x, spump) : x, [h1[0] + 4, h1[1] + 3, 184, 62, 190, 80, 196, 100, 200, 120, 204, 140, 208, 160], 4, COP, HOT, 8) +
+        glint(x, clipU(x, "ttube", `<path d="M${P2(A(0, 0))}L${P2(A(1, 0))}L${P2(A(1, 1))}L${P2(A(0, 1))}Z"/>`), 40, 58, 140, 100) +
+        (SM && stp != null ? (() => { const str = String(Math.max(-99, Math.min(999, stp))), col = sst === "vacation" ? "#7dd3fc" : sst === "heating" || (sst == null && spump) ? "#ffb070" : "#e8eef4", w = 7 + str.length * 5, cx = 176, cy = 40;
+          return `<path d="M${cx} ${cy + 5}L${f(h1[0] + 3)} ${f(h1[1] - 2)}" stroke="#2c2f36" stroke-width="1.6"/><rect x="${f(cx - w / 2 - 1)}" y="${cy - 6.5}" width="${f(w + 2)}" height="13" rx="2.4" fill="#2c2f36"/><rect x="${f(cx - w / 2)}" y="${cy - 5.5}" width="${f(w)}" height="11" rx="1.6" fill="#0b0e12"/>` +
+            digits(always(x), cx + w / 2 - 2.5, cy - 3.5, 7, str, str.length, col); })() : "");
+      return scene(x, back, body); }, { parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Idle"], ["heating", "Heating"], ["vacation", "Vacation"]], def: "heating" },
+      { id: "pump", name: "Circulation pump" }, { id: "temp", name: "Water temperature", type: "value", unit: "°", min: 40, max: 180, def: 130 }] }),
 
     ic("jetpump", "Jet pump", sw(["#c0392b", "#2f6fb8", "#2c2f36", "#e8b81e", "#8e959e"], "#c0392b"), "Finish", (o) => { const x = X(o), c = o.color;
       const back = basement(x, 170);

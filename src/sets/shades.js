@@ -153,7 +153,7 @@ ${extra || ""}</defs>`;
   }
   const hem = (o, x, y, w, fill) => `<rect x="${f1(x + 1)}" y="${f1(y + 4)}" width="${f1(w - 2)}" height="3" fill="#000" opacity=".18"/><rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="4.2" rx="1.6" fill="${fill || `url(#${o.uid}-metal)`}"/><rect x="${f1(x + 1)}" y="${f1(y + .6)}" width="${f1(w - 2)}" height=".8" fill="#fff" opacity=".5"/>`;
   function slats(o, x, y, w, h, n, kind) {
-    const u = o.uid, a = amt(o), p = h / n, hs = p * (1.12 - .86 * a);
+    const u = o.uid, a = pv("tilt", amt(o)), p = h / n, hs = p * (1.12 - .86 * a);
     const fill = kind === "alu" ? `url(#${u}-alu)` : `url(#${u}-slat)`;
     let s = "";
     for (let i = 0; i < n; i++) {
@@ -173,6 +173,15 @@ ${extra || ""}</defs>`;
       if (a > .05) s += shadowLine(f1(x), f1(yy + hs), f1(w), f1(Math.min(3, p - hs + .1)), .2);
       s += `<rect x="${f1(x)}" y="${f1(yy)}" width="${f1(w)}" height="${f1(hs)}" rx="${f1(Math.min(2.5, hs / 2))}" fill="url(#${u}-slat)"/><rect x="${f1(x + 1)}" y="${f1(yy + hs * .22)}" width="${f1(w - 2)}" height=".7" fill="#fff" opacity=".45"/>`;
     }
+    return s;
+  }
+  // (parts) PV = the Multi-Function readings (0..1, null = part not ticked) while a Multi-Function Image renders, else null
+  let PV = null;
+  const pv = (k, d) => (PV ? (PV[k] == null ? 0 : PV[k]) : d);
+  // raised blinds: the slats left below the open ones pile up flat on the bottom rail
+  function pile(o, x, y, w, k, kind) {
+    const fill = kind === "alu" ? `url(#${o.uid}-alu)` : `url(#${o.uid}-slat)`; let s = "";
+    for (let i = 0; i < k; i++) { const yy = y + i * 2.2; s += `<rect x="${f1(x)}" y="${f1(yy)}" width="${f1(w)}" height="2.2" rx=".5" fill="${fill}"/><rect x="${f1(x)}" y="${f1(yy + 1.8)}" width="${f1(w)}" height=".4" fill="#000" opacity=".4"/>`; }
     return s;
   }
   function drape(o, x0, x1, top, bot, n, kind) {
@@ -208,9 +217,10 @@ ${extra || ""}</defs>`;
 
   add("blackout", "Blackout roller", sw(FAB, "#3c4047"), "Fabric", (o) => {
     const a = amt(o), g = G.blackout, { x, y, w, h } = g, u = o.uid;
-    const fb = y + 10 + (h - 14) * (1 - a);
+    const fb = y + 10 + (h - 14) * (1 - a), fs = PV && PV.sheer != null ? y + 10 + (h - 14) * (1 - PV.sheer) : 0;
     return svg(o, stdWindow(o, g) +
       `<rect x="${x}" y="${y}" width="4" height="${h}" fill="url(#${u}-dmetal)"/><rect x="${x + w - 4}" y="${y}" width="4" height="${h}" fill="url(#${u}-dmetal)"/>` +
+      (fs ? `<rect x="${x + 4}" y="${y + 8}" width="${w - 8}" height="${f1(fs - y - 8)}" fill="#f4f1ea" opacity=".55"/><rect x="${x + 4}" y="${y + 8}" width="${w - 8}" height="${f1(fs - y - 8)}" fill="url(#${u}-wv)" opacity=".5"/>` + hem(o, x + 4, fs, w - 8, `url(#${u}-metal)`) : "") +
       `<rect x="${x + 4}" y="${y + 8}" width="${w - 8}" height="${f1(fb - y - 8)}" fill="url(#${u}-fv)"/><rect x="${x + 4}" y="${y + 8}" width="${w - 8}" height="${f1(fb - y - 8)}" fill="url(#${u}-fx)" opacity=".35"/>` +
       hem(o, x + 3, fb, w - 6, `url(#${u}-dmetal)`) +
       `<rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="17" rx="2" fill="url(#${u}-roll)"/><rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="2" fill="#fff" opacity=".25"/><rect x="${x - 7}" y="${y + 6}" width="${w + 14}" height="2" fill="#000" opacity=".3"/>` +
@@ -230,7 +240,8 @@ ${extra || ""}</defs>`;
 
   add("tdbu", "Top-down shade", sw(FAB, "#a3a7aa"), "Fabric", (o) => {
     const a = amt(o), g = G.tdbu, { x, y, w, h } = g, u = o.uid;
-    const ty = y + 7 + h * .56 * a, by = y + h - 4 - h * .08 * a;
+    let ty = y + 7 + h * .56 * a, by = y + h - 4 - h * .08 * a;
+    if (PV) { ty = y + 7 + (h - 17) * pv("top", 0); by = y + h - 4 - (h - 17) * pv("bottom", 0); if (by < ty + 6) { const m = Math.min(Math.max((ty + by) / 2, y + 10), y + h - 7); ty = m - 3; by = m + 3; } }
     const cords = `<path d="M${x + 18} ${y + 6}V${f1(ty)}M${x + w - 18} ${y + 6}V${f1(ty)}" stroke="#eee" stroke-opacity=".7" stroke-width=".6"/>`;
     return svg(o, stdWindow(o, g) + cords +
       `<rect x="${x + 2}" y="${f1(ty)}" width="${w - 4}" height="${f1(by - ty)}" fill="url(#${u}-cell)" opacity=".95"/><rect x="${x + 2}" y="${f1(ty)}" width="${w - 4}" height="${f1(by - ty)}" fill="url(#${u}-fx)" opacity=".25"/>` +
@@ -257,10 +268,10 @@ ${extra || ""}</defs>`;
   });
 
   add("wood", "Wood blinds", sw(WOOD), "Slats", (o) => {
-    const g = G.wood, { x, y, w, h } = g, u = o.uid, a = amt(o);
+    const g = G.wood, { x, y, w } = g, u = o.uid, a = amt(o), nO = Math.round(12 * (1 - pv("lift", 0))), ho = (g.h - 2) * nO / 12, h = PV ? ho + (12 - nO) * 2.2 + 2 : g.h;
     const tape = H().shade(o.color, -.12);
     return svg(o, stdWindow(o, g) +
-      slats(o, x - 4, y + 2, w + 8, h - 2, 12, "wood") +
+      (PV ? slats(o, x - 4, y + 2, w + 8, ho, nO, "wood") + pile(o, x - 4, y + 2 + ho, w + 8, 12 - nO, "wood") : slats(o, x - 4, y + 2, w + 8, h - 2, 12, "wood")) +
       `<rect x="${x + 14}" y="${y + 1}" width="6" height="${h + 3}" fill="${tape}" opacity=".95"/><rect x="${x + w - 20}" y="${y + 1}" width="6" height="${h + 3}" fill="${tape}" opacity=".95"/><path d="M${x + 14} ${y}v${h + 4}M${x + 20} ${y}v${h + 4}M${x + w - 20} ${y}v${h + 4}M${x + w - 14} ${y}v${h + 4}" stroke="#000" stroke-opacity=".18" stroke-width=".5"/>` +
       `<rect x="${x - 5}" y="${y + h - 1}" width="${w + 10}" height="6" rx="1.2" fill="url(#${u}-slat)"/><rect x="${x - 5}" y="${y + h - 1}" width="${w + 10}" height="6" fill="url(#${u}-grain)"/>` +
       `<rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="11" rx="1.5" fill="url(#${u}-slat)"/><rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="11" fill="url(#${u}-grain)"/><rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="1.4" fill="#fff" opacity=".35"/>` +
@@ -268,9 +279,9 @@ ${extra || ""}</defs>`;
   });
 
   add("mini", "Mini blinds", sw(ALU), "Slats", (o) => {
-    const g = G.mini, { x, y, w, h } = g, u = o.uid;
+    const g = G.mini, { x, y, w } = g, u = o.uid, nO = Math.round(22 * (1 - pv("lift", 0))), ho = (g.h - 9) * nO / 22, h = PV ? ho + (22 - nO) * 2.2 + 9 : g.h;
     return svg(o, stdWindow(o, g) +
-      slats(o, x + 1, y + 6, w - 2, h - 9, 22, "alu") +
+      (PV ? slats(o, x + 1, y + 6, w - 2, ho, nO, "alu") + pile(o, x + 1, y + 6 + ho, w - 2, 22 - nO, "alu") : slats(o, x + 1, y + 6, w - 2, h - 9, 22, "alu")) +
       `<path d="M${x + 24} ${y + 5}V${y + h - 2}M${x + w - 24} ${y + 5}V${y + h - 2}" stroke="#f2f2f2" stroke-opacity=".55" stroke-width=".55"/>` +
       `<rect x="${x + 1}" y="${y + h - 4}" width="${w - 2}" height="3.4" rx="1" fill="url(#${u}-alu)"/>` +
       `<rect x="${x}" y="${y}" width="${w}" height="6" rx="1" fill="url(#${u}-alu)"/><rect x="${x}" y="${y}" width="${w}" height="1" fill="#fff" opacity=".5"/>` +
@@ -278,12 +289,12 @@ ${extra || ""}</defs>`;
   });
 
   add("vertical", "Vertical blinds", sw(FAB, "#f6f4ef"), "Fabric", (o) => {
-    const a = amt(o), x = 36, y = 26, w = 128, h = 150, u = o.uid, n = 12, p = w / n, vw = p * (1.1 - .86 * a);
+    const a = amt(o), x = 36, y = 26, w = 128, h = 150, u = o.uid, n = 12, p = w / n, ta = pv("tilt", a), sp = PV ? p * (1 - .8 * pv("lift", 0)) : p, vw = p * (1.1 - .86 * ta);
     let v = "", chain = [];
     for (let i = 0; i < n; i++) {
-      const cx = x + p * (i + .5);
+      const cx = x + sp * (i + .5);
       v += `<rect x="${f1(cx - vw / 2)}" y="${y + 6}" width="${f1(vw)}" height="${h - 10}" fill="url(#${u}-fx)"/><rect x="${f1(cx - vw / 2)}" y="${y + 6}" width="${f1(vw)}" height="${h - 10}" fill="url(#${u}-wv)"/><rect x="${f1(cx - vw / 2)}" y="${y + h - 6}" width="${f1(vw)}" height="2" fill="#000" opacity=".2"/>`;
-      if (a > .05) v += shadowLine(f1(cx + vw / 2), y + 6, f1(Math.min(2, p - vw)), h - 10, .14);
+      if (ta > .05 && (!PV || sp > vw)) v += shadowLine(f1(cx + vw / 2), y + 6, f1(Math.min(2, sp - vw)), h - 10, .14);
       chain.push(f1(cx));
     }
     return svg(o, room(o, { wall: "#776d5d", x, y, w, h, floor: 182 }) + trim(o, x, y, w, h, 6) + view(o, x, y, w, h) + sash(x, y, w, h, "v") +
@@ -294,7 +305,7 @@ ${extra || ""}</defs>`;
 
   add("zebra", "Zebra shade", sw(FAB, "#a3a7aa"), "Fabric", (o) => {
     const a = amt(o), g = G.zebra, { x, y, w, h } = g, u = o.uid;
-    const phase = cl(a * 2, 0, 1), rise = cl((a - .5) * 2, 0, 1);
+    const phase = PV ? pv("tilt", 0) : cl(a * 2, 0, 1), rise = PV ? pv("lift", 0) : cl((a - .5) * 2, 0, 1);
     const top = y + 8, fb = top + (h - 12) * (1 - .82 * rise);
     let s = `<rect x="${x + 2}" y="${top}" width="${w - 4}" height="${f1(fb - top)}" fill="url(#${u}-fv)" opacity="${f2(.96 - .66 * phase)}"/>`;
     for (let yy = top; yy < fb - 1; yy += 12) {
@@ -324,12 +335,18 @@ ${extra || ""}</defs>`;
       `<rect x="26" y="28.5" width="148" height="3" rx="1.5" fill="url(#${u}-brass)"/><circle cx="25" cy="30" r="4" fill="url(#${u}-brass)"/><circle cx="175" cy="30" r="4" fill="url(#${u}-brass)"/>` + rings);
   });
 
+  // the sheers parted (Multi-Function, sheer part open): two panels gathered toward the sides, their pleats bunched closer
+  function sheers(o, top, bot, sw2) {
+    let t = "";
+    [[36, 36 + sw2], [164 - sw2, 164]].forEach(([a0, a1]) => { t += `<rect x="${f1(a0)}" y="${top}" width="${f1(a1 - a0)}" height="${bot - top}" fill="#f5f2ea" opacity=".5"/>`; for (let i = 0; i < 8; i++) t += `<rect x="${f1(a0 + (i + .2) * (a1 - a0) / 8)}" y="${top}" width="${f1(Math.max(1, 3.5 * (a1 - a0) / 64))}" height="${bot - top}" fill="#fff" opacity=".26"/>`; });
+    return `<g${an(o, "sway2")}>${t}</g>`;
+  }
   add("layered", "Drapes over sheers", sw(FAB, "#b9805f"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, top = 30, bot = 177, half = 64;
     const lw = half * (1 - .78 * a), lx1 = 28 + lw, rx0 = 172 - lw;
     let sv = ""; for (let i = 0; i < 16; i++) sv += `<rect x="${36 + i * 8}" y="${top}" width="3.5" height="${bot - top}" fill="#fff" opacity=".22"/>`;
     return svg(o, room(o, { wall: "#3d485b", x: 60, y: 44, w: 80, h: 92 }) + trim(o, 60, 44, 80, 92) + view(o, 60, 44, 80, 92) + sash(60, 44, 80, 92, "cross") + sill(o, 50, 142, 100) +
-      `<g${an(o, "sway2")}><rect x="36" y="${top}" width="128" height="${bot - top}" fill="#f5f2ea" opacity=".42"/>${sv}</g>` +
+      (PV && pv("sheer", 0) > 0 ? sheers(o, top, bot, 64 * (1 - .8 * pv("sheer", 0))) : `<g${an(o, "sway2")}><rect x="36" y="${top}" width="128" height="${bot - top}" fill="#f5f2ea" opacity=".42"/>${sv}</g>`) +
       `<rect x="30" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/><rect x="${f1(rx0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/>` +
       `<g${an(o, "soft")}>${drape(o, 28, lx1, top, bot, 6)}</g><g${an(o, "soft")}>${drape(o, rx0, 172, top, bot, 6)}</g>` +
       `<rect x="22" y="25.5" width="156" height="4.4" rx="2.2" fill="url(#${u}-trunk)"/><circle cx="20" cy="27.7" r="4.6" fill="url(#${u}-trunk)"/><circle cx="180" cy="27.7" r="4.6" fill="url(#${u}-trunk)"/><circle cx="18.6" cy="26.3" r="1.4" fill="#fff" opacity=".3"/><circle cx="178.6" cy="26.3" r="1.4" fill="#fff" opacity=".3"/>`);
@@ -482,6 +499,32 @@ ${extra || ""}</defs>`;
       `<path d="M68 40V128M132 40V128" stroke="#000" stroke-opacity=".12" stroke-width="3"/>` + `<g${an(o, "soft")}>${sh}</g>` +
       `<g class="hda-bg"><path d="M12 150L72 138H128L188 150V158H12Z" fill="#d7cfc2"/><path d="M12 150L72 138H128L188 150" stroke="#fff" stroke-opacity=".5" fill="none"/><rect x="12" y="158" width="176" height="22" fill="#e6e1d8"/><rect x="12" y="158" width="176" height="2" fill="#000" opacity=".2"/><path d="M58 162V178M100 162V178M142 162V178" stroke="#000" stroke-opacity=".12"/>` +
       `<rect x="44" y="136" width="30" height="16" rx="6" fill="url(#${u}-cg)" transform="rotate(-6 59 144)"/><rect x="126" y="136" width="30" height="16" rx="6" fill="url(#${u}-cg)" transform="rotate(6 141 144)"/><path d="M50 140Q59 138 68 137M132 137Q141 138 150 140" stroke="#fff" stroke-opacity=".35" fill="none"/></g>`);
+  });
+
+  // ---------- (parts) Multi-Function: position readings as value parts (0-100 %) ----------
+  // Blinds: Tilt (slats / vanes / zebra bands open) + Lift (raised; vertical blinds: drawn aside); shutters: Tilt only.
+  // Top-down/bottom-up: Top rail (lowered %) + Bottom rail (raised %). Dual layers: Sheer + Blackout (open %).
+  // o.mf: o.pval holds the ticked readings. A reading left out: tilt closed, lift down, rails home; in a dual layer the other
+  // layer stays out of the way (no sheer layer on the blackout roller, the drapes pulled aside). Device Images: today's look.
+  const pc = (id, name, def) => ({ id, name, type: "value", unit: "%", min: 0, max: 100, def });
+  const TILT = pc("tilt", "Tilt (open)", 50), LIFT = pc("lift", "Lift (raised)", 40);
+  const SP = {
+    wood: [TILT, LIFT], mini: [TILT, LIFT], vertical: [TILT, pc("lift", "Drawn aside", 40)], zebra: [pc("tilt", "Bands (see-through)", 60), LIFT], shutters: [TILT],
+    tdbu: [pc("top", "Top rail (lowered)", 35), pc("bottom", "Bottom rail (raised)", 15)],
+    layered: [pc("sheer", "Sheers (open)", 0), pc("blackout", "Drapes (open)", 60)], blackout: [pc("sheer", "Sheer layer (open)", 30), pc("blackout", "Blackout (open)", 50)],
+  };
+  icons.forEach((ic) => {
+    const ps = SP[ic.id]; if (!ps) return;
+    ic.parts = ps; const R = ic.render;
+    ic.render = (o) => {
+      if (!o.mf) return R(o);
+      const pr = o.pval || {}, v = {};
+      ps.forEach((p) => { const n = pr[p.id]; v[p.id] = n == null || n === "" || !isFinite(+n) ? null : cl(+n / 100, 0, 1); });
+      if ((ic.id === "layered" || ic.id === "blackout") && v.blackout == null && v.sheer != null) v.blackout = 1;
+      const t = v.tilt || 0, l = v.lift || 0;
+      const lv = ic.id === "tdbu" ? cl((v.top || 0) + (v.bottom || 0), 0, 1) : ic.id === "layered" || ic.id === "blackout" ? v.blackout || 0 : ic.id === "shutters" ? t : cl(l + (1 - l) * t, 0, 1);
+      PV = v; try { return R(Object.assign({}, o, { on: lv > 0 || !!v.sheer, level: lv })); } finally { PV = null; }
+    };
   });
 
   (window.HDA = window.HDA || []).push({

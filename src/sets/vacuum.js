@@ -531,6 +531,41 @@ ${halos}${extra || ""}</defs>`;
             bump(R) + btns(o, R * .5, "g") })); }),
   ];
 
+  // ---------- (parts) Multi-Function: a State stage ----------
+  // docked / cleaning (the mower: mowing) / returning / charging / paused / error, from the robot's state attribute. Cleaning =
+  // today's running look; docked = today's parked look; returning drives with a home badge; charging parks with a bolt badge;
+  // paused / error stop where they are (working look, not moving) with a pause / warning badge. Pool and window robots,
+  // floor washers and stick vacuums have no dock: idle / cleaning / paused / error. No State reading in a Multi-Function
+  // Image = parked. A Device Image (no o.mf, no reading) is exactly today's.
+  const ST6 = (work, name) => ({ id: "state", name: "State", type: "stage", values: [["docked", "Docked"], [work, name], ["returning", "Returning"], ["charging", "Charging"], ["paused", "Paused"], ["error", "Error"]], def: work });
+  const ST4 = { id: "state", name: "State", type: "stage", values: [["idle", "Idle"], ["cleaning", "Cleaning"], ["paused", "Paused"], ["error", "Error"]], def: "cleaning" };
+  const VST = { mower: ST6("mowing", "Mowing"), pool: ST4, window: ST4, washer: ST4 };
+  const VSKIP = { stick: 1, handheld: 1 };
+  // the state badge, top right: home (returning), bolt (charging), pause bars, warning triangle (error)
+  function badge(st) {
+    const k = { returning: [CYAN, "home"], charging: [GREEN, "bolt"], paused: [AMBER, "pause"], error: [RED, "err"] }[st]; if (!k) return "";
+    const c = k[0], g = k[1], cx = 174, cy = 26;
+    const gl = g === "home" ? `<path d="M${cx - 5.4} ${cy + .4}L${cx} ${cy - 5}L${cx + 5.4} ${cy + .4}M${cx - 3.6} ${cy - 1}V${cy + 4.6}H${cx + 3.6}V${cy - 1}" fill="none" stroke="${c}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>`
+      : g === "bolt" ? `<path d="M${cx + 1.2} ${cy - 6.4}L${cx - 4.2} ${cy + 1}H${cx - .2}L${cx - 1.2} ${cy + 6.4}L${cx + 4.2} ${cy - 1}H${cx + .2}Z" fill="${c}"/>`
+      : g === "pause" ? `<rect x="${cx - 3.8}" y="${cy - 4.6}" width="2.8" height="9.2" rx=".8" fill="${c}"/><rect x="${cx + 1}" y="${cy - 4.6}" width="2.8" height="9.2" rx=".8" fill="${c}"/>`
+      : `<path d="M${cx} ${cy - 6}L${cx + 6.6} ${cy + 5}H${cx - 6.6}Z" fill="${c}" stroke="${c}" stroke-width="1" stroke-linejoin="round"/><path d="M${cx} ${cy - 2}V${cy + 1.4}" stroke="#16181c" stroke-width="1.7" stroke-linecap="round"/><circle cx="${cx}" cy="${cy + 3.4}" r=".95" fill="#16181c"/>`;
+    return `<g${g === "err" ? ` class="${P}alarm"` : g === "bolt" ? ` class="${P}pulse"` : ""}><circle cx="${cx}" cy="${cy}" r="11.5" fill="#14161a" fill-opacity=".84"/><circle cx="${cx}" cy="${cy}" r="11.5" fill="none" stroke="${c}" stroke-opacity=".75" stroke-width="1.3"/>${gl}</g>`;
+  }
+  icons.forEach((ic) => {
+    if (VSKIP[ic.id]) return;
+    const R = ic.render, part = VST[ic.id] || ST6("cleaning", "Cleaning");
+    ic.parts = [part];
+    ic.render = (o) => {
+      const st = o.pval && o.pval.state != null && o.pval.state !== "" ? String(o.pval.state) : null;
+      if (!st && !o.mf) return R(o);
+      const add = (s) => s.replace(/<\/svg>$/, badge(st) + "</svg>");
+      if (st === "cleaning" || st === "mowing") return R(Object.assign({}, o, { on: true }));
+      if (st === "returning") return add(R(Object.assign({}, o, { on: true })));
+      if (st === "paused" || st === "error") return add(R(Object.assign({}, o, { on: true, anim: false })));
+      return add(R(Object.assign({}, o, { on: false })));
+    };
+  });
+
   (window.HDA = window.HDA || []).push({
     id: "vacuum", tab: "Robot vacuums", group: "Cleaning", kind: "device",
     intro: "Twenty robot vacuums and floor cleaners on real floors. When on, robots glide a lap and turn, side brushes and mop pads spin, the LiDAR turret sweeps and a clean lane shows on the floor; docked ones breathe a charging light. The slider sets suction power.",

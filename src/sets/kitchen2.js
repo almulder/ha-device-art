@@ -86,6 +86,20 @@ ${fill ? `<path d="M${f(cx - 8 + 2 * (1 - fill))} ${f(yBase - 26 * fill)} L${cx 
   }
 
   const base = (o) => Object.assign({ picker: true, colorLabel: "Finish" }, o);
+  // (multi-function) coffee makers: State (stage: off / heating / brewing / ready), Water level (value, %) where the
+  // drawing has a reservoir window, Warming plate (switch) under a carafe. As a Device Image (no o.mf) the drawing is
+  // exactly as today. As a Multi-Function Image (o.mf): heating = the display and light on; brewing = the coffee drips,
+  // the carafe or cup fills, steam; ready = a full carafe or cup, steam, no drips; a part left out = off / blank.
+  function CF(o) {
+    const x = ctx(o);
+    if (!o.mf) return { x, D: x, B: x, S: x, C: x, cup: x.on, wl: x.lv, mf: false };
+    const s = o.pval && o.pval.state != null ? String(o.pval.state) : "", brew = s === "brewing", rdy = s === "ready";
+    const w = o.pval && o.pval.water != null && isFinite(+o.pval.water) ? Math.max(0, Math.min(1, +o.pval.water / 100)) : null;
+    const v = (on, lv) => Object.assign({}, x, { on }, lv == null ? {} : { lv });
+    return { x, D: v(!!s && s !== "idle"), B: v(brew), S: v(brew || rdy), C: v(brew || rdy, rdy ? 1 : .45), cup: brew || rdy, wl: w, mf: true, pl: !!(o.parts && o.parts.plate) };
+  }
+  // the warming plate: today's dark plate, glowing red-orange when a Multi-Function Image has it on
+  const plate = (V, X, Y, W, Hh) => `<rect x="${X}" y="${Y}" width="${W}" height="${Hh}" rx="2" fill="${V.mf && V.pl ? "#e0522e" : "#1a1b20"}"/>` + (V.mf && V.pl ? `<ellipse cx="${X + W / 2}" cy="${Y + 1}" rx="${W / 2 + 4}" ry="5" fill="#ff6a3a" opacity=".35"/>` : "");
 
   const icons = [
     base({ id: "7-cu-ft-chest-freezer", name: "7 cu ft chest freezer", colors: [WH, BK, SS], render(o) {
@@ -158,53 +172,53 @@ ${T.s}${glassPour(x, T.xs[1], 81, 94)}${disp(x, 30, 108, 18, 8, "36", "#ff6a5a")
     } }),
 
     base({ id: "12-cup-drip-maker", name: "12-cup drip maker", colors: [BK, WH, "#b8343a"], render(o) {
-      const x = ctx(o);
+      const V = CF(o), x = V.x;
       return svg(x, kitchen(x) + shadow(x, 100, 157, 44) + `
 ${panel(x, 60, 46, 80, 110, 6)}<path d="M58 44 H142 C144 44 146 46 146 50 V64 H54 V50 C54 46 56 44 58 44 Z" fill="${x.url("fv")}"/>
-<rect x="64" y="66" width="14" height="40" rx="2" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".3"/><rect x="65" y="${f(106 - 34 * (.4 + .4 * x.lv))}" width="12" height="${f(34 * (.4 + .4 * x.lv))}" fill="#9cc8e8" opacity=".5"/>
-<rect x="82" y="66" width="54" height="10" rx="2" fill="#0d0e12"/>${disp(x, 98, 67, 22, 8, "7:30")}
-<rect x="66" y="150" width="68" height="5" rx="2" fill="#1a1b20"/>${carafe(x, 76, 106, 44, 44)}${drip(x, 98, 82, 106)}`);
-    } }),
+<rect x="64" y="66" width="14" height="40" rx="2" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".3"/>${V.wl == null ? "" : `<rect x="65" y="${f(106 - 34 * (.4 + .4 * V.wl))}" width="12" height="${f(34 * (.4 + .4 * V.wl))}" fill="#9cc8e8" opacity=".5"/>`}
+<rect x="82" y="66" width="54" height="10" rx="2" fill="#0d0e12"/>${disp(V.D, 98, 67, 22, 8, "7:30")}
+${plate(V, 66, 150, 68, 5)}${carafe(V.C, 76, 106, 44, 44)}${drip(V.B, 98, 82, 106)}`);
+    }, parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }, { id: "water", name: "Water level", type: "value", unit: "%", min: 0, max: 100, def: 70 }, { id: "plate", name: "Warming plate" }] }),
     base({ id: "steel-drip-maker", name: "Steel drip maker", colors: [SS, BK, WH], render(o) {
-      const x = ctx(o);
+      const V = CF(o), x = V.x;
       return svg(x, kitchen(x) + shadow(x, 100, 157, 44) + `
 <rect x="58" y="34" width="84" height="122" rx="4" fill="${x.url("bk")}"/>${panel(x, 62, 36, 76, 70, 3)}
-<rect x="76" y="44" width="48" height="16" rx="2" fill="#0d0e12"/>${x.on ? `<rect x="77" y="45" width="46" height="14" rx="1.5" fill="#3a6fd0" opacity="${(.3 + .5 * x.lv).toFixed(2)}"/>` : ""}${disp(x, 86, 47, 28, 10, "8:00", "#e8f6ff")}
-${[72, 84, 116, 128].map((xx) => `<circle cx="${xx}" cy="70" r="2.6" fill="#1a1b20"/>`).join("")}${led(x, 100, 70, "#5fb0ff")}
-<rect x="66" y="150" width="68" height="5" rx="2" fill="#1a1b20"/>${carafe(x, 76, 106, 46, 44)}<rect x="75" y="112" width="48" height="4" fill="${x.url("ss")}"/>${drip(x, 99, 90, 106)}`);
-    } }),
+<rect x="76" y="44" width="48" height="16" rx="2" fill="#0d0e12"/>${V.D.on ? `<rect x="77" y="45" width="46" height="14" rx="1.5" fill="#3a6fd0" opacity="${(.3 + .5 * x.lv).toFixed(2)}"/>` : ""}${disp(V.D, 86, 47, 28, 10, "8:00", "#e8f6ff")}
+${[72, 84, 116, 128].map((xx) => `<circle cx="${xx}" cy="70" r="2.6" fill="#1a1b20"/>`).join("")}${led(V.D, 100, 70, "#5fb0ff")}
+${plate(V, 66, 150, 68, 5)}${carafe(V.C, 76, 106, 46, 44)}<rect x="75" y="112" width="48" height="4" fill="${x.url("ss")}"/>${drip(V.B, 99, 90, 106)}`);
+    }, parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }, { id: "plate", name: "Warming plate" }] }),
     base({ id: "copper-element-drip-brewer", name: "Copper-element drip brewer", colors: ["#3c5a4a", BK, SS, "#b8343a", "#e6dcc6"], render(o) {
-      const x = ctx(o);
+      const V = CF(o), x = V.x;
       return svg(x, kitchen(x) + shadow(x, 100, 157, 50) + `
 ${panel(x, 52, 70, 26, 86, 4)}<rect x="50" y="146" width="96" height="10" rx="3" fill="${x.url("f")}"/>
-<rect x="54" y="26" width="22" height="46" rx="3" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".4"/><rect x="55" y="${f(70 - 40 * (.3 + .5 * x.lv))}" width="20" height="${f(40 * (.3 + .5 * x.lv))}" fill="#9cc8e8" opacity=".45"/><rect x="52" y="22" width="26" height="6" rx="2" fill="${x.url("f")}"/>
+<rect x="54" y="26" width="22" height="46" rx="3" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".4"/>${V.wl == null ? "" : `<rect x="55" y="${f(70 - 40 * (.3 + .5 * V.wl))}" width="20" height="${f(40 * (.3 + .5 * V.wl))}" fill="#9cc8e8" opacity=".45"/>`}<rect x="52" y="22" width="26" height="6" rx="2" fill="${x.url("f")}"/>
 <path d="M76 32 H112 V38 H76 Z" fill="${x.url("ss")}"/><path d="M96 38 H128 L120 64 H104 Z" fill="${x.url("bkv")}"/><rect x="94" y="36" width="36" height="4" rx="2" fill="#1a1b20"/>
-<rect x="60" y="134" width="12" height="5" rx="2" fill="${x.on ? "#ff5a3a" : "#3a1a14"}"/>${carafe(x, 92, 92, 40, 54)}${drip(x, 112, 66, 92)}`);
-    } }),
+<rect x="60" y="134" width="12" height="5" rx="2" fill="${(V.mf ? V.pl : x.on) ? "#ff5a3a" : "#3a1a14"}"/>${V.mf && V.pl ? `<ellipse cx="112" cy="146" rx="26" ry="4.5" fill="#ff6a3a" opacity=".4"/>` : ""}${carafe(V.C, 92, 92, 40, 54)}${drip(V.B, 112, 66, 92)}`);
+    }, parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }, { id: "water", name: "Water level", type: "value", unit: "%", min: 0, max: 100, def: 70 }, { id: "plate", name: "Warming plate" }] }),
 
     base({ id: "classic-pod-brewer", name: "Classic pod brewer", colors: [BK, "#7a1f2a", "#24345e"], render(o) {
-      const x = ctx(o);
+      const V = CF(o), x = V.x;
       return svg(x, kitchen(x) + shadow(x, 100, 157, 48) + `
-<rect x="50" y="56" width="22" height="94" rx="6" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".4"/><rect x="51" y="${f(148 - 80 * (.3 + .6 * x.lv))}" width="20" height="${f(80 * (.3 + .6 * x.lv))}" rx="4" fill="#9cc8e8" opacity=".45"/>
+<rect x="50" y="56" width="22" height="94" rx="6" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".4"/>${V.wl == null ? "" : `<rect x="51" y="${f(148 - 80 * (.3 + .6 * V.wl))}" width="20" height="${f(80 * (.3 + .6 * V.wl))}" rx="4" fill="#9cc8e8" opacity=".45"/>`}
 ${panel(x, 70, 50, 70, 104, 10)}<path d="M70 66 C70 48 140 44 140 64 V72 H70 Z" fill="${x.url("fv")}"/><rect x="92" y="54" width="28" height="7" rx="3.5" fill="#1a1b20"/>
-<rect x="82" y="78" width="48" height="12" rx="3" fill="#0d0e12"/>${[90, 100, 110, 120].map((xx, i) => `<circle cx="${xx}" cy="84" r="2.4" fill="${x.on && i === 1 ? "#5fb0ff" : "#2c3038"}"/>`).join("")}
-<rect x="80" y="144" width="52" height="8" rx="3" fill="#1a1b20"/>${mug(x, 94, 122, "#e9e6df", x.on)}${drip(x, 104, 98, 122)}${steam(x, 104, 118)}`);
-    } }),
+<rect x="82" y="78" width="48" height="12" rx="3" fill="#0d0e12"/>${[90, 100, 110, 120].map((xx, i) => `<circle cx="${xx}" cy="84" r="2.4" fill="${V.D.on && i === 1 ? "#5fb0ff" : "#2c3038"}"/>`).join("")}
+<rect x="80" y="144" width="52" height="8" rx="3" fill="#1a1b20"/>${mug(x, 94, 122, "#e9e6df", V.cup)}${drip(V.B, 104, 98, 122)}${steam(V.S, 104, 118)}`);
+    }, parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }, { id: "water", name: "Water level", type: "value", unit: "%", min: 0, max: 100, def: 70 }] }),
     base({ id: "mini-pod-brewer", name: "Mini pod brewer", colors: [BK, "#b9a6e6", WH, "#b8343a", "#2f8f8a"], render(o) {
-      const x = ctx(o);
+      const V = CF(o), x = V.x;
       return svg(x, kitchen(x) + shadow(x, 100, 157, 30) + `
 ${panel(x, 84, 40, 32, 116, 8)}<path d="M84 52 C84 38 116 38 116 52 V58 H84 Z" fill="${x.url("fv")}"/><rect x="92" y="44" width="16" height="5" rx="2.5" fill="#1a1b20"/>
-<rect x="84" y="66" width="32" height="24" fill="#000" opacity=".25"/><circle cx="100" cy="62" r="3" fill="${x.on ? "#5fb0ff" : "#2c3038"}"/>
-<rect x="80" y="150" width="40" height="6" rx="3" fill="${x.url("f")}"/>${mug(x, 91, 126, "#e9e6df", x.on)}${drip(x, 100, 90, 126)}${steam(x, 100, 122)}`);
-    } }),
+<rect x="84" y="66" width="32" height="24" fill="#000" opacity=".25"/><circle cx="100" cy="62" r="3" fill="${V.D.on ? "#5fb0ff" : "#2c3038"}"/>
+<rect x="80" y="150" width="40" height="6" rx="3" fill="${x.url("f")}"/>${mug(x, 91, 126, "#e9e6df", V.cup)}${drip(V.B, 100, 90, 126)}${steam(V.S, 100, 122)}`);
+    }, parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }] }),
     base({ id: "capsule-coffee-machine", name: "Capsule coffee machine", colors: ["#3a3c41", "#f0eee8", "#e6d6b8", "#7a1f2a"], render(o) {
-      const x = ctx(o);
+      const V = CF(o), x = V.x;
       return svg(x, kitchen(x) + shadow(x, 100, 157, 40) + `
-<rect x="112" y="64" width="22" height="88" rx="4" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".3"/>
+<rect x="112" y="64" width="22" height="88" rx="4" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".3"/>${V.mf && V.wl != null ? `<rect x="113" y="${f(151 - 80 * V.wl)}" width="20" height="${f(80 * V.wl)}" rx="3" fill="#9cc8e8" opacity=".45"/>` : ""}
 ${panel(x, 66, 72, 52, 84, 6)}<path d="M64 76 C64 58 78 48 96 48 C112 48 124 58 124 74 L120 80 H66 Z" fill="${x.url("ss")}"/><ellipse cx="96" cy="58" rx="18" ry="5" fill="#2c3038"/>
-${x.on ? `<ellipse class="${P}pulse" cx="96" cy="58" rx="18" ry="5" fill="none" stroke="#fff" stroke-width="1.6" opacity="${x.B.toFixed(2)}"/>` : ""}
-<rect x="70" y="148" width="48" height="6" rx="3" fill="#1a1b20"/><rect x="86" y="80" width="20" height="8" rx="2" fill="#1a1b20"/>${mug(x, 84, 124, "#f6f3ee", x.on)}${drip(x, 96, 88, 124)}${steam(x, 93, 120)}`);
-    } }),
+${V.D.on ? `<ellipse class="${P}pulse" cx="96" cy="58" rx="18" ry="5" fill="none" stroke="#fff" stroke-width="1.6" opacity="${x.B.toFixed(2)}"/>` : ""}
+<rect x="70" y="148" width="48" height="6" rx="3" fill="#1a1b20"/><rect x="86" y="80" width="20" height="8" rx="2" fill="#1a1b20"/>${mug(x, 84, 124, "#f6f3ee", V.cup)}${drip(V.B, 96, 88, 124)}${steam(V.S, 93, 120)}`);
+    }, parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }, { id: "water", name: "Water level", type: "value", unit: "%", min: 0, max: 100, def: 70 }] }),
   ];
 
   const css = `.hda-anim .${P}drop{animation:${P}drop .8s linear infinite}

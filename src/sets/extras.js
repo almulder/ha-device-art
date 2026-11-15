@@ -103,6 +103,22 @@ ${extra || ""}</defs>`;
   }
   const trapLed = (x, cx, cy) => led(cx, cy, 1.8, x.on ? "#ff4a4f" : "#7dff9a", true, 0, x.on);
   const base = (o) => Object.assign({ picker: true, colorLabel: "Finish" }, o);
+  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // Image (no o.mf, exactly as today) and stays off / dark, never blinking, as a Multi-Function Image (o.mf). Status
+  // parts (a box online, the internet up, activity, on battery) are contacts; a reading is o.pval[id].
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    val: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" && isFinite(+o.pval[k]) ? Math.round(+o.pval[k]) : null),
+    pw: (o) => (!o.mf ? !!o.on : MF.has(o, "power") ? !!o.parts.power : true),
+  };
+  // the temperature tag (Multi-Function Images with a reading only)
+  function ttag(o, X, Y) {
+    const t = o.mf ? MF.val(o, "temp") : null; if (t == null) return "";
+    const col = t >= 104 ? "#ff5a4f" : t >= 95 ? "#ffb347" : "#7ee08a";
+    return `<rect x="${X - 14}" y="${Y - 6}" width="28" height="12" rx="3" fill="#0b0d12" fill-opacity=".88" stroke="#fff" stroke-opacity=".18" stroke-width=".6"/><path d="M${X - 9} ${Y - 3}V${Y + 1.4}" stroke="${col}" stroke-width="1.4" stroke-linecap="round"/><circle cx="${X - 9}" cy="${Y + 2.4}" r="1.6" fill="${col}"/>` +
+      `<text x="${X + 3}" y="${Y + 2.8}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7.4" font-weight="700" fill="${col}">${t}°</text>`;
+  }
   const APPL = [WHITE, STEEL, BLACK, BSTEEL, GRAY];
 
   const icons = [
@@ -144,21 +160,25 @@ ${[80, 116].map((tx) => `<rect x="${tx - 3}" y="27" width="6" height="8" fill="$
     } }),
 
     base({ id: "rack", name: "Home server rack", colors: [BLACK, GRAY, WHITE, "#3a4a5a", BSTEEL], render(o) {
-      const x = ctx(o), r = rnd(9);
+      // (parts) Power, Switch / NAS / Mini PC 1 / Mini PC 2 / UPS (each box's status lights), Activity (the lights blink),
+      // On battery (the UPS display and light turn amber, blinking), Temperature (a tag)
+      const x = ctx(o), r = rnd(9), P0 = MF.pw(o), U = (k) => (!o.mf ? x.on : P0 && (MF.has(o, k) ? !!o.parts[k] : MF.has(o, "power"))),
+        on1 = U("u1"), on2 = U("u2"), on3 = U("u3"), on4 = U("u4"), on5 = U("u5"), bk = !o.mf || (MF.has(o, "act") && !!o.parts.act), bat = o.mf && on5 && MF.has(o, "bat") && !!o.parts.bat;
       const bg = `<rect x="8" y="8" width="184" height="184" fill="#3a3d44"/>` + floorBoards(x, 172);
       let units = "";
       units += `<rect x="58" y="40" width="84" height="12" fill="#1a1b20"/>${Array.from({ length: 12 }, (_, i) => `<rect x="${63 + i * 6.4}" y="43" width="4.6" height="5" fill="#0a0a0c" stroke="#555" stroke-width=".4"/>`).join("")}`;
-      units += `<rect x="58" y="54" width="84" height="12" fill="#2a2c33"/>${Array.from({ length: 12 }, (_, i) => `<rect x="${63 + i * 6.4}" y="58" width="4.6" height="5" fill="#0a0a0c"/>` + led(65.3 + i * 6.4, 56.6, .9, i % 3 ? "#7dff9a" : "#ffb347", x.on, r() * 1.4, true)).join("")}`;
+      units += `<rect x="58" y="54" width="84" height="12" fill="#2a2c33"/>${Array.from({ length: 12 }, (_, i) => `<rect x="${63 + i * 6.4}" y="58" width="4.6" height="5" fill="#0a0a0c"/>` + led(65.3 + i * 6.4, 56.6, .9, i % 3 ? "#7dff9a" : "#ffb347", on1, r() * 1.4, bk)).join("")}`;
       for (let i = 0; i < 6; i++) units += `<path d="M${65 + i * 12.8} 47 C${65 + i * 12.8} 52 ${66 + i * 12.8} 54 ${66 + i * 12.8} 60" stroke="${["#3a8ad8", "#e8e8e8", "#e8c43a", "#3a8ad8", "#d84a4a", "#e8e8e8"][i]}" stroke-width="1.6" fill="none"/>`;
-      units += `<rect x="58" y="70" width="84" height="26" fill="${x.url("blk")}"/>${Array.from({ length: 4 }, (_, i) => `<rect x="${62 + i * 16}" y="73" width="14" height="20" rx="1" fill="#14151a" stroke="#3a3c44" stroke-width=".6"/>${Array.from({ length: 4 }, (_, j) => `<path d="M${64 + i * 16} ${77 + j * 3} h10" stroke="#2c2e36" stroke-width="1"/>`).join("")}` + led(69 + i * 16, 90.6, 1, "#4dabf7", x.on, r() * 1.4, true)).join("")}<rect x="128" y="74" width="10" height="4" rx="1" fill="#14151a"/>${led(133, 84, 1.3, "#7dff9a", x.on, 0, false)}`;
-      units += `<rect x="58" y="100" width="84" height="18" fill="#1d1e24"/><rect x="62" y="104" width="30" height="12" rx="2" fill="#5a5d66"/><rect x="96" y="104" width="30" height="12" rx="2" fill="#5a5d66"/>${led(66, 110, .9, "#ffffff", x.on, .4, true)}${led(100, 110, .9, "#ffffff", x.on, .9, true)}`;
-      units += `<rect x="58" y="122" width="84" height="26" fill="#22232a"/><rect x="64" y="128" width="26" height="14" rx="1.6" fill="#0e1218"/>${digits("120", 77, 135, .32, x.on ? "#7fd8ff" : "#2a3038", 4)}${Array.from({ length: 8 }, (_, i) => `<path d="M${98 + i * 5} 126 v18" stroke="#000" stroke-opacity=".5" stroke-width="2"/>`).join("")}${led(136, 130, 1.2, "#7dff9a", x.on, 0, false)}`;
+      units += `<rect x="58" y="70" width="84" height="26" fill="${x.url("blk")}"/>${Array.from({ length: 4 }, (_, i) => `<rect x="${62 + i * 16}" y="73" width="14" height="20" rx="1" fill="#14151a" stroke="#3a3c44" stroke-width=".6"/>${Array.from({ length: 4 }, (_, j) => `<path d="M${64 + i * 16} ${77 + j * 3} h10" stroke="#2c2e36" stroke-width="1"/>`).join("")}` + led(69 + i * 16, 90.6, 1, "#4dabf7", on2, r() * 1.4, bk)).join("")}<rect x="128" y="74" width="10" height="4" rx="1" fill="#14151a"/>${led(133, 84, 1.3, "#7dff9a", on2, 0, false)}`;
+      units += `<rect x="58" y="100" width="84" height="18" fill="#1d1e24"/><rect x="62" y="104" width="30" height="12" rx="2" fill="#5a5d66"/><rect x="96" y="104" width="30" height="12" rx="2" fill="#5a5d66"/>${led(66, 110, .9, "#ffffff", on3, .4, bk)}${led(100, 110, .9, "#ffffff", on4, .9, bk)}`;
+      units += `<rect x="58" y="122" width="84" height="26" fill="#22232a"/><rect x="64" y="128" width="26" height="14" rx="1.6" fill="#0e1218"/>${digits("120", 77, 135, .32, on5 ? (bat ? "#ffb347" : "#7fd8ff") : "#2a3038", 4)}${Array.from({ length: 8 }, (_, i) => `<path d="M${98 + i * 5} 126 v18" stroke="#000" stroke-opacity=".5" stroke-width="2"/>`).join("")}${bat ? led(136, 130, 1.2, "#ffb347", true, 0, true) : led(136, 130, 1.2, "#7dff9a", on5, 0, false)}`;
       const fx = shadow(x, 100, 180, 56, 5) + `<rect x="48" y="26" width="104" height="150" rx="3" fill="${x.url("bdh")}"/><rect x="54" y="34" width="92" height="136" fill="#0c0c10"/>
 <rect x="55" y="34" width="3" height="136" fill="#3a3c44"/><rect x="142" y="34" width="3" height="136" fill="#3a3c44"/>${Array.from({ length: 24 }, (_, i) => `<rect x="55.6" y="${36 + i * 5.6}" width="1.6" height="1.6" fill="#000"/><rect x="142.8" y="${36 + i * 5.6}" width="1.6" height="1.6" fill="#000"/>`).join("")}${units}
 <rect x="54" y="34" width="92" height="136" fill="url(#${x.id("door")})"/><rect x="54" y="34" width="92" height="136" fill="none" stroke="${H.shade(x.c, -.3)}" stroke-width="2"/><rect x="138" y="90" width="4" height="22" rx="1" fill="${x.url("chr")}"/>
-${Array.from({ length: 6 }, (_, i) => `<path d="M50 ${40 + i * 4} h3" stroke="#000" stroke-opacity=".5"/>`).join("")}<rect x="52" y="176" width="8" height="5" fill="#111"/><rect x="140" y="176" width="8" height="5" fill="#111"/>`;
+${Array.from({ length: 6 }, (_, i) => `<path d="M50 ${40 + i * 4} h3" stroke="#000" stroke-opacity=".5"/>`).join("")}<rect x="52" y="176" width="8" height="5" fill="#111"/><rect x="140" y="176" width="8" height="5" fill="#111"/>` + ttag(o, 172, 22);
       return svg(x, { bg, fx }, lg(x.id("door"), [[0, "#ffffff", .1], [.3, "#ffffff", .02], [.32, "#ffffff", .08], [.6, "#ffffff", 0], [1, "#ffffff", .05]], 0, 0, 1, 1));
-    } }),
+    }, parts: [{ id: "power", name: "Power" }, { id: "u1", name: "Switch", type: "contact" }, { id: "u2", name: "NAS", type: "contact" }, { id: "u3", name: "Mini PC 1", type: "contact" }, { id: "u4", name: "Mini PC 2", type: "contact" },
+      { id: "u5", name: "UPS", type: "contact" }, { id: "act", name: "Drive & port activity", type: "contact" }, { id: "bat", name: "On battery", type: "contact" }, { id: "temp", name: "Temperature", type: "value", unit: "°F", min: 50, max: 120, def: 80 }] }),
 
     base({ id: "boom", name: "Boom barrier", colorLabel: "Body", colors: ["#f2b632", "#e8833a", "#c9ccd2", "#3a3d44", WHITE], onWord: "Open", offWord: "Closed", render(o) {
       const x = ctx(o);
@@ -174,7 +194,10 @@ ${Array.from({ length: 6 }, (_, i) => `<path d="M50 ${40 + i * 4} h3" stroke="#0
     } }),
 
     base({ id: "xmastree", name: "Christmas tree", colorLabel: "Light", colors: ["#ffc477", "#ffe2ad", "#eef4ff", "#ff6b6b", "#69db7c", "#4dabf7"], glow: { x: .5, y: .5, r: 1.2 }, cast: "around", render(o) {
-      const x = ctx(o), r = rnd(31), L = x.on ? .3 + .7 * x.lv : 0;
+      // (parts) Lights (the first string and the star) and Second string (every other bulb); o.pcolor.light2 tints it
+      const x = ctx(o), r = rnd(31), L = x.on ? .3 + .7 * x.lv : 0, s1 = MF.on(o, "light"), s2 = MF.on(o, "light2"),
+        c2 = o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor.light2 || "") ? o.pcolor.light2 : x.c, h2 = H.mix(c2, "#ffffff", .6);
+      const tf = (k) => (k ? .3 + .7 * x.lv : 0), L1 = !o.mf ? L : tf(s1), L2 = !o.mf ? L : tf(s2);
       const bg = `<rect x="8" y="8" width="184" height="160" fill="#3a2e2a"/><rect x="8" y="8" width="184" height="160" fill="${x.url("wall")}" opacity=".5"/><rect x="140" y="40" width="40" height="56" fill="#1a2238"/><path d="M160 40 V96 M140 68 H180" stroke="#d8d2c6" stroke-width="2.4"/><rect x="138" y="38" width="44" height="60" fill="none" stroke="#d8d2c6" stroke-width="3"/>` + floorBoards(x, 168);
       let tree = "";
       const tiers = [[100, 22, 20, 56], [100, 40, 32, 86], [100, 62, 44, 118], [100, 86, 56, 152]];
@@ -186,14 +209,15 @@ ${Array.from({ length: 6 }, (_, i) => `<path d="M50 ${40 + i * 4} h3" stroke="#0
       let bulbs = "", glows = "";
       for (let i = 0; i < 46; i++) { const t = r(), yy = 30 + t * 118, half = 8 + t * 52, xx = 100 + (r() - .5) * 2 * half * .85;
         const d = (r() * 2.2).toFixed(2);
-        bulbs += x.on ? `<g class="${P}tw" style="animation-delay:-${d}s"><circle cx="${f(xx)}" cy="${f(yy)}" r="1.7" fill="${x.hot}" fill-opacity="${(.5 + .5 * L).toFixed(2)}"/><circle cx="${f(xx)}" cy="${f(yy)}" r="5.6" fill="${x.c}" fill-opacity="${(.28 * L).toFixed(2)}"/></g>` : `<circle cx="${f(xx)}" cy="${f(yy)}" r="1.5" fill="#d8d4c8" fill-opacity=".45"/>`; }
+        const b2 = i % 2 === 1, bo = !o.mf ? x.on : b2 ? s2 : s1, bL = b2 ? L2 : L1, bh = o.mf && b2 ? h2 : x.hot, bc = o.mf && b2 ? c2 : x.c;
+        bulbs += bo ? `<g class="${P}tw" style="animation-delay:-${d}s"><circle cx="${f(xx)}" cy="${f(yy)}" r="1.7" fill="${bh}" fill-opacity="${(.5 + .5 * bL).toFixed(2)}"/><circle cx="${f(xx)}" cy="${f(yy)}" r="5.6" fill="${bc}" fill-opacity="${(.28 * bL).toFixed(2)}"/></g>` : `<circle cx="${f(xx)}" cy="${f(yy)}" r="1.5" fill="#d8d4c8" fill-opacity=".45"/>`; }
       for (let i = 0; i < 10; i++) { const t = r(), yy = 40 + t * 104, half = 10 + t * 46; tree += `<circle cx="${f(100 + (r() - .5) * 1.6 * half)}" cy="${f(yy)}" r="3" fill="${["#c0392b", "#d4a42a", "#2a5aa8"][i % 3]}"/>`; }
-      if (x.on) glows = `<ellipse cx="100" cy="96" rx="76" ry="84" fill="${x.url("halo")}" opacity="${(.45 * L).toFixed(2)}"/>`;
+      if (!o.mf ? x.on : s1 || s2) glows = `<ellipse cx="100" cy="96" rx="76" ry="84" fill="${x.url("halo")}" opacity="${(.45 * (!o.mf ? L : Math.max(L1, L2))).toFixed(2)}"/>`;
       const fx = shadow(x, 100, 176, 60, 6) + glows + `<rect x="94" y="150" width="12" height="20" fill="#4a3020"/><path d="M74 168 L80 156 H120 L126 168 Z" fill="#8a2a2a"/>` + tree + bulbs +
-        `<path d="M100 10 L103 18 L111 18 L105 23 L107 31 L100 26 L93 31 L95 23 L89 18 L97 18 Z" fill="${x.on ? x.hot : "#c9a24a"}"/>${x.on ? `<circle cx="100" cy="21" r="12" fill="${x.url("halo")}" opacity="${L.toFixed(2)}"/>` : ""}
+        `<path d="M100 10 L103 18 L111 18 L105 23 L107 31 L100 26 L93 31 L95 23 L89 18 L97 18 Z" fill="${(!o.mf ? x.on : s1) ? x.hot : "#c9a24a"}"/>${(!o.mf ? x.on : s1) ? `<circle cx="100" cy="21" r="12" fill="${x.url("halo")}" opacity="${L1.toFixed(2)}"/>` : ""}
 <rect x="40" y="152" width="28" height="22" fill="#2a6a8a"/><path d="M54 152 V174 M40 162 H68" stroke="#e8c45a" stroke-width="2"/><rect x="130" y="158" width="32" height="16" fill="#a83a4a"/><path d="M146 158 V174 M130 166 H162" stroke="#f0f0f0" stroke-width="2"/>`;
       return svg(x, { bg, fx }, lg(x.id("fir"), [[0, "#2f6a3a"], [1, "#143a22"]], 0, 0, 0, 1));
-    } }),
+    }, parts: [{ id: "light", name: "Lights" }, { id: "light2", name: "Second string" }] }),
 
     base({ id: "iron", name: "Steam iron", colorLabel: "Body", colors: ["#7a4ab8", "#2a9a9a", "#3a6ad8", "#d83a5a", GRAY], render(o) {
       const x = ctx(o);
@@ -253,23 +277,27 @@ ${[[48, 132], [128, 132]].map(([a, b]) => `<path d="M${a} ${b} h24 l2 22 h-28 Z"
     base({ id: "router", name: "Wi-Fi router", colorLabel: "Body", colors: [BLACK, WHITE, GRAY, "#3a4a5a"], render(o) {
       const x = ctx(o);
       const bg = `<rect x="8" y="8" width="184" height="124" fill="#4a4e58"/><rect x="8" y="132" width="184" height="60" fill="url(#${x.id("shelf")})"/><path d="M8 132 H192" stroke="#fff" stroke-opacity=".25"/>`;
+      // (parts) Power (the lights), Internet (the second light), Wi-Fi (the waves), Activity (the port lights blink)
+      const rp = MF.pw(o);
       const ant = (bx, by, a) => `<g transform="translate(${bx} ${by}) rotate(${a})"><rect x="-4" y="-66" width="8" height="66" rx="4" fill="${x.url("bdh")}"/><rect x="-5" y="-6" width="10" height="8" rx="2" fill="${H.shade(x.c, -.3)}"/>${hl("M-2 -62 V-8", .3, 1)}</g>`;
       const fx = shadow(x, 100, 150, 74, 6) + ant(48, 108, -14) + ant(80, 104, -4) + ant(120, 104, 4) + ant(152, 108, 14) +
         `<path d="M24 140 L40 108 H160 L176 140 Z" fill="${x.url("bd")}"/><path d="M24 140 H176 L172 148 H28 Z" fill="${H.shade(x.c, -.35)}"/>${Array.from({ length: 9 }, (_, i) => `<path d="M${62 + i * 9} 114 L${58 + i * 10} 132" stroke="#000" stroke-opacity=".3" stroke-width="2"/>`).join("")}
-${Array.from({ length: 7 }, (_, i) => led(58 + i * 14, 143.6, 1.2, i === 0 ? "#ffffff" : "#7fd8ff", x.on, i * .23, i > 1)).join("")}${hl("M44 110 H156", .25, 1)}` +
-        (x.on ? [0, 1, 2].map((i) => `<path d="M${88 - i * 8} ${34 - i * 6} Q100 ${24 - i * 8} ${112 + i * 8} ${34 - i * 6}" stroke="#7fd8ff" stroke-opacity=".7" stroke-width="2" fill="none" stroke-linecap="round" class="${P}wave" style="animation-delay:-${(i * .35).toFixed(2)}s"/>`).join("") : "");
+${Array.from({ length: 7 }, (_, i) => led(58 + i * 14, 143.6, 1.2, i === 0 ? "#ffffff" : "#7fd8ff", !o.mf ? x.on : i === 1 ? rp && MF.on(o, "net") : rp, i * .23, i > 1 && (!o.mf || MF.on(o, "act")))).join("")}${hl("M44 110 H156", .25, 1)}` +
+        ((!o.mf ? x.on : rp && MF.on(o, "wifi")) ? [0, 1, 2].map((i) => `<path d="M${88 - i * 8} ${34 - i * 6} Q100 ${24 - i * 8} ${112 + i * 8} ${34 - i * 6}" stroke="#7fd8ff" stroke-opacity=".7" stroke-width="2" fill="none" stroke-linecap="round" class="${P}wave" style="animation-delay:-${(i * .35).toFixed(2)}s"/>`).join("") : "");
       return svg(x, { bg, fx }, lg(x.id("shelf"), [[0, "#a07a50"], [1, "#5a3e24"]], 0, 0, 0, 1));
-    } }),
+    }, parts: [{ id: "power", name: "Power" }, { id: "net", name: "Internet", type: "contact" }, { id: "wifi", name: "Wi-Fi" }, { id: "act", name: "Activity", type: "contact" }] }),
 
     base({ id: "mesh", name: "Mesh Wi-Fi pair", colorLabel: "Body", colors: [WHITE, BLACK, GRAY, "#d8d0c4"], render(o) {
       const x = ctx(o);
       const bg = `<rect x="8" y="8" width="184" height="128" fill="#55606a"/><rect x="8" y="136" width="184" height="56" fill="url(#${x.id("shelf")})"/><path d="M8 136 H192" stroke="#fff" stroke-opacity=".25"/><path d="M8 100 H192" stroke="#000" stroke-opacity=".15"/>
 <path d="M150 110 L156 100 H176 L180 110 Z" fill="#2a4a2a"/><rect x="156" y="110" width="22" height="26" fill="#d8d0c4"/>`;
-      const node = (cx, s) => `<g transform="translate(${cx} 140) scale(${s})">${shadow(x, 0, 0, 24, 4)}<rect x="-20" y="-78" width="40" height="78" rx="10" fill="${x.url("bdh")}"/><ellipse cx="0" cy="-78" rx="20" ry="5" fill="${x.url("bdt")}"/>
-${Array.from({ length: 5 }, (_, i) => `<path d="M-10 ${-60 + i * 4} H10" stroke="#000" stroke-opacity=".12"/>`).join("")}<path d="M-20 -10 H20" stroke="#000" stroke-opacity=".2"/>${led(0, -16, 1.6, "#7fd8ff", x.on, 0, false)}${hl("M-14 -72 V-8", .4, 1.6)}</g>`;
-      const fx = node(58, 1) + node(136, .82) + (x.on ? [0, 1, 2].map((i) => `<path d="M${80 + i * 4} 80 Q97 ${68 - i * 3} ${114 - i * 4} 84" stroke="#7fd8ff" stroke-opacity=".7" stroke-width="2" fill="none" stroke-linecap="round" class="${P}wave" style="animation-delay:-${(i * .35).toFixed(2)}s"/>`).join("") : "");
+      // (parts) Main node and Satellite node (online = its light); the link waves show while both are online
+      const n1 = MF.on(o, "n1"), n2 = MF.on(o, "n2");
+      const node = (cx, s, on) => `<g transform="translate(${cx} 140) scale(${s})">${shadow(x, 0, 0, 24, 4)}<rect x="-20" y="-78" width="40" height="78" rx="10" fill="${x.url("bdh")}"/><ellipse cx="0" cy="-78" rx="20" ry="5" fill="${x.url("bdt")}"/>
+${Array.from({ length: 5 }, (_, i) => `<path d="M-10 ${-60 + i * 4} H10" stroke="#000" stroke-opacity=".12"/>`).join("")}<path d="M-20 -10 H20" stroke="#000" stroke-opacity=".2"/>${led(0, -16, 1.6, "#7fd8ff", on, 0, false)}${hl("M-14 -72 V-8", .4, 1.6)}</g>`;
+      const fx = node(58, 1, !o.mf ? x.on : n1) + node(136, .82, !o.mf ? x.on : n2) + ((!o.mf ? x.on : n1 && n2) ? [0, 1, 2].map((i) => `<path d="M${80 + i * 4} 80 Q97 ${68 - i * 3} ${114 - i * 4} 84" stroke="#7fd8ff" stroke-opacity=".7" stroke-width="2" fill="none" stroke-linecap="round" class="${P}wave" style="animation-delay:-${(i * .35).toFixed(2)}s"/>`).join("") : "");
       return svg(x, { bg, fx }, lg(x.id("shelf"), [[0, "#c9b48e"], [1, "#7a6040"]], 0, 0, 0, 1));
-    } }),
+    }, parts: [{ id: "n1", name: "Main node", type: "contact" }, { id: "n2", name: "Satellite node", type: "contact" }] }),
 
     base({ id: "rollershutter", name: "Roller shutter", colorLabel: "Body", colors: [WHITE, "#3c4046", BEIGE, "#5a4636", GRAY], onWord: "Down", offWord: "Up", render(o) {
       const x = ctx(o), down = x.on ? x.lv : 0, wy = 52, wh = 112, sh = wh * down;

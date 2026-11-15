@@ -354,6 +354,27 @@
   }
 
 
+  // (multi-function) the solar water heaters: State (heating / idle / vacation, a stage), the water temperature (a reading
+  // on a small pipe- or tank-mounted readout: orange heating, white idle, blue vacation) and the circulation pump (a switch:
+  // the hot pipe flows; the thermosiphon has no pump, its switch is the backup element glowing at the tank end). The
+  // collectors look sunlit while heating (or, with no stage, while the pump runs). Without parts: today's drawing.
+  const SOLP = (sw) => [{ id: "state", name: "State", type: "stage", values: [["idle", "Idle"], ["heating", "Heating"], ["vacation", "Vacation"]], def: "heating" },
+    sw, { id: "temp", name: "Water temperature", type: "value", unit: "°", min: 40, max: 180, def: 130 }];
+  function solMF(o, sid) {
+    const pv = o.pval || {}, pp = o.parts || {}, st = pv.state != null && pv.state !== "" ? String(pv.state).toLowerCase() : null, t = pv.temp != null && pv.temp !== "" && isFinite(+pv.temp) ? Math.round(+pv.temp) : null;
+    if (!o.mf && st == null && t == null) return null;
+    const sw = pp[sid] != null && (o.mf || st == null) ? !!pp[sid] : st != null ? st === "heating" : !o.mf && !!o.on;
+    return { st, t, sw, sun: st != null ? st === "heating" : sw };
+  }
+  const subOn = (x, on) => { const y = Object.create(x); y.on = on; y.an = on && x.o.anim; y.L = on ? .35 + .65 * x.lv : 0; return y; };
+  // the readout: a small dark display; stem = [x, y] of the pipe it hangs from (or none)
+  function solTag(x, S, cx, cy, stem) {
+    if (!S || S.t == null) return "";
+    const str = String(Math.max(-99, Math.min(999, S.t))), col = S.st === "vacation" ? "#7dd3fc" : S.st === "heating" || (S.st == null && S.sw) ? "#ffb070" : "#e8eef4", w = 7 + str.length * 5;
+    return (stem ? `<path d="M${cx} ${cy + 5}L${stem[0]} ${stem[1]}" stroke="#2c2f36" stroke-width="1.6"/>` : "") +
+      `<rect x="${f(cx - w / 2 - 1)}" y="${cy - 6.5}" width="${f(w + 2)}" height="13" rx="2.4" fill="#2c2f36"/><rect x="${f(cx - w / 2)}" y="${cy - 5.5}" width="${f(w)}" height="11" rx="1.6" fill="#0b0e12"/>` +
+      digits(always(x), cx + w / 2 - 2.5, cy - 3.5, 7, str, str.length, col);
+  }
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {});
   const COP = "#c8794a", HOT = "#ff7a3a", COLD = "#5ab0ff";
   const tempC = (x) => Math.round(30 + 50 * x.lv);
@@ -477,7 +498,7 @@
         cab(x, 150, 70, 28, 40, "#c9ccd1", 3) + led(x, 164, 80, 1, "#3ee08f") + pipe(x, [164, 110, 164, 130, 150, 140, 140, 140], 3, "#9aa1aa", x.on ? GREEN : null, 4);
       return scene(x, back, body); }),
 
-    ic("flatplate", "Flat-plate collectors", sw(["#c9ccd1", "#2c2f36", "#8e959e"], "#c9ccd1"), "Frame", (o) => { const x = X(o), c = o.color;
+    ic("flatplate", "Flat-plate collectors", sw(["#c9ccd1", "#2c2f36", "#8e959e"], "#c9ccd1"), "Frame", (o) => { const S = solMF(o, "pump"), x = X(S ? Object.assign({}, o, { on: S.sun }) : o), c = o.color;
       const roof = (() => { let s = `<path d="M8 110L192 80V192H8Z" fill="${x.lg([[0, "#8a4a3a"], [1, "#5a2e24"]])}"/>`;
         for (let i = 1; i < 12; i++) { const y = 110 + i * 8.5, y2 = 80 + i * 8.5; s += `<path d="M8 ${f(y)}L192 ${f(y2)}" stroke="#2a120c" stroke-opacity=".6" stroke-width="1.4"/>`; }
         return s; })();
@@ -487,10 +508,10 @@
         return `<path d="M${P2(q[0])}L${P2(q[1])}L${P2(q[2])}L${P2(q[3])}Z" fill="#000" fill-opacity=".35" transform="translate(3 5)"/><path d="M${P2(q[0])}L${P2(q[1])}L${P2(q[2])}L${P2(q[3])}Z" fill="${x.lg([[0, x.on ? "#2a4a8a" : "#1c2b4a"], [1, "#0e1626"]], 0, 0, 1, 1)}" stroke="${c}" stroke-width="2.4"/>` + fins +
           glint(x, arrayClip(x, "fp" + k, A), q[3][0], q[1][1], q[1][0] - q[3][0], q[3][1] - q[1][1]); };
       const body = panel(aff([30, 92], [98, 80], [42, 158]), 1) + panel(aff([104, 79], [172, 67], [116, 145]), 2) +
-        pipe(x, [172, 70, 184, 64, 190, 80, 194, 100, 198, 120, 204, 140, 208, 160], 4, COP, HOT, 7);
-      return scene(x, back, body); }),
+        pipe(S ? subOn(x, S.sw) : x, [172, 70, 184, 64, 190, 80, 194, 100, 198, 120, 204, 140, 208, 160], 4, COP, HOT, 7) + solTag(x, S, 176, 48, [184, 64]);
+      return scene(x, back, body); }, { parts: SOLP({ id: "pump", name: "Circulation pump" }) }),
 
-    ic("tubeground", "Evacuated-tube array", sw(["#c9ccd1", "#2c2f36", "#eef0f2"], "#c9ccd1"), "Frame", (o) => { const x = X(o), c = o.color;
+    ic("tubeground", "Evacuated-tube array", sw(["#c9ccd1", "#2c2f36", "#eef0f2"], "#c9ccd1"), "Frame", (o) => { const S = solMF(o, "pump"), x = X(S ? Object.assign({}, o, { on: S.sun }) : o), c = o.color;
       const back = sunny(x, 40, 28) + treeLine(x, 128) + grassB(x, 128, "#4b7536", 71);
       const A = aff([30, 60], [176, 48], [40, 140]); let tubes = "";
       for (let i = 0; i < 18; i++) { const u = (i + .5) / 18, p0 = A(u, .07), p1 = A(u, 1);
@@ -499,11 +520,11 @@
       const body = shadowE(x, 106, 168, 80, 6) + [[.05], [.5], [.95]].map(([u]) => { const t = A(u, 0), b = A(u, 1); return `<path d="M${P2(t)}L${f(t[0] + 6)} 166M${P2(b)}L${f(b[0])} 166M${f(t[0] + 6)} 166L${P2(b)}" stroke="${M.steel(x)}" stroke-width="2.4"/>`; }).join("") +
         tubes + `<path d="M${P2(b0)}L${P2(b1)}" stroke="${M.steel(x)}" stroke-width="3"/>` +
         `<path d="M${f(h0[0] - 4)} ${f(h0[1] - 3)}L${f(h1[0] + 4)} ${f(h1[1] - 3)}L${f(h1[0] + 4)} ${f(h1[1] + 8)}L${f(h0[0] - 4)} ${f(h0[1] + 8)}Z" fill="${x.lg([[0, H.shade(c, .4)], [1, H.shade(c, -.3)]])}"/>` +
-        pipe(x, [h1[0] + 4, h1[1] + 3, 186, 60, 190, 100, 192, 140, 194, 160, 196, 170, 200, 180], 4, "#1d1e22", HOT, 7) +
-        glint(x, arrayClip(x, "tg", A), 30, 44, 150, 100);
-      return scene(x, back, body); }),
+        pipe(S ? subOn(x, S.sw) : x, [h1[0] + 4, h1[1] + 3, 186, 60, 190, 100, 192, 140, 194, 160, 196, 170, 200, 180], 4, "#1d1e22", HOT, 7) +
+        glint(x, arrayClip(x, "tg", A), 30, 44, 150, 100) + solTag(x, S, 176, 28, [h1[0] + 3, h1[1] - 2]);
+      return scene(x, back, body); }, { parts: SOLP({ id: "pump", name: "Circulation pump" }) }),
 
-    ic("thermosiphon", "Thermosiphon heater", sw(["#c9ccd1", "#eef0f2", "#2c2f36"], "#c9ccd1"), "Tank", (o) => { const x = X(o), c = o.color;
+    ic("thermosiphon", "Thermosiphon heater", sw(["#c9ccd1", "#eef0f2", "#2c2f36"], "#c9ccd1"), "Tank", (o) => { const S = solMF(o, "element"), x = X(S ? Object.assign({}, o, { on: S.st != null ? S.st === "heating" : !!o.on && !o.mf }) : o), c = o.color;
       const back = sunny(x, 160, 28) + `<rect x="8" y="150" width="184" height="42" fill="${x.lg([[0, "#9d9a95"], [1, "#77746f"]])}"/><path d="M8 150H192" stroke="#fff" stroke-opacity=".3"/>`;
       const A = aff([44, 80], [156, 80], [36, 140]); let fins = "";
       for (let i = 1; i < 14; i++) fins += `<path d="M${P2(A(i / 14, .04))}L${P2(A(i / 14, .96))}" stroke="#0a1220" stroke-opacity=".5" stroke-width=".8"/>`;
@@ -512,8 +533,10 @@
         `<path d="M${P2(A(0, 0))}L${P2(A(1, 0))}L${P2(A(1, 1))}L${P2(A(0, 1))}Z" fill="${x.lg([[0, x.on ? "#2a4a8a" : "#1c2b4a"], [1, "#0e1626"]], 0, 0, 1, 1)}" stroke="#aab3bd" stroke-width="2.4"/>` + fins +
         glint(x, arrayClip(x, "ts", A), 36, 80, 128, 60) +
         `<rect x="38" y="52" width="124" height="26" rx="13" fill="${x.lg([[0, H.shade(c, .5)], [.4, c], [1, H.shade(c, -.45)]])}"/><ellipse cx="38" cy="65" rx="5" ry="13" fill="${H.shade(c, -.25)}"/><ellipse cx="162" cy="65" rx="5" ry="13" fill="${H.shade(c, .1)}"/>` +
-        `<path d="M44 56H156" stroke="#fff" stroke-opacity=".5"/>` + pipe(x, [150, 76, 166, 96, 172, 130, 172, 150], 3, COP, HOT, 5) + steam(x, 170, 40, 1, .25);
-      return scene(x, back, body); }),
+        `<path d="M44 56H156" stroke="#fff" stroke-opacity=".5"/>` + pipe(x, [150, 76, 166, 96, 172, 130, 172, 150], 3, COP, HOT, 5) + steam(x, 170, 40, 1, .25) +
+        (S && o.parts && o.parts.element != null ? (S.sw ? `<ellipse cx="163" cy="65" rx="9" ry="16" fill="#ff8a3a" opacity=".22"/>` : "") + `<rect x="160" y="58" width="9" height="14" rx="2" fill="#2c2f36"/><circle cx="164.5" cy="62" r="1.4" fill="${S.sw ? "#ff8a3a" : "#4a4e56"}"/><path d="M162 66.5h5M162 68.5h5" stroke="#000" stroke-opacity=".5" stroke-width=".7"/>` : "") +
+        solTag(x, S, 100, 65);
+      return scene(x, back, body); }, { parts: SOLP({ id: "element", name: "Backup element" }) }),
 
     ic("smartmeter", "Utility smart meter", sw(["#8e959e", "#c9ccd1", "#2c2f36"], "#8e959e"), "Base", (o) => { const x = X(o), c = o.color;
       const back = sidingB(x, "#7a8590");

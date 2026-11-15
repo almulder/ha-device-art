@@ -254,9 +254,11 @@ ${extra || ""}</defs>`;
     if (!noVortex) s += `<g transform="translate(${cx} ${yb + 5}) scale(1 .26)"><g class="${P}spin" style="animation-duration:${(2.6 - 1.8 * o.level).toFixed(2)}s"><circle r="${n1(w * .26)}" fill="none" stroke="#e4f6ff" stroke-opacity=".35" stroke-width="3" stroke-dasharray="14 9"/><circle r="${n1(w * .15)}" fill="none" stroke="#e4f6ff" stroke-opacity=".45" stroke-width="3" stroke-dasharray="9 7"/></g></g>`;
     return s;
   }
-  const cones = (o, xs, y, yc, sp) => o.on ? xs.map((x) => `<path d="M${x - 3} ${y}H${x + 3}L${x + (sp || 22)} ${yc}H${x - (sp || 22)}Z" fill="url(#${o.uid}-cone)"/>`).join("") : "";
-  const pools = (o, xs, yc, sp) => o.on ? xs.map((x) => `<ellipse cx="${x}" cy="${yc + 4}" rx="${(sp || 22) + 8}" ry="5" fill="url(#${o.uid}-pool)"/>`).join("") : "";
-  const lens = (o, x, y, w) => { w = w || 8; return o.on ? `<ellipse cx="${x}" cy="${y}" rx="${w * 1.6}" ry="4.5" fill="url(#${o.uid}-hw)"/><ellipse cx="${x}" cy="${y}" rx="${w / 2}" ry="1.4" fill="#fff4d6"/>` : `<ellipse cx="${x}" cy="${y}" rx="${w / 2}" ry="1.3" fill="#8a8f96"/><ellipse cx="${x - 1}" cy="${y - .4}" rx="${w / 5}" ry=".5" fill="#fff" fill-opacity=".4"/>`; };
+  // (parts) a range hood's light: o._lt (set by the hood parts below) = the Light part, else the drawing's on (as today)
+  const LT = (o) => o._lt || o;
+  const cones = (o0, xs, y, yc, sp) => { const o = LT(o0); return o.on ? xs.map((x) => `<path d="M${x - 3} ${y}H${x + 3}L${x + (sp || 22)} ${yc}H${x - (sp || 22)}Z" fill="url(#${o.uid}-cone)"/>`).join("") : ""; };
+  const pools = (o0, xs, yc, sp) => { const o = LT(o0); return o.on ? xs.map((x) => `<ellipse cx="${x}" cy="${yc + 4}" rx="${(sp || 22) + 8}" ry="5" fill="url(#${o.uid}-pool)"/>`).join("") : ""; };
+  const lens = (o0, x, y, w) => { const o = LT(o0); w = w || 8; return o.on ? `<ellipse cx="${x}" cy="${y}" rx="${w * 1.6}" ry="4.5" fill="url(#${o.uid}-hw)"/><ellipse cx="${x}" cy="${y}" rx="${w / 2}" ry="1.4" fill="#fff4d6"/>` : `<ellipse cx="${x}" cy="${y}" rx="${w / 2}" ry="1.3" fill="#8a8f96"/><ellipse cx="${x - 1}" cy="${y - .4}" rx="${w / 5}" ry=".5" fill="#fff" fill-opacity=".4"/>`; };
   function hoodScene(o, c) {
     const yc = c.yc || 158, L = c.lights || [], px = c.px || 100; let s = "";
     if (!c.noSplash) s += splash(o, 0, 0, 200, yc, c.tile);
@@ -532,9 +534,28 @@ ${extra || ""}</defs>`;
       lens(o, 70, 108.4, 8) + lens(o, 130, 108.4, 8)); }),
   ];
 
+  // ---------- (parts) range hoods: Fan + Light parts ----------
+  // o.mf = a Multi-Function Image: o.parts holds only the ticked parts; the fan pulls the steam up (and runs the cooking
+  // below it, as people do), the light washes the cooktop. A part left out is off. A Device Image (no o.mf, no parts) is today's.
+  // The fan's speed: o.plevel.fan, else the slider.
+  const HOODS = ["pyramid", "glass", "island", "undercab", "mantel", "plaster", "downdraft", "ceiling", "angled", "copper"];
+  icons.forEach((ic) => {
+    if (HOODS.indexOf(ic.id) < 0) return;
+    const nolamp = ic.id === "downdraft";
+    ic.parts = [{ id: "fan", name: "Fan", type: "switch" }].concat(nolamp ? [] : [{ id: "light", name: "Light", type: "switch" }]);
+    const R = ic.render;
+    ic.render = (o) => {
+      const p = o.parts || {};
+      if (!o.mf && p.fan == null && p.light == null) return R(o);
+      const g = (k) => (o.mf ? !!p[k] : !!o.on && p[k] !== false);
+      const fl = o.plevel && o.plevel.fan != null && isFinite(+o.plevel.fan) ? Math.max(0, Math.min(1, +o.plevel.fan)) : o.level;
+      return R(Object.assign({}, o, { on: g("fan"), level: fl, _lt: Object.assign({}, o, { on: nolamp ? false : g("light") }) }));
+    };
+  });
+
   (window.HDA = window.HDA || []).push({
     id: "microwave", tab: "Microwaves & hoods", group: "Appliances", kind: "device",
-    intro: "Ten microwaves and ten range hoods. A running microwave lights up inside, the turntable turns, the dish steams and the display counts down (the slider is power); a running hood pulls swirling air and steam up from the pan, its lights wash the cooktop and the display shows the fan speed.",
+    intro: "Ten microwaves and ten range hoods. A running microwave lights up inside, the turntable turns, the dish steams and the display counts down (the slider is power); a running hood pulls swirling air and steam up from the pan, its lights wash the cooktop and the display shows the fan speed. As a Multi-Function Image a hood's Fan and Light are separate parts.",
     
     css, icons,
   });

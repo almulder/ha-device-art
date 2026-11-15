@@ -6,12 +6,15 @@
   const GALV = "#aab1b9", BEIGE = "#d6cbb2", WHITE = "#ebe9e4", GRAY = "#878c94", BLACK = "#2b2d33", TAN = "#bfa27a", BRONZE = "#5a4636";
 
   function ctx(o) {
-    const c = o.color || GALV, lv = o.level == null ? 1 : o.level;
-    const pr = o.parts || {};
-    const fan = o.parts && pr.fan != null ? !!pr.fan : !!o.on, pump = o.parts && pr.pump != null ? !!pr.pump : !!o.on;
+    // (parts) Fan and Pump: o.parts holds only the ticked parts; a part left out follows the one device as a Device Image
+    // (no o.mf) and stays off as a Multi-Function Image (o.mf). The fan's speed = o.plevel.fan, else the level; the
+    // display lights while either part runs.
+    const pr = o.parts || {}, mf = !!o.mf, pl = o.plevel || {};
+    const c = o.color || GALV, lv = pl.fan != null && isFinite(+pl.fan) ? +pl.fan : o.level == null ? 1 : o.level;
+    const fan = pr.fan != null ? !!pr.fan : !mf && !!o.on, pump = pr.pump != null ? !!pr.pump : !mf && !!o.on;
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
     const dur = (1.3 - 1.0 * lv).toFixed(2) + "s", fdur = (2.2 - 1.5 * lv).toFixed(2) + "s";
-    return { c, on: !!o.on, fan, pump, lv, id, url, dur, fdur, n: 0 };
+    return { c, on: mf ? fan || pump : !!o.on, fan, pump, lv, id, url, dur, fdur, n: 0 };
   }
   const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
   const lg = (id, a, x1, y1, x2, y2) => `<linearGradient id="${id}" x1="${x1 || 0}" y1="${y1 || 0}" x2="${x2 == null ? 1 : x2}" y2="${y2 || 0}">${stops(a)}</linearGradient>`;

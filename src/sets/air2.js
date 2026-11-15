@@ -86,7 +86,11 @@
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
     const x = { o, c, on: !!o.on, lv, id, url, defs: [], have: {}, metal: METAL.indexOf(c) >= 0, parts: o.parts || null, opt: o.opt || {},
       dk: H.hx(c).reduce((a, b) => a + b, 0) < 300 };
-    x.part = (k) => (x.parts ? !!x.parts[k] : x.on);
+    // (parts) o.parts holds only the ticked parts; a part left out follows the one device as a Device Image (no o.mf)
+    // and stays off / closed as a Multi-Function Image (o.mf). x.zon = any zone part on (the pump / heat of a zone set).
+    x.mf = !!o.mf;
+    x.part = (k) => (x.parts && x.parts[k] != null ? !!x.parts[k] : !x.mf && x.on);
+    x.zon = (n) => { for (let i = 1; i <= n; i++) if (x.part("z" + i)) return true; return false; };
     x.add = (k, s) => { if (!x.have[k]) { x.have[k] = 1; x.defs.push(s); } };
     x.dur = (a, b) => Math.max(.3, a - b * lv).toFixed(2);
     return x;
@@ -301,43 +305,61 @@ ${x.defs.join("")}</defs>
       return scene(x, "ply", [166, "concrete"], b);
     } }),
 
-    base({ id: "pumpstation", name: "Manifold + pump station", colorLabel: "Pump", colors: ["#2f8f4e", "#c8322b", "#2f6fb5", "#1f2023"], render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a);
-      let loops = ""; for (let i = 0; i < 6; i++) { const X = 70 + i * 16;
+    // (parts) six zone loops z1..z6 (a zone valve / actuator each): an open loop flows (its flow meter bobs, its floor
+    // pipe runs hot); the pump runs while any zone is open. As a Device Image every loop follows the one device, as before.
+    base({ id: "pumpstation", name: "Manifold + pump station", colorLabel: "Pump", colors: ["#2f8f4e", "#c8322b", "#2f6fb5", "#1f2023"],
+      parts: [1, 2, 3, 4, 5, 6].map((i) => ({ id: "z" + i, name: "Zone " + i })), render(o) {
+      const x = ctx(o), S = (a) => H.shade(x.c, a), zone = x.mf || !!o.parts;
+      if (zone) x.on = x.zon(6);
+      let loops = ""; for (let i = 0; i < 6; i++) { const X = 70 + i * 16, zo = x.part("z" + (i + 1));
         loops += `<rect x="${X - 2}" y="64" width="4" height="12" fill="${x.url("brass")}"/><rect x="${X - 3.5}" y="52" width="7" height="12" rx="2" fill="#e8f0f6" opacity=".85"/>` +
-          `<rect x="${X - 1.5}" y="${f(54 + (x.on ? 8 * (1 - x.lv) : 8))}" width="3" height="2.4" fill="#c8322b"${x.on ? ` class="${P}bob" style="animation-delay:-${i * .3}s"` : ""}/>` +
+          `<rect x="${X - 1.5}" y="${f(54 + (zo ? 8 * (1 - x.lv) : 8))}" width="3" height="2.4" fill="#c8322b"${zo ? ` class="${P}bob" style="animation-delay:-${i * .3}s"` : ""}/>` +
           `<circle cx="${X}" cy="49" r="3.6" fill="#c8322b"/>` + `<rect x="${X - 2}" y="108" width="4" height="12" fill="${x.url("brass")}"/><circle cx="${X}" cy="124" r="3.6" fill="#2f6fb5"/>` +
           `<path d="M${X} 76 V96 Q${X} 104 ${X + 3} 108" fill="none" stroke="#e46a4c" stroke-width="3.2"/>` +
-          `<path d="M${X} 128 V176" stroke="${x.on ? "#e46a4c" : "#c9b9b0"}" stroke-width="3.2" opacity=".85"/>`; }
+          `<path d="M${X} 128 V176" stroke="${zo ? "#e46a4c" : "#c9b9b0"}" stroke-width="3.2" opacity=".85"/>` +
+          (zone && zo ? `<rect class="${P}breathe" x="${X - 8}" y="128" width="16" height="50" fill="${x.url("warm")}" opacity=".3"/>` : ""); }
       const b = drop(x, rr(56, 60, 112, 8, 2), 2, 4, .45) + `<rect x="56" y="64" width="112" height="8" rx="3" fill="${x.url("brass")}"/><rect x="56" y="104" width="112" height="8" rx="3" fill="${x.url("brass")}"/>` + loops +
         `<path d="M40 68 H58 M40 108 H58" stroke="${x.url("copper")}" stroke-width="6"/>` +
         `<rect x="28" y="76" width="22" height="28" rx="4" fill="${S(0)}"/><rect x="28" y="76" width="22" height="28" rx="4" fill="${x.url("gloss")}"/><circle cx="39" cy="90" r="7" fill="${S(-.35)}"/>` +
         fan(x, 39, 90, 5, S(.3), 4) + led(x, 46, 80, 1, "#7ee08a", x.on) + `<rect x="34" y="40" width="10" height="28" rx="3" fill="${x.url("chrome")}"/><circle cx="39" cy="40" r="6" fill="#e9e9e6"/><path d="M39 36 V40" stroke="#333" stroke-width="1.4"/>` +
-        (x.on ? `<rect class="${P}breathe" x="56" y="128" width="112" height="50" fill="${x.url("warm")}" opacity=".25"/>` : "");
+        (x.on && !zone ? `<rect class="${P}breathe" x="56" y="128" width="112" height="50" fill="${x.url("warm")}" opacity=".25"/>` : "");
       return scene(x, "ply", null, b);
     } }),
-    base({ id: "elecmat", name: "Electric mat + stat", colors: ["#f2f1ee", "#2a2b30", "#c9ccd1"], render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a); fin(x);
+    // (parts) Heat (the mat warms, the stat's heat mark lights) and Floor temperature (a value, shown on the stat; left
+    // out, the stat shows the set level as before). One mat = one zone, as the real floor-heat thermostats report.
+    base({ id: "elecmat", name: "Electric mat + stat", colors: ["#f2f1ee", "#2a2b30", "#c9ccd1"],
+      parts: [{ id: "heat", name: "Heat", type: "switch" }, { id: "temp", name: "Floor temperature", type: "value", unit: "°F", min: 50, max: 95, def: 78 }], render(o) {
+      const x = ctx(o), S = (a) => H.shade(x.c, a), stat = x.on; fin(x);
+      if (x.mf || o.parts) x.on = x.part("heat");
+      const tv = o.pval && o.pval.temp != null && o.pval.temp !== "" && isFinite(+o.pval.temp) ? Math.round(+o.pval.temp) : null;
       let cable = "M40 150"; for (let i = 0; i < 7; i++) { const X = 40 + i * 18; cable += ` L${X} ${i % 2 ? 150 : 184} L${X + 18} ${i % 2 ? 150 : 184}`; }
-      const t = String(Math.round(70 + x.lv * 14));
+      const t = tv != null ? String(tv) : x.mf ? "--" : String(Math.round(70 + x.lv * 14));
       const b = `<rect x="22" y="146" width="156" height="42" fill="#d8d2c4" opacity=".9"/><path d="M22 146 L178 146 L178 188 L22 188 Z" fill="none" stroke="#000" stroke-opacity=".15"/>` +
         `<rect x="30" y="148" width="140" height="38" fill="#e9e6df" opacity=".5"/>` +
         `<path d="${cable}" fill="none" stroke="${x.on ? "#ff7a3c" : "#b3542c"}" stroke-width="2.2" stroke-linejoin="round"/>` +
         (x.on ? `<path class="${P}breathe" d="${cable}" fill="none" stroke="#ffb070" stroke-width="5" opacity=".35" filter="${x.url("bs")}" stroke-linejoin="round"/>` : "") +
         `<rect x="22" y="146" width="56" height="42" fill="#9a968d"/>` + [0, 1].map((i) => `<path d="M22 ${160 + i * 14} H78 M${40 + i * 18} 146 V188" stroke="#6f6b64"/>`).join("") +
         slab(x, 74, 46, 52, 70, 8) + `<rect x="80" y="52" width="40" height="44" rx="3" fill="${x.url("glass")}"/>` +
-        (x.on ? digits(x, 100, 70, 14, "#ffb070", t, { deg: 1 }) : digits(x, 100, 70, 14, "#555b66", t, { deg: 1 })) +
+        (x.on || (x.mf && stat && tv != null) ? digits(x, 100, 70, 14, "#ffb070", t, { deg: 1 }) : digits(x, 100, 70, 14, "#555b66", t, { deg: 1 })) +
         `<path d="M86 86 c2 -3 4 3 6 0 c2 -3 4 3 6 0 c2 -3 4 3 6 0 c2 -3 4 3 6 0" fill="none" stroke="${x.on ? "#ff8a3c" : "#555b66"}" stroke-width="1.2"/>` +
         glossR(x, 80, 52, 40, 44, 3) + `<path d="M100 116 V146" stroke="#cfcfcd" stroke-width="2" stroke-dasharray="3 2"/>`;
       return scene(x, "denim", null, b);
     } }),
-    base({ id: "pexloops", name: "PEX floor loops", colorLabel: "Pipe", colors: ["#e4572e", "#f0a020", "#f2f1ee", "#2f6fb5"], render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a);
+    // (parts) three zones z1..z3 (two runs of the loop each, top to bottom): a zone on = its runs pulse and warm the floor.
+    // As a Device Image the whole loop follows the one device, as before.
+    base({ id: "pexloops", name: "PEX floor loops", colorLabel: "Pipe", colors: ["#e4572e", "#f0a020", "#f2f1ee", "#2f6fb5"],
+      parts: [1, 2, 3].map((i) => ({ id: "z" + i, name: "Zone " + i })), render(o) {
+      const x = ctx(o), S = (a) => H.shade(x.c, a), zone = x.mf || !!o.parts;
       let dots = ""; for (let r = 0; r < 9; r++) for (let c = 0; c < 12; c++) dots += `<circle cx="${30 + c * 13 + (r % 2) * 6}" cy="${44 + r * 15}" r="3.4" fill="#f2f3f5" opacity=".14"/>`;
       let d = "M24 40"; for (let i = 0; i < 6; i++) { const y = 46 + i * 22; d += ` H${i % 2 ? 40 : 166} Q${i % 2 ? 28 : 178} ${y + 11} ${i % 2 ? 40 : 166} ${y + 22}`; }
       const b = `<rect x="16" y="30" width="168" height="152" rx="4" fill="#3b4b70"/>` + dots +
         `<path d="${d}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="6" transform="translate(1 2)"/><path d="${d}" fill="none" stroke="${x.c}" stroke-width="5"/><path d="${d}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.2" transform="translate(-1 -1)"/>` +
-        (x.on ? `<path class="${P}pulse" d="${d}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.6" stroke-dasharray="3 14"/><rect class="${P}breathe" x="16" y="30" width="168" height="152" fill="${x.url("warm")}" opacity=".3"/>` : "") +
+        (zone ? [0, 1, 2].map((z) => { if (!x.part("z" + (z + 1))) return "";
+          let zd = ""; for (let i = 2 * z; i < 2 * z + 2; i++) { const y = 46 + i * 22, x0 = i ? (i - 1) % 2 ? 40 : 166 : 24;
+            zd += `M${x0} ${i ? y : 40} H${i % 2 ? 40 : 166} Q${i % 2 ? 28 : 178} ${y + 11} ${i % 2 ? 40 : 166} ${y + 22}`; }
+          const y0 = z ? 46 + 2 * z * 22 - 4 : 30, y1 = z === 2 ? 182 : 46 + (2 * z + 2) * 22 - 4;
+          return `<path class="${P}pulse" d="${zd}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.6" stroke-dasharray="3 14"/><rect class="${P}breathe" x="16" y="${y0}" width="168" height="${y1 - y0}" fill="${x.url("warm")}" opacity=".3"/>`; }).join("")
+        : x.on ? `<path class="${P}pulse" d="${d}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.6" stroke-dasharray="3 14"/><rect class="${P}breathe" x="16" y="30" width="168" height="152" fill="${x.url("warm")}" opacity=".3"/>` : "") +
         `<rect x="16" y="30" width="168" height="152" rx="4" fill="none" stroke="#000" stroke-opacity=".3"/>`;
       return scene(x, "concrete", null, b);
     } }),
@@ -395,8 +417,11 @@ ${x.defs.join("")}</defs>
       return scene(x, "plaster", null, b);
     } }),
 
-    base({ id: "loop-purifier-heater", name: "Loop purifier heater", options: [{ id: "mode", name: "Mode", values: [["cool", "Cool"], ["heat", "Heat"]] }], colors: ["#f2f1ee", "#2a2b30", "#c9ccd1", "#c9a457"], colorLabel: "Trim", render(o) {
-      const x = ctx(o), heat = x.opt.mode === "heat", S = (a) => H.shade(x.c, a);
+    // (parts) Fan (the air flows) and Mode (a stage: cool / heat, from the thermostat mode; left out, the Mode option)
+    base({ id: "loop-purifier-heater", name: "Loop purifier heater", options: [{ id: "mode", name: "Mode", values: [["cool", "Cool"], ["heat", "Heat"]] }], colors: ["#f2f1ee", "#2a2b30", "#c9ccd1", "#c9a457"], colorLabel: "Trim",
+      parts: [{ id: "fan", name: "Fan", type: "switch" }, { id: "mode", name: "Mode", type: "stage", values: [["cool", "Cool"], ["heat", "Heat"]], def: "cool" }], render(o) {
+      const x = ctx(o), st = o.pval && o.pval.mode != null ? String(o.pval.mode) : null, heat = (st || x.opt.mode) === "heat", S = (a) => H.shade(x.c, a);
+      if (x.mf || o.parts) x.on = x.part("fan");
       x.add("loop", lg(x.id("loop"), [[0, "#bfc4cb"], [.3, "#f5f6f8"], [.6, "#aeb4bc"], [1, "#e9ecef"]]));
       x.add("base", lg(x.id("base"), [[0, "#6f747b"], [.35, "#d9dce0"], [.7, "#9aa0a8"], [1, "#5f646b"]]));
       let mesh = ""; for (let r = 0; r < 6; r++) for (let c = 0; c < 9; c++) mesh += `<circle cx="${80 + c * 5 + (r % 2) * 2.5}" cy="${128 + r * 6}" r="1" fill="#000" opacity=".35"/>`;

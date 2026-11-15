@@ -42,7 +42,12 @@
     return null;
   }
   let uidN = 0;
-  /* render one drawing; o: { on, anim, color, color2, level, parts, opt, bg, plant, pot, pot_color } */
+  /* render one drawing; o: { on, anim, color, color2, level, parts, opt, bg, plant, pot, pot_color,
+     mf, pval, plevel, pcolor, pname, open } — mf (multi-function): parts holds only the parts given, a part left out
+     stays closed / off / blank; without mf every switch part follows on and the doors follow open. Only switch parts
+     count for the drawing's own on (a door, a reading or a stage don't). */
+  const ptype = (t) => (t === "contact" || t === "value" || t === "stage" ? t : "switch");
+  const IDLE = /^(off|idle|done|none|standby)$/i;
   function render(key, o) {
     const it = ITEMS[key]; if (!it) return "";
     o = o || {};
@@ -54,12 +59,23 @@
     const ic = it.ic;
     const opt = {}; (ic.options || []).forEach((op) => { const v = o.opt && o.opt[op.id]; opt[op.id] = op.values.some((x) => x[0] === v) ? v : op.values[0][0]; });
     (ic.options || []).forEach((op) => { if (op.when && [].concat(op.when.is).indexOf(opt[op.when.opt]) < 0) opt[op.id] = op.values[0][0]; });
-    const parts = {}; let any = false;
-    (ic.parts || []).forEach((p) => { const v = o.parts && o.parts[p.id] != null ? !!o.parts[p.id] : o.on !== false; parts[p.id] = v; if (v && (!p.when || [].concat(p.when.is).indexOf(opt[p.when.opt]) >= 0)) any = true; });
-    const on = ic.parts && ic.parts.length ? any : o.on !== false;
+    const P = ic.parts || [], mf = !!o.mf && P.length > 0, pb = o.parts || {}, pv = o.pval || {};
+    if (mf && !(o.opt && o.opt.kit) && (ic.options || []).some((op) => op.id === "kit")) opt.kit = "light";
+    const parts = {}, pval = {}; let any = false, sw = 0, stg = null;
+    P.forEach((p) => {
+      const ty = ptype(p.type), has = pb[p.id] != null, ok = !p.when || [].concat(p.when.is).indexOf(opt[p.when.opt]) >= 0;
+      if (ty === "switch") {
+        if (has || !mf) parts[p.id] = has ? !!pb[p.id] : o.on !== false;
+        if (p.id in parts && ok) { sw++; if (parts[p.id]) any = true; }
+      } else if (ty === "contact" && has) parts[p.id] = !!pb[p.id];
+      else if (ty === "value" && num(pv[p.id]) !== null) pval[p.id] = num(pv[p.id]);
+      else if (ty === "stage" && pv[p.id] != null && pv[p.id] !== "") { pval[p.id] = String(pv[p.id]); if (stg == null || !IDLE.test(pval[p.id])) stg = pval[p.id]; }
+    });
+    const on = sw ? any : mf ? (stg != null ? !IDLE.test(stg) : true) : o.on !== false;
+    const some = (x) => (x && typeof x === "object" && Object.keys(x).length ? x : undefined);
     try {
       return ic.render({ on, anim: !!o.anim, color: o.color || (ic.colors && ic.colors[0]) || "#ffd8a8", color2: o.color2 || (ic.colors2 && ic.colors2[0]) || "#e8e2d6",
-        level: lvl, parts, opt, uid: "dac" + (++uidN) });
+        level: lvl, parts, opt, uid: "dac" + (++uidN), mf, open: !mf && !!o.open, pval: some(pval), plevel: some(o.plevel), pcolor: some(o.pcolor), pname: some(o.pname) });
     } catch (e) { return ""; }
   }
   window.DeviceArt = { items: ITEMS, order: ORDER, catalog: CATALOG, names: NAMES, sets: SETS, render, css: cssFor, resolve };
@@ -159,16 +175,46 @@
         if (v == null && op) { const m = op.values.filter((x) => String(x[0]).toLowerCase() === s.toLowerCase() || String(x[1]).toLowerCase() === s.toLowerCase())[0]; if (m) v = m[0]; }
         if (v != null) opt[id] = v;
       });
-      const parts = {};
-      if (it.ic && it.ic.parts) it.ic.parts.forEach((p) => { const pe = c.parts && c.parts[p.id]; parts[p.id] = pe ? entityOn(h && h.states[pe], {}) : on; });
+      // parts: { id: entity } (or { entity, map } for a stage part). multi_function: true = each part follows its own
+      // entity and a part left out stays closed / off / blank; else the parts without an entity follow the main one.
+      // part_names: { id: name } (your own names, e.g. a rack's drawers). A light part's brightness and color follow it.
+      const mf = !!c.multi_function, parts = {}, pval = {}, plevel = {}, pcolor = {};
+      const P = (it.ic && it.ic.parts) || [];
+      P.forEach((p) => {
+        const spec = c.parts && c.parts[p.id], sp = typeof spec === "string" ? { entity: spec } : spec || {};
+        const es = h && sp.entity ? h.states[sp.entity] : null, ty = ptype(p.type);
+        if (!sp.entity) { if (!mf && ty === "switch") parts[p.id] = on; return; }
+        // attribute: read that attribute of the entity instead of its state (climate.x's hvac_action, current_temperature…)
+        const at = typeof sp.attribute === "string" && sp.attribute ? sp.attribute : null;
+        const raw = !es ? null : at ? (es.attributes || {})[at] : es.state;
+        if (ty === "value") { const n = num(raw); if (n !== null) pval[p.id] = n; return; }
+        if (ty === "stage") {
+          const s = raw == null ? "" : String(raw); let v = sp.map && sp.map[s] != null ? String(sp.map[s]) : null;
+          if (v == null) { const m = (p.values || []).filter((x) => String(x[0]).toLowerCase() === s.toLowerCase() || String(x[1]).toLowerCase() === s.toLowerCase())[0]; if (m) v = String(m[0]); }
+          if (v != null) pval[p.id] = v; return;
+        }
+        if (at) {   // (an attribute: on when it's one of on_states, else an "on" word or a number above 0)
+          const s = raw == null ? "" : String(raw).toLowerCase(), n = num(raw);
+          parts[p.id] = sp.on_states ? [].concat(sp.on_states).map((x) => String(x).toLowerCase()).indexOf(s) >= 0 : raw === true || ON.indexOf(s) >= 0 || (n !== null && n > 0);
+          return;
+        }
+        parts[p.id] = entityOn(es, sp.on_states ? { on_states: sp.on_states } : {});
+        const a = (es && es.attributes) || {};
+        if (a.brightness != null) plevel[p.id] = (+a.brightness || 0) / 255; else if (a.percentage != null) plevel[p.id] = (+a.percentage || 0) / 100;
+        if (a.rgb_color) pcolor[p.id] = toHex(a.rgb_color);
+      });
+      if (mf || P.length) { const k = (it.ic.options || []).some((x) => x.id === "kit"); if (k && !(c.options && c.options.kit)) opt.kit = mf ? "light" : "none"; }
+      // one device: the doors follow its door / contact (open, opening)
+      const dom = st ? st.entity_id.split(".")[0] : "", s0 = st ? String(st.state).toLowerCase() : "";
+      const open = !mf && !!st && (dom === "binary_sensor" || dom === "cover") && (s0 === "on" || s0 === "open" || s0 === "opening");
       return { on, level, color, color2: c.color2 || null, opt, parts, st, anim: c.animate !== false && !this._reduced(), bg: c.scenery !== false,
-        plant: c.plant, pot: c.pot, pot_color: c.pot_color };
+        plant: c.plant, pot: c.pot, pot_color: c.pot_color, mf, open, pval, plevel, pcolor, pname: c.part_names || null };
     }
     _update(force) {
       if (!this._config || !this._els) return;
       const s = this._compute(), c = this._config, it = ITEMS[this._key];
       const stKey = s.st ? s.st.state + JSON.stringify(s.st.attributes || {}) : "";
-      const key = JSON.stringify([s.on, Math.round(s.level * 100), s.color, s.color2, s.opt, s.parts, s.anim, s.bg, stKey, this._hass ? 1 : 0]);
+      const key = JSON.stringify([s.on, Math.round(s.level * 100), s.color, s.color2, s.opt, s.parts, s.anim, s.bg, stKey, this._hass ? 1 : 0, s.mf, s.open, s.pval, s.plevel, s.pcolor, s.pname]);
       if (!force && key === this._last) return;
       this._last = key;
       const e = this._els;
@@ -240,7 +286,7 @@
   if (!customElements.get("device-art-card-editor")) customElements.define("device-art-card-editor", DeviceArtCardEditor);
 
   /* version line in the browser console, so anyone can check which release they are running */
-  const VERSION = "1.1.1";
+  const VERSION = "1.2.0";
   console.info("%c DEVICE-ART-CARD %c v" + VERSION + " · " + Object.keys(ITEMS).length + " drawings ", "background:#7c5cff;color:#fff;font-weight:700;border-radius:3px 0 0 3px", "background:#2a1f5c;color:#fff;border-radius:0 3px 3px 0");
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === "device-art-card"))

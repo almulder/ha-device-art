@@ -304,16 +304,20 @@ ${hl(`M${cx - 8} 72 C${cx - 11} 77 ${cx - 13} 81 ${cx - 14} 85`, .25, 1.4)}<elli
         `<path d="M64 46 L136 46 M64 176 H136" stroke="#3a1e0a" stroke-opacity=".3" stroke-width=".6"/>` + pd(30) + pd(170));
     } }),
 
-    base({ id: "antifog", name: "Anti-fog LED", glow: { x: .5, y: .5, r: 1.25 }, render(o) {
-      const x = ctx(o), d = rr(26, 32, 148, 136, 14);
-      const fog = rg(x.id("fog"), x.on ? [[0, "#e9eef8", 0], [.55, "#e9eef8", 0], [.8, "#e9eef8", .12], [1, "#e9eef8", .22]] : [[0, "#e9eef8", .2], [1, "#e9eef8", .26]], .5, .5, .62);
+    // (parts) Multi-Function: Light (the LED bands and their glow, its own brightness and color) and Defog (the heater pad:
+    // the glass clears, its key lights); a part left out stays off: no glow, the glass fogged. A Device Image is today's.
+    base({ id: "antifog", name: "Anti-fog LED", glow: { x: .5, y: .5, r: 1.25 }, parts: [{ id: "light", name: "Light" }, { id: "defog", name: "Defog" }], render(o) {
+      const mf = !!o.mf, pp = o.parts || {}, pl = o.plevel || {}, pc = o.pcolor || {};
+      if (mf) o = Object.assign({}, o, { on: !!pp.light, level: pl.light == null ? o.level : pl.light, color: pc.light || o.color });
+      const x = ctx(o), d = rr(26, 32, 148, 136, 14), df = mf ? !!pp.defog : x.on, dk = mf ? Object.assign({}, x, { on: df, op: (k) => (k * (df ? 1 : 0)).toFixed(3), hot: df ? "#bfe3ff" : x.hot }) : x;
+      const fog = rg(x.id("fog"), df ? [[0, "#e9eef8", 0], [.55, "#e9eef8", 0], [.8, "#e9eef8", .12], [1, "#e9eef8", .22]] : [[0, "#e9eef8", .2], [1, "#e9eef8", .26]], .5, .5, .62);
       return svg(x, (x.on ? halo(x, d, .3) : wsh(d)) + glass(x, d, [26, 32, 148, 136], 19, "C", .6) +
         `<path d="${d}" fill="url(#${x.id("fog")})"/>` +
         band(x, rr(36, 46, 9, 108, 4.5)) + band(x, rr(155, 46, 9, 108, 4.5)) +
         touch(x, 92, 154, 3.2) +
-        `<circle cx="108" cy="154" r="3.2" fill="none" stroke="${x.on ? x.hot : "#fff"}" stroke-opacity="${x.on ? x.op(.9) : ".35"}" stroke-width=".9"/>
-<path d="M106 155.6 C106.6 153.6 107.4 153.6 108 155.6 C108.6 153.6 109.4 153.6 110 155.6" fill="none" stroke="${x.on ? x.hot : "#fff"}" stroke-opacity="${x.on ? x.op(.9) : ".35"}" stroke-width=".7"/>
-<path d="M104 151.8 V151 M108 151.8 V150.6 M112 151.8 V151" stroke="${x.on ? x.hot : "#fff"}" stroke-opacity="${x.on ? x.op(.9) : ".3"}" stroke-width=".6" stroke-linecap="round"/>`, fog);
+        `<circle cx="108" cy="154" r="3.2" fill="none" stroke="${dk.on ? dk.hot : "#fff"}" stroke-opacity="${dk.on ? dk.op(.9) : ".35"}" stroke-width=".9"/>
+<path d="M106 155.6 C106.6 153.6 107.4 153.6 108 155.6 C108.6 153.6 109.4 153.6 110 155.6" fill="none" stroke="${dk.on ? dk.hot : "#fff"}" stroke-opacity="${dk.on ? dk.op(.9) : ".35"}" stroke-width=".7"/>
+<path d="M104 151.8 V151 M108 151.8 V150.6 M112 151.8 V151" stroke="${dk.on ? dk.hot : "#fff"}" stroke-opacity="${dk.on ? dk.op(.9) : ".3"}" stroke-width=".6" stroke-linecap="round"/>`, fog);
     } }),
 
     base({ id: "floor", name: "Full-length LED", colors: COLRGB, glow: { x: .5, y: .48, r: 1.3 }, colors2: ["#2a2b33", "#c99a48", "#d6d9de", "#ecebf0", "#5a4232"], picker2: true, colorLabel2: "Frame", render(o) {

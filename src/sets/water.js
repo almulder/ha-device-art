@@ -60,7 +60,7 @@ ${extra || ""}</defs>`;
   const state = (o, x, y, r) => led(o, x, y, r, true, o.on ? GREEN : RED, o.on ? "hg" : "hr");
   const screw = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r || 1.6}" fill="#8b929a"/><path d="M${n1(x - (r || 1.6) * .7)} ${y}H${n1(x + (r || 1.6) * .7)}" stroke="#3a3f46" stroke-width=".6"/>`;
 
-  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgecd", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+  const SEG = { U: "bcdef", A: "abcefg", C: "adef", 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgecd", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
   function digits(str, x, y, s, col, dim) {
     const w = s * .52, t = Math.max(.7, s * .14); let out = "", X = x;
     String(str).split("").forEach((ch) => {
@@ -182,6 +182,40 @@ ${extra || ""}</defs>`;
 
   const ic = (id, name, colors, label, render) => ({ id, name, colors, picker: true, colorLabel: label, render });
 
+  // ---------- (parts) Multi-Function: the water heaters ----------
+  // State (heating / idle / vacation, a stage), the water temperature (a reading), the burner / element / heat pump (a
+  // switch: the flame, the glow, the fan) and a leak sensor (a contact: wet = puddle and a red blinking puck).
+  // The burner part runs the heat; without it the Heating stage does. The display shows the temperature even while idle,
+  // VAC on vacation (the gas tank: a dial on its hot pipe and a blue vacation lamp). A part left out: off, dry, no reading.
+  // Without parts (a Device Image) every heater is drawn as before.
+  const WSTATE = { id: "state", name: "State", type: "stage", values: [["idle", "Idle"], ["heating", "Heating"], ["vacation", "Vacation"]], def: "heating" };
+  const WTEMP = { id: "temp", name: "Water temperature", type: "value", unit: "°", min: 40, max: 180, def: 120 };
+  const WLEAK = { id: "leak", name: "Leak sensor", type: "contact" };
+  function whMF(o, fid) {
+    const pv = o.pval || {}, pp = o.parts || {}, st = pv.state != null && pv.state !== "" ? String(pv.state).toLowerCase() : null, t = pv.temp != null && pv.temp !== "" && isFinite(+pv.temp) ? Math.round(+pv.temp) : null;
+    if (!o.mf && st == null && t == null) return null;
+    let fire = pp[fid] != null && (o.mf || st == null) ? !!pp[fid] : st != null ? st === "heating" : !o.mf && !!o.on;
+    if (st === "vacation" && !(o.mf && pp[fid] != null)) fire = false;
+    return Object.assign({}, o, { on: fire, wt: t, wst: st, leak: o.mf && pp.leak != null ? !!pp.leak : null });
+  }
+  const wS = (o, a, b) => (o.wst === "vacation" ? "UAC" : o.wt != null ? String(Math.max(-99, Math.min(999, o.wt))) : o.on ? a : b);
+  const wO = (o) => (o.wt != null || o.wst === "vacation" ? Object.assign({}, o, { on: true }) : o);
+  // the leak sensor on the floor beside the heater: dry = a gray puck with a green lamp; wet = a puddle and a red blinking puck
+  function leakFx(o, cx, fy, px) {
+    if (o.leak == null) return "";
+    const wet = o.leak; let s = "";
+    if (wet) s += `<ellipse cx="${cx}" cy="${fy}" rx="40" ry="6" fill="#4aa8ff" fill-opacity=".35"/><ellipse cx="${cx - 6}" cy="${fy - 1}" rx="22" ry="2.6" fill="#cfe9ff" fill-opacity=".35"/><ellipse cx="${cx + 26}" cy="${fy + 2}" rx="9" ry="2" fill="#4aa8ff" fill-opacity=".3"/>`;
+    s += `<ellipse cx="${px}" cy="${fy + 1.6}" rx="8" ry="2.4" fill="#000" fill-opacity=".35"/><path d="M${px - 7} ${fy}V${fy - 3}Q${px} ${fy - 6.4} ${px + 7} ${fy - 3}V${fy}Q${px} ${fy + 2.6} ${px - 7} ${fy}Z" fill="#eceef0"/><path d="M${px - 7} ${fy - 3}Q${px} ${fy - 6.4} ${px + 7} ${fy - 3}" fill="none" stroke="#fff" stroke-opacity=".7"/>` +
+      `<g class="${wet ? P + "blink" : ""}">${led(o, px, fy - 3.6, 1.3, true, wet ? RED : GREEN, wet ? "hr" : "hg")}</g>`;
+    return s;
+  }
+  // a heater's parts and its Multi-Function look: fid = its burner / element part, fy = floor line, px = sensor spot
+  function whWrap(ic, fid, fname, fy, cx, px, extra) {
+    const R = ic.render;
+    ic.parts = [WSTATE, { id: fid, name: fname }, WTEMP, WLEAK];
+    ic.render = (o) => { const q = whMF(o, fid); if (!q) return R(o); return R(q).replace(/<\/svg>$/, (extra ? extra(q) : "") + leakFx(q, cx, fy, px) + "</svg>"); };
+    return ic;
+  }
   const icons = [
     ic("ball", "Valve actuator", ["#2b2f36", "#eceef0", "#2f6db5", "#c7372f", "#8a949e"], "Body", (o) => { const u = o.uid, pd = "M-4 132H164Q178 132 178 118V-4";
       const lever = o.on ? `<path d="M96 110H138" stroke="#c9332c" stroke-width="6" stroke-linecap="round"/><path d="M98 108.5H136" stroke="#ff8a7a" stroke-opacity=".6" stroke-width="1.5" stroke-linecap="round"/>`
@@ -253,7 +287,7 @@ ${extra || ""}</defs>`;
         tank(o, 52, 40, 88, 172) +
         `<path d="${rr(84, 34, 18, 10, 2)}" fill="url(#${u}-mtv)"/>` + tube("M93 34C93 14 60 18 40 8", 5, ["#3c3f44", "#8d939b", "#d6dade"]) +
         [[70, 66], [70, 128]].map((p) => `<path d="${rr(p[0], p[1], 24, 22, 2)}" fill="none" stroke="#000" stroke-opacity=".3"/><path d="${rr(p[0], p[1], 24, 22, 2)}" fill="#fff" opacity=".05"/>` + screw(p[0] + 4, p[1] + 4, 1.2) + screw(p[0] + 20, p[1] + 18, 1.2)).join("") +
-        `<path d="${rr(104, 92, 28, 30, 4)}" fill="url(#${u}-bk)"/>` + lcd(o, 107, 96, 22, 12, o.on ? String(t) : "---", 6.5, ORNG) +
+        `<path d="${rr(104, 92, 28, 30, 4)}" fill="url(#${u}-bk)"/>` + lcd(wO(o), 107, 96, 22, 12, wS(o, String(t), "---"), 6.5, ORNG) +
         [0, 1, 2, 3].map((i) => led(o, 110 + i * 5.5, 116, 1.2, o.on && i < 1 + o.level * 3, ORNG, "ho")).join("") +
         heat(o, [72, 82, 92], 64) + `<path d="M106 94H128" stroke="#fff" stroke-opacity=".15"/>`); }),
 
@@ -265,7 +299,7 @@ ${extra || ""}</defs>`;
         sh(o, 102, 150, 46, 4) +
         `<path d="M134 40L140 36V146L134 150Z" fill="url(#${u}-sd)"/>` + face(o, rr(64, 36, 72, 114, 6)) +
         `<path d="M64 128H136" stroke="#000" stroke-opacity=".22"/><path d="M64 129H136" stroke="#fff" stroke-opacity=".1"/>` +
-        `<path d="${rr(78, 58, 44, 34, 5)}" fill="#0b0d10"/>` + lcd(o, 81, 61, 38, 20, o.on ? String(t) : "   ", 11, ORNG) +
+        `<path d="${rr(78, 58, 44, 34, 5)}" fill="#0b0d10"/>` + lcd(wO(o), 81, 61, 38, 20, wS(o, String(t), "   "), 11, ORNG) +
         `<path d="M86 85q2 -5 4 -2q1 -4 3 -6q2 4 2 8z" fill="${o.on ? "#3d8bff" : "#2b3a40"}"/>` +
         [92, 100, 108].map((x) => `<circle cx="${x + 8}" cy="86" r="1.4" fill="#3a4148"/>`).join("") +
         `<path d="${rr(82, 100, 36, 18, 3)}" fill="#000" fill-opacity=".25"/>` + [0, 1, 2, 3, 4].map((i) => `<path d="M86 ${103 + i * 3}H114" stroke="#000" stroke-opacity=".45" stroke-width="1.2"/>`).join("") +
@@ -282,7 +316,7 @@ ${extra || ""}</defs>`;
         `<circle cx="100" cy="40" r="20" fill="#0e1014"/><g class="${o.on ? P + "spin" : ""}" style="animation-duration:${dur(o, 1.3, 1)}s">${blades}<circle cx="100" cy="40" r="3" fill="#5a6168"/></g>` +
         [-14, -7, 0, 7, 14].map((d) => `<path d="M${100 + d} 21V59" stroke="#c9ced4" stroke-opacity=".55" stroke-width="1.2"/>`).join("") +
         `<circle cx="100" cy="40" r="20" fill="none" stroke="#5a6168" stroke-width="2"/>` +
-        `<path d="${rr(80, 84, 40, 22, 4)}" fill="#0b0d10"/>` + lcd(o, 83, 87, 24, 16, o.on ? String(Math.round(115 + 25 * o.level)) : "---", 8, "#7ee08a") +
+        `<path d="${rr(80, 84, 40, 22, 4)}" fill="#0b0d10"/>` + lcd(wO(o), 83, 87, 24, 16, wS(o, String(Math.round(115 + 25 * o.level)), "---"), 8, "#7ee08a") +
         led(o, 113, 91, 1.4, o.on, "#7ee08a", "hg") + led(o, 113, 99, 1.4, o.on && o.level > .6, ORNG, "ho") +
         (o.on ? [0, 1, 2].map((i) => `<path class="${P}heat" style="animation-delay:-${i * .8}s" d="M${148 + i * 8} 50q5 -2 10 0t10 0" fill="none" stroke="#bfe6ff" stroke-width="1.2"/>`).join("") : "") +
         tube("M140 160C150 160 152 176 160 186", 2.5, ["#3a3f46", "#c9ced4", "#fff"])); }),
@@ -400,6 +434,15 @@ ${extra || ""}</defs>`;
         `<path d="M96 42H104V46H96Z" fill="#8b929a"/>` + screw(60, 52) + screw(140, 52) +
         led(o, 172, 30, 1.6, true, o.on ? GREEN : "#5a636d", "hg")); }),
   ];
+
+  icons.forEach((ic) => {
+    // the gas tank: its water temperature on a dial on the hot pipe, a blue lamp on the gas valve for vacation
+    if (ic.id === "gastank") whWrap(ic, "flame", "Burner", 186, 100, 160, (q) => (q.wt != null ? `<path d="M80 22H70" stroke="#b87333" stroke-width="3"/>` + gauge(q, 63, 22, 7, Math.max(0, Math.min(1, q.wt < 90 ? (q.wt - 30) / 50 : (q.wt - 90) / 90))) : "") +
+      (q.wst === "vacation" ? led(q, 89, 132, 1.3, true, CYAN, "hb") : ""));
+    if (ic.id === "elec") whWrap(ic, "element", "Element", 186, 96, 160);
+    if (ic.id === "tankless") whWrap(ic, "flame", "Burner", 190, 100, 156);
+    if (ic.id === "heatpump") whWrap(ic, "comp", "Heat pump", 188, 100, 160);
+  });
 
   (window.HDA = window.HDA || []).push({
     id: "water", tab: "Water & valves", group: "Utility", kind: "device",

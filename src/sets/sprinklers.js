@@ -206,13 +206,16 @@ ${extra || ""}</defs>`;
   const ring = (o, cx, cy, r, n, act, w) => { let s = "";
     for (let i = 0; i < n; i++) { const a0 = (i * 360 / n - 90 + 5) * Math.PI / 180, a1 = ((i + 1) * 360 / n - 90 - 5) * Math.PI / 180;
       const d = `M${n1(cx + Math.cos(a0) * r)} ${n1(cy + Math.sin(a0) * r)}A${r} ${r} 0 0 1 ${n1(cx + Math.cos(a1) * r)} ${n1(cy + Math.sin(a1) * r)}`;
-      const lit = o.on && (o.anim || i === act);
+      const lit = ZA ? ZA.indexOf(i) >= 0 : o.on && (o.anim || i === act);
       s += `<path d="${d}" fill="none" stroke="#2a3038" stroke-width="${w || 4}" stroke-linecap="round"/>` +
         (lit ? `<path${o.anim ? ` class="${P}chase" style="animation-delay:${n1(i * 4 / n)}s"` : ""} d="${d}" fill="none" stroke="${CYAN}" stroke-width="${w || 4}" stroke-linecap="round"/>` : ""); }
     return s; };
-  const zone = (o, n) => 1 + Math.min(n - 1, Math.floor(o.level * n));
+  // (parts) ZA = the running zones (0-based) while a Multi-Function Image renders, null otherwise (today's look)
+  let ZA = null;
+  const zon = (o, i, z) => (ZA ? ZA.indexOf(i) >= 0 : o.on && i === z - 1);
+  const zone = (o, n) => (ZA ? 1 + Math.min(n - 1, ZA.length ? ZA[0] : 0) : 1 + Math.min(n - 1, Math.floor(o.level * n)));
   const zleds = (o, x, y, n, gap, r, col) => { let s = "", z = zone(o, n);
-    for (let i = 0; i < n; i++) s += o.on && o.anim ? `<g class="${P}chase" style="animation-delay:${n1(i * 4 / n)}s">${led(o, x + i * gap, y, r, true, col || GREEN, "hg")}</g>` : led(o, x + i * gap, y, r, o.on && i === z - 1, col || GREEN, "hg");
+    for (let i = 0; i < n; i++) s += o.on && o.anim ? `<g class="${P}chase" style="animation-delay:${n1(i * 4 / n)}s">${led(o, x + i * gap, y, r, true, col || GREEN, "hg")}</g>` : led(o, x + i * gap, y, r, zon(o, i, z), col || GREEN, "hg");
     return s; };
   const spigot = (o, x, y) => { const u = o.uid;
     return `<circle cx="${x}" cy="${y}" r="12" fill="url(#${u}-bsv)"/><circle cx="${x}" cy="${y}" r="12" fill="none" stroke="#5e3f10"/>` +
@@ -223,10 +226,10 @@ ${extra || ""}</defs>`;
   const ic = (id, name, colors, label, render) => ({ id, name, colors, picker: true, colorLabel: label, render });
 
   const icons = [
-    ic("controller", "Sprinkler timer", ["#8e98a2", "#d8cfbd", "#eceef0", "#2b2e33", "#4d7a52"], "Body", (o) => { const u = o.uid, z = 1 + Math.floor(o.level * 7.99);
+    ic("controller", "Sprinkler timer", ["#8e98a2", "#d8cfbd", "#eceef0", "#2b2e33", "#4d7a52"], "Body", (o) => { const u = o.uid, z = ZA ? zone(o, 8) : 1 + Math.floor(o.level * 7.99);
       const leds = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => o.on && o.anim
         ? `<g class="${P}chase" style="animation-delay:${n1(i * .5)}s">${led(o, 66 + i * 9.7, 114, 1.8, true, GREEN, "hg")}</g>`
-        : led(o, 66 + i * 9.7, 114, 1.8, o.on && i === z - 1, GREEN, "hg")).join("");
+        : led(o, 66 + i * 9.7, 114, 1.8, zon(o, i, z), GREEN, "hg")).join("");
       return svg(o, room(o, 186, "siding") + sh(o, 100, 160, 56, 4) +
         tube("M86 156V204", 10, ["#3a3f46", "#8d939b", "#c9ced4"]) + tube("M116 156V204", 10, ["#3a3f46", "#8d939b", "#c9ced4"]) +
         ["#c33", "#2a6dd9", "#e2b400", "#2f9e4e", "#f5f5f5"].map((c, i) => `<path d="M${96 + i * 2.5} 154C${96 + i * 2.5} 170 ${80 + i * 10} 176 ${76 + i * 12} 204" stroke="${c}" stroke-width="1.6" fill="none"/>`).join("") +
@@ -280,7 +283,7 @@ ${extra || ""}</defs>`;
 
     ic("dial", "Dial controller", ["#d8cfbd", "#8e98a2", "#eceef0", "#2b2e33", "#4d7a52"], "Body", (o) => { const u = o.uid, z = zone(o, 6), ang = o.on ? 40 + z * 26 : -60;
       let ticks = "";
-      for (let i = 0; i < 12; i++) { const a = (-150 + i * 27) * Math.PI / 180; ticks += `<circle cx="${n1(100 + Math.sin(a) * 34)}" cy="${n1(112 - Math.cos(a) * 34)}" r="1.5" fill="${i === Math.round((ang + 150) / 27) && o.on ? GREEN : "#444"}"/>`; }
+      for (let i = 0; i < 12; i++) { const a = (-150 + i * 27) * Math.PI / 180; ticks += `<circle cx="${n1(100 + Math.sin(a) * 34)}" cy="${n1(112 - Math.cos(a) * 34)}" r="1.5" fill="${(ZA ? ZA.some((k) => i === Math.round((66 + k * 26 + 150) / 27)) : i === Math.round((ang + 150) / 27) && o.on) ? GREEN : "#444"}"/>`; }
       return svg(o, room(o, 186, "block") + sh(o, 100, 168, 56, 4) + tube("M84 164V204", 8, ["#3a3f46", "#8d939b", "#c9ced4"]) + tube("M116 164V204", 8, ["#3a3f46", "#8d939b", "#c9ced4"]) +
         `<path d="M152 40L158 36V158L152 164Z" fill="url(#${u}-sd)"/>` + face(o, rr(48, 40, 104, 124, 7)) +
         lcd(o, 66, 50, 68, 22, o.on ? z + " " + (5 + Math.round(o.level * 25)) : "6 00", 13, "#9fe08a") + ticks +
@@ -292,7 +295,7 @@ ${extra || ""}</defs>`;
 
     ic("touch", "Touch controller", ["#2b2e33", "#eceef0", "#8a949e", "#c3c8ce", "#4a6f8f"], "Body", (o) => { const u = o.uid, z = zone(o, 8);
       let tiles = "";
-      for (let i = 0; i < 8; i++) { const x = 58 + (i % 4) * 22, y = 72 + Math.floor(i / 4) * 24, on = o.on && i === z - 1;
+      for (let i = 0; i < 8; i++) { const x = 58 + (i % 4) * 22, y = 72 + Math.floor(i / 4) * 24, on = zon(o, i, z);
         tiles += `<path d="${rr(x, y, 19, 20, 3)}" fill="${on ? CYAN : o.on ? "#1d2a33" : "#12171c"}" fill-opacity="${on ? .9 : 1}"/>` + (on ? `<path d="${rr(x - 2, y - 2, 23, 24, 4)}" fill="none" stroke="${CYAN}" stroke-opacity=".4"/>` : "") +
           `<path d="M${x + 6} ${y + 8}q3.5 -6 7 0q-3.5 6 -7 0z" fill="${on ? "#0b2a3a" : "#33424d"}"/>`; }
       return svg(o, room(o, 186, "") + sh(o, 100, 152, 58, 4) +
@@ -312,15 +315,15 @@ ${extra || ""}</defs>`;
         `<path d="${rr(148, 88, 10, 14, 2)}" fill="url(#${u}-mtv)"/><path d="M151 96a3 3 0 0 1 4 0v6h-4z" fill="#333"/>`); }),
 
     ic("modular", "Pro controller", ["#8e98a2", "#2b2e33", "#eceef0", "#d8cfbd", "#4d7a52"], "Body", (o) => { const u = o.uid, z = zone(o, 3);
-      const mods = [0, 1, 2].map((i) => { const x = 104 + i * 22, act = o.on && (o.anim || i === z - 1);
+      const mods = [0, 1, 2].map((i) => { const x = 104 + i * 22, act = ZA ? ZA.some((k) => (k >> 2) === i) : o.on && (o.anim || i === z - 1);
         return `<path d="${rr(x, 62, 18, 70, 2)}" fill="url(#${u}-bk)"/><path d="M${x + 2} 64H${x + 16}" stroke="#fff" stroke-opacity=".2"/>` +
           (act ? `<g${o.anim ? ` class="${P}chase" style="animation-delay:${n1(i * 1.33)}s"` : ""}>${led(o, x + 9, 70, 1.6, true, GREEN, "hg")}</g>` : led(o, x + 9, 70, 1.6, false)) +
-          [0, 1, 2, 3].map((k) => `<circle cx="${x + 9}" cy="${84 + k * 11}" r="2.6" fill="url(#${u}-mt)"/><path d="M${x + 7} ${84 + k * 11}H${x + 11}" stroke="#555" stroke-width=".8"/>`).join(""); }).join("");
+          [0, 1, 2, 3].map((k) => (ZA && ZA.indexOf(i * 4 + k) >= 0 ? `<circle cx="${x + 9}" cy="${84 + k * 11}" r="6" fill="url(#${u}-hg)"/><circle cx="${x + 9}" cy="${84 + k * 11}" r="3.7" fill="none" stroke="${GREEN}" stroke-width="1"/>` : "") + `<circle cx="${x + 9}" cy="${84 + k * 11}" r="2.6" fill="url(#${u}-mt)"/><path d="M${x + 7} ${84 + k * 11}H${x + 11}" stroke="#555" stroke-width=".8"/>`).join(""); }).join("");
       return svg(o, room(o, 186, "block") + sh(o, 102, 156, 74, 4) +
         ["#c33", "#2a6dd9", "#e2b400", "#2f9e4e", "#f5f5f5", "#8a4fbf", "#ff8a3c"].map((c, i) => `<path d="M${108 + i * 8} 146C${108 + i * 8} 166 ${96 + i * 4} 176 ${96 + i * 4} 204" stroke="${c}" stroke-width="1.6" fill="none"/>`).join("") +
         `<path d="M174 54L180 50V146L174 150Z" fill="url(#${u}-sd)"/>` + face(o, rr(26, 54, 148, 96, 6)) +
         `<path d="${rr(32, 58, 136, 88, 3)}" fill="#000" opacity=".28"/><path d="${rr(36, 62, 62, 70, 3)}" fill="url(#${u}-bk)"/>` +
-        lcd(o, 40, 66, 54, 20, o.on ? z + " " + (5 + Math.round(o.level * 25)) : " --", 11, CYAN) +
+        lcd(o, 40, 66, 54, 20, o.on ? (ZA && ZA.length ? ZA[0] + 1 : z) + " " + (5 + Math.round(o.level * 25)) : " --", 11, CYAN) +
         `<circle cx="66" cy="110" r="13" fill="#2a2e34"/><circle cx="66" cy="110" r="11" fill="url(#${u}-mtv)"/><path d="M66 110L${o.on ? "74 104" : "66 100"}" stroke="#333" stroke-width="2" stroke-linecap="round"/>` +
         `<circle cx="44" cy="124" r="2.6" fill="#3a4048"/><circle cx="88" cy="124" r="2.6" fill="#3a4048"/>` + mods + hl(30, 57, 170, 57, 1.4, .5)); }),
 
@@ -342,13 +345,13 @@ ${extra || ""}</defs>`;
         `<path d="M86 104V86" stroke="#c62828" stroke-width="5" stroke-linecap="round" transform="rotate(${n1(a)} 86 104)"/><circle cx="86" cy="104" r="7" fill="#e8eaec" stroke="#aaa"/>` +
         coupling(o, 86, 136, 18)); }),
 
-    ic("hdual", "2-outlet timer", ["#3f8f4f", "#2f6db5", "#7b858f", "#2b2e33", "#e8752a"], "Body", (o) => { const u = o.uid, h1 = "M74 146Q70 176 30 186Q4 192 -4 200", h2 = "M102 146Q106 176 150 184Q190 190 204 200", two = o.level > .5;
+    ic("hdual", "2-outlet timer", ["#3f8f4f", "#2f6db5", "#7b858f", "#2b2e33", "#e8752a"], "Body", (o) => { const u = o.uid, h1 = "M74 146Q70 176 30 186Q4 192 -4 200", h2 = "M102 146Q106 176 150 184Q190 190 204 200", two = ZA ? ZA.indexOf(1) >= 0 : o.level > .5;
       return svg(o, `<g class="hda-bg"><rect width="200" height="186" fill="url(#${u}-wall)"/><rect width="200" height="186" fill="url(#${u}-brk)"/><path d="M0 186H200V200H0Z" fill="#7d858c" fill-opacity=".45"/></g>` +
-        tube(h1, 8, HOSE) + tube(h2, 8, ["#0f2a44", "#2a6aa8", "#9cc8ef"]) + flow(o, h1, 2.2, "#c5f0ff") + (two ? flow(o, h2, 2.2, "#c5f0ff") : "") +
+        tube(h1, 8, HOSE) + tube(h2, 8, ["#0f2a44", "#2a6aa8", "#9cc8ef"]) + (ZA && ZA.indexOf(0) < 0 ? "" : flow(o, h1, 2.2, "#c5f0ff")) + (two ? flow(o, h2, 2.2, "#c5f0ff") : "") +
         spigot(o, 58, 40) + coupling(o, 88, 48, 18) +
         `<path d="M60 64Q60 56 70 56H106Q116 56 116 64V128Q116 138 106 138H70Q60 138 60 128Z" fill="url(#${u}-c)"/><path d="M60 64Q60 56 70 56H106Q116 56 116 64V128Q116 138 106 138H70Q60 138 60 128Z" fill="url(#${u}-g)" opacity=".3"/>` +
         lcd(o, 66, 70, 44, 22, o.on ? String(5 + Math.round(o.level * 55)) : "--", 12, "#9fe08a") +
-        led(o, 74, 102, 1.8, o.on, CYAN, "hb") + led(o, 102, 102, 1.8, o.on && two, CYAN, "hb") +
+        led(o, 74, 102, 1.8, ZA ? ZA.indexOf(0) >= 0 : o.on, CYAN, "hb") + led(o, 102, 102, 1.8, o.on && two, CYAN, "hb") +
         `<path d="${rr(66, 110, 16, 8, 3)}" fill="#1b1e23"/><path d="${rr(94, 110, 16, 8, 3)}" fill="#1b1e23"/>` +
         coupling(o, 74, 138, 14) + coupling(o, 102, 138, 14)); }),
 
@@ -417,7 +420,7 @@ ${extra || ""}</defs>`;
         `<path d="M24 92L176 92L186 186H14Z" fill="${p.k}"/><path d="M30 98H170L178 180H22Z" fill="#6b5a48"/>` +
         [[40, 172], [60, 166], [150, 170], [168, 162], [100, 176], [130, 160]].map((q) => `<circle cx="${q[0]}" cy="${q[1]}" r="2.6" fill="#9a8a76"/>`).join("") +
         tube("M14 150H186", 9, PVC) +
-        [0, 1, 2].map((i) => { const x = 52 + i * 48, act = o.on && i === z - 1, out = `M${x} 150V114`;
+        [0, 1, 2].map((i) => { const x = 52 + i * 48, act = zon(o, i, z), out = `M${x} 150V114`;
           return tube(out, 7, PVC) + (act ? flow(o, `M${x} 150V108`, 2) : "") +
             `<path d="${rr(x - 13, 126, 26, 20, 5)}" fill="#1b1e23"/><path d="${rr(x - 13, 126, 26, 20, 5)}" fill="url(#${u}-fx)"/>` +
             `<rect x="${x + 4}" y="110" width="10" height="16" rx="2" fill="#2a2e34"/><rect x="${x + 4}" y="110" width="10" height="16" rx="2" fill="url(#${u}-fx)"/>` +
@@ -453,6 +456,22 @@ ${extra || ""}</defs>`;
         `<path d="M90 88Q96 84 104 85" stroke="#fff" stroke-opacity=".5" stroke-width="1.5" fill="none"/>` +
         tube("M122 80C150 80 150 60 170 40", 3, BLKP) + led(o, 114, 118, 1.4, o.on, GREEN, "hg")); }),
   ];
+
+  // ---------- (parts) Multi-Function: zones z1..zN (switches; the 2-outlet timer: outlets a + b) ----------
+  // o.mf: o.parts holds only the ticked zones; each running zone lights its own LED / tile / ring segment / terminal and the
+  // display shows the first running zone. A zone left out stays dark. A Device Image (no o.mf) is exactly today's.
+  const ZN = { controller: 8, smart: 8, touch: 8, modular: 8, dial: 6, outdoor: 6, basic4: 4 };
+  icons.forEach((ic) => {
+    const n = ZN[ic.id], ab = ic.id === "hdual"; if (!n && !ab) return;
+    const ids = ab ? ["a", "b"] : Array.from({ length: n }, (_, i) => "z" + (i + 1));
+    ic.parts = ids.map((id, i) => ({ id, name: ab ? (i ? "Outlet B" : "Outlet A") : "Zone " + (i + 1), type: "switch" }));
+    const R = ic.render;
+    ic.render = (o) => {
+      if (!o.mf) return R(o);
+      const p = o.parts || {}, act = []; ids.forEach((id, i) => { if (p[id]) act.push(i); });
+      ZA = act; try { return R(Object.assign({}, o, { on: act.length > 0, anim: false })); } finally { ZA = null; }
+    };
+  });
 
   (window.HDA = window.HDA || []).push({
     id: "sprinklers", tab: "Sprinklers & timers", group: "Outdoor", kind: "device",

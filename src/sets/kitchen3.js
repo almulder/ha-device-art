@@ -55,6 +55,15 @@ ${extra || ""}</defs>`;
   const cup = (x, X, Y, w, h) => `<path d="M${X} ${Y} H${X + w} L${X + w - 2} ${Y + h} H${X + 2} Z" fill="#f6f3ee"/><path d="M${X + w} ${Y + 3} C${X + w + 6} ${Y + 3} ${X + w + 6} ${Y + h - 3} ${X + w - 1} ${Y + h - 3}" fill="none" stroke="#f6f3ee" stroke-width="2"/>${x.on ? `<ellipse cx="${X + w / 2}" cy="${Y + 1.5}" rx="${w / 2 - 1}" ry="1.4" fill="#8a5a2a"/>` : ""}`;
   const heatGlow = (x, cx, cy, rx, ry) => x.on ? `<ellipse class="${P}glow" cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url("heat")}" opacity="${(.3 + .5 * x.lv).toFixed(2)}"/>` : "";
   const base = (o) => Object.assign({ picker: true, colorLabel: "Finish" }, o);
+  // (multi-function) espresso machines: State (stage: off / heating / brewing / ready). As a Device Image (no o.mf) the
+  // drawing is exactly as today. As a Multi-Function Image (o.mf): heating = the lights on, the gauge climbing; brewing =
+  // the shot pours, steam, the gauge high; ready = the lights on, a full cup, steam; left out = off.
+  function CF(o) {
+    const x = ctx(o);
+    if (!o.mf) return { x, D: x, B: x, S: x, G: x };
+    const s = o.pval && o.pval.state != null ? String(o.pval.state) : "", brew = s === "brewing", rdy = s === "ready", v = (on, lv) => Object.assign({}, x, { on }, lv == null ? {} : { lv });
+    return { x, D: v(!!s && s !== "idle"), B: v(brew), S: v(brew || rdy), G: v(!!s && s !== "idle", brew ? .85 : s === "heating" ? .35 : rdy ? .6 : 0) };
+  }
 
   function slots(x, xs, y, w) {
     const shade = H.mix("#f0d29a", "#5a2e10", x.lv);
@@ -63,7 +72,7 @@ ${extra || ""}</defs>`;
 
   const icons = [
     base({ id: "espresso-with-grinder", name: "Espresso with grinder", colors: [SS, BK, "#b8343a", "#e6dcc6"], render(o) {
-      const x = ctx(o), a = Math.PI * (1.15 - .9 * x.lv);
+      const V = CF(o), x = V.x, a = Math.PI * (1.15 - .9 * V.G.lv);
       return svg(x, kitchen(x) + shadow(x, 100, 157, 64) + `
 <path d="M50 34 L62 18 H84 L96 34 Z" fill="${x.url("glass")}" stroke="#fff" stroke-opacity=".4"/><path d="M56 32 L64 22 H82 L90 32 Z" fill="${x.url("bean")}" opacity=".85"/><rect x="58" y="14" width="30" height="6" rx="3" fill="#1a1b20"/>
 ${panel(x, 40, 34, 120, 122, 5)}<rect x="40" y="148" width="120" height="8" rx="2" fill="#1a1b20"/><rect x="44" y="138" width="112" height="10" rx="2" fill="${x.url("ss")}"/>
@@ -71,18 +80,18 @@ ${panel(x, 40, 34, 120, 122, 5)}<rect x="40" y="148" width="120" height="8" rx="
 <path d="M98 64 A12 12 0 0 1 104 47" fill="none" stroke="#3a3c44" stroke-width="2"/>
 <rect x="56" y="70" width="22" height="16" rx="3" fill="#1a1b20"/><path d="M60 86 V96 H74 V86" fill="none" stroke="#1a1b20" stroke-width="3"/>
 <rect x="94" y="78" width="28" height="9" rx="4" fill="#1a1b20"/><path d="M122 82 H142" stroke="#1a1b20" stroke-width="5" stroke-linecap="round"/>
-<path d="M146 50 L150 112" stroke="${x.url("ss")}" stroke-width="3" stroke-linecap="round"/>${[126, 134, 142].map((xx, i) => `<circle cx="${xx}" cy="66" r="2.6" fill="${x.on && i === 1 ? "#ffb347" : "#2c3038"}"/>`).join("")}
-${stream(x, 108, 88, 122)}${cup(x, 100, 120, 16, 18)}${steam(x, 108, 118)}`);
-    } }),
+<path d="M146 50 L150 112" stroke="${x.url("ss")}" stroke-width="3" stroke-linecap="round"/>${[126, 134, 142].map((xx, i) => `<circle cx="${xx}" cy="66" r="2.6" fill="${V.D.on && i === 1 ? "#ffb347" : "#2c3038"}"/>`).join("")}
+${stream(V.B, 108, 88, 122)}${cup(V.S, 100, 120, 16, 18)}${steam(V.S, 108, 118)}`);
+    }, parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }] }),
     base({ id: "slim-espresso-machine", name: "Slim espresso machine", colors: [SS, "#a9c9b8", WH, "#b8343a", BK], render(o) {
-      const x = ctx(o);
+      const V = CF(o), x = V.x;
       return svg(x, kitchen(x) + shadow(x, 100, 157, 32) + `
 ${panel(x, 78, 30, 44, 126, 6)}<rect x="78" y="30" width="44" height="8" rx="3" fill="${x.url("ss")}"/>${hl("M82 40 V150", .35, 1.2)}
-${[90, 100, 110].map((xx, i) => `<circle cx="${xx}" cy="50" r="3" fill="#1a1b20"/>${x.on && i === 0 ? `<circle cx="${xx}" cy="50" r="1.6" fill="#ffffff"/>` : ""}`).join("")}
+${[90, 100, 110].map((xx, i) => `<circle cx="${xx}" cy="50" r="3" fill="#1a1b20"/>${V.D.on && i === 0 ? `<circle cx="${xx}" cy="50" r="1.6" fill="#ffffff"/>` : ""}`).join("")}
 <rect x="86" y="76" width="28" height="8" rx="4" fill="#1a1b20"/><path d="M114 80 H132" stroke="#1a1b20" stroke-width="4.6" stroke-linecap="round"/>
 <path d="M124 46 L130 96" stroke="${x.url("ss")}" stroke-width="2.6" stroke-linecap="round"/><rect x="80" y="144" width="40" height="10" rx="2" fill="${x.url("ss")}"/>
-${stream(x, 100, 84, 124)}${cup(x, 92, 122, 16, 20)}${steam(x, 100, 120)}`);
-    } }),
+${stream(V.B, 100, 84, 124)}${cup(V.S, 92, 122, 16, 20)}${steam(V.S, 100, 120)}`);
+    }, parts: [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }] }),
 
     base({ id: "square-basket-air-fryer", name: "Square basket air fryer", colors: ["#3a3c41", WH, BK], render(o) {
       const x = ctx(o);

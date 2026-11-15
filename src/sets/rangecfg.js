@@ -13,13 +13,14 @@
   let K = .34;
   let PT = null;
   const sub = (o, v) => Object.assign({}, o, { on: !!v });
+  // (parts) o.mf = a Multi-Function Image: o.parts holds only the ticked parts, a part left out is off (a Device Image: o.on, as today)
   function mkPT(o) {
-    const p = o.parts || {}, has = (k) => p[k] != null, g = (k, d) => sub(o, has(k) ? p[k] : d == null ? o.on : d);
+    const p = o.parts || {}, has = (k) => p[k] != null, on0 = o.mf ? false : o.on, g = (k, d) => sub(o, has(k) ? p[k] : d == null ? on0 : d);
     const t = { oven: g("oven"), grid: g("grid"), mw: g("mw") };
     t.oven2 = has("oven2") ? g("oven2") : t.oven;
-    t.cook = has("cook") ? g("cook") : (has("front") || has("back")) ? sub(o, p.front || p.back) : sub(o, o.on);
+    t.cook = has("cook") ? g("cook") : (has("front") || has("back")) ? sub(o, p.front || p.back) : sub(o, on0);
     t.front = has("front") ? g("front") : t.cook; t.back = has("back") ? g("back") : t.cook;
-    t.bs = [1, 2, 3, 4, 5].map((i) => has("b" + i) ? g("b" + i) : sub(o, o.on));
+    t.bs = [1, 2, 3, 4, 5].map((i) => has("b" + i) ? g("b" + i) : sub(o, on0));
     return t;
   }
   const metal = (o) => { const c = String(o.color || "").toLowerCase(); return c === SS ? 1 : c === BSS ? 2 : 0; };
@@ -491,7 +492,7 @@ ${extra || ""}</defs>`;
   }
   function otr(o, look) {
     const u = o.uid, op = o.opt || {}, ck = look.below || op.below || "gas", duct = op.vent !== "recirc";
-    const om = sub(o, o.parts && o.parts.mw != null ? o.parts.mw : o.on), ol = sub(o, o.parts && o.parts.light != null ? o.parts.light : o.on), of = sub(o, o.parts && o.parts.fan != null ? o.parts.fan : o.on);
+    const d0 = o.mf ? false : o.on, om = sub(o, o.parts && o.parts.mw != null ? o.parts.mw : d0), ol = sub(o, o.parts && o.parts.light != null ? o.parts.light : d0), of = sub(o, o.parts && o.parts.fan != null ? o.parts.fan : d0);
     const x1 = 28, x2 = 172, y1 = 34, y2 = 100, Lv = (q) => n1(q.on ? .35 + .65 * q.level : 0);
     let s = otrScene(o, ck);
     if (ol.on) s += [60, 140].map((x) => `<path d="M${x - 6} ${y2 + 3}L${x - 30} ${ck === "none" ? 140 : 146}H${x + 30}L${x + 6} ${y2 + 3}Z" fill="#fff1d0" opacity="${n1(.22 * Lv(ol) / 1)}"/>`).join("") +

@@ -221,6 +221,13 @@ ${extra || ""}</defs>`;
 @keyframes hda-yard2-hum{50%{transform:translate(.4px,-.3px)}}
 `;
   const bg = (s) => `<g class="hda-bg">${s}</g>`;
+  // (parts) PS = the Multi-Function part states while a spa renders as a Multi-Function Image ({jets, heater, light: bool,
+  // temp: number|null, lc / ll: the light's color / level}), else null; pon / po = a part's on state / o with on = that part
+  let PS = null;
+  const pon = (o, k) => (PS ? !!PS[k] : o.on), po = (o, k) => (PS ? Object.assign({}, o, { on: !!PS[k] }) : o);
+  // a floating pool thermometer with a digital readout (the water temperature part)
+  const floatT = (o, cx, cy, t) => `<ellipse cx="${cx}" cy="${cy + 6}" rx="15" ry="3" fill="#000" opacity=".25"/><path d="${rr(cx - 14, cy - 7, 28, 14, 7)}" fill="#f2f4f6"/><path d="${rr(cx - 14, cy - 7, 28, 14, 7)}" fill="url(#${o.uid}-fx)" opacity=".5"/>` +
+    lcd(Object.assign({}, o, { on: true }), cx - 10, cy - 4.5, 20, 9, String(Math.round(t)), 5.5, CYAN) + `<path d="M${cx - 12} ${cy - 5}Q${cx} ${cy - 8} ${cx + 12} ${cy - 5}" fill="none" stroke="#fff" stroke-opacity=".8"/>`;
   function yextra(o) {
     const u = o.uid;
     return lg(u + "-wd", 0, [[0, "#6b4426"], [.3, "#c08454"], [.6, "#a46a3c"], [1, "#5a381e"]]) + lg(u + "-wdv", 1, [[0, "#c99560"], [1, "#7a4c28"]]) +
@@ -268,11 +275,11 @@ ${extra || ""}</defs>`;
       `<path d="${left}" fill="${p.m}"/><path d="${left}" fill="url(#${u}-v)" opacity=".8"/><path d="${right}" fill="url(#${u}-sd)"/>` + pan +
       `<path d="M${A[0]} ${A[1] + dn - 6}L${D[0]} ${D[1] + dn - 6}L${C[0]} ${C[1] + dn - 6}" fill="none" stroke="#1a1c20" stroke-width="5"/>` +
       `<path d="${quad(q)}" fill="#6a7078"/><path d="${quad(rim)}" fill="#e9edf0"/><path d="${quad(shell)}" fill="#c6ced5"/><path d="${wq}" fill="url(#${u}-pw)"/>` +
-      (o.on ? `<path d="${wq}" fill="#7ff0ff" opacity=".35"/>` : "") +
-      `<clipPath id="${u}-sw"><path d="${wq}"/></clipPath><g clip-path="url(#${u}-sw)"><g class="${o.on ? P + "caus" : ""}"><rect x="40" y="60" width="140" height="80" fill="url(#${u}-wav)"/></g>` +
-      (o.on ? [[70, 96], [92, 86], [120, 90], [138, 100], [100, 106], [80, 108]].map((b, i) => `<circle class="${P}rip" style="animation-delay:-${n1(i * .3)}s" cx="${b[0]}" cy="${b[1]}" r="5" fill="none" stroke="#fff" stroke-width="1"/>`).join("") : "") + `</g>` +
+      (pon(o, "light") ? `<path d="${wq}" fill="${(PS && PS.lc) || "#7ff0ff"}" opacity=".35"/>` : "") +
+      `<clipPath id="${u}-sw"><path d="${wq}"/></clipPath><g clip-path="url(#${u}-sw)"><g class="${pon(o, "jets") ? P + "caus" : ""}"><rect x="40" y="60" width="140" height="80" fill="url(#${u}-wav)"/></g>` +
+      (pon(o, "jets") ? [[70, 96], [92, 86], [120, 90], [138, 100], [100, 106], [80, 108]].map((b, i) => `<circle class="${P}rip" style="animation-delay:-${n1(i * .3)}s" cx="${b[0]}" cy="${b[1]}" r="5" fill="none" stroke="#fff" stroke-width="1"/>`).join("") : "") + `</g>` +
       `<path d="M${n1(shell[0][0] + 12)} ${n1(shell[0][1])}L${n1(shell[1][0] - 8)} ${n1(shell[1][1] + 6)}" stroke="#9aa6b0" stroke-width="5" stroke-linecap="round" opacity=".6"/>` +
-      steam(o, [[80, 82, 14], [112, 74, 16], [134, 88, 12]]) + `<path d="M${A[0]} ${A[1]}L${B[0]} ${B[1]}" stroke="#fff" stroke-opacity=".35"/>`;
+      steam(po(o, "heater"), [[80, 82, 14], [112, 74, 16], [134, 88, 12]]) + (PS && PS.temp != null ? floatT(o, 78, 99, PS.temp) : "") + `<path d="M${A[0]} ${A[1]}L${B[0]} ${B[1]}" stroke="#fff" stroke-opacity=".35"/>`;
   }
 
   function dolphin(o) { const u = o.uid, p = pal(o.color);
@@ -340,21 +347,22 @@ ${extra || ""}</defs>`;
       const wall = `M${cx - rx} ${top}V${bot}A${rx} ${ry} 0 0 0 ${cx + rx} ${bot}V${top}A${rx} ${ry} 0 0 1 ${cx - rx} ${top}Z`;
       return svgY(o, bg(yard0(o, 116, "fence", "deck")) + `<ellipse cx="${cx}" cy="${bot + 6}" rx="${rx + 8}" ry="${ry + 4}" fill="#000" opacity=".35"/>` +
         `<path d="${wall}" fill="url(#${u}-c)"/><path d="${wall}" fill="url(#${u}-qlt)"/><ellipse cx="${cx}" cy="${top}" rx="${rx}" ry="${ry}" fill="url(#${u}-c)"/>` +
-        `<ellipse cx="${cx}" cy="${top + 1}" rx="${rx - 12}" ry="${ry - 6}" fill="url(#${u}-pw)"/>` + (o.on ? `<ellipse cx="${cx}" cy="${top + 1}" rx="${rx - 12}" ry="${ry - 6}" fill="#fff" opacity=".25"/>` : "") +
+        `<ellipse cx="${cx}" cy="${top + 1}" rx="${rx - 12}" ry="${ry - 6}" fill="url(#${u}-pw)"/>` + (PS ? (PS.light ? `<ellipse cx="${cx}" cy="${top + 1}" rx="${rx - 12}" ry="${ry - 6}" fill="${PS.lc || "#7ff0ff"}" opacity=".35"/>` : "") : o.on ? `<ellipse cx="${cx}" cy="${top + 1}" rx="${rx - 12}" ry="${ry - 6}" fill="#fff" opacity=".25"/>` : "") +
         `<clipPath id="${u}-ps"><ellipse cx="${cx}" cy="${top + 1}" rx="${rx - 12}" ry="${ry - 6}"/></clipPath><g clip-path="url(#${u}-ps)">` +
-        (o.on ? [[60, 92], [80, 96], [100, 90], [118, 96], [92, 100], [130, 90], [70, 86]].map((b, i) => `<circle class="${P}rip" style="animation-delay:-${n1(i * .2)}s;animation-duration:${dur(o, 1.4, .8)}s" cx="${b[0]}" cy="${b[1]}" r="4" fill="none" stroke="#fff" stroke-width="1"/>`).join("") : "") + `</g>` +
+        (pon(o, "jets") ? [[60, 92], [80, 96], [100, 90], [118, 96], [92, 100], [130, 90], [70, 86]].map((b, i) => `<circle class="${P}rip" style="animation-delay:-${n1(i * .2)}s;animation-duration:${dur(o, 1.4, .8)}s" cx="${b[0]}" cy="${b[1]}" r="4" fill="none" stroke="#fff" stroke-width="1"/>`).join("") : "") + `</g>` +
         `<path d="M${cx - rx + 6} ${top + 4}A${rx - 6} ${ry - 4} 0 0 0 ${cx + rx - 6} ${top + 4}" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="2"/>` +
-        `<path d="${rr(160, 118, 30, 36, 5)}" fill="#e9edf0"/><path d="${rr(160, 118, 30, 36, 5)}" fill="url(#${u}-fx)"/><path d="${rr(164, 122, 22, 10, 2)}" fill="#0b0d10"/>` + lcd(o, 165, 123, 20, 8, o.on ? String(Math.round(90 + 14 * o.level)) : "--", 5, ORNG) +
-        tube(`M160 140H${cx + rx - 2}`, 5, ["#555", "#cfd4d9", "#fff"]) + steam(o, [[70, 80, 12], [100, 74, 14], [124, 82, 10]])); }),
+        `<path d="${rr(160, 118, 30, 36, 5)}" fill="#e9edf0"/><path d="${rr(160, 118, 30, 36, 5)}" fill="url(#${u}-fx)"/><path d="${rr(164, 122, 22, 10, 2)}" fill="#0b0d10"/>` + (PS ? lcd(Object.assign({}, o, { on: PS.temp != null }), 165, 123, 20, 8, PS.temp != null ? String(Math.round(PS.temp)) : "--", 5, ORNG) : lcd(o, 165, 123, 20, 8, o.on ? String(Math.round(90 + 14 * o.level)) : "--", 5, ORNG)) +
+        tube(`M160 140H${cx + rx - 2}`, 5, ["#555", "#cfd4d9", "#fff"]) + steam(po(o, "heater"), [[70, 80, 12], [100, 74, 14], [124, 82, 10]])); }),
     ic("cedartub", "Cedar hot tub", ["#b07a4a", "#6a4428", "#d8b48a"], "Wood", (o) => { const u = o.uid, cx = 92, top = 96, bot = 156, rx = 62, ry = 17;
       const wall = `M${cx - rx} ${top}V${bot}A${rx} ${ry} 0 0 0 ${cx + rx} ${bot}V${top}A${rx} ${ry} 0 0 1 ${cx - rx} ${top}Z`;
       return svgY(o, lawnBg(o, 120) + `<ellipse cx="${cx}" cy="${bot + 6}" rx="${rx + 8}" ry="${ry + 4}" fill="#000" opacity=".35"/>` +
         `<ellipse cx="${cx}" cy="${top + 2}" rx="${rx - 4}" ry="${ry - 3}" fill="url(#${u}-pw)"/>` +
-        `<clipPath id="${u}-ct2"><ellipse cx="${cx}" cy="${top + 2}" rx="${rx - 4}" ry="${ry - 3}"/></clipPath><g clip-path="url(#${u}-ct2)"><g class="${o.on ? P + "caus" : ""}"><rect x="20" y="80" width="150" height="30" fill="url(#${u}-wav)"/></g></g>` +
+        `<clipPath id="${u}-ct2"><ellipse cx="${cx}" cy="${top + 2}" rx="${rx - 4}" ry="${ry - 3}"/></clipPath><g clip-path="url(#${u}-ct2)"><g class="${pon(o, "jets") ? P + "caus" : ""}"><rect x="20" y="80" width="150" height="30" fill="url(#${u}-wav)"/></g></g>` +
         `<path d="${wall}" fill="url(#${u}-c)"/><path d="${wall}" fill="url(#${u}-stv)"/>` + [top + 12, bot - 10].map((y) => `<path d="M${cx - rx} ${y}A${rx} ${ry} 0 0 0 ${cx + rx} ${y}" fill="none" stroke="#2a2e34" stroke-width="3"/>`).join("") +
         `<ellipse cx="${cx}" cy="${top}" rx="${rx}" ry="${ry}" fill="none" stroke="${pal(o.color).d}" stroke-width="5"/>` +
         `<path d="M146 92V30" stroke="#2a2e34" stroke-width="8"/><path d="M144 92V30" stroke="#5a6168" stroke-width="2"/><path d="M140 30H152V26H140Z" fill="#1a1c20"/><path d="${rr(132, 96, 26, 40, 3)}" fill="#22252a"/>` +
-        (o.on ? `<path d="${rr(136, 120, 18, 10, 2)}" fill="#ff7a2a" opacity=".85" class="${P}glow"/>` + steam(o, [[146, 24, 8], [150, 16, 10]]) + steam(o, [[70, 86, 12], [100, 82, 14]]) : "") +
+        (pon(o, "heater") ? `<path d="${rr(136, 120, 18, 10, 2)}" fill="#ff7a2a" opacity=".85" class="${P}glow"/>` + steam(po(o, "heater"), [[146, 24, 8], [150, 16, 10]]) + steam(po(o, "heater"), [[70, 86, 12], [100, 82, 14]]) : "") +
+        (PS && PS.jets ? [[66, 98], [96, 100], [118, 96]].map((b, i) => `<ellipse class="${P}rip" style="animation-delay:-${n1(i * .4)}s" cx="${b[0]}" cy="${b[1]}" rx="6" ry="2" fill="none" stroke="#fff" stroke-width="1"/>`).join("") : "") + (PS && PS.temp != null ? floatT(o, 70, 99, PS.temp) : "") +
         `<path d="M30 160L36 140H46L50 160" fill="none" stroke="${pal(o.color).d}" stroke-width="3"/>`); }),
 
     ic("brushed-pool-robot", "Brushed pool robot", ["#2f6fd6", "#3fb5c9", "#8a949e"], "Accent", dolphin),
@@ -418,6 +426,68 @@ ${extra || ""}</defs>`;
         ch(66, "dl") + ch(134, "dr") + `<path d="${rr(88, 90, 24, 34, 3)}" fill="url(#${u}-mtv)"/><rect x="94" y="96" width="12" height="8" rx="1" fill="#2a2e34"/>` +
         `<path d="M52 174H148V178H52Z" fill="#2a2e34"/>` + (o.on ? `<path class="${P}flow" style="animation-duration:.5s" d="M100 106H130" stroke="#fff" stroke-width="1.2" stroke-dasharray="2 4" fill="none"/>` : "")); }),
   ];
+
+  // ---------- (parts) Multi-Function ----------
+  // Spas: jets, heater, light (switches) + the water temperature (value): the jets churn the water, the heater steams (the cedar
+  // tub: its wood stove burns), the light colors the water (o.pcolor / o.plevel .light), the temperature floats on a pool
+  // thermometer (the inflatable spa: on its own display). Robots: a State stage (docked / mowing or cleaning / returning /
+  // charging / paused / error): working = today's running look, docked = today's parked look, returning drives with a home
+  // badge, charging parks with a bolt badge, paused / error stop where they are with a pause / warning badge. The pool pump:
+  // a Speed stage (off / low / medium / high) and an RPM reading (the RPM wins). A part left out stays off; a robot or pump
+  // with no State reading is parked / off. A Device Image (no o.mf, no reading) is exactly today's.
+  const sw = (id, name) => ({ id, name, type: "switch" });
+  const PT = { id: "temp", name: "Water temperature", type: "value", unit: "°F", min: 40, max: 106, def: 102 };
+  const SPA = { "square-acrylic-spa": [sw("jets", "Jets"), sw("heater", "Heater"), sw("light", "Light"), PT], "inflatable-spa": [sw("jets", "Jets"), sw("heater", "Heater"), sw("light", "Light"), PT],
+    cedartub: [sw("jets", "Jets"), sw("heater", "Wood stove"), PT] };
+  const stage = (work, workName) => ({ id: "state", name: "State", type: "stage", values: [["docked", "Docked"], [work, workName], ["returning", "Returning"], ["charging", "Charging"], ["paused", "Paused"], ["error", "Error"]], def: work });
+  const ROB = { "robot-mower-gray": stage("mowing", "Mowing"), "robot-mower-orange": stage("mowing", "Mowing"), "wire-free-robot-mower": stage("mowing", "Mowing"),
+    "brushed-pool-robot": { id: "state", name: "State", type: "stage", values: [["idle", "Idle"], ["cleaning", "Cleaning"], ["paused", "Paused"], ["error", "Error"]], def: "cleaning" },
+    "pressure-side-pool-cleaner": { id: "state", name: "State", type: "stage", values: [["idle", "Idle"], ["cleaning", "Cleaning"], ["paused", "Paused"], ["error", "Error"]], def: "cleaning" } };
+  // the state badge, top right: home (returning), bolt (charging), pause bars, warning triangle (error)
+  function badge(st) {
+    const k = { returning: ["#67e8f9", "home"], charging: ["#34d399", "bolt"], paused: ["#ffb547", "pause"], error: ["#ff5257", "err"] }[st]; if (!k) return "";
+    const c = k[0], g = k[1], cx = 174, cy = 26;
+    const gl = g === "home" ? `<path d="M${cx - 5.4} ${cy + .4}L${cx} ${cy - 5}L${cx + 5.4} ${cy + .4}M${cx - 3.6} ${cy - 1}V${cy + 4.6}H${cx + 3.6}V${cy - 1}" fill="none" stroke="${c}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>`
+      : g === "bolt" ? `<path d="M${cx + 1.2} ${cy - 6.4}L${cx - 4.2} ${cy + 1}H${cx - .2}L${cx - 1.2} ${cy + 6.4}L${cx + 4.2} ${cy - 1}H${cx + .2}Z" fill="${c}"/>`
+      : g === "pause" ? `<rect x="${cx - 3.8}" y="${cy - 4.6}" width="2.8" height="9.2" rx=".8" fill="${c}"/><rect x="${cx + 1}" y="${cy - 4.6}" width="2.8" height="9.2" rx=".8" fill="${c}"/>`
+      : `<path d="M${cx} ${cy - 6}L${cx + 6.6} ${cy + 5}H${cx - 6.6}Z" fill="${c}" stroke="${c}" stroke-width="1" stroke-linejoin="round"/><path d="M${cx} ${cy - 2}V${cy + 1.4}" stroke="#16181c" stroke-width="1.7" stroke-linecap="round"/><circle cx="${cx}" cy="${cy + 3.4}" r=".95" fill="#16181c"/>`;
+    return `<g${g === "err" ? ` class="${P}blink"` : ""}><circle cx="${cx}" cy="${cy}" r="11.5" fill="#14161a" fill-opacity=".84"/><circle cx="${cx}" cy="${cy}" r="11.5" fill="none" stroke="${c}" stroke-opacity=".75" stroke-width="1.3"/>${gl}</g>`;
+  }
+  const still = (s) => s.replace(/<path class="hda-yard2-clip"[^>]*\/>/g, "").replace(/ class="hda-yard2-(drive|tail)"/g, "");
+  icons.forEach((ic) => {
+    const R = ic.render, sp = SPA[ic.id], rb = ROB[ic.id], pump = ic.id === "variable-speed-pool-pump";
+    if (sp) {
+      ic.parts = sp;
+      ic.render = (o) => {
+        if (!o.mf) return R(o);
+        const p = o.parts || {}, pv = o.pval || {}, s = {}; let any = false;
+        sp.forEach((q) => { if (q.type === "switch") { s[q.id] = !!p[q.id]; any = any || s[q.id]; } });
+        const t = pv.temp; s.temp = t == null || t === "" || !isFinite(+t) ? null : +t;
+        s.lc = o.pcolor && o.pcolor.light; s.ll = o.plevel && o.plevel.light != null ? +o.plevel.light : null;
+        PS = s; try { return R(Object.assign({}, o, { on: any })); } finally { PS = null; }
+      };
+    } else if (rb) {
+      ic.parts = [rb];
+      ic.render = (o) => {
+        const st = o.pval && o.pval.state != null && o.pval.state !== "" ? String(o.pval.state) : null;
+        if (!st && !o.mf) return R(o);
+        if (st === "mowing" || st === "cleaning") return R(Object.assign({}, o, { on: true }));
+        if (st === "returning") return R(Object.assign({}, o, { on: true })).replace(/<\/svg>$/, badge(st) + "</svg>");
+        if (st === "paused" || st === "error") return still(R(Object.assign({}, o, { on: true, anim: false }))).replace(/<\/svg>$/, badge(st) + "</svg>");
+        return R(Object.assign({}, o, { on: false })).replace(/<\/svg>$/, badge(st) + "</svg>");
+      };
+    } else if (pump) {
+      ic.parts = [{ id: "speed", name: "Speed", type: "stage", values: [["off", "Off"], ["low", "Low"], ["medium", "Medium"], ["high", "High"]], def: "medium" },
+        { id: "rpm", name: "Speed (RPM)", type: "value", unit: "RPM", min: 0, max: 3450, def: 2400 }];
+      ic.render = (o) => {
+        const pv = o.pval || {}, st = pv.speed != null && pv.speed !== "" ? String(pv.speed) : null, rpm = pv.rpm == null || pv.rpm === "" || !isFinite(+pv.rpm) ? null : +pv.rpm;
+        if (!o.mf && st == null && rpm == null) return R(o);
+        if (rpm != null) return R(Object.assign({}, o, { on: rpm > 0, level: Math.max(0, Math.min(1, (rpm - 450) / 3000)) }));
+        const lv = { low: .25, medium: .55, high: .95 }[st];
+        return R(Object.assign({}, o, { on: lv != null, level: lv == null ? o.level : lv }));
+      };
+    }
+  });
 
   (window.HDA = window.HDA || []).push({
     id: "yard2", tab: "Pool, spa & yard", group: "Outdoor", kind: "device",

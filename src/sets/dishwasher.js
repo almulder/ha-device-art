@@ -547,9 +547,76 @@ ${extra || ""}</defs>`;
       overhang(o) + (o.on ? steam(o, 100, CY - 1, 4, 24, 6) : "")); }),
   ];
 
+  // ---------- (parts) Multi-Function: the door (each drawer its own contact) and the cycle stage ----------
+  // o.mf = a Multi-Function Image: o.parts holds only the ticked parts (a contact: true = open), o.pval.cycle the stage
+  // (idle / wash / rinse / dry / done), mapped onto today's progress look (the slider): wash .3, rinse .6, dry .9, clean 1.
+  // A part left out is drawn plain: the door closed, no stage = the machine off. A Device Image (no o.mf) is exactly today's,
+  // its doors following the device's contact (o.open). An open door stops the machine and shows the racks inside.
+  const STAGE = { id: "cycle", name: "Cycle", type: "stage", values: [["idle", "Off"], ["wash", "Washing"], ["rinse", "Rinsing"], ["dry", "Drying"], ["done", "Clean"]], def: "wash" };
+  const SLV = { wash: .3, rinse: .6, dry: .9, done: 1 };
+  // the inside seen through the open door: today's tub (racks, plates, cups) in daylight, without its glass
+  function openTub(o, X, Y, W, H, opt) {
+    const q = Object.assign({}, o, { on: false }), r = (opt && opt.r) || 2, d = rr(X, Y, W, H, r);
+    let t = tub(q, "op" + Math.round(Y), X, Y, W, H, Object.assign({ r }, opt || {}));
+    const cut = t.lastIndexOf(`<path d="${d}" fill="url(#${o.uid}-gl)"`); if (cut > 0) t = t.slice(0, cut);
+    return t + `<path d="${d}" fill="#dfe6ec" opacity=".28"/><path d="M${X} ${n1(Y + .6)}H${X + W}" stroke="#000" stroke-opacity=".5" stroke-width="1.2"/>`;
+  }
+  // the door folded down toward you, hinged at its bottom edge: its stainless inside face with the detergent cup, its edge
+  function dropDoor(o, X, Yb, W, dp) {
+    const g = 6, dd = `M${X} ${n1(Yb)}H${X + W}L${X + W + g} ${n1(Yb + dp)}H${X - g}Z`;
+    return `<ellipse cx="${X + W / 2}" cy="${n1(Math.min(198, Yb + dp + 2))}" rx="${W / 2 + 10}" ry="2.4" fill="url(#${o.uid}-sh)"/><path d="${dd}" fill="url(#${o.uid}-stv)"/><path d="${dd}" fill="#c9d0d6" opacity=".55"/>` +
+      `<path d="M${X + 5} ${n1(Yb + 1.6)}H${X + W - 5}L${X + W + g - 4} ${n1(Yb + dp - 2.4)}H${X - g + 4}Z" fill="none" stroke="#000" stroke-opacity=".2" stroke-width=".6"/>` +
+      `<rect x="${n1(X + W / 2 - 8)}" y="${n1(Yb + dp * .3)}" width="16" height="${n1(dp * .38)}" rx="1" fill="#8d969f"/><rect x="${n1(X + W / 2 - 6)}" y="${n1(Yb + dp * .36)}" width="12" height="${n1(dp * .24)}" rx=".8" fill="#59616a"/>` +
+      `<rect x="${X - g}" y="${n1(Yb + dp)}" width="${W + 2 * g}" height="3.4" rx="1" fill="url(#${o.uid}-fin)"/><rect x="${X - g}" y="${n1(Yb + dp)}" width="${W + 2 * g}" height="3.4" rx="1" fill="none" stroke="${edgeC(o)}" stroke-width=".6"/>`;
+  }
+  const doorOpen = (o, r, opt) => openTub(o, r[0], r[1], r[2], r[3], opt) + dropDoor(o, r[0], r[1] + r[3], r[2], Math.min(22, 199 - r[1] - r[3] - 3.4));
+  // a drawer pulled out, seen from above: the dark opening, the tub with the dishes in their rack, the front nearer and lower
+  function drawerOpen(o, X, Y, W, H) {
+    const u = o.uid, tb = Y + H * .8, fy = Y + H * .78, fh = Math.min(H * .45, 199 - fy), e = 8, fe = 12;
+    const tubd = `M${X + 2} ${n1(Y + 4)}H${X + W - 2}L${X + W + e} ${n1(tb)}H${X - e}Z`;
+    let dishes = "", n = Math.max(5, Math.round(W / 12));
+    for (let r = 0; r < 2; r++) for (let i = 0; i < n; i++) { const cx = X + (r ? 3 : 7) + i * (W - (r ? 6 : 14)) / (n - 1), cy = Y + H * (r ? .58 : .38), ry = H * (r ? .2 : .16), rx = ry * .42, c = (i + r) % 3 === 1 ? "#5d8fc4" : "#aeb9c5";
+      dishes += `<g transform="rotate(${(i % 2 ? 6 : -4) + (r ? 0 : 2)} ${n1(cx)} ${n1(cy)})"><ellipse cx="${n1(cx)}" cy="${n1(cy)}" rx="${n1(rx)}" ry="${n1(ry)}" fill="url(#${u}-plate)" stroke="${c}" stroke-width="1"/></g>`; }
+    const fr = `M${X - fe} ${n1(fy)}H${X + W + fe}V${n1(fy + fh)}H${X - fe}Z`;
+    return `<rect x="${X - 1}" y="${Y - 1}" width="${W + 2}" height="${H + 2}" fill="#07080a"/><path d="${tubd}" fill="url(#${u}-tub)"/><path d="${tubd}" fill="url(#${u}-tubx)"/><path d="${tubd}" fill="#dfe6ec" opacity=".3"/>` +
+      dishes + `<path d="M${X - e + 2} ${n1(tb - 2)}H${X + W + e - 2}" stroke="#c4ccd5" stroke-width="1"/>` +
+      `<ellipse cx="${X + W / 2}" cy="${n1(Math.min(198, fy + fh + 2))}" rx="${W / 2 + 14}" ry="2.6" fill="url(#${u}-sh)"/>` +
+      `<path d="${fr}" fill="url(#${u}-fin)"/><path d="${fr}" fill="url(#${u}-${metal(o) ? "br" : "gls"})"/><path d="${fr}" fill="url(#${u}-fv)"/><path d="${fr}" fill="none" stroke="${edgeC(o)}" stroke-width=".8"/>` +
+      `<path d="M${X - fe} ${n1(fy + .6)}H${X + W + fe}" stroke="#fff" stroke-opacity=".7"/>` + bar(o, X + 8, X + W - 8, fy + 3);
+  }
+  // each model: its doors / drawers (id, rect, kind) — drawn over the closed drawing when open
+  const FULL = [49, 53, 102, 122];
+  const DOORS = {
+    front: [["door", FULL]], hidden: [["door", FULL]], projection: [["door", FULL]], panel: [["door", [49.2, 53.2, 101.6, 121.6]]],
+    drawer1: [["door", [49, 53, 102, 58], "drawer"]], drawer2: [["d1", [49, 53, 102, 59.5], "drawer"], ["d2", [49, 115, 102, 60], "drawer"]],
+    slim: [["door", [65, 53, 70, 122]]], countertop: [["door", [44, 68, 108, 80]]], portable: [["door", [60, 66, 92, 106]]],
+    glass: [["door", FULL]], retro: [["door", [50, 54, 100, 120]]], smart: [["door", FULL]], third: [["door", FULL, null, { third: true }]], quiet: [["door", FULL]],
+    autoopen: [["door", FULL]], opendrawer: [["door", [49, 53, 102, 58], "own"]], dial: [["door", FULL]], commercial: [["door", [49, 53, 102, 122]]],
+  };
+  icons.forEach((ic) => {
+    const ds = DOORS[ic.id]; if (!ds) return;
+    ic.parts = ds.map((d) => ({ id: d[0], name: ds.length > 1 ? (d[0] === "d1" ? "Upper drawer" : "Lower drawer") : d[2] === "drawer" || d[2] === "own" ? "Drawer" : "Door", type: "contact" })).concat([STAGE]);
+    const R = ic.render;
+    ic.render = (o) => {
+      const mf = !!o.mf, p = o.parts || {}, st = o.pval && o.pval.cycle != null && o.pval.cycle !== "" ? String(o.pval.cycle) : null;
+      const isOpen = (id) => (mf ? !!p[id] : !!o.open);
+      if (!mf && !st && !o.open) return R(o);
+      const q = Object.assign({}, o);
+      if (mf || st) { const lv = SLV[st]; q.on = lv != null; if (lv != null) q.level = lv; }
+      if (ic.id === "autoopen" && (mf || st)) q.on = st === "dry" || st === "done";
+      const op = ds.filter((d) => isOpen(d[0]));
+      if (ic.id === "opendrawer") return R(Object.assign(q, { on: op.length > 0 }));
+      if (!op.length) return R(q);
+      let s = R(Object.assign(q, { on: false }));
+      let add = "";
+      op.slice().sort((a, b) => b[1][1] - a[1][1]).forEach((d) => { add += d[2] === "drawer" ? drawerOpen(o, d[1][0], d[1][1], d[1][2], d[1][3]) : doorOpen(o, d[1], d[3]); });
+      return s.replace(/<\/svg>$/, add + "</svg>");
+    };
+  });
+
   (window.HDA = window.HDA || []).push({
     id: "dishwasher", tab: "Dishwashers", group: "Appliances", kind: "device",
-    intro: "Eighteen dishwashers built in under real counters. When running, the spray arms spin and water jets sweep behind glass, solid doors show the time left in segment digits or a light on the floor, a soft sheen hums across the door, and near the end steam puffs out at the top. The slider is the cycle progress.",
+    intro: "Eighteen dishwashers built in under real counters. When running, the spray arms spin and water jets sweep behind glass, solid doors show the time left in segment digits or a light on the floor, a soft sheen hums across the door, and near the end steam puffs out at the top. The slider is the cycle progress. As a Multi-Function Image the door (each drawer its own) and the cycle stage are parts: open shows the racks inside.",
     
     css, icons,
   });

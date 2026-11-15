@@ -7,6 +7,18 @@
   const WOODS = { "#8a5a3b": 1, "#b88a5a": 1, "#6e4a30": 1 };
   const isWood = (c) => !!WOODS[String(c).toLowerCase()];
   const AIR = "#d6ebff", LEDC = "#7dd3fc", GREEN = "#34d399";
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
 
   function K(o) {
     const u = o.uid, defs = [], seen = {};
@@ -288,14 +300,18 @@
         osc(k, neck(k, cx, 92, 110, 9, c, kd) + at(cx, cy, head(k, { R, n: 5, bt: "slim", bw: R * 0.34, bc: mix(c, "#9aa6b4", 0.5), ba: 0.85, body: c, kind: kd, cage: { c: sh(c, 0.2), n: 34, w: 0.8, rimW: 3 } }))) + air(k, cx, cy, R);
       return k.svg(b); } });
 
+  // (parts) Fan (the blades, the swing, the air, the pole dot) and Light (the ring round the head and the base ring, in
+  // the light's color, dimmed by its level); the app screen lights with either. As a Device Image both follow the one device.
   icons.push({ id: "smart", name: "Smart ring light", colors: sw([C.white, C.black, C.silver, C.lav]), picker: true, colorLabel: "Body",
-    render(o) { const k = K(o), c = k.c, cx = 100, cy = 58, R = 46, kd = bk(c), on = k.on;
-      const ringL = on ? `<circle r="${R + 2}" fill="none" stroke="${LEDC}" stroke-opacity=".22" stroke-width="7"/><g opacity="${f(0.6 + 0.4 * k.lv)}"><circle class="${P}pulse" r="${R + 1.5}" fill="none" stroke="${LEDC}" stroke-width="1.8"/></g>` +
+    parts: [{ id: "fan", name: "Fan" }, { id: "light", name: "Ring light" }],
+    render(o) { const k = K(MF.as(o, "fan")), c = k.c, cx = 100, cy = 58, R = 46, kd = bk(c), on = MF.on(o, "light"), fon = k.on, LEDC = MF.col(o, "light", "#7dd3fc");
+      const llv = Math.max(0.05, Math.min(1, +MF.lv(o, "light") || 0));
+      const ringL = on ? `<circle r="${R + 2}" fill="none" stroke="${LEDC}" stroke-opacity=".22" stroke-width="7"/><g opacity="${f(0.6 + 0.4 * llv)}"><circle class="${P}pulse" r="${R + 1.5}" fill="none" stroke="${LEDC}" stroke-width="1.8"/></g>` +
         `<circle r="${R + 1.5}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width=".6"/>` : `<circle r="${R + 1.5}" fill="none" stroke="#9aa0aa" stroke-opacity=".55" stroke-width="1.4"/>`;
-      const app = `<g transform="translate(140 174) rotate(-10)"><rect x="-8" y="-3" width="16" height="6" rx="1.6" fill="#15161a"/><rect x="-8" y="-4" width="16" height="5.6" rx="1.6" fill="#202228"/><rect x="-6.6" y="-3.2" width="13.2" height="4" rx="1" fill="${on ? k.lin("scr", [[0, "#7dd3fc"], [1, "#a78bfa"]]) : "#33363e"}"/></g>`;
+      const app = `<g transform="translate(140 174) rotate(-10)"><rect x="-8" y="-3" width="16" height="6" rx="1.6" fill="#15161a"/><rect x="-8" y="-4" width="16" height="5.6" rx="1.6" fill="#202228"/><rect x="-6.6" y="-3.2" width="13.2" height="4" rx="1" fill="${on || fon ? k.lin("scr", [[0, "#7dd3fc"], [1, "#a78bfa"]]) : "#33363e"}"/></g>`;
       const baseGlow = on ? `<ellipse cx="${cx}" cy="183" rx="30" ry="6" fill="${k.rad("bg", [[0, LEDC, 0.45], [1, LEDC, 0]])}"/>` : "";
       const b = shadow(k, cx, 188, 40) + baseGlow + roundBase(k, cx, 188, 30, 5, c, kd) + `<path d="M${cx - 29} 180A30 7.8 0 0 0 ${cx + 29} 180" fill="none" stroke="${on ? LEDC : "#777b84"}" stroke-width="1.2" opacity="${on ? 0.9 : 0.5}"/>` +
-        pole(k, cx, 108, 176, 5.5, c, kd) + `<circle cx="${cx}" cy="140" r="2.6" fill="${mg(k, sh(c, -0.2), kd)}"/><circle cx="${cx}" cy="140" r="1" fill="${on ? LEDC : "#888"}"/>` +
+        pole(k, cx, 108, 176, 5.5, c, kd) + `<circle cx="${cx}" cy="140" r="2.6" fill="${mg(k, sh(c, -0.2), kd)}"/><circle cx="${cx}" cy="140" r="1" fill="${fon ? "#7dd3fc" : "#888"}"/>` +
         osc(k, neck(k, cx, 92, 112, 9, c, kd) + at(cx, cy, ringL + head(k, { R, n: 5, bt: "sickle", bw: R * 0.32, bc: mix(c, "#cdd7e6", 0.55), ba: 0.65, body: c, kind: kd, cage: { c: sh(c, 0.12), n: 40, w: 0.6, rings: [0.38, 0.62, 0.84], rimW: 3 } }))) + app + air(k, cx, cy, R + 3);
       return k.svg(b); } });
 

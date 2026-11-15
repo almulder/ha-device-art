@@ -239,18 +239,30 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     return scene(x, "walnut", tex, hw);
   });
 
-  add("video", "Video doorbell lock", NIC, (x) => {
+  // (parts) Multi-Function: Lock (on = locked), Doorbell (a stage: idle / ringing) and Door (a contact: open swings the
+  // door edge away from the jamb, the bolt showing in the gap). A Device Image (no o.mf) is drawn exactly as before.
+  const VPARTS = [{ id: "lock", name: "Lock", type: "switch" }, { id: "bell", name: "Doorbell", type: "stage", values: [["idle", "Idle"], ["ringing", "Ringing"]], def: "idle" },
+    { id: "door", name: "Door", type: "contact" }];
+  add("video", "Video doorbell lock", NIC, (x0) => {
+    const o = x0.o, mf = !!o.mf, x = mf ? ctx(Object.assign({}, o, { on: !!(o.parts && o.parts.lock) })) : x0;
+    const rng = mf && o.pval && o.pval.bell === "ringing", open = mf && !!(o.parts && o.parts.door);
     const E = 164, d = rr(92, 20, 48, 160, 16);
     let tex = ""; for (let y = 30; y < 192; y += 26) tex += `<path d="M8 ${y}H192" stroke="#000" stroke-opacity=".55" stroke-width="2"/><path d="M8 ${y + 1.6}H192" stroke="#fff" stroke-opacity=".08"/>`;
     const sc = rr(98, 60, 36, 54, 7);
-    const hw = jamb(x, E, "#4a4f57", "#25282d") + strike(x, E, 150) + bolt(x, E, 150, 15, 9) + plate(x, d) +
+    const jb = jamb(x, E, "#4a4f57", "#25282d") + strike(x, E, 150), hw0 = bolt(x, E, 150, 15, 9) + plate(x, d) +
       `<circle cx="116" cy="40" r="11" fill="#06070a"/><circle cx="116" cy="40" r="11" fill="none" stroke="#fff" stroke-opacity=".15"/><circle cx="116" cy="40" r="6.5" fill="#15233a"/><circle cx="116" cy="40" r="3.6" fill="#03050a"/><circle cx="114" cy="38" r="1.8" fill="#9fd8ff" fill-opacity=".55"/><circle cx="106" cy="40" r="1" fill="#3a1a1a"/><circle cx="126" cy="40" r="1" fill="#3a1a1a"/>` +
       `<path d="${sc}" fill="${x.url("scr")}"/>` + pad(x, 100, 63, 3, N12, 9.4, 9, 2, 4, "touch") +
       `<path d="M98 66C110 61 122 61 134 63V80C122 76 110 76 98 79Z" fill="#fff" fill-opacity=".07"/>` +
       `<circle cx="116" cy="132" r="10" fill="${x.url("fs")}"/><circle cx="116" cy="132" r="7.5" fill="${x.url("rub")}"/>` + ring(x, 116, 132, 10.5, 1.5) +
-      `<path d="M112.5 132.5L116 129L119.5 132.5V136H112.5Z" fill="#fff" fill-opacity=".5"/>` + keyway(x, 116, 158, 6.5);
+      `<path d="M112.5 132.5L116 129L119.5 132.5V136H112.5Z" fill="#fff" fill-opacity=".5"/>` + keyway(x, 116, 158, 6.5) +
+      (rng ? `<g class="${P}breath"><circle cx="116" cy="132" r="15" fill="none" stroke="${KEY}" stroke-opacity=".55" stroke-width="3"/><circle cx="116" cy="40" r="15" fill="none" stroke="${KEY}" stroke-opacity=".4" stroke-width="2"/>` +
+        [18, 24].map((r, i) => [0, 180].map((a) => { const a1 = (a - 32) * Math.PI / 180, a2 = (a + 32) * Math.PI / 180;
+          return `<path d="M${f(116 + r * Math.cos(a1))} ${f(132 + r * Math.sin(a1))}A${r} ${r} 0 0 1 ${f(116 + r * Math.cos(a2))} ${f(132 + r * Math.sin(a2))}" fill="none" stroke="${KEY}" stroke-width="${2 - i * .6}" stroke-linecap="round" opacity="${.9 - i * .3}"/>`; }).join("")).join("") + `</g>` : "");
+    const hw = jb + (open ? `<rect x="${E - 18}" y="0" width="23" height="200" fill="#07080b"/><g transform="translate(-18 0)">${hw0}</g>` : hw0);
     return scene(x, "steel", tex, hw);
   });
+
+  icons[icons.length - 1].parts = VPARTS;
 
   add("btpadlock", "Bluetooth padlock", NIC, (x) => {
     let tex = ""; for (let i = 0; i < 6; i++) tex += `<path d="${rr(40 + i * 21, 20, 9, 30, 4.5)}" fill="#000" fill-opacity=".38"/><path d="M${44 + i * 21} 22V48" stroke="#fff" stroke-opacity=".08"/>`;

@@ -8,6 +8,7 @@
     opt = opt || {};
     const on = !!o.on, lv = o.level == null ? 1 : Math.max(0, Math.min(1, o.level));
     const x = { o, u: o.uid, on, lv, an: on && o.anim, L: on ? .35 + .65 * lv : 0, d: [], k: {}, n: 0 };
+    if (o.evStill) { x.still = true; if (o.evDim) x.L *= .55; }   // (parts) EV charger stage: plugged in / charged = lit but still
     x.led = opt.led || o.color || "#4da3ff"; x.body = opt.body || "#eef0f2";
     x.id = (s) => `${o.uid}-${s}`;
     x.def = (key, mk) => { if (!x.k[key]) { const id = `${o.uid}-g${x.n++}`; x.k[key] = id; x.d.push(mk(id)); } return `url(#${x.k[key]})`; };
@@ -169,7 +170,7 @@
 <path d="${d}" fill="none" stroke="${p.k}" stroke-width="${f(w)}" stroke-linecap="round"/>
 <path d="${d}" fill="none" stroke="${col}" stroke-width="${f(w * .6)}" stroke-linecap="round"/>
 <path d="${d}" fill="none" stroke="${p.l}" stroke-opacity=".7" stroke-width="${f(Math.max(.5, w * .2))}" stroke-linecap="round" transform="translate(${f(-w * .16)} ${f(-w * .16)})"/>`;
-    if (flow && x.on) s += chase(x, pts, n || 14, w, flow);
+    if (flow && x.on && !x.still) s += chase(x, pts, n || 14, w, flow);
     return s;
   }
   function chase(x, pts, n, w, col) {
@@ -348,7 +349,15 @@
   const paint = (x, c) => x.lg([[0, H.shade(c, .55)], [.3, H.shade(c, .15)], [.62, c], [.66, H.shade(c, -.35)], [1, H.shade(c, -.55)]]);
 
   const CHG = ["#eef0f2", "#2c2f36", "#8e959e", "#c9b99a", "#3d5a80"];
-  const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {});
+  // ---------- (parts) Multi-Function: EV chargers get a Charging state stage (o.pval.state, Multi-Function Image only):
+  // idle = no charging (today's off look), plugged in = lit but still (no power along the cord, softer glow, the charge
+  // from the slider), charging = today's on look, charged = full and still. A Device Image is drawn exactly as before.
+  const EVST = { id: "state", name: "Charging state", type: "stage", values: [["idle", "Idle"], ["connected", "Plugged in"], ["charging", "Charging"], ["done", "Charged"]], def: "charging" };
+  const EV = { round: 1, slim: 1, pedestal: 1, cord: 1, car: 1 };
+  const evO = (o) => { const st = o.mf && o.pval && o.pval.state != null && o.pval.state !== "" ? String(o.pval.state) : null; if (!st) return o;
+    return Object.assign({}, o, { on: st !== "idle", level: st === "done" ? 1 : o.level, anim: st === "charging" && o.anim, evStill: st === "connected" || st === "done", evDim: st === "connected" }); };
+  const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label, render: EV[id] ? (o) => render(evO(o)) : render },
+    EV[id] ? { parts: [EVST] } : {}, extra || {});
 
   const icons = [
     ic("round", "Round wall charger", sw(CHG, "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color, cx = 90, cy = 78, R = 38;

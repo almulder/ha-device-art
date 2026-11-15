@@ -100,6 +100,20 @@ ${extra || ""}</defs>`;
   const C3 = [DAY, SOFT, WARM, "#9ef0c4", "#8fd0ff"];
   const RGB = ["#ff3d9a", "#7a5cff", "#18d8ff", "#3dffa0", WARM, DAY];
   const base = (o) => Object.assign({ picker: true, colorLabel: "Light", cast: "down" }, o);
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
+  // a light part: on, level and color (o.pcolor[id], else the drawing's color)
+  const lit = (o, k) => Object.assign(MF.as(o, k), { color: MF.col(o, k, o.color) });
 
   const BG = (s) => `<g class="hda-bg">${s}</g>`;
   const room = (...a) => BG(room0(...a));
@@ -288,22 +302,24 @@ ${x.on ? "" : hl("M60 40 C68 34 82 31 96 30.6", .7, 1.8)}<circle cx="100" cy="56
 <ellipse cx="100" cy="44" rx="58" ry="18.5" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/>`, ex);
     } }),
 
-     base({ id: "stars", name: "Star projector", colors: ["#8fb8ff", "#c79bff", "#7ef2d6", "#ffd27a", "#ff8fc8"], cast: "around", glow: { x: .5, y: .22, r: 1.3 }, render(o) {
-      const x = ctx(o), D = "M78 32 A22 7 0 0 1 122 32 C122 44 112 50 100 50 C88 50 78 44 78 32 Z";
+     // (parts) Light (the nebula wash, the lens and the room glow, in the light's color) and Stars (the laser star field)
+     base({ id: "stars", name: "Star projector", colors: ["#8fb8ff", "#c79bff", "#7ef2d6", "#ffd27a", "#ff8fc8"], cast: "around", glow: { x: .5, y: .22, r: 1.3 },
+      parts: [{ id: "light", name: "Nebula light" }, { id: "stars", name: "Stars" }], render(o) {
+      const x = ctx(lit(o, "light")), xs = ctx(MF.as(o, "stars")), D = "M78 32 A22 7 0 0 1 122 32 C122 44 112 50 100 50 C88 50 78 44 78 32 Z";
       const n2 = H.mix(x.c, "#7a5cff", .5);
       const ex = rg(x.id("dg"), [[0, "#4a4466"], [.6, "#1d1a2c"], [1, "#09080f"]], .4, .35, .75) +
         rg(x.id("nb"), [[0, x.c, .55], [.5, x.c, .18], [1, x.c, 0]]) + rg(x.id("nb2"), [[0, n2, .5], [.5, n2, .16], [1, n2, 0]]);
       let sky = "";
-      if (x.on) {
-        const r = rnd(29), lite = H.mix(x.c, "#ffffff", .55);
-        sky += `<g clip-path="url(#${x.id("cl")})"><g class="hda-ceilinglight-neb"><ellipse cx="56" cy="28" rx="52" ry="18" fill="url(#${x.id("nb")})" opacity="${x.op(.9)}"/>
+      if (x.on || xs.on) {
+        const r = rnd(29), lite = H.mix(xs.c, "#ffffff", .55);
+        if (x.on) sky += `<g clip-path="url(#${x.id("cl")})"><g class="hda-ceilinglight-neb"><ellipse cx="56" cy="28" rx="52" ry="18" fill="url(#${x.id("nb")})" opacity="${x.op(.9)}"/>
 <ellipse cx="146" cy="46" rx="48" ry="16" fill="url(#${x.id("nb2")})" opacity="${x.op(.9)}"/><ellipse cx="120" cy="16" rx="30" ry="9" fill="url(#${x.id("nb")})" opacity="${x.op(.6)}"/></g></g>`;
-        for (let i = 0; i < 90; i++) {
+        if (xs.on) for (let i = 0; i < 90; i++) {
           const sx = 14 + r() * 172, sy = 10 + r() * 118, inC = sy < J ? (sx > 8 + (sy - 8) * .3 && sx < 192 - (sy - 8) * .3) : (sx > 30 && sx < 170);
           if (!inC || (Math.abs(sx - 100) < 34 && sy < 64)) continue;
           const far = sy > J ? .55 : 1, big = r() > .82, d = r() * 3;
-          sky += big ? spark(sx, sy, 2.4 + r() * 1.6, "hda-ceilinglight-tw", d, x.op(far))
-            : `<circle class="hda-ceilinglight-tw" style="animation-delay:-${f(d)}s" cx="${f(sx)}" cy="${f(sy)}" r="${f(.5 + r() * 1)}" fill="${r() > .5 ? lite : "#ffffff"}" opacity="${x.op(.9 * far)}"/>`;
+          sky += big ? spark(sx, sy, 2.4 + r() * 1.6, "hda-ceilinglight-tw", d, xs.op(far))
+            : `<circle class="hda-ceilinglight-tw" style="animation-delay:-${f(d)}s" cx="${f(sx)}" cy="${f(sy)}" r="${f(.5 + r() * 1)}" fill="${r() > .5 ? lite : "#ffffff"}" opacity="${xs.op(.9 * far)}"/>`;
         }
       }
       return svg(x, room(x, 100, 36, 70, .35, .3) + sky +
@@ -397,15 +413,16 @@ ${hl("M60 40 C62 54 70 66 80 74", .3, 2.4)}<path d="M54 30 A46 14 0 0 1 146 30" 
 <circle cx="100" cy="84" r="3.4" fill="${x.url("brs")}"/><circle cx="99" cy="83" r="1" fill="#fff" fill-opacity=".8"/>`, ex);
     } }),
 
-     base({ id: "vent", name: "Vent light", colors: C3, glow: { x: .5, y: .2, r: 1 }, render(o) {
-      const x = ctx(o), Q = "M58 20 H142 L137 60 H63 Z", Qi = "M64 24 H136 L132 56 H68 Z";
+     // (parts) the bath fan + light combo: Fan (the blades behind the grille) and Light (the lens, the beam, the room)
+     base({ id: "vent", name: "Vent light", colors: C3, glow: { x: .5, y: .2, r: 1 }, parts: [{ id: "fan", name: "Fan" }, { id: "light", name: "Light" }], render(o) {
+      const x = ctx(lit(o, "light")), fan = MF.on(o, "fan"), Q = "M58 20 H142 L137 60 H63 Z", Qi = "M64 24 H136 L132 56 H68 Z";
       const ex = `<clipPath id="${x.id("vc")}"><path d="${Qi}"/></clipPath>`;
       let sl = "", bl = "";
       for (let y = 27; y < 56; y += 3.4) { const t = (y - 24) / 32; sl += `M${f(64 + 4 * t)} ${f(y)} H${f(136 - 4 * t)} `; }
       for (let k = 0; k < 5; k++) bl += `<path d="M0 0 C8 -6 18 -6 24 -2 C18 4 8 4 0 0 Z" fill="#5a5866" transform="rotate(${k * 72})"/>`;
       return svg(x, room(x, 100, 40, 82, .55) + beam(x, 100, 48, 24, 42, .9) +
         `<path d="${Q}" fill="${x.url("wht")}"/><path d="M58 20 H142" stroke="#fff" stroke-opacity=".8"/><path d="${Qi}" fill="#121118"/>
-<g clip-path="url(#${x.id("vc")})"><g transform="translate(100 40) scale(1 .42)"><g class="${x.on ? "hda-ceilinglight-fan" : ""}">${bl}<circle r="5" fill="#2d2c36"/></g></g>
+<g clip-path="url(#${x.id("vc")})"><g transform="translate(100 40) scale(1 .42)"><g class="${fan ? "hda-ceilinglight-fan" : ""}">${bl}<circle r="5" fill="#2d2c36"/></g></g>
 <path d="${sl}" stroke="#000" stroke-opacity=".5" stroke-width="2.2" transform="translate(0 .9)"/><path d="${sl}" stroke="${x.url("wht")}" stroke-width="1.8"/></g>
 <path d="${Qi}" fill="none" stroke="#000" stroke-opacity=".35"/>
 <ellipse cx="100" cy="40" rx="17" ry="7" fill="${x.url("wht")}"/><ellipse cx="100" cy="40.4" rx="14" ry="5.6" fill="${x.on ? x.url("fill") : x.url("frost")}"/>

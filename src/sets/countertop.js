@@ -179,7 +179,8 @@ ${extra || ""}</defs>`;
     }),
 
     ic("stacked-double-oven", "Stacked double oven", [SS, BK], { parts: [{ id: "top", name: "Top oven" }, { id: "bottom", name: "Bottom oven" }] }, (o) => {
-      const u = o.uid, t = sub(o, o.on && (!o.parts || o.parts.top !== false)), b = sub(o, o.on && (!o.parts || o.parts.bottom !== false));
+      // (parts) o.mf = a Multi-Function Image: o.parts holds only the ticked parts, a part left out is off (a Device Image: as today)
+      const u = o.uid, pm = (k) => (o.mf ? !!(o.parts && o.parts[k]) : o.on && (!o.parts || o.parts[k] !== false)), t = sub(o, pm("top")), b = sub(o, pm("bottom"));
       return svg(o, kitchen(o, 150) + sh(o, 100, 152, 70, 5) + box3(o, 36, 42, 128, 108, 9, 6, 3) +
         cavity(t, 42, 48, 92, 38, { k: 1, food: pizza(u, 88, 72, 30), racks: [76], r: 2 }) + bar(o, 50, 87, 76) +
         cavity(b, 42, 94, 92, 50, { k: 2, fan: true, racks: [134], food: roast(u, 70, 128, .62) + fries(108, 133, 26) }) + bar(o, 50, 145, 76) +

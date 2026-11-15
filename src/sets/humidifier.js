@@ -135,25 +135,53 @@ ${extra || ""}</defs>`;
 `;
 
   const ic = (id, name, first, render, label, colors) => ({ id, name, colors: colors || sw(first), picker: true, colorLabel: label || "Body", render });
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
+  // (parts) Mist (the mist, the tank's bubbles) and Night light (the drawing's glow, in the light's color: o.pcolor.light,
+  // else the drawing's light color). render(o, L): o = the mist's view, L = the light's. A Device Image (no o.mf, no parts)
+  // gets the one device for both, so it is drawn exactly as before. own = the picker color is the light's color.
+  const HP = [{ id: "mist", name: "Mist" }, { id: "light", name: "Night light" }];
+  const lv1 = (v) => (v == null || !isFinite(+v) ? 1 : Math.max(0, Math.min(1, +v)));
+  const MH = (render, own) => (o) => {
+    if (!o.mf && !o.parts) return render(o, o);
+    const lc = MF.col(o, "light", null), mo = Object.assign({}, o, { on: MF.on(o, "mist"), level: lv1(MF.lv(o, "mist")) });
+    const L = Object.assign({}, o, { on: MF.on(o, "light"), level: lv1(MF.lv(o, "light")), mf: true });
+    if (lc && own) mo.color = L.color = lc; else if (lc) L.lc = lc;
+    return render(mo, L);
+  };
+  const icm = (id, name, first, render, own, label, colors) => Object.assign(ic(id, name, first, MH(render, own), label, colors), { parts: HP });
+  // a night-light glow with its own gradient (drawings whose picker color is the body)
+  const glowL = (L, key, cx, cy, rx, ry, col, m) => L.on ? `<defs><radialGradient id="${L.uid}-${key}"><stop offset="0" stop-color="${col}" stop-opacity=".9"/><stop offset=".5" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient></defs>` +
+    `<g opacity="${((.3 + .7 * L.level) * (m || 1)).toFixed(2)}"><ellipse class="${P}glow" cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="url(#${L.uid}-${key})"/></g>` : "";
 
   const icons = [
-    ic("cleartank", "Clear tank", W, (o) => { const u = o.uid, p = pal(o.color), td = "M62 136V80A17 17 0 0 1 79 63H121A17 17 0 0 1 138 80V136Z"; return svg(o,
+    icm("cleartank", "Clear tank", W, (o, L) => { const u = o.uid, p = pal(o.color), td = "M62 136V80A17 17 0 0 1 79 63H121A17 17 0 0 1 138 80V136Z"; return svg(o,
       sh(o, 100, 182, 56, 7) +
       tank(o, td, 62, 138, 100, 136, { ch: [100, 66, 6], hl: [68, 76, 128], bub: [[84, 132], [118, 130, 1.2], [92, 126, 1]] }) +
       `<path d="${rr(54, 132, 92, 48, 15)}" fill="url(#${u}-v)"/><path d="${rr(54, 132, 92, 48, 15)}" fill="url(#${u}-edge)" opacity=".75"/>` +
       `<path d="M60 134H140" stroke="#000" stroke-opacity=".28" stroke-width="2"/><path d="M62 137H138" stroke="#fff" stroke-opacity=".45" stroke-width="1"/>` +
-      `<path d="${rr(78, 148, 44, 20, 10)}" fill="#000" fill-opacity=".14"/>` + knob(o, 92, 158, 7) + led(o, 112, 158, 1.8) +
+      `<path d="${rr(78, 148, 44, 20, 10)}" fill="#000" fill-opacity=".14"/>` + (L.mf ? glowL(L, "ctg", 100, 182, 64, 9, L.lc || NL[0], .9) + glowL(L, "ctb", 100, 137, 44, 9, L.lc || NL[0], .8) + `<path d="M64 137.6H136" stroke="${L.on ? H().mix(L.lc || NL[0], "#ffffff", .35) : "#000"}" stroke-opacity="${L.on ? (.55 + .45 * L.level).toFixed(2) : .18}" stroke-width="2.2" stroke-linecap="round"/>` : "") + knob(o, 92, 158, 7) + led(o, 112, 158, 1.8) +
       `<path d="${rr(68, 55, 64, 11, 5.5)}" fill="url(#${u}-c)" stroke="${p.e}" stroke-width=".5"/><path d="M73 57H127" stroke="#fff" stroke-opacity=".55" stroke-width="1"/>` +
-      nozzle(o, 100, 56, 9, 2.8) + mist(o, 100, 54)); }),
+      nozzle(o, 100, 56, 9, 2.8) + mist(o, 100, 54)); }, false),
 
-    ic("teardrop", "Teardrop", SK, (o) => { const u = o.uid, p = pal(o.color), d = "M100 36C122 66 144 94 144 128A44 44 0 0 1 56 128C56 94 78 66 100 36Z"; return svg(o,
+    icm("teardrop", "Teardrop", SK, (o, L) => { const u = o.uid, p = pal(o.color), d = "M100 36C122 66 144 94 144 128A44 44 0 0 1 56 128C56 94 78 66 100 36Z"; return svg(o,
       sh(o, 100, 182, 54, 7) +
       tank(o, d, 56, 144, 118, 172, { ch: [100, 52, 4.5], hl: [70, 104, 146], bub: [[82, 160], [116, 156, 1.2]] }) +
       `<path d="M74 72C66 86 60 100 59 116" fill="none" stroke="#fff" stroke-opacity=".38" stroke-width="2.6" stroke-linecap="round"/>` +
       `<path d="${cylF(62, 138, 158, 172, 8)}" fill="url(#${u}-c)"/><ellipse cx="100" cy="158" rx="38" ry="8" fill="none" stroke="${p.e}" stroke-opacity=".6" stroke-width="1"/>` +
       `<path d="${arcF(62, 138, 158, 8)}" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="1"/>` +
-      (o.on ? `<g opacity="${k1(o).toFixed(2)}"><path class="${P}pulse" d="${arcF(68, 132, 167, 6.5)}" fill="none" stroke="${CY}" stroke-width="1.8"/></g>` : `<path d="${arcF(68, 132, 167, 6.5)}" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="1.6"/>`) +
-      `<ellipse cx="100" cy="38.5" rx="5.5" ry="2.4" fill="url(#${u}-tp)"/><ellipse cx="100" cy="38" rx="2.4" ry="1" fill="#05070a"/>` + mist(o, 100, 36, { s: .95 })); }),
+      (L.on ? `<g opacity="${k1(L).toFixed(2)}"><path class="${P}pulse" d="${arcF(68, 132, 167, 6.5)}" fill="none" stroke="${L.lc || CY}" stroke-width="1.8"/></g>` + (L.mf ? glowL(L, "tdg", 100, 172, 50, 9, L.lc || CY, .7) : "") : `<path d="${arcF(68, 132, 167, 6.5)}" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="1.6"/>`) +
+      `<ellipse cx="100" cy="38.5" rx="5.5" ry="2.4" fill="url(#${u}-tp)"/><ellipse cx="100" cy="38" rx="2.4" ry="1" fill="#05070a"/>` + mist(o, 100, 36, { s: .95 })); }, false),
 
     ic("woodbase", "Wood base", W, (o) => { const u = o.uid, cone = "M64 136C66 108 84 84 92 66H108C116 84 134 108 136 136Z"; let spk = "";
       for (let i = 0; i < 26; i++) { const t = (i * .618 + .1) % 1, y = 72 + t * 60, hw = 8 + 28 * t, fr = Math.abs(Math.sin(i * 12.9898 + 4.1) * 43758.5) % 1, x = 100 + (fr * 2 - 1) * hw * .82; spk += `<circle cx="${n1(x)}" cy="${n1(y)}" r="${i % 3 ? .55 : .8}" fill="#3a3330" opacity=".45"/>`; }
@@ -232,39 +260,39 @@ ${extra || ""}</defs>`;
       (o.on ? `<g opacity="${k1(o).toFixed(2)}"><path class="${P}pulse" d="${arcF(82, 118, 164, 4.6)}" fill="none" stroke="${CY}" stroke-width="1.6"/></g>` : "") +
       mist(o, 100, 109, { s: .82 })); }),
 
-    ic("flame", "Flame mist", FL[0], (o) => { const u = o.uid, c = o.color, k = k1(o); return svg(o,
+    icm("flame", "Flame mist", FL[0], (o, L) => { const u = o.uid, c = o.color, k = k1(L); return svg(o,
       sh(o, 100, 182, 66, 7) +
       `<path d="${rr(38, 104, 124, 74, 12)}" fill="#24272e"/><path d="${rr(38, 104, 124, 74, 12)}" fill="url(#${u}-edge)" opacity=".8"/>` +
       `<path d="M44 108H156" stroke="#fff" stroke-opacity=".22" stroke-width="1"/>` +
       `<path d="M40 150H160V166A12 12 0 0 1 148 178H52A12 12 0 0 1 40 166Z" fill="url(#${u}-wood)"/><path d="M40 150H160V166A12 12 0 0 1 148 178H52A12 12 0 0 1 40 166Z" fill="url(#${u}-grain)"/><path d="M40 150H160" stroke="#000" stroke-opacity=".4" stroke-width="1.2"/><path d="M40 151.4H160" stroke="#fff" stroke-opacity=".18" stroke-width=".8"/>` +
       `<path d="M46 112V146" stroke="#fff" stroke-opacity=".12" stroke-width="2" stroke-linecap="round"/>` +
-      (o.on ? `<g opacity="${(.35 * k).toFixed(2)}"><path class="${P}flk" d="${rr(40, 104, 120, 44, 12)}" fill="url(#${u}-nl)"/></g>` : "") +
+      (L.on ? `<g opacity="${(.35 * k).toFixed(2)}"><path class="${P}flk" d="${rr(40, 104, 120, 44, 12)}" fill="url(#${u}-nl)"/></g>` : "") +
       `<path d="${rr(54, 98, 92, 10, 5)}" fill="#08090c"/>` +
-      (o.on ? `<g opacity="${k.toFixed(2)}"><path class="${P}flk" d="${rr(56, 100, 88, 6, 3)}" fill="${H().mix(c, "#ffffff", .45)}"/></g><g opacity="${(.9 * k).toFixed(2)}"><ellipse class="${P}flk" cx="100" cy="102" rx="60" ry="14" fill="url(#${u}-nl)"/></g>` : `<path d="${rr(56, 100, 88, 6, 3)}" fill="#1a1c22"/>`) +
-      `<circle cx="146" cy="128" r="2.4" fill="#15171c"/><circle cx="136" cy="128" r="2.4" fill="#15171c"/>` + (o.on ? `<circle cx="146" cy="128" r="1.7" fill="${c}"/>` : "") +
-      nl(o, 100, 72, 64, 50, .5) + mist(o, 100, 102, { col: "c", xs: [-30, -10, 10, 30], flk: true, k: 1.15, wd: .9 })); }, "Flame", FL),
+      (L.on ? `<g opacity="${k.toFixed(2)}"><path class="${P}flk" d="${rr(56, 100, 88, 6, 3)}" fill="${H().mix(c, "#ffffff", .45)}"/></g><g opacity="${(.9 * k).toFixed(2)}"><ellipse class="${P}flk" cx="100" cy="102" rx="60" ry="14" fill="url(#${u}-nl)"/></g>` : `<path d="${rr(56, 100, 88, 6, 3)}" fill="#1a1c22"/>`) +
+      `<circle cx="146" cy="128" r="2.4" fill="#15171c"/><circle cx="136" cy="128" r="2.4" fill="#15171c"/>` + (L.on ? `<circle cx="146" cy="128" r="1.7" fill="${c}"/>` : "") +
+      nl(L, 100, 72, 64, 50, .5) + mist(o, 100, 102, { col: L.on ? "c" : "", xs: [-30, -10, 10, 30], flk: true, k: 1.15, wd: .9 })); }, true, "Flame", FL),
 
-    ic("cloud", "Cloud light", NL[2], (o) => { const u = o.uid, cl = "M58 152A24 24 0 0 1 58 106A30 30 0 0 1 104 84A31 31 0 0 1 148 106A23 23 0 0 1 144 152Z", body = lit(o, "#f4f2fb", .45);
+    icm("cloud", "Cloud light", NL[2], (o, L) => { const u = o.uid, cl = "M58 152A24 24 0 0 1 58 106A30 30 0 0 1 104 84A31 31 0 0 1 148 106A23 23 0 0 1 144 152Z", body = lit(L, "#f4f2fb", .45);
       return svg(o,
-      nl(o, 100, 168, 70, 14, .9) + sh(o, 100, 168, 48, 5) +
+      nl(L, 100, 168, 70, 14, .9) + sh(o, 100, 168, 48, 5) +
       `<ellipse cx="78" cy="156" rx="7" ry="4" fill="#cfcbe0"/><ellipse cx="124" cy="156" rx="7" ry="4" fill="#cfcbe0"/>` +
       `<path d="${cl}" fill="${body}"/>` +
-      (o.on ? `<g opacity="${(.55 + .4 * o.level).toFixed(2)}"><path class="${P}glow" d="${cl}" fill="url(#${u}-nl)"/></g>` : "") +
+      (L.on ? `<g opacity="${(.55 + .4 * L.level).toFixed(2)}"><path class="${P}glow" d="${cl}" fill="url(#${u}-nl)"/></g>` : "") +
       `<path d="${cl}" fill="url(#${u}-g)" opacity=".5"/><path d="M58 152A24 24 0 0 1 58 106A30 30 0 0 1 104 84A31 31 0 0 1 148 106A23 23 0 0 1 144 152Z" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="1"/>` +
       `<path d="M60 146C48 138 48 116 62 110M80 92C88 86 98 85 106 86" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="2.4" stroke-linecap="round"/>` +
       `<path d="M58 152H144" stroke="#000" stroke-opacity=".18" stroke-width="3"/>` +
       `<ellipse cx="108" cy="86" rx="7" ry="2.4" fill="#e6e3f0"/>` + nozzle(o, 108, 86, 4.5, 1.5) + led(o, 128, 140, 1.4) +
-      mist(o, 108, 84, { s: .95 })); }, "Night light", NL),
+      mist(o, 108, 84, { s: .95 })); }, true, "Night light", NL),
 
-    ic("ledring", "LED ring", NL[0], (o) => { const u = o.uid, dome = "M58 128C58 94 78 76 100 76C122 76 142 94 142 128Z"; return svg(o,
-      nl(o, 100, 176, 76, 12) + sh(o, 100, 178, 52, 5) +
+    icm("ledring", "LED ring", NL[0], (o, L) => { const u = o.uid, dome = "M58 128C58 94 78 76 100 76C122 76 142 94 142 128Z"; return svg(o,
+      nl(L, 100, 176, 76, 12) + sh(o, 100, 178, 52, 5) +
       tank(o, dome, 58, 142, 104, 130, { ch: [100, 80, 5], hl: [66, 104, 124], bub: [[84, 126], [116, 124, 1.1]] }) +
       `<path d="${cylP(56, 144, 128, 162, 10)}" fill="url(#${u}-pw)"/>` + seam(56, 144, 128, 10) +
       `<path d="M64 140V156" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>` +
-      `<path d="${band(58, 142, 162, 170, 9)}" fill="${lit(o, "#5a5f69", .9)}"/>` +
-      (o.on ? `<g opacity="${(.5 + .5 * o.level).toFixed(2)}"><path class="${P}pulse" d="${band(58, 142, 162, 170, 9)}" fill="${H().mix(o.color, "#ffffff", .4)}"/></g><ellipse class="${P}glow" cx="100" cy="170" rx="62" ry="14" fill="url(#${u}-nl)"/>` : "") +
+      `<path d="${band(58, 142, 162, 170, 9)}" fill="${lit(L, "#5a5f69", .9)}"/>` +
+      (L.on ? `<g opacity="${(.5 + .5 * L.level).toFixed(2)}"><path class="${P}pulse" d="${band(58, 142, 162, 170, 9)}" fill="${H().mix(L.color, "#ffffff", .4)}"/></g><ellipse class="${P}glow" cx="100" cy="170" rx="62" ry="14" fill="url(#${u}-nl)"/>` : "") +
       `<ellipse cx="100" cy="77" rx="7.5" ry="2.6" fill="url(#${u}-pwv)"/>` + nozzle(o, 100, 76.5, 5, 1.7) + led(o, 100, 146, 1.5) +
-      mist(o, 100, 75)); }, "Night light", NL),
+      mist(o, 100, 75)); }, true, "Night light", NL),
 
     ic("console", "Console", SD, (o) => { const u = o.uid; return svg(o,
       sh(o, 100, 184, 64, 6) +
@@ -277,7 +305,7 @@ ${extra || ""}</defs>`;
       `<path d="M49 80V170" stroke="#fff" stroke-opacity=".3" stroke-width="2" stroke-linecap="round"/>` +
       mist(o, 100, 64, { xs: [-26, 0, 26], k: .9, wd: 1.1 })); }),
 
-    ic("plantpot", "Plant pot", "#c86f4a", (o) => { const u = o.uid, p = pal(o.color), pot = "M64 120H136L128 174A28 6 0 0 1 72 174Z"; return svg(o,
+    icm("plantpot", "Plant pot", "#c86f4a", (o, L) => { const u = o.uid, p = pal(o.color), pot = "M64 120H136L128 174A28 6 0 0 1 72 174Z"; return svg(o,
       sh(o, 100, 182, 50, 6) +
       leaf(84, 116, -56, 44, u) + leaf(118, 116, 60, 42, u) + leaf(90, 114, -26, 40, u) + leaf(112, 114, 30, 38, u) + leaf(96, 113, -8, 30, u) +
       `<path d="${pot}" fill="url(#${u}-c)"/><path d="${pot}" fill="url(#${u}-edge)" opacity=".5"/>` +
@@ -285,8 +313,8 @@ ${extra || ""}</defs>`;
       `<path d="M72 130L76 168" stroke="#fff" stroke-opacity=".3" stroke-width="2.6" stroke-linecap="round"/>` +
       `<ellipse cx="100" cy="113" rx="34" ry="4.5" fill="#2a1d15"/><ellipse cx="100" cy="113" rx="8" ry="2.2" fill="#d9dcdf"/>` + nozzle(o, 100, 112.6, 5, 1.5) +
       leaf(76, 115, -84, 30, u) + leaf(125, 115, 86, 28, u) +
-      `<path d="M92 160H108" stroke="${p.k}" stroke-opacity=".5" stroke-width="2"/>` + led(o, 100, 150, 1.4) +
-      mist(o, 100, 111, { s: .92 })); }, "Pot", ["#c86f4a", "#eef0ef", "#3d4148", "#a7b79c", "#dac9a9"]),
+      `<path d="M92 160H108" stroke="${p.k}" stroke-opacity=".5" stroke-width="2"/>` + (L.mf ? glowL(L, "ppg", 100, 181, 58, 8, L.lc || NL[0], .9) + `<path d="M73 172.6A28 5 0 0 0 127 172.6" fill="none" stroke="${L.on ? H().mix(L.lc || NL[0], "#ffffff", .35) : "#000"}" stroke-opacity="${L.on ? (.55 + .45 * L.level).toFixed(2) : .2}" stroke-width="2" stroke-linecap="round"/>` : "") + led(o, 100, 150, 1.4) +
+      mist(o, 100, 111, { s: .92 })); }, false, "Pot", ["#c86f4a", "#eef0ef", "#3d4148", "#a7b79c", "#dac9a9"]),
 
     ic("cordless", "Cordless", SG, (o) => { const u = o.uid, p = pal(o.color); let bat = "";
       for (let i = 0; i < 4; i++) bat += `<rect x="${90 + i * 5.5}" y="100" width="4" height="7" rx="1" fill="${o.on && i < 3 ? CY : "#3a3f47"}"${o.on && i < 3 ? ` opacity=".9"` : ""}/>`;
@@ -311,20 +339,20 @@ ${extra || ""}</defs>`;
       `<ellipse cx="76" cy="75" rx="9" ry="2.8" fill="url(#${u}-tp)"/><ellipse cx="124" cy="75" rx="9" ry="2.8" fill="url(#${u}-tp)"/>` + nozzle(o, 76, 75, 6, 1.9) + nozzle(o, 124, 75, 6, 1.9) +
       mist(o, 76, 73, { rot: -10, s: .9 }) + mist(o, 124, 73, { rot: 10, s: .9 })); }),
 
-    ic("smartring", "Smart ring", CH, (o) => { const u = o.uid, p = pal(o.color), lv = o.on ? o.level : 0; let arc = "";
+    icm("smartring", "Smart ring", CH, (o, L) => { const u = o.uid, p = pal(o.color), lv = L.on ? L.level : 0, CR = L.lc || CY, dev = { on: o.on || L.on }; let arc = "";
       const a0 = Math.PI * .75, a1 = a0 + Math.PI * 1.5 * Math.max(.04, lv), pt = (a) => `${n1(100 + Math.cos(a) * 34)} ${n1(104 + Math.sin(a) * 8.6)}`;
       let dtr = `M${pt(a0)}`; for (let i = 1; i <= 24; i++) dtr += `L${pt(a0 + Math.PI * 1.5 * i / 24)}`;
-      if (o.on) { arc = `M${pt(a0)}`; for (let i = 1; i <= 24; i++) arc += `L${pt(a0 + (a1 - a0) * i / 24)}`; }
+      if (L.on) { arc = `M${pt(a0)}`; for (let i = 1; i <= 24; i++) arc += `L${pt(a0 + (a1 - a0) * i / 24)}`; }
       return svg(o,
       sh(o, 100, 182, 56, 7) +
       `<path d="${cylP(54, 146, 104, 172, 12)}" fill="url(#${u}-c)"/><path d="${cylP(54, 146, 104, 172, 12)}" fill="url(#${u}-g)" opacity=".2"/>` + seam(54, 146, 162, 12) +
       `<ellipse cx="100" cy="104" rx="46" ry="12" fill="url(#${u}-tp)" stroke="${p.e}" stroke-width=".6"/>` +
       `<path d="${dtr}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="4" stroke-linecap="round"/>` +
-      (o.on ? `<path d="${arc}" fill="none" stroke="${CY}" stroke-opacity=".3" stroke-width="7" stroke-linecap="round"/><path d="${arc}" fill="none" stroke="${CY}" stroke-width="3" stroke-linecap="round"/><path d="${arc}" fill="none" stroke="#effdff" stroke-width="1" stroke-linecap="round"/>` : "") +
+      (L.on ? `<path d="${arc}" fill="none" stroke="${CR}" stroke-opacity=".3" stroke-width="7" stroke-linecap="round"/><path d="${arc}" fill="none" stroke="${CR}" stroke-width="3" stroke-linecap="round"/><path d="${arc}" fill="none" stroke="#effdff" stroke-width="1" stroke-linecap="round"/>` : "") +
       `<ellipse cx="100" cy="104" rx="12" ry="3.2" fill="${p.d}"/>` + nozzle(o, 100, 104, 7, 2) +
-      `<path d="${rr(84, 128, 32, 16, 8)}" fill="url(#${u}-dk)"/>` + disp(o, 100, 140, "48%", 9.5) +
-      (o.on ? `<path d="M126 136a6 6 0 0 1 8 0M128 139a3 3 0 0 1 4 0" fill="none" stroke="${CY}" stroke-width="1.2" stroke-linecap="round"/>` : "") + hl(61, 114, 164, 2.4, .25) +
-      mist(o, 100, 102)); }),
+      `<path d="${rr(84, 128, 32, 16, 8)}" fill="url(#${u}-dk)"/>` + disp(dev, 100, 140, "48%", 9.5) +
+      (dev.on ? `<path d="M126 136a6 6 0 0 1 8 0M128 139a3 3 0 0 1 4 0" fill="none" stroke="${CY}" stroke-width="1.2" stroke-linecap="round"/>` : "") + hl(61, 114, 164, 2.4, .25) +
+      mist(o, 100, 102)); }, false),
 
     ic("vaporizer", "Vaporizer", JAR[0], (o) => { const u = o.uid, h = H(), jar = "M66 120C63 138 63 160 68 172A32 6 0 0 0 132 172C137 160 137 138 134 120Z", cap = "M60 122C60 102 80 92 100 92C120 92 140 102 140 122Z"; return svg(o,
       sh(o, 100, 182, 52, 6) +

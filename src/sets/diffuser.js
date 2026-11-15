@@ -161,14 +161,36 @@ ${extra || ""}</defs>`;
 `;
 
   const ic = (id, name, colors, label, render) => ({ id, name, colors, picker: true, colorLabel: label, render });
+  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
+  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
+  const MF = {
+    has: (o, k) => !!(o.parts && o.parts[k] != null),
+    on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
+    lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
+    col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
+    st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
+    // the drawing as one part: on = that part, level = its level
+    as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
+  };
+  // (parts) Mist (the mist) and Light (the LED glow, in the light's color: o.pcolor.light, else the drawing's light color,
+  // dimmed by its level). render(o, L): o = the mist's view, L = the light's; a Device Image (no o.mf, no parts) gets the
+  // one device for both, so it is drawn exactly as before. A tinted mist takes the light's color only while the light is on.
+  const DP = [{ id: "mist", name: "Mist" }, { id: "light", name: "Light" }];
+  const lv1 = (v) => (v == null || !isFinite(+v) ? 1 : Math.max(0, Math.min(1, +v)));
+  const icm = (id, name, colors, label, render) => Object.assign(ic(id, name, colors, label, (o) => {
+    if (!o.mf && !o.parts) return render(o, o);
+    const lc = MF.col(o, "light", o.color);
+    return render(Object.assign({}, o, { on: MF.on(o, "mist"), level: lv1(MF.lv(o, "mist")), color: lc }), Object.assign({}, o, { on: MF.on(o, "light"), level: lv1(MF.lv(o, "light")), color: lc }));
+  }), { parts: DP });
 
   const icons = [
-    ic("woodcone", "Wood cone", sw("#ffb36b"), "Light", (o) => {
+    icm("woodcone", "Wood cone", sw("#ffb36b"), "Light", (o, L) => {
       const u = o.uid, cone = "M85 62C83 90 67 124 58 150A42 8 0 0 0 142 150C133 124 117 90 115 62Z";
       return svg(o,
-        sh(o, 100, 176, 56, 7) + pool(o, 100, 170, 78, 12) +
+        sh(o, 100, 176, 56, 7) + pool(L, 100, 170, 78, 12) +
         `<path d="${cylP(60, 140, 152, 164, 8)}" fill="url(#${u}-blk)"/><path d="${arcF(60, 140, 164, 8)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>` +
-        `<path d="${band(59, 141, 149, 154, 8)}" fill="${o.on ? H().mix(o.color, "#ffffff", .35) : "#22262d"}" opacity="${o.on ? n2(kl(o)) : 1}"/>` + halo(o, 100, 156, 58, 12, .8) +
+        `<path d="${band(59, 141, 149, 154, 8)}" fill="${L.on ? H().mix(o.color, "#ffffff", .35) : "#22262d"}" opacity="${L.on ? n2(kl(L)) : 1}"/>` + halo(L, 100, 156, 58, 12, .8) +
         `<path d="${cone}" fill="url(#${u}-wood)"/><path d="${cone}" fill="url(#${u}-grain)"/><path d="${cone}" fill="url(#${u}-edge)" opacity=".65"/>` +
         `<path d="M58 150A42 8 0 0 0 142 150" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="1.3"/>` +
         hlp("M89 70C87 96 76 122 68 144", 2.6, .28) + hlp("M95 70C94 84 91 96 88 104", 1.2, .18) +
@@ -177,13 +199,13 @@ ${extra || ""}</defs>`;
         wisp(o, 100, 60));
     }),
 
-    ic("speckled", "Ceramic vase", sw("#ffd27a"), "Light", (o) => {
+    icm("speckled", "Ceramic vase", sw("#ffd27a"), "Light", (o, L) => {
       const u = o.uid, vase = "M90 58H110C110 70 108 78 114 88C128 104 142 118 142 140C142 160 124 168 100 168C76 168 58 160 58 140C58 118 72 104 86 88C92 78 90 70 90 58Z";
       let spk = ""; for (let i = 0; i < 46; i++) { const y = 64 + rnd(i, 1) * 100, hw = y < 90 ? 10 + (y - 64) * .3 : 40, x = 100 + (rnd(i, 2) * 2 - 1) * hw; spk += `<circle cx="${n1(x)}" cy="${n1(y)}" r="${i % 3 ? .6 : .95}" fill="#3a3330" opacity="${n2(.3 + rnd(i, 3) * .35)}"/>`; }
-      let holes = ""; for (let i = 0; i < 9; i++) { const t = i / 8, x = 70 + t * 60, y = 150 + Math.sin(t * Math.PI) * 7; holes += o.on ? `<circle cx="${n1(x)}" cy="${n1(y)}" r="3.6" fill="url(#${u}-halo)" opacity="${n2(kl(o))}"/><circle cx="${n1(x)}" cy="${n1(y)}" r="1.4" fill="${H().mix(o.color, "#ffffff", .5)}"/>` : `<circle cx="${n1(x)}" cy="${n1(y)}" r="1.4" fill="#4a423b"/><circle cx="${n1(x)}" cy="${n1(y + .4)}" r="1" fill="#211c18"/>`; }
+      let holes = ""; for (let i = 0; i < 9; i++) { const t = i / 8, x = 70 + t * 60, y = 150 + Math.sin(t * Math.PI) * 7; holes += L.on ? `<circle cx="${n1(x)}" cy="${n1(y)}" r="3.6" fill="url(#${u}-halo)" opacity="${n2(kl(L))}"/><circle cx="${n1(x)}" cy="${n1(y)}" r="1.4" fill="${H().mix(o.color, "#ffffff", .5)}"/>` : `<circle cx="${n1(x)}" cy="${n1(y)}" r="1.4" fill="#4a423b"/><circle cx="${n1(x)}" cy="${n1(y + .4)}" r="1" fill="#211c18"/>`; }
       return svg(o,
         `<clipPath id="${u}-vc"><path d="${vase}"/></clipPath>` +
-        sh(o, 100, 172, 50, 6) + pool(o, 100, 168, 66, 10) +
+        sh(o, 100, 172, 50, 6) + pool(L, 100, 168, 66, 10) +
         `<path d="${vase}" fill="url(#${u}-cer)"/><g clip-path="url(#${u}-vc)">${spk}<rect x="50" y="160" width="100" height="10" fill="#7a6f60" opacity=".55"/></g>` +
         `<path d="${vase}" fill="url(#${u}-edge)" opacity=".55"/>` +
         hlp("M84 96C72 110 64 122 63 138", 2.8, .45) + hlp("M95 64V80", 1.4, .4) +
@@ -192,37 +214,37 @@ ${extra || ""}</defs>`;
         wisp(o, 100, 56, { s: .95 }));
     }),
 
-    ic("glassdome", "Glass dome", sw("#c4b5fd"), "Light", (o) => {
+    icm("glassdome", "Glass dome", sw("#c4b5fd"), "Light", (o, L) => {
       const u = o.uid, h = H(), dome = "M62 148V112A38 40 0 0 1 138 112V148Z", c = o.color, cl = h.mix(c, "#ffffff", .55);
-      const fr = o.on ? `<radialGradient id="${u}-fr" cx=".5" cy=".7" r=".7"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset=".35" stop-color="${cl}" stop-opacity=".85"/><stop offset="1" stop-color="${c}" stop-opacity=".55"/></radialGradient>`
+      const fr = L.on ? `<radialGradient id="${u}-fr" cx=".5" cy=".7" r=".7"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset=".35" stop-color="${cl}" stop-opacity=".85"/><stop offset="1" stop-color="${c}" stop-opacity=".55"/></radialGradient>`
         : `<radialGradient id="${u}-fr" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#ffffff" stop-opacity=".42"/><stop offset="1" stop-color="#c9d2e0" stop-opacity=".16"/></radialGradient>`;
       return svg(o,
-        sh(o, 100, 178, 58, 7) + halo(o, 100, 118, 66, 62, .55) + pool(o, 100, 170, 80, 12, .7) +
+        sh(o, 100, 178, 58, 7) + halo(L, 100, 118, 66, 62, .55) + pool(L, 100, 170, 80, 12, .7) +
         `<path d="${cylP(54, 146, 150, 168, 8)}" fill="url(#${u}-wood)"/><path d="${cylP(54, 146, 150, 168, 8)}" fill="url(#${u}-grain)"/><path d="${cylP(54, 146, 150, 168, 8)}" fill="url(#${u}-edge)" opacity=".5"/>` +
         `<ellipse cx="100" cy="150" rx="46" ry="8" fill="url(#${u}-woodt)"/>` + seam(54, 146, 160, 8) +
         `<ellipse cx="100" cy="149" rx="39" ry="6.2" fill="#000" fill-opacity=".3"/>` +
         `<path d="${cylP(86, 114, 116, 148, 4)}" fill="url(#${u}-cer)" opacity=".85"/><ellipse cx="100" cy="116" rx="14" ry="4" fill="#fff" opacity=".7"/>` +
         `<path d="${dome}" fill="url(#${u}-fr)"/><path d="${dome}" fill="url(#${u}-gls)" stroke="#f4f8ff" stroke-opacity=".55" stroke-width="1"/>` +
-        (o.on ? `<g opacity="${n2(.35 * kl(o))}"><ellipse class="${P}glow" cx="100" cy="122" rx="20" ry="16" fill="#ffffff"/></g>` : "") +
+        (L.on ? `<g opacity="${n2(.35 * kl(L))}"><ellipse class="${P}glow" cx="100" cy="122" rx="20" ry="16" fill="#ffffff"/></g>` : "") +
         `<path d="M62 148A38 6 0 0 0 138 148" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.2"/>` +
         hlp("M70 140V112C70 98 76 86 86 79", 3, .5) + hlp("M78 136V116", 1.4, .3) +
         `<ellipse cx="100" cy="72.5" rx="7" ry="2" fill="#f4f8ff" fill-opacity=".6"/>` + nozzle(100, 72.5, 4.6, 1.4) +
-        wisp(o, 100, 71, { tint: true, s: .95 }));
+        wisp(o, 100, 71, { tint: L.on, s: .95 }));
     }),
 
-    ic("marble", "Marble stone", sw("#7dd3fc"), "Light", (o) => {
+    icm("marble", "Marble stone", sw("#7dd3fc"), "Light", (o, L) => {
       const u = o.uid, peb = "M50 138C50 104 76 92 100 92C124 92 150 104 150 138C150 160 128 170 100 170C72 170 50 160 50 138Z";
       const mb = `<radialGradient id="${u}-mb" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#e4e3ea"/><stop offset="1" stop-color="#9c9aa8"/></radialGradient>`;
       const veins = ["M54 120C70 126 78 112 92 118S118 140 136 128", "M66 104C74 112 84 104 96 110", "M110 98C118 108 134 104 146 116", "M60 150C76 144 92 158 112 150S138 142 148 148", "M92 118C96 128 90 134 98 142"];
       const lc = H().mix(o.color, "#ffffff", .45);
       return svg(o,
         `<clipPath id="${u}-pc"><path d="${peb}"/></clipPath>` +
-        sh(o, 100, 174, 56, 6) + pool(o, 100, 168, 76, 12, .9) +
+        sh(o, 100, 174, 56, 6) + pool(L, 100, 168, 76, 12, .9) +
         `<path d="${peb}" fill="url(#${u}-mb)"/><g clip-path="url(#${u}-pc)">` +
         veins.map((d, i) => `<path d="${d}" fill="none" stroke="#7e7a8e" stroke-opacity="${i % 2 ? .3 : .45}" stroke-width="${i % 2 ? .7 : 1.3}"/>`).join("") +
         `<path d="M50 160H150V172H50Z" fill="#000" opacity=".14"/></g>` +
         `<path d="${peb}" fill="url(#${u}-edge)" opacity=".4"/>` +
-        (o.on ? `<path d="${arcF(51, 149, 138, 12)}" fill="none" stroke="url(#${u}-halo)" stroke-width="10" opacity="${n2(kl(o) * .8)}"/><path d="${arcF(51, 149, 138, 12)}" fill="none" stroke="${lc}" stroke-width="2.2" opacity="${n2(kl(o))}"/>` + halo(o, 100, 148, 60, 14, .6)
+        (L.on ? `<path d="${arcF(51, 149, 138, 12)}" fill="none" stroke="url(#${u}-halo)" stroke-width="10" opacity="${n2(kl(L) * .8)}"/><path d="${arcF(51, 149, 138, 12)}" fill="none" stroke="${lc}" stroke-width="2.2" opacity="${n2(kl(L))}"/>` + halo(L, 100, 148, 60, 14, .6)
           : `<path d="${arcF(51, 149, 138, 12)}" fill="none" stroke="#2a2a33" stroke-opacity=".6" stroke-width="1.6"/>`) +
         `<path d="${arcF(51, 149, 139.6, 12)}" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width=".7"/>` +
         hlp("M64 112C72 102 84 97 96 96", 3, .7) +
@@ -230,18 +252,18 @@ ${extra || ""}</defs>`;
         wisp(o, 100, 93), mb);
     }),
 
-    ic("nebulizer", "Glass nebulizer", sw("#ffd27a"), "Light", (o) => {
+    icm("nebulizer", "Glass nebulizer", sw("#ffd27a"), "Light", (o, L) => {
       const u = o.uid, gl = "M92 138C80 134 72 124 72 110C72 94 84 85 94 82C95 74 96 68 97 58H103C104 68 105 74 106 82C116 85 128 94 128 110C128 124 120 134 108 138Z";
       return svg(o,
         `<clipPath id="${u}-gc"><path d="${gl}"/></clipPath>` +
-        sh(o, 100, 178, 46, 6) + pool(o, 100, 172, 62, 10, .8) +
+        sh(o, 100, 178, 46, 6) + pool(L, 100, 172, 62, 10, .8) +
         `<path d="${cylP(66, 134, 140, 172, 8)}" fill="url(#${u}-wood)"/><path d="${cylP(66, 134, 140, 172, 8)}" fill="url(#${u}-grain)"/><path d="${cylP(66, 134, 140, 172, 8)}" fill="url(#${u}-edge)" opacity=".55"/>` +
         `<ellipse cx="100" cy="140" rx="34" ry="8" fill="url(#${u}-woodt)"/>` + seam(66, 134, 164, 8) +
-        `<ellipse cx="100" cy="140" rx="20" ry="4.6" fill="none" stroke="${o.on ? H().mix(o.color, "#ffffff", .4) : "#3a3f47"}" stroke-width="2" opacity="${o.on ? n2(kl(o)) : 1}"/>` +
+        `<ellipse cx="100" cy="140" rx="20" ry="4.6" fill="none" stroke="${L.on ? H().mix(o.color, "#ffffff", .4) : "#3a3f47"}" stroke-width="2" opacity="${L.on ? n2(kl(L)) : 1}"/>` +
         `<path d="M86 140V134H114V140Z" fill="url(#${u}-st)"/><ellipse cx="100" cy="134" rx="14" ry="3" fill="#cfd5db"/>` +
         `<path d="${gl}" fill="#0b1626" fill-opacity=".3"/><g clip-path="url(#${u}-gc)">` +
         `<rect x="70" y="120" width="60" height="22" fill="url(#${u}-amb)"/><path d="M70 120q5 -1.6 10 0t10 0t10 0t10 0t10 0t10 0V123H70Z" fill="#ffe2a8" opacity=".5"/>` +
-        (o.on ? `<rect x="70" y="56" width="60" height="84" fill="url(#${u}-up)" opacity="${n2(kl(o) * .8)}"/>` : "") +
+        (L.on ? `<rect x="70" y="56" width="60" height="84" fill="url(#${u}-up)" opacity="${n2(kl(L) * .8)}"/>` : "") +
         `<path d="M99 136V66" stroke="#fff" stroke-opacity=".35" stroke-width="1.6"/></g>` +
         `<path d="${gl}" fill="url(#${u}-gls)" stroke="#e8f6ff" stroke-opacity=".6" stroke-width="1"/>` +
         hlp("M80 100C82 94 86 90 91 88", 2.6, .55) + hlp("M78 116C78 112 78 110 79 107", 1.6, .3) +
@@ -273,21 +295,21 @@ ${extra || ""}</defs>`;
         rd + reeds.filter((r, i) => i % 2 === 0).map((r, i) => waves(o, n1(r[0]), n1(r[1] - 6), i)).join(""));
     }),
 
-    ic("plugin", "Plug-in", sw("#ffd27a"), "Light", (o) => {
+    icm("plugin", "Plug-in", sw("#ffd27a"), "Light", (o, L) => {
       const u = o.uid, h = H(), body = "M76 50C76 42 84 38 100 38C116 38 124 42 124 50V108C124 116 116 120 100 120C84 120 76 116 76 108Z", bot = "M84 122H116V150Q116 160 106 160H94Q84 160 84 150Z";
       let vents = ""; for (let i = 0; i < 6; i++) vents += `<path d="M${88 + i * 5} 54V72" stroke="#000" stroke-opacity=".28" stroke-width="2" stroke-linecap="round"/><path d="M${89 + i * 5} 54V72" stroke="#fff" stroke-opacity=".5" stroke-width=".7"/>`;
       return svg(o,
         `<path d="${rr(58, 18, 84, 168, 10)}" fill="url(#${u}-cert)"/><path d="${rr(58, 18, 84, 168, 10)}" fill="none" stroke="#000" stroke-opacity=".18" stroke-width="1"/><path d="M62 22H138" stroke="#fff" stroke-opacity=".8" stroke-width="1"/>` +
         `<circle cx="100" cy="28" r="2.6" fill="#d4d0c8" stroke="#000" stroke-opacity=".2" stroke-width=".5"/><path d="M98.4 28H101.6" stroke="#8a857c" stroke-width=".8"/>` +
         `<path d="${rr(80, 164, 40, 18, 7)}" fill="#e2ddd3" stroke="#000" stroke-opacity=".15" stroke-width=".8"/><path d="M93 168V175M107 168V175" stroke="#2a2a2a" stroke-width="1.8" stroke-linecap="round"/><path d="M98.5 177Q100 179 101.5 177" stroke="#2a2a2a" stroke-width="1.4" fill="none"/>` +
-        halo(o, 100, 92, 46, 40, .5) +
+        halo(L, 100, 92, 46, 40, .5) +
         `<path d="${body}" transform="translate(4 5)" fill="#000" opacity=".2"/>` +
         `<path d="${bot}" fill="#0b1626" fill-opacity=".35"/><clipPath id="${u}-oc"><path d="${bot}"/></clipPath><g clip-path="url(#${u}-oc)"><rect x="82" y="126" width="36" height="36" fill="url(#${u}-amb)"/><path d="M99 120V160" stroke="#f2ead8" stroke-opacity=".55" stroke-width="3"/></g>` +
         `<path d="${bot}" fill="url(#${u}-gls)" stroke="#e8f6ff" stroke-opacity=".55" stroke-width="1"/>` + hlp("M88 128V150", 2, .45) +
         `<path d="${body}" fill="url(#${u}-cer)"/><path d="${body}" fill="url(#${u}-edge)" opacity=".4"/>` + vents +
         `<path d="M80 50C82 44 90 42 100 42" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="1.6" stroke-linecap="round"/>` +
-        `<circle cx="100" cy="94" r="12" fill="${o.on ? h.mix("#ffffff", o.color, .5 + .4 * o.level) : "#d9d5cc"}" stroke="#000" stroke-opacity=".15" stroke-width="1"/>` +
-        (o.on ? `<g opacity="${n2(kl(o))}"><circle class="${P}glow" cx="100" cy="94" r="20" fill="url(#${u}-halo)"/></g><circle cx="100" cy="94" r="6" fill="#fff" opacity=".7"/>` : `<circle cx="100" cy="94" r="8" fill="#fff" opacity=".35"/>`) +
+        `<circle cx="100" cy="94" r="12" fill="${L.on ? h.mix("#ffffff", o.color, .5 + .4 * L.level) : "#d9d5cc"}" stroke="#000" stroke-opacity=".15" stroke-width="1"/>` +
+        (L.on ? `<g opacity="${n2(kl(L))}"><circle class="${P}glow" cx="100" cy="94" r="20" fill="url(#${u}-halo)"/></g><circle cx="100" cy="94" r="6" fill="#fff" opacity=".7"/>` : `<circle cx="100" cy="94" r="8" fill="#fff" opacity=".35"/>`) +
         `<path d="${rr(92, 110, 16, 5, 2.5)}" fill="#b9b4aa"/>` +
         wisp(o, 100, 48, { s: .7, wd: .6, h: 26, n: 7 }));
     }),
@@ -317,16 +339,16 @@ ${extra || ""}</defs>`;
         spray);
     }),
 
-    ic("scentpod", "Smart pod", sw("#c4b5fd"), "Light", (o) => {
+    icm("scentpod", "Smart pod", sw("#c4b5fd"), "Light", (o, L) => {
       const u = o.uid, h = H(), lc = h.mix(o.color, "#ffffff", .4);
       return svg(o,
-        sh(o, 100, 172, 54, 7) + halo(o, 100, 112, 62, 26, .55) +
+        sh(o, 100, 172, 54, 7) + halo(L, 100, 112, 62, 26, .55) +
         `<path d="${cylP(56, 144, 112, 160, 10)}" fill="url(#${u}-blk)"/><path d="${cylP(56, 144, 112, 160, 10)}" fill="#fff" opacity=".04"/>` +
         `<path d="M62 120V152" stroke="#fff" stroke-opacity=".18" stroke-width="3" stroke-linecap="round"/>` + seam(56, 144, 150, 10) +
         `<ellipse cx="100" cy="112" rx="44" ry="10" fill="#2e333b"/><ellipse cx="100" cy="112" rx="38" ry="8" fill="#1a1d23"/>` +
         `<ellipse cx="100" cy="112" rx="41" ry="9" fill="none" stroke="#000" stroke-opacity=".6" stroke-width="3"/>` +
-        (o.on ? `<ellipse cx="100" cy="112" rx="41" ry="9" fill="none" stroke="url(#${u}-halo)" stroke-width="9" opacity="${n2(kl(o) * .7)}"/>` +
-          `<ellipse cx="100" cy="112" rx="41" ry="9" fill="none" stroke="${lc}" stroke-width="2.4" pathLength="100" stroke-dasharray="${n1(18 + 82 * o.level)} 100" stroke-linecap="round"/>` : "") +
+        (L.on ? `<ellipse cx="100" cy="112" rx="41" ry="9" fill="none" stroke="url(#${u}-halo)" stroke-width="9" opacity="${n2(kl(L) * .7)}"/>` +
+          `<ellipse cx="100" cy="112" rx="41" ry="9" fill="none" stroke="${lc}" stroke-width="2.4" pathLength="100" stroke-dasharray="${n1(18 + 82 * L.level)} 100" stroke-linecap="round"/>` : "") +
         `<path d="${cylP(84, 116, 98, 112, 4)}" fill="url(#${u}-st)"/><ellipse cx="100" cy="98" rx="16" ry="4" fill="#d5dade"/>` +
         `<ellipse cx="100" cy="98" rx="10" ry="2.4" fill="url(#${u}-amb)"/>` +
         [-8, -4, 0, 4, 8].map((x) => `<path d="M${100 + x} 96.4V99.6" stroke="#0b0d10" stroke-width="1.2" stroke-linecap="round"/>`).join("") +
@@ -494,21 +516,21 @@ ${extra || ""}</defs>`;
         wisp(o, 100, 68));
     }),
 
-    ic("cloud", "Cloud night", sw("#c4b5fd"), "Light", (o) => {
+    icm("cloud", "Cloud night", sw("#c4b5fd"), "Light", (o, L) => {
       const u = o.uid, h = H(), c = o.color, cl = h.mix(c, "#ffffff", .45);
       const cs = [[66, 126, 26], [94, 104, 32], [128, 112, 27], [148, 136, 18], [52, 144, 16], [100, 140, 26]];
-      const cg = `<linearGradient id="${u}-cg" gradientUnits="userSpaceOnUse" x1="0" y1="72" x2="0" y2="162"><stop offset="0" stop-color="${o.on ? "#ffffff" : "#f4f2f8"}"/><stop offset=".55" stop-color="${o.on ? cl : "#dcd8e6"}"/><stop offset="1" stop-color="${o.on ? h.shade(c, -.12) : "#aaa5b8"}"/></linearGradient>`;
+      const cg = `<linearGradient id="${u}-cg" gradientUnits="userSpaceOnUse" x1="0" y1="72" x2="0" y2="162"><stop offset="0" stop-color="${L.on ? "#ffffff" : "#f4f2f8"}"/><stop offset=".55" stop-color="${L.on ? cl : "#dcd8e6"}"/><stop offset="1" stop-color="${L.on ? h.shade(c, -.12) : "#aaa5b8"}"/></linearGradient>`;
       const shape = (f, dy) => `<g clip-path="url(#${u}-cc)">` + cs.map(([x, y, r]) => `<circle cx="${x}" cy="${y + (dy || 0)}" r="${r}" fill="${f}"/>`).join("") + `<rect x="52" y="${130 + (dy || 0)}" width="96" height="30" fill="${f}"/></g>`;
       return svg(o,
         cg + `<clipPath id="${u}-cc"><rect x="20" y="40" width="160" height="120"/></clipPath>` +
-        sh(o, 100, 164, 64, 6) + halo(o, 100, 120, 84, 62, .6) + pool(o, 100, 162, 80, 10, .8) +
+        sh(o, 100, 164, 64, 6) + halo(L, 100, 120, 84, 62, .6) + pool(L, 100, 162, 80, 10, .8) +
         shape("#000", 2).replace("<g ", `<g opacity=".18" `) + shape(`url(#${u}-cg)`) +
         [[80, 100, 22], [110, 86, 22], [134, 100, 16]].map(([x, y, r]) => `<path d="M${x - r * .7} ${y}A${r} ${r} 0 0 1 ${x + r * .2} ${y - r * .66}" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="2.4" stroke-linecap="round"/>`).join("") +
         `<path d="M52 158H148" stroke="#000" stroke-opacity=".12" stroke-width="3"/>` +
         `<path d="M84 128Q88 132 92 128M108 128Q112 132 116 128" fill="none" stroke="#3b335f" stroke-width="2" stroke-linecap="round"/><path d="M96 138Q100 141 104 138" fill="none" stroke="#3b335f" stroke-width="1.8" stroke-linecap="round"/>` +
         `<ellipse cx="80" cy="136" rx="5" ry="3" fill="#ff8fb0" opacity=".45"/><ellipse cx="120" cy="136" rx="5" ry="3" fill="#ff8fb0" opacity=".45"/>` +
         `<ellipse cx="96" cy="73" rx="6" ry="1.8" fill="#e8e4ef"/>` + nozzle(96, 73, 4, 1.3) +
-        wisp(o, 96, 72, { tint: true, s: .9 }));
+        wisp(o, 96, 72, { tint: L.on, s: .9 }));
     }),
 
     ic("cabinet", "Room cabinet", sw("#7dd3fc"), "Light", (o) => {

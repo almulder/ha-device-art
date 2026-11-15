@@ -57,7 +57,7 @@ ${extra || ""}</defs>`;
   }
   const row4 = (cx, cy, gap) => [0, 1, 2, 3].map((i) => [cx + (i - 1.5) * gap, cy]);
 
-  const SEG = { 0: "abcdef", 1: "bc", 2: "abdeg", 3: "abcdg", 4: "bcfg", 5: "acdfg", 6: "acdefg", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
+  const SEG = { O: "abcdef", F: "aefg", "-": "g", 0: "abcdef", 1: "bc", 2: "abdeg", 3: "abcdg", 4: "bcfg", 5: "acdfg", 6: "acdefg", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
   function digits(str, X, Y, h, col) {
     const w = h * .52, t = Math.max(1, h * .13); let s = "", xx = X;
     for (const ch of str) {
@@ -90,6 +90,70 @@ ${digits("10:08", X + W * .07, Y + Hh * .64, Hh * .22, "#ffffff")}
   }
   const led = (x, cx, cy, col, cls) => x.on ? `<circle cx="${cx}" cy="${cy}" r="5" fill="${col}" opacity=".25"/><circle class="${cls || ""}" cx="${cx}" cy="${cy}" r="1.8" fill="${col}"/>` : `<circle cx="${cx}" cy="${cy}" r="1.4" fill="#000" opacity=".25"/>`;
   const base = (o) => Object.assign({ picker: true, colorLabel: "Color" }, o);
+
+  // ---------- (parts) Multi-Function: the two thermostats and the smoke & CO alarm ----------
+  // Thermostats: o.pval.mode (off / heat / cool / auto / eco), state (idle / heating / cooling / fan), fan (auto / on /
+  // circulate) as stages, temp (room) and sp (setpoint) as readings. As a Multi-Function Image the display stays awake:
+  // the setpoint big (OFF when off), the room temperature small under it, a mark for what it does (flame, snowflake, leaf,
+  // fan) and, on the round one, the ring arc from the room temperature to the setpoint in the running color.
+  // Alarm: o.pval.smoke and o.pval.co (clear / detected / tested): smoke blinks the ring red, CO amber, a test blue;
+  // all clear leaves the ring dark. Without readings (a Device Image) both are drawn as before.
+  const TMODE = { id: "mode", name: "Mode", type: "stage", values: [["off", "Off"], ["heat", "Heat"], ["cool", "Cool"], ["auto", "Auto"], ["eco", "Eco"]], def: "heat" };
+  const TPARTS = [TMODE,
+    { id: "state", name: "Operating state", type: "stage", values: [["idle", "Idle"], ["heating", "Heating"], ["cooling", "Cooling"], ["fan", "Fan only"]], def: "heating" },
+    { id: "fan", name: "Fan", type: "stage", values: [["auto", "Auto"], ["on", "On"], ["circulate", "Circulate"]], def: "auto" },
+    { id: "temp", name: "Temperature", type: "value", unit: "°", min: 40, max: 95, def: 68 }, { id: "sp", name: "Setpoint", type: "value", unit: "°", min: 45, max: 90, def: 70 }];
+  const APARTS = [{ id: "smoke", name: "Smoke", type: "stage", values: [["clear", "Clear"], ["detected", "Smoke"], ["tested", "Test"]], def: "clear" },
+    { id: "co", name: "Carbon monoxide", type: "stage", values: [["clear", "Clear"], ["detected", "CO detected"], ["tested", "Test"]], def: "clear" }];
+  const pvs = (o, ks) => { const v = o.pval || {}, r = {}; let any = false; ks.forEach((k) => { if (v[k] != null && v[k] !== "") { r[k] = String(v[k]).toLowerCase(); any = true; } }); return any ? r : null; };
+  const TCOL = { heat: "#ff8a2a", cool: "#3c9cff", fan: "#3fcf9a", eco: "#5fc46e", idle: "#9aa0a8" };
+  // what the thermostat says: { main (string), room (string or null), run: heat / cool / fan / null, mark: heat / cool / eco / fan / null }
+  function tRead(v) {
+    const num = (k) => (v[k] != null && isFinite(+v[k]) ? Math.round(+v[k]) : null), sp = num("sp"), tp = num("temp"), m = v.mode || null, s = v.state || null;
+    const run = s === "heating" ? "heat" : s === "cooling" ? "cool" : s === "fan" ? "fan" : null;
+    const off = m === "off", main = off ? "OFF" : sp != null ? String(sp) : tp != null ? String(tp) : "--";
+    const mark = off ? null : run === "fan" || ((v.fan === "on" || v.fan === "circulate") && !run) ? "fan" : m === "eco" ? "eco" : run || (m === "heat" ? "heat" : m === "cool" ? "cool" : null);
+    return { main, room: (sp != null || off) && tp != null ? String(tp) : null, run, mark, sp, tp };
+  }
+  const dW = (str, h) => { const w = h * .52, t = Math.max(1, h * .13); let n = 0; for (const ch of str) n += ch === "°" ? t * 3.4 : w + t * 1.6; return n - t * 1.6; };
+  const dC = (str, cx, y, h, col) => digits(str, cx - dW(str, h) / 2, y, h, col);
+  function tMark(kind, cx, cy, s, col) {
+    if (kind === "heat") return `<path transform="translate(${cx} ${cy}) scale(${s})" d="M0 -1 C.55 -.5 .78 -.05 .6 .38 C.47 .76 .16 .98 0 .98 C-.16 .98 -.5 .78 -.6 .38 C-.7 -.04 -.38 -.32 -.22 -.62 C-.14 -.3 .02 -.26 .07 -.44 C.12 -.64 .06 -.84 0 -1 Z" fill="${col}"/>`;
+    if (kind === "cool") return `<g transform="translate(${cx} ${cy}) scale(${s})" stroke="${col}" stroke-width=".18" stroke-linecap="round">${[0, 60, 120].map((a) => `<path transform="rotate(${a})" d="M0 -1 V1 M-.28 -.78 L0 -.55 L.28 -.78 M-.28 .78 L0 .55 L.28 .78" fill="none"/>`).join("")}</g>`;
+    if (kind === "eco") return `<g transform="translate(${cx} ${cy}) scale(${s})"><path d="M-.85 .85 C-1 -.25 -.25 -1 .95 -.95 C1 .25 .25 1 -.85 .85 Z" fill="${col}"/><path d="M-.7 .7 L.5 -.5" stroke="#d9f5c8" stroke-width=".14" stroke-linecap="round"/></g>`;
+    if (kind === "fan") return `<g transform="translate(${cx} ${cy}) scale(${s})" fill="${col}">${[0, 120, 240].map((a) => `<path transform="rotate(${a})" d="M0 0 C-.55 -.35 -.4 -1 0 -1 C.35 -1 .3 -.4 0 0 Z"/>`).join("")}<circle r=".18"/></g>`;
+    return "";
+  }
+  function learningMF(x, v) {
+    const R = tRead(v), col = TCOL[R.run || (R.mark === "eco" ? "eco" : "idle")];
+    const arc = (r, a0, a1) => { const p = (a) => `${f(100 + Math.cos(a) * r)} ${f(100 + Math.sin(a) * r)}`; return `M${p(a0)} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${p(a1)}`; };
+    const ang = (t) => Math.PI * (.75 + 1.5 * Math.max(0, Math.min(1, (t - (t < 45 ? 10 : 50)) / (t < 45 ? 22 : 40))));
+    let ring = `<path d="${arc(44, Math.PI * .75, Math.PI * 2.25)}" stroke="#ffffff" stroke-opacity=".15" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    if (R.main !== "OFF" && R.sp != null) {
+      const a = ang(R.sp), b = R.tp != null ? ang(R.tp) : a;
+      if (R.run && Math.abs(a - b) > .02) ring += `<path class="${P}breath" d="${arc(44, Math.min(a, b), Math.max(a, b))}" stroke="${col}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+      if (R.tp != null) ring += `<circle cx="${f(100 + Math.cos(b) * 44)}" cy="${f(100 + Math.sin(b) * 44)}" r="1.8" fill="#fff" opacity=".7"/>`;
+      ring += `<circle cx="${f(100 + Math.cos(a) * 44)}" cy="${f(100 + Math.sin(a) * 44)}" r="3.4" fill="#fff"/>`;
+    }
+    const face = R.run ? `<circle cx="100" cy="100" r="53" fill="${col}" opacity=".16"/>` : "";
+    const h = R.main === "OFF" ? 26 : 34;
+    return face + ring + dC(R.main, 100, 98 - h / 2, h, R.main === "OFF" ? "#c9ccd2" : "#ffffff") +
+      (R.mark ? `<g${R.run ? ` class="${P}breath"` : ""}>${tMark(R.mark, 100, 70, 5, R.run ? col : R.mark === "eco" ? TCOL.eco : "#b8bdc4")}</g>` : "") +
+      (R.room ? dC(R.room, 100, 120, 10, "#ffffff").replace(/fill="#ffffff"/g, 'fill="#ffffff" fill-opacity=".72"') : "");
+  }
+  function frostedMF(x, v) {
+    const R = tRead(v), col = R.run ? (R.run === "cool" ? "#2f86e0" : R.run === "fan" ? "#23a87a" : "#f29a4a") : R.mark === "eco" ? "#4aa85a" : "#8b9097";
+    const h = R.main === "OFF" ? 22 : 28;
+    return `<circle cx="100" cy="100" r="40" fill="#fff" opacity=".7"/>` + (R.run ? `<circle class="${P}breath" cx="100" cy="100" r="40" fill="${col}" opacity=".08"/>` : "") +
+      dC(R.main, 100, 98 - h / 2, h, col) + (R.mark ? tMark(R.mark, 100, 74, 4, col) : "") + (R.room ? dC(R.room, 100, 117, 8.5, "#7d838b") : "");
+  }
+  // the alarm ring: smoke red, CO amber, test blue (blinking); all clear dark
+  function alarmRing(x, v) {
+    const sm = v.smoke, cm = v.co, det = (s) => s === "detected", col = det(sm) ? "#ff3b30" : det(cm) ? "#ffa31a" : sm === "tested" || cm === "tested" ? "#3c8dff" : null;
+    if (!col) return `<circle cx="100" cy="92" r="20" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="2"/>`;
+    const cls = det(sm) || det(cm) ? "blink" : "breath";
+    return `<g class="${P}${cls}"><circle cx="100" cy="92" r="46" fill="${col}" opacity=".12"/><circle cx="100" cy="92" r="20" fill="none" stroke="${col}" stroke-width="3.4" opacity=".95"/><circle cx="100" cy="92" r="26" fill="none" stroke="${col}" stroke-width="6" opacity=".25"/></g>`;
+  }
   const first = (c, l) => [c].concat(l.filter((k) => k !== c));
 
   const icons = [
@@ -196,31 +260,31 @@ ${x.on ? `<ellipse class="${P}ring" cx="100" cy="146" rx="52" ry="9" fill="url(#
 <path d="M70 120 C70 104 74 96 80 93" stroke="#fff" stroke-opacity=".55" stroke-width="2.4" fill="none" stroke-linecap="round"/>`));
     } }),
 
-    base({ id: "round-learning-thermostat", name: "Round learning thermostat", colors: ["#d6d9de", "#d9c08a", "#2a2b2e"], colorLabel: "Ring", render(o) {
-      const x = ctx(o);
+    base({ id: "round-learning-thermostat", name: "Round learning thermostat", colors: ["#d6d9de", "#d9c08a", "#2a2b2e"], colorLabel: "Ring", parts: TPARTS, render(o) {
+      const x = ctx(o), TV = pvs(o, ["mode", "state", "fan", "temp", "sp"]);
       const arc = (r, a0, a1) => { const p = (a) => `${f(100 + Math.cos(a) * r)} ${f(100 + Math.sin(a) * r)}`; return `M${p(a0)} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${p(a1)}`; };
       return svg(x, fin(x, `${wallBg(x)}<circle cx="102" cy="104" r="58" fill="#000" opacity=".3"/>
 <circle cx="100" cy="100" r="58" fill="${x.url("met")}"/><circle cx="100" cy="100" r="54" fill="#000" opacity=".25"/><circle cx="100" cy="100" r="53" fill="${x.url("blk")}"/>
-${x.on ? `<path d="${arc(44, Math.PI * .75, Math.PI * 2.25)}" stroke="#ffffff" stroke-opacity=".15" stroke-width="3" fill="none" stroke-linecap="round"/>
+${TV ? learningMF(x, TV) : x.on ? `<path d="${arc(44, Math.PI * .75, Math.PI * 2.25)}" stroke="#ffffff" stroke-opacity=".15" stroke-width="3" fill="none" stroke-linecap="round"/>
 <path d="${arc(44, Math.PI * .75, Math.PI * 1.55)}" stroke="#ff8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="${f(100 + Math.cos(Math.PI * 1.55) * 44)}" cy="${f(100 + Math.sin(Math.PI * 1.55) * 44)}" r="3.4" fill="#fff"/>
 ${digits("71", 78, 82, 34, "#ffffff")}<rect x="86" y="126" width="28" height="3" rx="1.5" fill="#ff8a2a" opacity=".85"/>` : ""}
 <circle cx="100" cy="100" r="53" fill="${x.url("glass")}"/>`));
     } }),
 
-    base({ id: "frosted-thermostat", name: "Frosted thermostat", colors: [SNOW, "#e8e3da", "#d8dde2"], render(o) {
-      const x = ctx(o);
+    base({ id: "frosted-thermostat", name: "Frosted thermostat", colors: [SNOW, "#e8e3da", "#d8dde2"], parts: TPARTS, render(o) {
+      const x = ctx(o), TV = pvs(o, ["mode", "state", "fan", "temp", "sp"]);
       return svg(x, fin(x, `${wallBg(x)}<circle cx="102" cy="104" r="50" fill="#000" opacity=".28"/><circle cx="100" cy="100" r="50" fill="${x.url("pl")}"/>
 <circle cx="100" cy="100" r="42" fill="#e6e8ec"/><circle cx="100" cy="100" r="42" fill="${x.url("glass")}"/>
-${x.on ? `<circle cx="100" cy="100" r="40" fill="#fff" opacity=".7"/>${digits("70", 82, 86, 28, "#f29a4a")}` : `<circle cx="100" cy="100" r="42" fill="#000" opacity=".05"/>`}`));
+${TV ? frostedMF(x, TV) : x.on ? `<circle cx="100" cy="100" r="40" fill="#fff" opacity=".7"/>${digits("70", 82, 86, 28, "#f29a4a")}` : `<circle cx="100" cy="100" r="42" fill="#000" opacity=".05"/>`}`));
     } }),
 
-    base({ id: "smoke-and-co-alarm", name: "Smoke & CO alarm", colors: [SNOW, "#e9e6df", "#dcdfe3"], render(o) {
-      const x = ctx(o); let holes = "";
+    base({ id: "smoke-and-co-alarm", name: "Smoke & CO alarm", colors: [SNOW, "#e9e6df", "#dcdfe3"], parts: APARTS, render(o) {
+      const x = ctx(o), AV = pvs(o, ["smoke", "co"]); let holes = "";
       for (let r = 0; r < 13; r++) for (let c = 0; c < 13; c++) { const hx = 56 + c * 7.4, hy = 48 + r * 7.4; if (Math.hypot(hx - 100, hy - 92) < 26 || Math.hypot(Math.max(0, Math.abs(hx - 100) - 30), Math.max(0, Math.abs(hy - 92) - 30)) > 14) continue; holes += `<circle cx="${f(hx)}" cy="${f(hy)}" r="1.2" fill="#000" opacity=".22"/>`; }
       return svg(x, fin(x, `<g class="hda-bg"><rect width="200" height="200" fill="#d9d6e0" opacity=".35"/></g><rect x="50" y="42" width="104" height="104" rx="22" fill="#000" opacity=".2"/>
 <rect x="48" y="40" width="104" height="104" rx="22" fill="${x.url("pl")}"/>${holes}
 <circle cx="100" cy="92" r="20" fill="${H.shade(x.c, -.05)}"/>
-${x.on ? `<circle class="${P}breath" cx="100" cy="92" r="20" fill="none" stroke="#5be08a" stroke-width="3.4" opacity=".9"/><circle cx="100" cy="92" r="26" fill="none" stroke="#5be08a" stroke-width="6" opacity=".2"/>` : `<circle cx="100" cy="92" r="20" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="2"/>`}
+${AV ? alarmRing(x, AV) : x.on ? `<circle class="${P}breath" cx="100" cy="92" r="20" fill="none" stroke="#5be08a" stroke-width="3.4" opacity=".9"/><circle cx="100" cy="92" r="26" fill="none" stroke="#5be08a" stroke-width="6" opacity=".2"/>` : `<circle cx="100" cy="92" r="20" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="2"/>`}
 <circle cx="100" cy="92" r="15" fill="${x.url("pl")}"/>`));
     } }),
 

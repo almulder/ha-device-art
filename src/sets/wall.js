@@ -108,6 +108,14 @@ ${extra || ""}</defs>`;
 <path d="${sh(w0 * .6, sp * .45, len * .7)}" fill="${g}" opacity="${x.op(.5 * k)}"/>
 <ellipse cx="${cx}" cy="${y + dir * 5}" rx="${w0 + 8}" ry="9" fill="${x.url("halo")}" opacity="${x.op(.8 * k)}"/>`;
   }
+  // (multi-function) up / down lights as their own parts: o.mf = only the ticked ones in o.parts, each with its own
+  // brightness (o.plevel), one light color (o.pcolor.up, else .down, else the device's); a light left out stays dark.
+  // udO(o): the device as a whole (on = either light); udX(x, o, k): one light's view of the drawing. A Device Image is today's.
+  const UDP = [{ id: "up", name: "Up light", type: "switch" }, { id: "down", name: "Down light", type: "switch" }];
+  const udO = (o) => { if (!o.mf) return o; const pp = o.parts || {}, pl = o.plevel || {}, pc = o.pcolor || {}, d = o.level == null ? 1 : o.level;
+    return Object.assign({}, o, { on: !!(pp.up || pp.down), color: pc.up || pc.down || o.color, level: Math.max(pp.up ? (pl.up == null ? d : pl.up) : 0, pp.down ? (pl.down == null ? d : pl.down) : 0) }); };
+  const udX = (x, o, k) => { if (!o.mf) return x; const pp = o.parts || {}, pl = o.plevel || {}, y = Object.assign({}, x), lv = pl[k] == null ? (o.level == null ? 1 : o.level) : pl[k];
+    y.on = !!pp[k]; y.L = y.on ? .3 + .7 * lv : 0; y.op = (q) => (q * y.L).toFixed(2); return y; };
   const glowE = (x, cx, cy, rx, ry, k) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url("halo")}" opacity="${x.op(k == null ? .7 : k)}"/>`;
   const halo = (x, cx, cy, r, k) => x.on ? glowE(x, cx, cy, r, r, k == null ? .6 : k) : "";
   const drop = (x, shape, dx, dy, a) => `<g transform="translate(${dx == null ? 3.5 : dx} ${dy == null ? 5 : dy})" fill="#000" opacity="${a || .45}" filter="${x.url("bl")}">${shape}</g>`;
@@ -162,14 +170,14 @@ ${hl(`M${cx - h + 2} ${y0 + 5} V${y1 - 2}`, .5, 1)}`;
   const base = (o) => Object.assign({ picker: true, colorLabel: "Light", cast: "around" }, o);
 
   const icons = [
-     base({ id: "updown", name: "Up/down cylinder", colors: COLS, cast: "both", glow: { x: .5, y: .5, r: 1.1 }, colors2: ["#5a4232", "#2a2b33", "#ecebf0", "#c99a48", "#b8774f", "#8ea58b"], picker2: true, colorLabel2: "Finish", render(o) {
-      const x = ctx(o); x.k2 = "brz"; x.c2v = x.c2 || "#5a4232"; const _t = 0;
-      const W = scallop(x, 100, 77, -1, 12, 44, 70) + scallop(x, 100, 123, 1, 12, 44, 70) + glowE(x, 100, 100, 34, 46, .3);
+     base({ id: "updown", name: "Up/down cylinder", colors: COLS, cast: "both", glow: { x: .5, y: .5, r: 1.1 }, colors2: ["#5a4232", "#2a2b33", "#ecebf0", "#c99a48", "#b8774f", "#8ea58b"], picker2: true, colorLabel2: "Finish", parts: UDP, render(o0) {
+      const o = udO(o0), x = ctx(o); x.k2 = "brz"; x.c2v = x.c2 || "#5a4232"; const _t = 0, xu = udX(x, o0, "up"), xd = udX(x, o0, "down");
+      const W = scallop(xu, 100, 77, -1, 12, 44, 70) + scallop(xd, 100, 123, 1, 12, 44, 70) + (o0.mf ? glowE(xu, 100, 86, 34, 26, .3) + glowE(xd, 100, 114, 34, 26, .3) : glowE(x, 100, 100, 34, 46, .3));
       const F = drop(x, `<rect x="86" y="76" width="28" height="48" rx="3"/>`) +
         `<rect x="86" y="76" width="28" height="48" rx="3" fill="${x.url("brz")}"/>
 <rect x="85" y="75" width="30" height="4" rx="1.6" fill="${x.url("brz")}"/><rect x="85" y="121" width="30" height="4" rx="1.6" fill="${x.url("brz")}"/>
-<path d="M85.5 75.6 H114.5" stroke="${x.on ? x.hot : "#a88a70"}" stroke-opacity="${x.on ? x.op(1) : ".5"}" stroke-width="1.2"/>
-<path d="M85.5 124.4 H114.5" stroke="${x.on ? x.hot : "#a88a70"}" stroke-opacity="${x.on ? x.op(1) : ".35"}" stroke-width="1.2"/>
+<path d="M85.5 75.6 H114.5" stroke="${xu.on ? x.hot : "#a88a70"}" stroke-opacity="${xu.on ? xu.op(1) : ".5"}" stroke-width="1.2"/>
+<path d="M85.5 124.4 H114.5" stroke="${xd.on ? x.hot : "#a88a70"}" stroke-opacity="${xd.on ? xd.op(1) : ".35"}" stroke-width="1.2"/>
 <rect x="86" y="98.4" width="28" height="3" fill="#000" fill-opacity=".35"/><path d="M86 101.6 H114" stroke="#fff" stroke-opacity=".12"/>
 ${hl("M92.4 81 V96 M92.4 104 V119", .32, 1.6)}`;
       return scene(x, "plaster", W, F);
@@ -356,16 +364,16 @@ ${x.on ? `<ellipse cx="128" cy="91" rx="12" ry="2.6" fill="#fff" opacity="${x.op
       return scene(x, "siding", W, F);
     } }),
 
-     base({ id: "cube", name: "Up/down cube", colors: OUT, cast: "both", glow: { x: .52, y: .5, r: 1 }, colors2: ["#3a3c44", "#ecebf0", "#5a4232", "#9a9ca4", "#2f4a3c"], picker2: true, colorLabel2: "Finish", render(o) {
-      const x = ctx(o); const b2 = x.c2 || "#3a3c44"; const _t = 0;
+     base({ id: "cube", name: "Up/down cube", colors: OUT, cast: "both", glow: { x: .52, y: .5, r: 1 }, colors2: ["#3a3c44", "#ecebf0", "#5a4232", "#9a9ca4", "#2f4a3c"], picker2: true, colorLabel2: "Finish", parts: UDP, render(o0) {
+      const o = udO(o0), x = ctx(o); const b2 = x.c2 || "#3a3c44"; const _t = 0, xu = udX(x, o0, "up"), xd = udX(x, o0, "down");
       const ex = lg(x.id("gp"), [[0, H.shade(b2, -.2)], [.4, H.shade(b2, .15)], [1, H.shade(b2, -.4)]], 0, 0, 1, 1);
-      const W = scallop(x, 100, 77, -1, 7, 26, 69) + scallop(x, 100, 125, 1, 7, 26, 67) + glowE(x, 104, 100, 30, 40, .2);
+      const W = scallop(xu, 100, 77, -1, 7, 26, 69) + scallop(xd, 100, 125, 1, 7, 26, 67) + (o0.mf ? glowE(xu, 104, 86, 30, 22, .2) + glowE(xd, 104, 114, 30, 22, .2) : glowE(x, 104, 100, 30, 40, .2));
       const F = drop(x, `<rect x="76" y="76" width="56" height="48"/>`, 5, 6, .55) +
         `<rect x="76" y="80" width="48" height="44" fill="url(#${x.id("gp")})"/><path d="M124 80 L136 74 L136 118 L124 124 Z" fill="#141519"/>
 <path d="M76 80 L88 74 L136 74 L124 80 Z" fill="#5d606b"/>
-<rect x="90" y="75.4" width="22" height="3" rx="1.4" fill="${x.on ? x.hot : "#2a2c33"}" ${x.on ? `opacity="${x.op(1)}"` : ""}/>
-${x.on ? `<rect x="94" y="75.8" width="14" height="1.6" rx=".8" fill="#fff" opacity="${x.op(.9)}"/>` : ""}
-<path d="M90 124 H110" stroke="${x.on ? x.hot : "#555"}" stroke-opacity="${x.on ? x.op(1) : ".6"}" stroke-width="1.8" stroke-linecap="round"/>
+<rect x="90" y="75.4" width="22" height="3" rx="1.4" fill="${xu.on ? x.hot : "#2a2c33"}" ${xu.on ? `opacity="${xu.op(1)}"` : ""}/>
+${xu.on ? `<rect x="94" y="75.8" width="14" height="1.6" rx=".8" fill="#fff" opacity="${xu.op(.9)}"/>` : ""}
+<path d="M90 124 H110" stroke="${xd.on ? x.hot : "#555"}" stroke-opacity="${xd.on ? xd.op(1) : ".6"}" stroke-width="1.8" stroke-linecap="round"/>
 ${hl("M77 81 H123", .2, 1)}${hl("M77.4 82 V122", .14, 1)}`;
       return scene(x, "concrete", W, F, ex);
     } }),

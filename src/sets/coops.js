@@ -182,10 +182,17 @@ ${extra || ""}</defs>`;
 `;
   const BG = (s) => `<g class="hda-bg">${s}</g>`;
   const RED_B = "#a8322c", WHT = "#ecebe6", GRY = "#8a9096", WOOD = "#b07a4a", GRN = "#5a7a4a";
-  const part = (o, id) => Object.assign({}, o, { on: !!(o.parts && o.parts[id] != null ? o.parts[id] : o.on) });
+  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // Image (no o.mf, as today: the auto door, light and heaters follow o.on) and stays off / closed, never animated, as a
+  // Multi-Function Image (o.mf). The readings come from o.pval when o.mf (temp = the coop temperature, water = the
+  // waterer level in %), else from the Temperature menu and the slider (as today); a reading left out is blank.
+  const has = (o, k) => !!(o.parts && o.parts[k] != null);
+  const part = (o, id) => Object.assign({}, o, { on: has(o, id) ? !!o.parts[id] : !o.mf && !!o.on });
+  const val = (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" && isFinite(+o.pval[k]) ? Math.round(+o.pval[k]) : null);
+  const wlev = (o) => (o.mf ? (val(o, "water") == null ? null : Math.max(0, Math.min(1, val(o, "water") / 100))) : o.level);
   const TEMPS = [["40", "40°F"], ["20", "20°F"], ["60", "60°F"], ["80", "80°F"], ["95", "95°F"]];
   const OPTS = [{ id: "temp", name: "Temperature", values: TEMPS }];
-  const tval = (o) => +((o.opt && o.opt.temp) || 40);
+  const tval = (o) => (o.mf ? val(o, "temp") : +((o.opt && o.opt.temp) || 40));
 
   function cextra(o) {
     const u = o.uid;
@@ -226,7 +233,7 @@ ${extra || ""}</defs>`;
   }
   
   function fount(o, x, y, s) {
-    const lv = o.level, h = 24 * s, w = 16 * s, wl = lv < .05 ? 0 : lv, col = lv < .05 ? RED : lv < .25 ? AMB : null;
+    const lv = wlev(o), h = 24 * s, w = 16 * s, wl = lv == null || lv < .05 ? 0 : lv, col = lv == null ? null : lv < .05 ? RED : lv < .25 ? AMB : null;
     return `<ellipse cx="${x}" cy="${y}" rx="${w * .9}" ry="${3 * s}" fill="#000" opacity=".3"/><path d="M${x - w * .8} ${y}L${x - w * .7} ${y - 4 * s}H${x + w * .7}L${x + w * .8} ${y}Z" fill="#c8323a"/>` +
       `<path d="M${x - w / 2} ${y - 4 * s}V${y - h + 4 * s}Q${x - w / 2} ${y - h} ${x} ${y - h}Q${x + w / 2} ${y - h} ${x + w / 2} ${y - h + 4 * s}V${y - 4 * s}Z" fill="#eef0f1"/>` +
       `<path d="M${x - w / 2} ${y - 4 * s}V${y - h + 4 * s}Q${x - w / 2} ${y - h} ${x} ${y - h}Q${x + w / 2} ${y - h} ${x + w / 2} ${y - h + 4 * s}V${y - 4 * s}Z" fill="url(#${o.uid}-fx)"/>` +
@@ -237,6 +244,7 @@ ${extra || ""}</defs>`;
   
   function ctemp(o, x, y) {
     const t = tval(o), col = t <= 32 ? "#6fb8ff" : t >= 90 ? RED : "#7ee08a";
+    if (t == null) return `<path d="${rr(x, y, 30, 15, 2)}" fill="#e9ecef"/><path d="${rr(x + 2, y + 2, 26, 11, 1.5)}" fill="#0a0d10"/>`;
     return `<path d="${rr(x, y, 30, 15, 2)}" fill="#e9ecef"/><path d="${rr(x + 2, y + 2, 26, 11, 1.5)}" fill="#0a0d10"/>` + digits(String(t), x + 6, y + 4.4, 6.4, col, "rgba(255,255,255,.05)") +
       `<circle cx="${x + 19.4}" cy="${y + 4.8}" r=".9" fill="none" stroke="${col}" stroke-width=".6"/><path d="M${x + 21.4} ${y + 4.4}v6.2M${x + 21.4} ${y + 4.4}h3M${x + 21.4} ${y + 7.4}h2.4" stroke="${col}" stroke-width=".8"/>`;
   }
@@ -264,7 +272,10 @@ ${extra || ""}</defs>`;
   const lampGlow = (o, x, y) => o.on ? `<circle cx="${x}" cy="${y}" r="22" fill="url(#${o.uid}-heat)"/><circle cx="${x}" cy="${y}" r="3" fill="#ff6a2a"/>` : `<circle cx="${x}" cy="${y}" r="3" fill="#5a2a1a"/>`;
   const winLight = (o, x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${o.on ? "#ffe2a0" : "#2a2e34"}"/>` + (o.on ? `<rect x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" fill="#ffe2a0" opacity=".25"/>` : "") + `<path d="M${x + w / 2} ${y}V${y + h}M${x} ${y + h / 2}H${x + w}" stroke="#f2f0ea" stroke-width="1"/>`;
 
-  const ic = (id, name, colors, parts, render) => ({ id, name, colors, picker: true, colorLabel: "Paint", parts: parts.length ? parts.map((p) => ({ id: p[0], name: p[1] })) : undefined, options: OPTS, render });
+  // parts: [id, name, type?, unit, min, max, def] (no type = switch); every drawing with parts also gets its readings
+  const READS = [["temp", "Coop temperature", "value", "°F", -20, 110, 40], ["water", "Water level", "value", "%", 0, 100, 80]];
+  const pcs = (list) => list.map((p) => Object.assign({ id: p[0], name: p[1] }, p[2] ? { type: p[2] } : {}, p[3] ? { unit: p[3], min: p[4], max: p[5], def: p[6] } : {}));
+  const ic = (id, name, colors, parts, render) => ({ id, name, colors, picker: true, colorLabel: "Paint", parts: parts.length ? pcs(parts.concat(READS)) : undefined, options: OPTS, render });
   const DOOR = ["door", "Auto door"], LIGHT = ["light", "Light"], HEAT = ["heat", "Heat lamp"], WHEAT = ["wheat", "Waterer heater"];
 
   const icons = [
@@ -339,8 +350,8 @@ ${extra || ""}</defs>`;
         (open ? hen(100, 182, .9, "speck", true) : "") + ctemp(o, 22, 60) + fount(o, 26, 180, .7)); }),
 
     
-    ic("heatwaterer", "Heated waterer", [WHT, GRY, RED_B], [WHEAT], (o) => { const u = o.uid, oh = part(o, "wheat"), lv = o.level, t = tval(o), ice = t <= 32 && !oh.on;
-      const col = lv < .05 ? RED : lv < .25 ? AMB : null, wl = lv < .05 ? 0 : lv;
+    ic("heatwaterer", "Heated waterer", [WHT, GRY, RED_B], [WHEAT], (o) => { const u = o.uid, oh = part(o, "wheat"), lv = wlev(o), t = tval(o), ice = t != null && t <= 32 && !oh.on;
+      const col = lv == null ? null : lv < .05 ? RED : lv < .25 ? AMB : null, wl = lv == null || lv < .05 ? 0 : lv;
       return svgC(o, yard(o, 130, false) + sh(o, 100, 176, 60, 6) + `<path d="M48 174L56 156H144L152 174Z" fill="#c8323a"/><path d="M48 174H152V178H48Z" fill="#8a1e1a"/>` +
         `<ellipse cx="100" cy="158" rx="42" ry="5" fill="${ice ? "#e6f6ff" : "url(#" + u + "-wat)"}"/>` + (oh.on ? `<ellipse cx="100" cy="170" rx="54" ry="8" fill="url(#${u}-heat)" opacity=".7"/>` : "") +
         `<path d="M64 156V64Q64 46 100 46Q136 46 136 64V156Z" fill="url(#${u}-c)"/><path d="M64 156V64Q64 46 100 46Q136 46 136 64V156Z" fill="url(#${u}-g)" opacity=".3"/>` +
@@ -349,7 +360,7 @@ ${extra || ""}</defs>`;
         `<path d="M86 46Q100 36 114 46" fill="none" stroke="#3a3f46" stroke-width="4"/>` + tube("M152 172C170 172 176 180 204 182", 3, BLKP) + led(o, 138, 168, 1.4, oh.on, ORNG, "ho") + ctemp(o, 150, 60)); }),
 
     
-    ic("nipple", "Nipple waterer bucket", [WHT, GRY, RED_B], [WHEAT], (o) => { const u = o.uid, oh = part(o, "wheat"), lv = o.level, col = lv < .05 ? RED : lv < .25 ? AMB : null, wl = lv < .05 ? 0 : lv;
+    ic("nipple", "Nipple waterer bucket", [WHT, GRY, RED_B], [WHEAT], (o) => { const u = o.uid, oh = part(o, "wheat"), lv = wlev(o), col = lv == null ? null : lv < .05 ? RED : lv < .25 ? AMB : null, wl = lv == null || lv < .05 ? 0 : lv;
       return svgC(o, yard(o, 130, false) + `<path d="M100 4V34" stroke="#555" stroke-width="2"/><path d="M70 50Q100 24 130 50" fill="none" stroke="#5a6068" stroke-width="2"/>` +
         `<path d="M66 48H134L128 130H72Z" fill="#f2f2ee" fill-opacity=".85"/><path d="M66 48H134L128 130H72Z" fill="url(#${u}-fx)"/>` +
         `<path d="M${n1(72 + 6 * (1 - wl))} ${n1(130 - 80 * wl)}H${n1(128 - 6 * (1 - wl))}L128 130H72Z" fill="${col || "#5ab4ec"}" opacity=".55"/>` + (col ? `<path d="M66 48H134L128 130H72Z" fill="none" stroke="${col}" stroke-width="1.6"${lv < .05 ? ` class="${P}blink"` : ""}/>` : "") +

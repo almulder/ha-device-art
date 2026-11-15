@@ -161,6 +161,22 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
   }
   const litN = (x, n) => x.on ? Math.max(1, Math.round(x.lv * n)) : 0;
 
+  // ---------- (parts) Multi-Function: 2-gang a + b, fan controller fan + light, switch + outlet load + outlet,
+  // nightlight switch load + light, blue-bar load + LED bar. A Device Image (no o.mf, no parts) is drawn as before; as a
+  // Multi-Function Image (o.mf) o.parts holds only the ticked parts (true = on), a part left out is drawn off; a dimmer
+  // part's level is o.plevel[id] (else the slider).
+  const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
+  const plv = (o, k, d) => (o.plevel && o.plevel[k] != null ? Math.max(0, Math.min(1, +o.plevel[k] || 0)) : d);
+  const sx = (x, on, lv) => Object.assign({}, x, { on, lv: lv == null ? x.lv : lv });
+  const SP = (a, b) => [{ id: a[0], name: a[1], type: "switch" }, { id: b[0], name: b[1], type: "switch" }];
+  // a small bulb mark on the fan controller's paddle (only drawn when the Light part is ticked)
+  function bulb(x, on) {
+    const d = "M100 78.4c-2 0-3.5 1.5-3.5 3.4 0 1.3.7 2.1 1.3 2.8.4.4.6.8.6 1.4h3.2c0-.6.2-1 .6-1.4.6-.7 1.3-1.5 1.3-2.8 0-1.9-1.5-3.4-3.5-3.4z";
+    return (on ? `<g class="${P}in"><g class="${P}pulse"><circle cx="100" cy="82" r="9" fill="${x.url("halo")}" opacity=".7"/></g><path d="${d}" fill="${x.url("lens")}"/></g>`
+      : `<path d="${d}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width=".9"/>`) +
+      `<path d="M98.5 86.9H101.5M98.8 88.2H101.2" stroke="#000" stroke-opacity="${on ? .45 : .3}" stroke-width=".8" stroke-linecap="round"/>`;
+  }
+
   const engr = (X, Y, w, dk) => `<path d="M${f(X)} ${f(Y)} H${f(X + w)}" stroke="${dk ? "#fff" : "#000"}" stroke-opacity="${dk ? .5 : .28}" stroke-width="1.3" stroke-linecap="round"/><path d="M${f(X)} ${f(Y + .9)} H${f(X + w)}" stroke="#fff" stroke-opacity="${dk ? .05 : .55}" stroke-width=".6" stroke-linecap="round"/>`;
   const chev = (cx, cy, s, upward, dk) => { const d = upward ? `M${f(cx - s)} ${f(cy + s * .5)} L${f(cx)} ${f(cy - s * .5)} L${f(cx + s)} ${f(cy + s * .5)}` : `M${f(cx - s)} ${f(cy - s * .5)} L${f(cx)} ${f(cy + s * .5)} L${f(cx + s)} ${f(cy - s * .5)}`;
     return `<path d="${d}" fill="none" stroke="${dk ? "#fff" : "#000"}" stroke-opacity="${dk ? .45 : .3}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>`; };
@@ -292,24 +308,26 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
       return scene(x, "blush", b);
     } }),
 
-     base({ id: "twogang", name: "2-gang black", colors: led6(BL), glow: { x: .58, y: .5, r: .5 }, render(o) {
-      const x = ctx(o);
-      const b = plate(x, 40, 40, 120, 120, "black", { r: 4, seam: 1, gloss: 1 }) + rocker(x, 78, 100, 34, 66, "black", x.on) +
-        led(x, 78, 126, 1.6, { locator: 1 }) + frame(x, 104, 67, 36, 66, "black") + paddle(x, 116, 69, 22, 62, "black", 2) +
-        dots(x, 110, 126, 110, 74, 7, litN(x, 7), 1.5);
+     base({ id: "twogang", name: "2-gang black", colors: led6(BL), glow: { x: .58, y: .5, r: .5 }, parts: SP(["a", "Left switch"], ["b", "Right dimmer"]), render(o) {
+      const x = ctx(o), a = sx(x, pon(o, "a")), d = sx(x, pon(o, "b"), plv(o, "b", x.lv));
+      const b = plate(x, 40, 40, 120, 120, "black", { r: 4, seam: 1, gloss: 1 }) + rocker(a, 78, 100, 34, 66, "black", a.on) +
+        led(a, 78, 126, 1.6, { locator: 1 }) + frame(x, 104, 67, 36, 66, "black") + paddle(x, 116, 69, 22, 62, "black", 2) +
+        dots(d, 110, 126, 110, 74, 7, litN(d, 7), 1.5);
       return scene(x, "linen", b, 1.3);
     } }),
 
-     base({ id: "blue-bar-2-in-1", name: "Blue-bar 2-in-1", colors: led6(BL), glow: { x: .59, y: .55, r: .5 }, render(o) {
-      const x = ctx(o);
-      return scene(x, "slate", ino(x, "white", "pulse"));
+     base({ id: "blue-bar-2-in-1", name: "Blue-bar 2-in-1", colors: led6(BL), glow: { x: .59, y: .55, r: .5 }, parts: SP(["load", "Load"], ["led", "LED bar"]), render(o) {
+      // (parts) the LED bar part on = the whole bar lit with a chase (a notification); else the bar shows the load's level
+      const x = ctx(o), nb = !!o.mf && pon(o, "led");
+      const y = !o.mf ? x : nb ? sx(x, true, 1) : sx(x, pon(o, "load"), plv(o, "load", x.lv));
+      return scene(y, "slate", ino(y, "white", nb ? "chase" : "pulse"));
     } }),
 
-     base({ id: "fan", name: "Fan controller", colors: led6(BL), glow: { x: .5, y: .63, r: .45 }, render(o) {
-      const x = ctx(o), n = litN(x, 4);
+     base({ id: "fan", name: "Fan controller", colors: led6(BL), glow: { x: .5, y: .63, r: .45 }, parts: SP(["fan", "Fan"], ["light", "Light"]), render(o) {
+      const x0 = ctx(o), x = sx(x0, pon(o, "fan"), plv(o, "fan", x0.lv)), n = litN(x, 4);
       const blades = [0, 120, 240].map((a) => `<path d="M100 114 C97.6 111 98 106.6 100.6 106 C103 105.8 103 110 100 114Z" transform="rotate(${a} 100 114)"/>`).join("");
       let b = plate(x, 62, 38, 76, 124, "ivory", { r: 4, seam: 1 }) + frame(x, 80, 58, 40, 84, "ivory") + paddle(x, 82, 60, 36, 44, "ivory", 2.4) +
-        chev(100, 72, 3.2, true) + chev(100, 92, 3.2, false);
+        chev(100, 72, 3.2, true) + chev(100, 92, 3.2, false) + (o.mf && o.parts && o.parts.light != null ? bulb(x, !!o.parts.light) : "");
       const dur = (1.6 - 1.2 * x.lv).toFixed(2);
       b += `<circle cx="100" cy="114" r="6.4" fill="#000" opacity=".08"/>` + (x.on
         ? `<g class="${P}in"><circle cx="100" cy="114" r="11" fill="${x.url("halo")}" opacity=".45"/></g><g class="${P}spin" style="animation-duration:${dur}s"><circle cx="100" cy="114" r="6" fill="none"/><g fill="${x.hot}">${blades}</g></g><circle cx="100" cy="114" r="1.2" fill="#fff"/>`
@@ -403,14 +421,16 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
       return scene(x, "plum", b);
     } }),
 
-     base({ id: "outlet", name: "Switch + outlet", colors: led6(GR), glow: { x: .5, y: .38, r: .42 }, render(o) {
-      const x = ctx(o);
+     base({ id: "outlet", name: "Switch + outlet", colors: led6(GR), glow: { x: .5, y: .38, r: .42 }, parts: SP(["load", "Switch"], ["outlet", "Outlet"]), render(o) {
+      const x = ctx(o), l = sx(x, pon(o, "load"));
       need(x, "white"); x.add("rec", rg(x.id("rec"), [[0, "#ffffff"], [.7, "#efedf2"], [1, "#c9c5d1"]], .4, .3, .8));
-      let b = plate(x, 63, 40, 74, 120, "white", { r: 4, seam: 1 }) + frame(x, 82, 60, 36, 80, "white") + rocker(x, 100, 78, 32, 32, "white", x.on) +
-        led(x, 100, 89.4, 1.3, { locator: 1 }) + `<path d="M83 99.6 H117" stroke="#000" stroke-opacity=".3" stroke-width="1"/>`;
+      let b = plate(x, 63, 40, 74, 120, "white", { r: 4, seam: 1 }) + frame(x, 82, 60, 36, 80, "white") + rocker(l, 100, 78, 32, 32, "white", l.on) +
+        led(l, 100, 89.4, 1.3, { locator: 1 }) + `<path d="M83 99.6 H117" stroke="#000" stroke-opacity=".3" stroke-width="1"/>`;
       b += `<rect x="84" y="103" width="32" height="34" rx="9" fill="#000" opacity=".2"/><rect x="84.4" y="102.4" width="31.2" height="33.6" rx="9" fill="${x.url("rec")}"/>${hl("M88 104 H112", .9, .7)}
 <rect x="92" y="111" width="2.8" height="9" rx=".8" fill="#1c1a22"/><rect x="105.2" y="110" width="2.8" height="11" rx=".8" fill="#1c1a22"/>
 <path d="M97.6 131 V128.4 A2.4 2.4 0 0 1 102.4 128.4 V131 Z" fill="#1c1a22"/>`;
+      // (parts) the outlet's own little LED, only as a Multi-Function Image
+      if (o.mf) b += led(sx(x, pon(o, "outlet")), 100, 106.4, .9, { hr: 3.4 });
       return scene(x, "tile", b);
     } }),
 
@@ -429,14 +449,14 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
       return scene(x, "denim", b);
     } }),
 
-     base({ id: "nightlight", name: "Nightlight switch", colors: led6(AM), glow: { x: .5, y: .6, r: .55 }, render(o) {
-      const x = ctx(o);
+     base({ id: "nightlight", name: "Nightlight switch", colors: led6(AM), glow: { x: .5, y: .6, r: .55 }, parts: SP(["load", "Switch"], ["light", "Night light"]), render(o) {
+      const x = ctx(o), l = sx(x, pon(o, "load")), nl = pon(o, "light");
       x.add("nl", rg(x.id("nl"), [[0, "#ffffff", .9], [.6, "#eeeaf4", .7], [1, "#bdb7c8", .7]], .45, .35, .7));
       const star = (cx, cy, r) => "M" + [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => { const a = (i * 36 - 90) * Math.PI / 180, rr2 = i % 2 ? r * .45 : r; return `${f(cx + rr2 * Math.cos(a))} ${f(cy + rr2 * Math.sin(a))}`; }).join(" L") + " Z";
       const art = `<path d="M96 108 C89 108 85.6 114 87 119.4 C88.4 124.6 94.4 126.6 99 124 C94 123.6 91.4 118.6 92.8 114 C93.4 111.6 94.6 109.4 96 108 Z"/><path d="${star(106, 113, 3.4)}"/><path d="${star(110.6, 122.4, 2.2)}"/><path d="${star(101.6, 129, 1.6)}"/>`;
-      let b = plate(x, 62, 38, 76, 124, "white", { r: 10, seam: 1 }) + rocker(x, 100, 74, 34, 36, "white", x.on) +
-        led(x, 100, 87, 1.2, { locator: 1 }) + gap(82, 102, 36, 40, 10) + `<rect x="82" y="102" width="36" height="40" rx="10" fill="${x.url("nl")}"/>`;
-      if (x.on) b += `<g class="${P}in"><g class="${P}pulse"><ellipse cx="100" cy="124" rx="30" ry="28" fill="${x.url("halo")}" opacity=".7"/></g><rect x="84" y="104" width="32" height="36" rx="9" fill="${x.url("lens")}" opacity=".75"/><g fill="#fff" opacity=".95">${art}</g></g>`;
+      let b = plate(x, 62, 38, 76, 124, "white", { r: 10, seam: 1 }) + rocker(l, 100, 74, 34, 36, "white", l.on) +
+        led(l, 100, 87, 1.2, { locator: 1 }) + gap(82, 102, 36, 40, 10) + `<rect x="82" y="102" width="36" height="40" rx="10" fill="${x.url("nl")}"/>`;
+      if (nl) b += `<g class="${P}in"><g class="${P}pulse"><ellipse cx="100" cy="124" rx="30" ry="28" fill="${x.url("halo")}" opacity=".7"/></g><rect x="84" y="104" width="32" height="36" rx="9" fill="${x.url("lens")}" opacity=".75"/><g fill="#fff" opacity=".95">${art}</g></g>`;
       else b += `<g fill="#9a94a8" opacity=".55">${art}</g>`;
       b += hl("M86 106 C92 104 108 104 114 106", .7, 1) + `<rect x="82.3" y="102.3" width="35.4" height="39.4" rx="10" fill="none" stroke="#8f8b9a" stroke-opacity=".4" stroke-width=".6"/>`;
       return scene(x, "mint", b);

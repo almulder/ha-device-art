@@ -209,7 +209,23 @@ ${extra || ""}</defs>`;
 @media (prefers-reduced-motion:reduce){.hda-anim .hda-smallkitchen-spin,.hda-anim .hda-smallkitchen-flow,.hda-anim .hda-smallkitchen-pulse,.hda-anim .hda-smallkitchen-blink,.hda-anim .hda-smallkitchen-wob,.hda-anim .hda-smallkitchen-stm,.hda-anim .hda-smallkitchen-stl,.hda-anim .hda-smallkitchen-jet,.hda-anim .hda-smallkitchen-bub,.hda-anim .hda-smallkitchen-fiz,.hda-anim .hda-smallkitchen-fill,.hda-anim .hda-smallkitchen-rise,.hda-anim .hda-smallkitchen-pop,.hda-anim .hda-smallkitchen-jig,.hda-anim .hda-smallkitchen-twist,.hda-anim .hda-smallkitchen-orb,.hda-anim .hda-smallkitchen-shim,.hda-anim .hda-smallkitchen-swirl,.hda-anim .hda-smallkitchen-glow{animation:none!important}}
 `;
 
-  const ic = (id, name, colors, render, lbl) => ({ id, name, colors, picker: true, colorLabel: lbl || "Finish", render });
+  const ic = (id, name, colors, render, lbl, parts) => { if (Array.isArray(lbl)) { parts = lbl; lbl = null; } return Object.assign({ id, name, colors, picker: true, colorLabel: lbl || "Finish", render }, parts ? { parts } : {}); };
+  const PARTS_DRIP = [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }, { id: "water", name: "Water level", type: "value", unit: "%", min: 0, max: 100, def: 70 }, { id: "plate", name: "Warming plate" }], PARTS_POD = [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }, { id: "water", name: "Water level", type: "value", unit: "%", min: 0, max: 100, def: 70 }],
+    PARTS_ESP = [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }, { id: "plate", name: "Cup warmer" }], PARTS_BEAN = [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["brewing", "Brewing"], ["ready", "Ready"]], def: "brewing" }],
+    PARTS_GOOSE = [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["ready", "Ready"]], def: "heating" }, { id: "temp", name: "Water temperature", type: "value", unit: "°F", min: 50, max: 212, def: 190 }], PARTS_GLASSK = [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["ready", "Ready"]], def: "heating" }, { id: "water", name: "Water level", type: "value", unit: "%", min: 0, max: 100, def: 70 }], PARTS_RETROK = [{ id: "state", name: "State", type: "stage", values: [["idle", "Off"], ["heating", "Heating"], ["ready", "Ready"]], def: "heating" }, { id: "temp", name: "Water temperature", type: "value", unit: "°F", min: 50, max: 212, def: 190 }];
+  // (multi-function) coffee makers and kettles: State (stage: off / heating / brewing / ready; kettles off / heating /
+  // ready), Water level (value, %) where the drawing has a window, Warming plate / Cup warmer (switch), the kettle's
+  // Water temperature (value, °F) where it has a readout. As a Device Image (no o.mf) every drawing is exactly as today.
+  // As a Multi-Function Image (o.mf): heating = the display and light on (a kettle's water bubbling); brewing = the
+  // coffee pours, the carafe or cup fills, steam; ready = a full carafe or cup, steam; a part left out = off / blank.
+  function CF(o) {
+    if (!o.mf) return { D: o, B: o, S: o, H: o, PL: o, cup: o.on, wl: null, t: null, mf: false };
+    const s = o.pval && o.pval.state != null ? String(o.pval.state) : "", brew = s === "brewing", rdy = s === "ready", heat = s === "heating";
+    const num = (k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" && isFinite(+o.pval[k]) ? +o.pval[k] : null), w = num("water");
+    const v = (on, lv) => Object.assign({}, o, { on }, lv == null ? {} : { level: lv });
+    return { D: v(!!s && s !== "idle"), B: v(brew), S: v(brew || rdy || heat && false), H: v(heat), K: v(heat || rdy), PL: v(!!(o.parts && o.parts.plate)), C: v(brew || rdy, rdy ? 1 : .5),
+      cup: brew || rdy, wl: w == null ? null : Math.max(0, Math.min(1, w / 100)), t: num("temp"), mf: true };
+  }
   const fillCls = (o) => o.on ? `class="${P}fill" style="animation-duration:${dur(o, 12, 6)}s"` : "";
 
   function toastSet(o, xs, y, w, up) {
@@ -238,92 +254,92 @@ ${extra || ""}</defs>`;
   const fries = (o, x, y, w) => { let s = ""; for (let i = 0; i < 11; i++) { const fx = x + 3 + (i * 7.3) % (w - 6), a = (i * 37) % 50 - 25; s += `<rect x="${n1(fx)}" y="${n1(y - 7 + (i % 3) * 2)}" width="2.4" height="11" rx=".8" fill="${i % 2 ? "#e9b84e" : "#f5cf66"}" transform="rotate(${a} ${n1(fx + 1)} ${n1(y)})"/>`; } return s; };
 
   const icons = [
-    ic("drip", "Drip coffee maker", [BK, SS, WH, RED, CREAM], (o) => { const u = o.uid, car = "M64 100H104L106 106Q115 122 111 140Q109 150 99 150H69Q59 150 57 140Q53 122 62 106Z", cid = u + "-car";
+    ic("drip", "Drip coffee maker", [BK, SS, WH, RED, CREAM], (o) => { const V = CF(o), wy = !o.mf ? (o.on ? .55 : .2) : 1 - (V.wl || 0), wh = !o.mf ? (o.on ? .45 : .8) : V.wl || 0, u = o.uid, car = "M64 100H104L106 106Q115 122 111 140Q109 150 99 150H69Q59 150 57 140Q53 122 62 106Z", cid = u + "-car";
       return svg(o, room(o, "sub", "quartz") + plug(o, 170, 104, [150, 160]) + sh(o, 100, 164, 64, 5) +
-        face(o, rr(42, 148, 116, 16, 5)) + `<ellipse cx="84" cy="151" rx="30" ry="3.5" fill="${o.on ? REDL : "#1a1c20"}" opacity="${o.on ? .5 : 1}"/>` + warmPool(o, 84, 151, 36, 6, .9) +
-        face(o, rr(116, 40, 40, 112, 7), "c") + `<path d="${rr(124, 50, 7, 34, 3)}" fill="#0c0f14"/><path d="${rr(124.6, 50 + 34 * (o.on ? .55 : .2), 5.8, 34 * (o.on ? .45 : .8), 2.6)}" fill="url(#${u}-wt)"/><path d="${rr(124, 50, 7, 34, 3)}" fill="url(#${u}-gl)"/>` +
+        face(o, rr(42, 148, 116, 16, 5)) + `<ellipse cx="84" cy="151" rx="30" ry="3.5" fill="${V.PL.on ? REDL : "#1a1c20"}" opacity="${V.PL.on ? .5 : 1}"/>` + warmPool(V.PL, 84, 151, 36, 6, .9) +
+        face(o, rr(116, 40, 40, 112, 7), "c") + `<path d="${rr(124, 50, 7, 34, 3)}" fill="#0c0f14"/>${o.mf && V.wl == null ? "" : `<path d="${rr(124.6, 50 + 34 * wy, 5.8, 34 * wh, 2.6)}" fill="url(#${u}-wt)"/>`}<path d="${rr(124, 50, 7, 34, 3)}" fill="url(#${u}-gl)"/>` +
         face(o, rr(40, 32, 116, 36, 10)) + `<path d="M46 36H150" stroke="#fff" stroke-opacity=".5" stroke-width="1"/>` + groove("M44 56H152") +
         mat(o, "M58 68H110L104 80H64Z", "blk") + `<rect x="80" y="80" width="8" height="3" rx="1" fill="#0c0d10"/>` +
-        digits(o, 136, 98, 6, "7:30", AMB) + btn(130, 116, 3.3, true) + btn(142, 116, 3.3, true) + led(o, 136, 128, 1.5, REDL, "hr") +
-        `<clipPath id="${cid}"><path d="${car}"/></clipPath>` + drips(o, "M84 83V118", "#3a1d0c", 2.4) +
-        `<g clip-path="url(#${cid})">${o.on ? `<rect ${fillCls(o)} x="50" y="${n1(150 - 36 * (.4 + .6 * o.level))}" width="70" height="${n1(36 * (.4 + .6 * o.level))}" fill="url(#${u}-cof)"/>` : `<rect x="50" y="144" width="70" height="8" fill="url(#${u}-cof)" opacity=".8"/>`}</g>` +
+        digits(V.D, 136, 98, 6, "7:30", AMB) + btn(130, 116, 3.3, true) + btn(142, 116, 3.3, true) + led(V.D, 136, 128, 1.5, REDL, "hr") +
+        `<clipPath id="${cid}"><path d="${car}"/></clipPath>` + drips(V.B, "M84 83V118", "#3a1d0c", 2.4) +
+        `<g clip-path="url(#${cid})">${(V.mf ? V.cup : o.on) ? `<rect ${fillCls(V.B)} x="50" y="${n1(150 - 36 * (.4 + .6 * (V.mf ? V.C.level : o.level)))}" width="70" height="${n1(36 * (.4 + .6 * (V.mf ? V.C.level : o.level)))}" fill="url(#${u}-cof)"/>` : `<rect x="50" y="144" width="70" height="8" fill="url(#${u}-cof)" opacity=".8"/>`}</g>` +
         glass(o, car) + `<path d="M61 112Q57 126 60 140" stroke="#fff" stroke-opacity=".45" stroke-width="2" fill="none" stroke-linecap="round"/>` +
         mat(o, rr(60, 94, 50, 9, 3), "blk") + `<path d="M62 96H108" stroke="#fff" stroke-opacity=".25"/>` +
         `<path d="M58 104Q42 106 43 120Q44 134 58 136" fill="none" stroke="#14161a" stroke-width="6" stroke-linecap="round"/><path d="M56 106Q46 108 46 120" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="1.2"/>` +
-        hl(119, 46, 119, 148, 1.4, .3)); }),
+        hl(119, 46, 119, 148, 1.4, .3)); }, PARTS_DRIP),
 
-    ic("pod", "Pod brewer", [BK, WH, RED, NAVY, SAGE, SS], (o) => { const u = o.uid;
+    ic("pod", "Pod brewer", [BK, WH, RED, NAVY, SAGE, SS], (o) => { const V = CF(o), u = o.uid;
       return svg(o, room(o, "zel", "wood") + plug(o, 30, 96, [62, 158]) + sh(o, 104, 165, 52, 5) +
-        `<path d="${rr(140, 46, 18, 106, 6)}" fill="url(#${u}-glb)"/><path d="${rr(141, 70, 16, 81, 5)}" fill="url(#${u}-wt)"/><path d="${rr(140, 46, 18, 106, 6)}" fill="none" stroke="#e8f6ff" stroke-opacity=".4"/>` + (o.on ? bubbles(o, [[146, 140, 1], [151, 130, 1.2], [148, 118, .9]]) : "") +
+        `<path d="${rr(140, 46, 18, 106, 6)}" fill="url(#${u}-glb)"/>${!o.mf ? `<path d="${rr(141, 70, 16, 81, 5)}" fill="url(#${u}-wt)"/>` : V.wl == null ? "" : `<path d="${rr(141, n1(151 - 100 * Math.max(.1, V.wl)), 16, n1(100 * Math.max(.1, V.wl)), 5)}" fill="url(#${u}-wt)"/>`}<path d="${rr(140, 46, 18, 106, 6)}" fill="none" stroke="#e8f6ff" stroke-opacity=".4"/>` + (V.B.on ? bubbles(V.B, [[146, 140, 1], [151, 130, 1.2], [148, 118, .9]]) : "") +
         face(o, rr(66, 30, 80, 132, 14), "c") + face(o, "M60 44Q60 28 76 28H138Q150 28 150 42V58H60Z") + groove("M60 58H150") +
         `<path d="${rr(86, 32, 40, 6, 3)}" fill="#000" fill-opacity=".22"/>` +
         face(o, rr(60, 58, 90, 24, 9)) + `<path d="M66 60H144" stroke="#fff" stroke-opacity=".35"/>` +
-        `<circle cx="105" cy="70" r="7" fill="#0c0e12"/>` + (o.on ? `<circle class="${P}pulse" cx="105" cy="70" r="12" fill="url(#${u}-hb)"/>` : "") + `<circle cx="105" cy="70" r="5.2" fill="none" stroke="${o.on ? BLU : "#4a5059"}" stroke-width="1.4"/><circle cx="105" cy="70" r="3" fill="url(#${u}-blc)"/>` +
+        `<circle cx="105" cy="70" r="7" fill="#0c0e12"/>` + (V.D.on ? `<circle class="${P}pulse" cx="105" cy="70" r="12" fill="url(#${u}-hb)"/>` : "") + `<circle cx="105" cy="70" r="5.2" fill="none" stroke="${V.D.on ? BLU : "#4a5059"}" stroke-width="1.4"/><circle cx="105" cy="70" r="3" fill="url(#${u}-blc)"/>` +
         btn(80, 70, 2.6, true) + btn(130, 70, 2.6, true) +
         mat(o, rr(72, 82, 66, 66, 6), "blk") + `<path d="${rr(72, 82, 66, 66, 6)}" fill="url(#${u}-gl)" opacity=".5"/>` + `<path d="${rr(100, 82, 10, 6, 2)}" fill="url(#${u}-st)"/>` +
-        stream(o, "M105 88V124", "#5a2d12", 2.6, "#c98a55") + mug(o, 90, 124, 30, 24, "#e9e3d6", o.on) +
+        stream(V.B, "M105 88V124", "#5a2d12", 2.6, "#c98a55") + mug(o, 90, 124, 30, 24, "#e9e3d6", V.cup) +
         mat(o, rr(70, 148, 70, 10, 3), "st", 1) + `<path d="${rr(76, 149, 58, 4, 1.5)}" fill="url(#${u}-grt)"/>` +
-        steam(o, 105, 120, 3, 3.5) + hl(70, 64, 70, 156, 1.3, .3)); }),
+        steam(V.S, 105, 120, 3, 3.5) + hl(70, 64, 70, 156, 1.3, .3)); }, PARTS_POD),
 
-    ic("espresso", "Espresso machine", [SS, BK, CREAM, RED, MINT, WH], (o) => { const u = o.uid, ga = (o.on ? -110 + 180 * (.55 + .4 * o.level) : -110);
+    ic("espresso", "Espresso machine", [SS, BK, CREAM, RED, MINT, WH], (o) => { const V = CF(o), u = o.uid, ga = !o.mf ? (o.on ? -110 + 180 * (.55 + .4 * o.level) : -110) : V.D.on ? -110 + 180 * (V.B.on ? .9 : V.H.on ? .35 : .65) : -110;
       return svg(o, room(o, "dark", "granite") + sh(o, 100, 165, 66, 5) +
         face(o, rr(40, 50, 120, 108, 6)) + `<path d="M44 52H156" stroke="#fff" stroke-opacity=".55" stroke-width="1"/>` +
         `<path d="M40 42H160" stroke="url(#${u}-crh)" stroke-width="3" stroke-linecap="round"/><path d="M46 42V50M154 42V50" stroke="#a7adb4" stroke-width="2"/>` +
-        mug(o, 60, 38, 13, 8, "#f4f2ee") + mug(o, 80, 38, 13, 8, "#f4f2ee") +
+        (o.mf && V.PL.on ? `<path d="M48 41H152" stroke="#ff7a3a" stroke-width="2.4" stroke-linecap="round" opacity=".7"/>` + warmPool(V.PL, 76, 40, 30, 6, .8) : "") + mug(o, 60, 38, 13, 8, "#f4f2ee") + mug(o, 80, 38, 13, 8, "#f4f2ee") +
         `<circle cx="132" cy="76" r="13" fill="url(#${u}-cr)"/><circle cx="132" cy="76" r="10.5" fill="#f6f4ee"/><path d="M124.5 83.5A10.5 10.5 0 0 1 132 65.5" fill="none" stroke="#000" stroke-opacity=".08" stroke-width="3"/>` +
         `<path d="M139.4 70.6A10.5 10.5 0 0 1 141.8 79" fill="none" stroke="#d94a3e" stroke-width="2"/>` + [-110, -65, -20, 25, 70].map((a) => { const t = a * Math.PI / 180; return `<path d="M${n1(132 + Math.sin(t) * 8)} ${n1(76 - Math.cos(t) * 8)}L${n1(132 + Math.sin(t) * 10)} ${n1(76 - Math.cos(t) * 10)}" stroke="#333" stroke-width=".7"/>`; }).join("") +
         `<path d="M132 76L132 67" stroke="#c8323a" stroke-width="1.3" stroke-linecap="round" transform="rotate(${n1(ga)} 132 76)"/><circle cx="132" cy="76" r="1.6" fill="#333"/><circle cx="132" cy="76" r="10.5" fill="url(#${u}-gl)"/>` +
-        btn(56, 66, 3.2) + btn(68, 66, 3.2) + led(o, 80, 66, 1.4, ORNG, "ho") +
+        btn(56, 66, 3.2) + btn(68, 66, 3.2) + led(V.D, 80, 66, 1.4, ORNG, "ho") +
         mat(o, rr(74, 82, 34, 12, 3), "crh") + mat(o, "M70 94H112L108 102H74Z", "crh") +
         `<path d="M74 98L36 110L38 116L76 104Z" fill="#111317"/><path d="${"M40 108L22 114Q18 116 20 120Q22 122 26 121L44 116Z"}" fill="url(#${u}-wd)"/><path d="M24 116L42 110" stroke="#fff" stroke-opacity=".3"/>` +
-        mat(o, rr(84, 102, 14, 5, 1.5), "crh") + stream(o, "M87.5 107V132", "#7a4322", 1.8, "#e6b479") + stream(o, "M94.5 107V132", "#7a4322", 1.8, "#e6b479") +
-        `<path d="M80 126H102L100 146Q99 148 97 148H85Q83 148 82 146Z" fill="url(#${u}-glb)"/><path d="M81.4 ${o.on ? 132 : 141}H100.6L100 146Q99 148 97 148H85Q83 148 82 146Z" fill="url(#${u}-cof)"/><path d="M81.4 ${o.on ? 132 : 141}H100.6V${o.on ? 135 : 142.5}H81.6Z" fill="url(#${u}-crm)"/><path d="M80 126H102L100 146Q99 148 97 148H85Q83 148 82 146Z" fill="none" stroke="#e8f6ff" stroke-opacity=".5" stroke-width=".8"/>` +
+        mat(o, rr(84, 102, 14, 5, 1.5), "crh") + stream(V.B, "M87.5 107V132", "#7a4322", 1.8, "#e6b479") + stream(V.B, "M94.5 107V132", "#7a4322", 1.8, "#e6b479") +
+        `<path d="M80 126H102L100 146Q99 148 97 148H85Q83 148 82 146Z" fill="url(#${u}-glb)"/><path d="M81.4 ${V.cup ? 132 : 141}H100.6L100 146Q99 148 97 148H85Q83 148 82 146Z" fill="url(#${u}-cof)"/><path d="M81.4 ${V.cup ? 132 : 141}H100.6V${V.cup ? 135 : 142.5}H81.6Z" fill="url(#${u}-crm)"/><path d="M80 126H102L100 146Q99 148 97 148H85Q83 148 82 146Z" fill="none" stroke="#e8f6ff" stroke-opacity=".5" stroke-width=".8"/>` +
         `<path d="M142 92V102Q142 108 146 112L150 136" fill="none" stroke="url(#${u}-crh)" stroke-width="3.4" stroke-linecap="round"/>` + knob(o, 142, 92, 4.5) +
-        (o.on ? (o.anim ? [0, 1, 2].map((i) => `<circle class="${P}stl" cx="150" cy="138" r="4" fill="url(#${u}-stm)" style="animation-duration:${dur(o, 2.4, 1)}s;animation-delay:-${i * .8}s"/>`).join("") : `<path d="M150 138c-6 -3 -6 -9 -12 -12" stroke="#fff" stroke-opacity=".3" stroke-width="3" fill="none" stroke-linecap="round"/>`) : "") +
-        mat(o, rr(48, 148, 104, 10, 3), "st", 1) + `<path d="${rr(54, 149, 92, 4, 1.5)}" fill="url(#${u}-grt)"/>` + steam(o, 91, 124, 2, 3) + hl(43, 56, 43, 154, 1.4, .3)); }),
+        (V.B.on ? (o.anim ? [0, 1, 2].map((i) => `<circle class="${P}stl" cx="150" cy="138" r="4" fill="url(#${u}-stm)" style="animation-duration:${dur(o, 2.4, 1)}s;animation-delay:-${i * .8}s"/>`).join("") : `<path d="M150 138c-6 -3 -6 -9 -12 -12" stroke="#fff" stroke-opacity=".3" stroke-width="3" fill="none" stroke-linecap="round"/>`) : "") +
+        mat(o, rr(48, 148, 104, 10, 3), "st", 1) + `<path d="${rr(54, 149, 92, 4, 1.5)}" fill="url(#${u}-grt)"/>` + steam(V.S, 91, 124, 2, 3) + hl(43, 56, 43, 154, 1.4, .3)); }, PARTS_ESP),
 
-    ic("bean", "Bean-to-cup", [BK, SS, WH, SL], (o) => { const u = o.uid, act = Math.min(3, Math.floor(o.level * 4)), cup = "M88 108H112L110 148H90Z", cid = u + "-lt";
+    ic("bean", "Bean-to-cup", [BK, SS, WH, SL], (o) => { const V = CF(o), D = V.D, u = o.uid, act = Math.min(3, Math.floor(o.level * 4)), cup = "M88 108H112L110 148H90Z", cid = u + "-lt";
       return svg(o, room(o, "sub", "marble") + plug(o, 26, 100, [52, 158]) + sh(o, 100, 165, 58, 5) +
         face(o, rr(50, 30, 100, 132, 10)) + `<path d="M56 32H144" stroke="#fff" stroke-opacity=".5"/>` +
         `<path d="M62 30Q62 18 82 18H118Q138 18 138 30Z" fill="#2a1a10" fill-opacity=".85"/>` + [[70, 26], [78, 24], [86, 27], [94, 23], [102, 26], [110, 24], [118, 27], [126, 26], [74, 21], [90, 20], [106, 20], [122, 22]].map((p, i) => `<ellipse cx="${p[0]}" cy="${p[1]}" rx="3" ry="2" fill="${i % 2 ? "#6b3c1d" : "#4e2a12"}" transform="rotate(${i * 30} ${p[0]} ${p[1]})"/>`).join("") +
         `<path d="M62 30Q62 18 82 18H118Q138 18 138 30Z" fill="url(#${u}-gl)" stroke="#fff" stroke-opacity=".3"/>` +
         mat(o, rr(60, 40, 80, 32, 5), "blk") + `<path d="${rr(60, 40, 80, 32, 5)}" fill="url(#${u}-gl)"/>` +
-        [0, 1, 2, 3].map((i) => { const x = 70 + i * 20, lit = o.on && i === act, c = o.on ? (lit ? "#ffffff" : "#8fb6d8") : "#3d434c";
+        [0, 1, 2, 3].map((i) => { const x = 70 + i * 20, lit = D.on && i === act, c = D.on ? (lit ? "#ffffff" : "#8fb6d8") : "#3d434c";
           return (lit ? `<circle class="${P}pulse" cx="${x}" cy="52" r="9" fill="url(#${u}-hb)"/>` : "") + `<path d="M${x - 4} ${48 - i % 2}H${x + 4}L${x + 3} 56H${x - 3}Z" fill="none" stroke="${c}" stroke-width="1"/><path d="M${x + 4} 50h1.5a1.5 1.5 0 0 1 0 3H${x + 3.5}" fill="none" stroke="${c}" stroke-width=".8"/>`; }).join("") +
-        [0, 1, 2, 3, 4].map((i) => `<rect x="${86 + i * 6}" y="63" width="4" height="3" rx="1" fill="${o.on && i <= Math.round(o.level * 4) ? AMB : "#2c3138"}"/>`).join("") +
+        [0, 1, 2, 3, 4].map((i) => `<rect x="${86 + i * 6}" y="63" width="4" height="3" rx="1" fill="${D.on && i <= Math.round(o.level * 4) ? AMB : "#2c3138"}"/>`).join("") +
         mat(o, rr(58, 78, 84, 72, 5), "blk") + `<path d="${rr(58, 78, 84, 72, 5)}" fill="url(#${u}-gl)" opacity=".4"/>` +
         mat(o, rr(84, 80, 32, 12, 3), "crh") + mat(o, rr(90, 92, 6, 4, 1), "crh") + mat(o, rr(104, 92, 6, 4, 1), "crh") +
-        stream(o, "M93 96V128", "#6b3a1e", 1.8, "#e6b479") + stream(o, "M107 96V128", "#6b3a1e", 1.8, "#e6b479") +
+        stream(V.B, "M93 96V128", "#6b3a1e", 1.8, "#e6b479") + stream(V.B, "M107 96V128", "#6b3a1e", 1.8, "#e6b479") +
         `<clipPath id="${cid}"><path d="${cup}"/></clipPath><g clip-path="url(#${cid})">` +
-        (o.on ? `<g ${fillCls(o)}><rect x="86" y="118" width="28" height="32" fill="#f4ead8"/><rect x="86" y="128" width="28" height="22" fill="#c08454"/><rect x="86" y="138" width="28" height="12" fill="url(#${u}-cof)"/></g>` : `<rect x="86" y="140" width="28" height="10" fill="#f4ead8"/><rect x="86" y="144" width="28" height="6" fill="#c08454"/>`) +
+        (V.cup ? `<g ${fillCls(V.B)}><rect x="86" y="118" width="28" height="32" fill="#f4ead8"/><rect x="86" y="128" width="28" height="22" fill="#c08454"/><rect x="86" y="138" width="28" height="12" fill="url(#${u}-cof)"/></g>` : `<rect x="86" y="140" width="28" height="10" fill="#f4ead8"/><rect x="86" y="144" width="28" height="6" fill="#c08454"/>`) +
         `</g>` + glass(o, cup) + `<path d="M91 112L92 144" stroke="#fff" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round"/>` +
-        mat(o, rr(62, 150, 76, 10, 3), "st", 1) + `<path d="${rr(68, 151, 64, 4, 1.5)}" fill="url(#${u}-grt)"/>` + steam(o, 100, 106, 2, 3) + hl(53, 36, 53, 156, 1.4, .3)); }),
+        mat(o, rr(62, 150, 76, 10, 3), "st", 1) + `<path d="${rr(68, 151, 64, 4, 1.5)}" fill="url(#${u}-grt)"/>` + steam(V.S, 100, 106, 2, 3) + hl(53, 36, 53, 156, 1.4, .3)); }, PARTS_BEAN),
 
-    ic("goose", "Gooseneck kettle", [BK, WH, SS, PINK, SAGE, COP], (o) => { const u = o.uid, t = String(Math.round(160 + 52 * o.level));
+    ic("goose", "Gooseneck kettle", [BK, WH, SS, PINK, SAGE, COP], (o) => { const V = CF(o), u = o.uid, t = !o.mf ? String(Math.round(160 + 52 * o.level)) : V.t == null ? "" : String(Math.round(V.t)), D = o.mf ? Object.assign({}, V.D, { on: V.D.on && V.t != null }) : o;
       return svg(o, room(o, "zel", "quartz") + sh(o, 100, 165, 58, 5) + board(o, 132, 70, 40, 72) +
-        mat(o, rr(56, 146, 92, 16, 6), "blk") + `<path d="M60 147H144" stroke="#fff" stroke-opacity=".2"/>` + digits(o, 92, 154, 6, t, "#f4f1ea") + knob(o, 128, 154, 5.5, true) +
-        (o.on ? `<g opacity=".9"><path class="${P}pulse" d="M60 146H144" stroke="${ORNG}" stroke-width="1.6"/></g>` : "") +
+        mat(o, rr(56, 146, 92, 16, 6), "blk") + `<path d="M60 147H144" stroke="#fff" stroke-opacity=".2"/>` + digits(D, 92, 154, 6, t || "888", "#f4f1ea") + knob(o.mf ? V.D : o, 128, 154, 5.5, true) +
+        ((o.mf ? V.H.on : o.on) ? `<g opacity=".9"><path class="${P}pulse" d="M60 146H144" stroke="${ORNG}" stroke-width="1.6"/></g>` : "") +
         `<path d="M76 140C52 140 50 112 56 98C60 88 54 80 40 80" fill="none" stroke="${pal(o.color).k}" stroke-width="6" stroke-linecap="round"/><path d="M76 140C52 140 50 112 56 98C60 88 54 80 40 80" fill="none" stroke="${pal(o.color).m}" stroke-width="4" stroke-linecap="round"/><path d="M70 138C54 136 52 114 57 100" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.2"/>` +
         `<path d="M126 98H140Q150 98 150 108V128Q150 140 136 140H128" fill="none" stroke="${pal(o.color).k}" stroke-width="7.5" stroke-linecap="round"/><path d="M126 98H140Q150 98 150 108V128Q150 140 136 140H128" fill="none" stroke="${pal(o.color).d}" stroke-width="5.5" stroke-linecap="round"/>` +
         face(o, "M72 146L74 100Q74 92 82 92H118Q126 92 126 100L128 146Z", "c") + `<path d="M74 140H128" stroke="#000" stroke-opacity=".2"/>` +
         face(o, rr(80, 86, 40, 8, 3), "tp") + `<path d="${rr(96, 79, 8, 8, 3)}" fill="url(#${u}-wd)"/>` + hl(80, 100, 79, 140, 2.6, .35) +
-        `<circle cx="100" cy="108" r="5.5" fill="url(#${u}-cr)"/><circle cx="100" cy="108" r="4" fill="#f6f4ee"/><path d="M100 108L${o.on ? 103 : 97.5} ${o.on ? 105 : 105.5}" stroke="#c8323a" stroke-width=".9"/>` +
-        steam(o, 40, 76, 3, 3.2, "stl")); }),
+        `<circle cx="100" cy="108" r="5.5" fill="url(#${u}-cr)"/><circle cx="100" cy="108" r="4" fill="#f6f4ee"/><path d="M100 108L${(o.mf ? V.K.on : o.on) ? 103 : 97.5} ${(o.mf ? V.K.on : o.on) ? 105 : 105.5}" stroke="#c8323a" stroke-width=".9"/>` +
+        steam(o.mf ? V.K : o, 40, 76, 3, 3.2, "stl")); }, PARTS_GOOSE),
 
-    ic("glasskettle", "Glass kettle", [SS, BK, WH, RED, MINT], (o) => { const u = o.uid, k = "M68 146L72 80Q100 72 128 80L132 146Z", kid = u + "-gk", p = pal(o.color);
+    ic("glasskettle", "Glass kettle", [SS, BK, WH, RED, MINT], (o) => { const V = CF(o), wdy = o.mf ? n1(52 * (1 - (V.wl == null ? 0 : V.wl))) : null, u = o.uid, k = "M68 146L72 80Q100 72 128 80L132 146Z", kid = u + "-gk", p = pal(o.color);
       return svg(o, room(o, "sub", "wood") + plug(o, 176, 100, [146, 158]) + sh(o, 100, 165, 54, 5) +
-        face(o, rr(58, 148, 84, 14, 6)) + `<path d="M62 149H138" stroke="#fff" stroke-opacity=".4"/>` + led(o, 100, 155, 1.5) +
+        face(o, rr(58, 148, 84, 14, 6)) + `<path d="M62 149H138" stroke="#fff" stroke-opacity=".4"/>` + led(V.D, 100, 155, 1.5) +
         `<path d="M128 84H140Q150 84 150 96V126Q150 138 138 138H132" fill="none" stroke="${p.k}" stroke-width="8" stroke-linecap="round"/><path d="M128 84H140Q150 84 150 96V126Q150 138 138 138H132" fill="none" stroke="${p.d}" stroke-width="6" stroke-linecap="round"/><path d="M144 92V128" stroke="#fff" stroke-opacity=".3" stroke-width="1.3" stroke-linecap="round"/>` +
-        `<clipPath id="${kid}"><path d="${k}"/></clipPath><g clip-path="url(#${kid})"><rect x="60" y="92" width="80" height="56" fill="url(#${u}-wt)"/>` +
-        (o.on ? `<rect x="60" y="92" width="80" height="56" fill="${BLU}" opacity="${n1(.12 + .2 * o.level)}"/><ellipse class="${P}pulse" cx="100" cy="146" rx="40" ry="22" fill="url(#${u}-hb)"/>` : "") +
-        `<path d="M60 92q5 -2 10 0t10 0t10 0t10 0t10 0t10 0t10 0t10 0" fill="none" stroke="#e6f6ff" stroke-opacity=".7" stroke-width=".9"/>` +
-        bubbles(o, [[80, 136, 1.6], [92, 140, 2], [104, 134, 1.4], [116, 138, 1.8], [86, 126, 1.2], [110, 124, 1.5], [98, 118, 1.1], [120, 128, 1], [76, 130, 1.3], [102, 142, 1.7]]) + `</g>` +
+        `<clipPath id="${kid}"><path d="${k}"/></clipPath><g clip-path="url(#${kid})">` + (o.mf && V.wl == null ? "" : (wdy ? `<g transform="translate(0 ${wdy})">` : "") + `<rect x="60" y="92" width="80" height="56" fill="url(#${u}-wt)"/>` +
+        ((o.mf ? V.K.on : o.on) ? `<rect x="60" y="92" width="80" height="56" fill="${BLU}" opacity="${n1(.12 + .2 * o.level)}"/><ellipse class="${P}pulse" cx="100" cy="146" rx="40" ry="22" fill="url(#${u}-hb)"/>` : "") +
+        `<path d="M60 92q5 -2 10 0t10 0t10 0t10 0t10 0t10 0t10 0t10 0" fill="none" stroke="#e6f6ff" stroke-opacity=".7" stroke-width=".9"/>` + (wdy ? `</g>` : "") +
+        bubbles(o.mf ? V.H : o, [[80, 136, 1.6], [92, 140, 2], [104, 134, 1.4], [116, 138, 1.8], [86, 126, 1.2], [110, 124, 1.5], [98, 118, 1.1], [120, 128, 1], [76, 130, 1.3], [102, 142, 1.7]])) + `</g>` +
         glass(o, k) + `<path d="M76 86L75 136" stroke="#fff" stroke-opacity=".45" stroke-width="2.2" stroke-linecap="round"/>` + [100, 110, 120, 130].map((y) => `<path d="M118 ${y}H124" stroke="#fff" stroke-opacity=".4" stroke-width=".6"/>`).join("") +
         `<path d="M72 82L52 76L56 84L72 92Z" fill="url(#${u}-glb)" stroke="#e8f6ff" stroke-opacity=".4" stroke-width=".7"/>` +
         mat(o, "M70 140H130L132 148H68Z", "crh") + face(o, "M70 80Q100 70 130 80V84Q100 76 70 84Z", "tp") + `<path d="M88 76Q100 68 112 76" fill="url(#${u}-crh)"/>` + `<path d="${rr(96, 68, 8, 5, 2)}" fill="${p.d}"/>` +
-        steam(o, 52, 72, 3, 3.2, "stl")); }, "Color"),
+        steam(o.mf ? V.K : o, 52, 72, 3, 3.2, "stl")); }, "Color", PARTS_GLASSK),
 
-    ic("retrokettle", "Retro kettle", [CREAM, RED, MINT, NAVY, PINK, BK], (o) => { const u = o.uid, ga = o.on ? -70 + 140 * o.level : -70;
+    ic("retrokettle", "Retro kettle", [CREAM, RED, MINT, NAVY, PINK, BK], (o) => { const V = CF(o), u = o.uid, ga = !o.mf ? (o.on ? -70 + 140 * o.level : -70) : V.t == null ? -70 : -70 + 140 * Math.max(0, Math.min(1, (V.t - 50) / 162));
       return svg(o, room(o, "sub", "wood") + sh(o, 100, 165, 54, 5) +
         mat(o, rr(56, 152, 88, 10, 5), "crh") +
         `<path d="M78 98Q72 70 100 62Q128 70 122 98" fill="none" stroke="#1a1c20" stroke-width="7" stroke-linecap="round"/><path d="M80 94Q76 72 100 66" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="1.3"/>` +
@@ -332,7 +348,7 @@ ${extra || ""}</defs>`;
         mat(o, "M58 140Q100 136 142 140L142 148Q100 144 58 148Z", "crh") + mat(o, "M84 92Q100 86 116 92V96Q100 90 84 96Z", "crh") + `<circle cx="100" cy="86" r="5" fill="#1a1c20"/><circle cx="98.5" cy="84.5" r="1.4" fill="#fff" fill-opacity=".3"/>` +
         `<circle cx="100" cy="118" r="11" fill="url(#${u}-cr)"/><circle cx="100" cy="118" r="8.6" fill="#f7f4ec"/><path d="M93 121A8 8 0 0 1 107 121" fill="none" stroke="#7fb5e0" stroke-width="1.6"/><path d="M103.4 113A8 8 0 0 1 107 121" fill="none" stroke="#d94a3e" stroke-width="1.6"/>` +
         `<path d="M100 118V111.5" stroke="#222" stroke-width="1" stroke-linecap="round" transform="rotate(${n1(ga)} 100 118)"/><circle cx="100" cy="118" r="1.2" fill="#222"/><circle cx="100" cy="118" r="8.6" fill="url(#${u}-gl)"/>` +
-        led(o, 128, 146, 1.3, REDL, "hr") + steam(o, 45, 95, 3, 3.4, "stl")); }),
+        led(o.mf ? V.H : o, 128, 146, 1.3, REDL, "hr") + steam(o.mf ? V.K : o, 45, 95, 3, 3.4, "stl")); }, PARTS_RETROK),
 
     ic("toaster2", "2-slice toaster", [SS, BK, WH, RED, MINT, CREAM], (o) => { const u = o.uid, b = rr(54, 96, 92, 66, 14), cid = u + "-ts";
       return svg(o, room(o, "sub", "quartz") + plug(o, 26, 100, [56, 158]) + sh(o, 100, 165, 54, 5) +

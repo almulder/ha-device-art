@@ -200,6 +200,13 @@ ${extra || ""}</defs>`;
   }
   const steam = (o, pts) => o.on ? pts.map((p, i) => `<ellipse class="${P}steam${o.anim ? "" : " " + P + "still"}" style="animation-delay:-${n1(i * .9)}s" cx="${p[0]}" cy="${p[1]}" rx="${p[2] || 10}" ry="${n1((p[2] || 10) * .6)}" fill="url(#${o.uid}-mist)"/>`).join("") : "";
   const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  // (parts) PS = the Multi-Function part states while a Multi-Function Image renders ({pump, jets, heater, light, spa: bool,
+  // temp: number|null, lc / ll: the light's color / level}), else null; pon / po = a part's on state / o with on = that part
+  let PS = null;
+  const pon = (o, k) => (PS ? !!PS[k] : o.on), po = (o, k) => (PS ? Object.assign({}, o, { on: !!PS[k] }) : o);
+  // a floating pool thermometer with a digital readout (the water temperature part)
+  const floatT = (o, cx, cy, t) => `<ellipse cx="${cx}" cy="${cy + 6}" rx="15" ry="3" fill="#000" opacity=".25"/><path d="${rr(cx - 14, cy - 7, 28, 14, 7)}" fill="#f2f4f6"/><path d="${rr(cx - 14, cy - 7, 28, 14, 7)}" fill="url(#${o.uid}-fx)" opacity=".5"/>` +
+    lcd(Object.assign({}, o, { on: true }), cx - 10, cy - 4.5, 20, 9, String(Math.round(t)), 5.5, CYAN) + `<path d="M${cx - 12} ${cy - 5}Q${cx} ${cy - 8} ${cx + 12} ${cy - 5}" fill="none" stroke="#fff" stroke-opacity=".8"/>`;
   const quad = (q) => `M${q.map((p) => n1(p[0]) + " " + n1(p[1])).join("L")}Z`;
   const inset = (q, t) => { const c = [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4]; return q.map((p) => lerp(p, c, t)); };
 
@@ -284,22 +291,22 @@ ${extra || ""}</defs>`;
       const left = quad([A, D, [D[0], D[1] + dn], [A[0], A[1] + dn]]), right = quad([D, C, [C[0], C[1] + dn], [D[0], D[1] + dn]]);
       let slats = "";
       for (let i = 1; i < 8; i++) { const t = i / 8, a = lerp(A, D, t), b = lerp(D, C, t); slats += `<path d="M${n1(a[0])} ${n1(a[1] + 6)}V${n1(a[1] + dn - 2)}" stroke="#000" stroke-opacity=".28"/><path d="M${n1(b[0])} ${n1(b[1] + 6)}V${n1(b[1] + dn - 2)}" stroke="#000" stroke-opacity=".3"/>`; }
-      const wc = o.on ? "#7ff0ff" : "#4aa6c8", wq = quad(wtr), wcx = (wtr[0][0] + wtr[2][0]) / 2, wcy = (wtr[1][1] + wtr[3][1]) / 2;
+      const wc = PS ? PS.lc || "#7ff0ff" : o.on ? "#7ff0ff" : "#4aa6c8", wq = quad(wtr), wcx = (wtr[0][0] + wtr[2][0]) / 2, wcy = (wtr[1][1] + wtr[3][1]) / 2;
       return svgP(o, yard(o, 120, "fence", "deck") + sh(o, 100, 168, 86, 16) +
         `<path d="${left}" fill="${p.m}"/><path d="${left}" fill="url(#${u}-v)" opacity=".8"/><path d="${right}" fill="url(#${u}-sd)"/>` + slats +
         `<path d="M${A[0]} ${A[1] + 6}L${D[0]} ${D[1] + 6}L${C[0]} ${C[1] + 6}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="2"/>` +
         `<path d="M${A[0]} ${A[1] + dn - 4}L${D[0]} ${D[1] + dn - 4}L${C[0]} ${C[1] + dn - 4}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="3"/>` +
         `<path d="M${D[0]} ${D[1]}V${D[1] + dn}" stroke="#fff" stroke-opacity=".25"/>` +
         `<path d="${quad(q)}" fill="#4f555c"/><path d="${quad(q)}" fill="url(#${u}-g)" opacity=".35"/><path d="${quad(rim)}" fill="#e9edf0"/><path d="${quad(shell)}" fill="#cdd5db"/>` +
-        `<path d="${wq}" fill="url(#${u}-pw)"/>` + (o.on ? `<path d="${wq}" fill="${wc}" opacity=".35"/>` : "") +
-        `<clipPath id="${u}-wt2"><path d="${wq}"/></clipPath><g clip-path="url(#${u}-wt2)"><g class="${o.on ? P + "caus" : ""}"><rect x="40" y="60" width="140" height="80" fill="url(#${u}-wav)"/></g>` +
-        (o.on ? [[70, 96], [92, 86], [118, 90], [134, 100], [100, 104], [80, 106], [126, 108]].map((b, i) => `<circle class="${P}rip" style="animation-delay:-${n1(i * .3)}s;animation-duration:${dur(o, 1.8, 1)}s" cx="${b[0]}" cy="${b[1]}" r="5" fill="none" stroke="#fff" stroke-width="1"/>`).join("") +
+        `<path d="${wq}" fill="url(#${u}-pw)"/>` + (pon(o, "light") ? `<path d="${wq}" fill="${wc}" opacity=".35"/>` : "") +
+        `<clipPath id="${u}-wt2"><path d="${wq}"/></clipPath><g clip-path="url(#${u}-wt2)"><g class="${pon(o, "jets") ? P + "caus" : ""}"><rect x="40" y="60" width="140" height="80" fill="url(#${u}-wav)"/></g>` +
+        (pon(o, "jets") ? [[70, 96], [92, 86], [118, 90], [134, 100], [100, 104], [80, 106], [126, 108]].map((b, i) => `<circle class="${P}rip" style="animation-delay:-${n1(i * .3)}s;animation-duration:${dur(o, 1.8, 1)}s" cx="${b[0]}" cy="${b[1]}" r="5" fill="none" stroke="#fff" stroke-width="1"/>`).join("") +
           `<ellipse cx="${n1(wcx)}" cy="${n1(wcy)}" rx="24" ry="9" fill="#fff" opacity=".18"/>` : "") + `</g>` +
         [lerp(shell[0], shell[1], .5), lerp(shell[1], shell[2], .4), lerp(shell[0], shell[3], .5)].map((j) => `<circle cx="${n1(j[0])}" cy="${n1(j[1] + 2)}" r="1.6" fill="#8a949e"/>`).join("") +
-        steam(o, [[80, 82, 14], [112, 76, 16], [132, 88, 12], [96, 90, 12]]) +
+        steam(po(o, "heater"), [[80, 82, 14], [112, 76, 16], [132, 88, 12], [96, 90, 12]]) + (PS && PS.temp != null ? floatT(o, 76, 100, PS.temp) : "") +
         `<path d="M${A[0]} ${A[1]}L${B[0]} ${B[1]}" stroke="#fff" stroke-opacity=".35"/>`); }),
 
-    ic("inground", "In-ground pool", ["#3fb8ff", "#2ee6c5", "#b06cff", "#ff5a8a", "#ffd27a", "#7cff6b"], "Light", (o) => { const u = o.uid, c = o.color, k = o.on ? .35 + .65 * o.level : 0;
+    ic("inground", "In-ground pool", ["#3fb8ff", "#2ee6c5", "#b06cff", "#ff5a8a", "#ffd27a", "#7cff6b"], "Light", (o) => { const u = o.uid, c = (PS && PS.lc) || o.color, lon = pon(o, "light"), k = lon ? .35 + .65 * (PS && PS.ll != null ? PS.ll : o.level) : 0;
       const pool = "M40 88C40 80 48 76 60 76H140C156 76 164 82 162 94L176 164C178 178 170 184 154 184H46C30 184 22 178 24 164Z";
       const inner = "M46 92C46 86 52 84 62 84H138C150 84 156 88 155 96L168 162C170 172 164 176 152 176H48C36 176 30 172 32 162Z";
       const lit = H().mix(c, "#ffffff", .35);
@@ -309,11 +316,12 @@ ${extra || ""}</defs>`;
         `<path d="M62 84H138C150 84 156 88 155 96L155.6 99H45.6L46 92C46 86 52 84 62 84Z" fill="url(#${u}-tile)"/>` +
         `<clipPath id="${u}-pl"><path d="${inner}"/></clipPath><g clip-path="url(#${u}-pl)">` +
         (k ? `<radialGradient id="${u}-lg" cx=".5" cy=".12" r=".95"><stop offset="0" stop-color="#fff" stop-opacity="${n1(.9 * k)}"/><stop offset=".18" stop-color="${lit}" stop-opacity="${n1(.95 * k)}"/><stop offset=".6" stop-color="${c}" stop-opacity="${n1(.6 * k)}"/><stop offset="1" stop-color="${H().shade(c, -.5)}" stop-opacity="${n1(.5 * k)}"/></radialGradient><path d="${inner}" fill="url(#${u}-lg)"/>` : `<path d="${inner}" fill="#1b5f8a" opacity=".35"/>`) +
-        `<g class="${o.on ? P + "caus" : ""}"><rect x="10" y="90" width="190" height="90" fill="url(#${u}-wav)" opacity="${o.on ? 1 : .5}"/></g>` +
+        `<g class="${pon(o, "pump") ? P + "caus" : ""}"><rect x="10" y="90" width="190" height="90" fill="url(#${u}-wav)" opacity="${pon(o, "pump") ? 1 : .5}"/></g>` +
+        (PS && PS.pump ? [[56, 100], [146, 102]].map((b, i) => `<ellipse class="${P}rip" style="animation-delay:-${n1(i * .8)}s" cx="${b[0]}" cy="${b[1]}" rx="9" ry="3" fill="none" stroke="#fff" stroke-width="1"/>`).join("") : "") +
         `<path d="M120 176L132 150H170V176Z" fill="#fff" opacity=".1"/><path d="M128 162H168M134 150H166" stroke="#fff" stroke-opacity=".22" stroke-width="2"/></g>` +
-        `<circle cx="100" cy="104" r="${o.on ? 5 : 4}" fill="${o.on ? "#fff" : "#4a5a66"}"/><circle cx="100" cy="104" r="${o.on ? 5 : 4}" fill="none" stroke="#c9d0d6" stroke-width="1.4"/>` +
-        (o.on ? `<circle cx="100" cy="104" r="16" fill="${lit}" opacity="${n1(.45 * k)}"/>` : "") +
-        `<path d="${pool}" fill="none" stroke="#fff" stroke-opacity=".25"/>` +
+        `<circle cx="100" cy="104" r="${lon ? 5 : 4}" fill="${lon ? "#fff" : "#4a5a66"}"/><circle cx="100" cy="104" r="${lon ? 5 : 4}" fill="none" stroke="#c9d0d6" stroke-width="1.4"/>` +
+        (lon ? `<circle cx="100" cy="104" r="16" fill="${lit}" opacity="${n1(.45 * k)}"/>` : "") +
+        `<path d="${pool}" fill="none" stroke="#fff" stroke-opacity=".25"/>` + (PS ? steam(po(o, "heater"), [[74, 128, 18], [122, 140, 16], [96, 158, 18]]) + (PS.temp != null ? floatT(o, 62, 140, PS.temp) : "") : "") +
         `<path d="M168 96V64M180 96V64M168 72H180M168 82H180" stroke="#d6dade" stroke-width="2.4" stroke-linecap="round" transform="translate(-4 10)"/>`); }),
 
     ic("above", "Above-ground pool", ["#2f6db5", "#eceef0", "#8a949e", "#a8774a", "#2b2e33"], "Wall", (o) => { const u = o.uid, cx = 104, top = 86, bot = 146, rx = 76, ry = 20, hd = "M48 166C40 166 30 160 24 150", hr = "M38 150C30 150 26 132 34 112";
@@ -322,14 +330,15 @@ ${extra || ""}</defs>`;
       [-.92, -.6, -.2, .2, .6, .92].forEach((s) => { const x = cx + s * rx, y = top + Math.sqrt(1 - s * s) * ry; ups += `<path d="M${n1(x)} ${n1(y + 2)}V${n1(y + bot - top)}" stroke="#d6dade" stroke-width="5"/><path d="M${n1(x - 1.5)} ${n1(y + 2)}V${n1(y + bot - top)}" stroke="#fff" stroke-opacity=".5" stroke-width="1"/>`; });
       return svgP(o, yard(o, 112, "fence", "grass") + `<ellipse cx="${cx}" cy="${bot + 6}" rx="${rx + 10}" ry="${ry + 4}" fill="#000" opacity=".35"/>` +
         `<ellipse cx="${cx}" cy="${top + 2}" rx="${rx - 4}" ry="${ry - 3}" fill="url(#${u}-pw)"/>` +
-        `<clipPath id="${u}-ab"><ellipse cx="${cx}" cy="${top + 2}" rx="${rx - 4}" ry="${ry - 3}"/></clipPath><g clip-path="url(#${u}-ab)"><g class="${o.on ? P + "caus" : ""}"><rect x="20" y="64" width="170" height="44" fill="url(#${u}-wav)"/></g>` +
-        (o.on ? `<ellipse class="${P}rip" cx="${cx + 40}" cy="${top + 6}" rx="12" ry="3" fill="none" stroke="#fff" stroke-width="1"/><ellipse class="${P}rip" style="animation-delay:-1.1s" cx="${cx + 40}" cy="${top + 6}" rx="12" ry="3" fill="none" stroke="#fff" stroke-width="1"/>` : "") + `</g>` +
+        `<clipPath id="${u}-ab"><ellipse cx="${cx}" cy="${top + 2}" rx="${rx - 4}" ry="${ry - 3}"/></clipPath><g clip-path="url(#${u}-ab)"><g class="${pon(o, "pump") ? P + "caus" : ""}"><rect x="20" y="64" width="170" height="44" fill="url(#${u}-wav)"/></g>` +
+        (PS && PS.light ? `<ellipse cx="${cx}" cy="${top + 2}" rx="${rx - 4}" ry="${ry - 3}" fill="${PS.lc || "#7fe0ff"}" opacity="${n1(.2 + .3 * (PS.ll == null ? o.level : PS.ll))}"/><ellipse cx="${cx - 30}" cy="${top + 6}" rx="22" ry="7" fill="#fff" opacity=".3"/>` : "") +
+        (pon(o, "pump") ? `<ellipse class="${P}rip" cx="${cx + 40}" cy="${top + 6}" rx="12" ry="3" fill="none" stroke="#fff" stroke-width="1"/><ellipse class="${P}rip" style="animation-delay:-1.1s" cx="${cx + 40}" cy="${top + 6}" rx="12" ry="3" fill="none" stroke="#fff" stroke-width="1"/>` : "") + `</g>` +
         `<path d="${wall}" fill="url(#${u}-c)"/><path d="${wall}" fill="url(#${u}-g)" opacity=".25"/>` + ups +
         `<ellipse cx="${cx}" cy="${top}" rx="${rx}" ry="${ry}" fill="none" stroke="#c9ced4" stroke-width="5"/><ellipse cx="${cx}" cy="${top - 1}" rx="${rx}" ry="${ry}" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.2"/>` +
         `<path d="M160 64L170 150M176 64L186 150M162 82L174 80M164 100L177 98M166 118L180 116M152 74L160 64M168 74L176 64" stroke="#e6e9ec" stroke-width="2.6" stroke-linecap="round"/>` +
-        tube(hd, 5, ["#0f2a44", "#2a6aa8", "#9cc8ef"]) + tube(hr, 5, ["#0f2a44", "#2a6aa8", "#9cc8ef"]) + flow(o, hr, 1.6) + flow(o, hd, 1.6) +
+        tube(hd, 5, ["#0f2a44", "#2a6aa8", "#9cc8ef"]) + tube(hr, 5, ["#0f2a44", "#2a6aa8", "#9cc8ef"]) + flow(po(o, "pump"), hr, 1.6) + flow(po(o, "pump"), hd, 1.6) + (PS ? steam(po(o, "heater"), [[84, 76, 16], [124, 72, 14]]) + (PS.temp != null ? floatT(o, cx - 34, top + 1, PS.temp) : "") : "") +
         sh(o, 40, 186, 24, 4) + `<path d="${rr(22, 154, 22, 30, 5)}" fill="url(#${u}-plas)"/><path d="${rr(44, 160, 22, 22, 4)}" fill="#1a1d22"/><ellipse cx="33" cy="154" rx="11" ry="3.5" fill="#3a4048"/>` +
-        `<path d="${rr(44, 164, 20, 14, 3)}" fill="#3a4048"/>` + led(o, 54, 171, 1.4, o.on, GREEN, "hg")); }),
+        `<path d="${rr(44, 164, 20, 14, 3)}" fill="#3a4048"/>` + led(o, 54, 171, 1.4, pon(o, "pump"), GREEN, "hg")); }),
 
     ic("falls", "Sheer waterfall", ["#7fd8ff", "#2ee6c5", "#b06cff", "#ff5a8a", "#ffd27a", "#eaf6ff"], "Light", (o) => { const u = o.uid, c = o.color, lit = H().mix(c, "#ffffff", .5), sheet = "M50 92Q48 114 54 142H146Q152 114 150 92Z";
       const streaks = [58, 70, 82, 94, 106, 118, 130, 142].map((x, i) => `<path class="${P}flow" style="animation-duration:${dur(o, .9, .5)}s;animation-delay:-${n1(i * .11)}s" d="M${x} 93Q${x - 1} 116 ${x + (x - 100) * .08} 141" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-dasharray="4 6"/>`).join("");
@@ -370,12 +379,46 @@ ${extra || ""}</defs>`;
         tube("M78 148V170", 9, ["#3a3f46", "#8d939b", "#c9ced4"]) + tube("M100 148V170", 9, ["#3a3f46", "#8d939b", "#c9ced4"]) + tube("M122 148V170", 9, ["#3a3f46", "#8d939b", "#c9ced4"]) +
         sh(o, 100, 152, 54, 4) + `<path d="M150 30L156 26V144L150 148Z" fill="url(#${u}-sd)"/>` + face(o, rr(50, 26, 100, 122, 7)) +
         `<path d="M50 40H150" stroke="#000" stroke-opacity=".18"/><path d="M50 41H150" stroke="#fff" stroke-opacity=".12"/>` +
-        `<path d="${rr(62, 50, 76, 36, 4)}" fill="#0b0d10"/>` + lcd(o, 65, 53, 46, 30, o.on ? String(t) : "--", 18, CYAN) +
-        (o.on ? `<path d="M118 60q4 -6 8 0q-4 6 -8 0z" fill="${CYAN}" opacity=".85"/><path d="M118 72h10M118 76h7" stroke="${CYAN}" stroke-width="1.6" opacity=".7"/>` : "") +
-        btn.map((b) => { const x = 66 + b[0] * 24, y = 98 + b[1] * 22, on = o.on && b[2];
-          return `<path d="${rr(x, y, 20, 16, 3)}" fill="url(#${u}-bk)"/><path d="M${x + 2} ${y + 2}H${x + 18}" stroke="#fff" stroke-opacity=".2"/>` + led(o, x + 10, y + 9, 1.6, on, GREEN, "hg"); }).join("") +
+        `<path d="${rr(62, 50, 76, 36, 4)}" fill="#0b0d10"/>` + (PS ? lcd(Object.assign({}, o, { on: PS.temp != null }), 65, 53, 46, 30, PS.temp != null ? String(Math.round(PS.temp)) : "--", 18, CYAN) : lcd(o, 65, 53, 46, 30, o.on ? String(t) : "--", 18, CYAN)) +
+        (pon(o, "heater") ? `<path d="M118 60q4 -6 8 0q-4 6 -8 0z" fill="${CYAN}" opacity=".85"/><path d="M118 72h10M118 76h7" stroke="${CYAN}" stroke-width="1.6" opacity=".7"/>` : "") +
+        btn.map((b) => { const x = 66 + b[0] * 24, y = 98 + b[1] * 22, pk = PBTN[b[0] + b[1] * 3], on = PS ? !!(pk && PS[pk]) : o.on && b[2];
+          return `<path d="${rr(x, y, 20, 16, 3)}" fill="url(#${u}-bk)"/><path d="M${x + 2} ${y + 2}H${x + 18}" stroke="#fff" stroke-opacity=".2"/>` + led(o, x + 10, y + 9, 1.6, on, GREEN, "hg") + (PS && pk ? glyph(pk, x + 4.6, y + 8.5, on) : ""); }).join("") +
         `<g class="${o.on ? P + "blink" : ""}">${led(o, 140, 34, 1.4, true, o.on ? CYAN : "#5a636d", "hb")}</g>` + hl(56, 30, 140, 30, 1.4, .5) + screw(56, 142) + screw(144, 142)); }),
   ];
+
+  // ---------- (parts) Multi-Function: pump / jets, heater, light, spa (switches) + the water temperature (value) ----------
+  // o.mf: o.parts holds only the ticked parts; the pump moves the water (ripples, hoses), the jets churn the spa, the heater
+  // steams, the light colors the water (o.pcolor / o.plevel .light), the temperature floats on a pool thermometer (the
+  // controller: on its display, each circuit lit on its own button with a small symbol). A part left out stays off.
+  // A Device Image (no o.mf) is exactly today's.
+  const PBTN = ["pump", "heater", "light", "spa"];
+  function glyph(k, x, y, on) {
+    const c = on ? "#d9f7ea" : "#8a949e";
+    if (k === "pump") return `<circle cx="${x}" cy="${y}" r="2.1" fill="none" stroke="${c}" stroke-width=".7"/><path d="M${x} ${y}l1.4 -1M${x} ${y}l-1.4 -1M${x} ${y}v1.7" stroke="${c}" stroke-width=".7"/>`;
+    if (k === "heater") return `<path d="M${x} ${y + 2.2}c-1.8 0 -2.2 -1.6 -1.2 -2.8c.4 .7 .9 .8 .9 .1c0 -1 .6 -1.6 .9 -2.2c.3 1 1.8 1.8 1.2 3.6c-.3 .8 -1 1.3 -1.8 1.3z" fill="${on ? "#ffb35c" : c}"/>`;
+    if (k === "light") return `<circle cx="${x}" cy="${y - .5}" r="1.7" fill="${on ? "#ffe9a8" : "none"}" stroke="${c}" stroke-width=".6"/><path d="M${x - .8} ${y + 1.6}h1.6" stroke="${c}" stroke-width=".6"/>`;
+    return `<circle cx="${x - 1.1}" cy="${y + .8}" r=".9" fill="none" stroke="${c}" stroke-width=".55"/><circle cx="${x + 1}" cy="${y - .2}" r=".75" fill="none" stroke="${c}" stroke-width=".55"/><circle cx="${x - .2}" cy="${y - 1.6}" r=".6" fill="none" stroke="${c}" stroke-width=".55"/>`;
+  }
+  const PT = { id: "temp", name: "Water temperature", type: "value", unit: "°F", min: 40, max: 106, def: 82 };
+  const sw = (id, name) => ({ id, name, type: "switch" });
+  const PP = {
+    panel: [sw("pump", "Pump"), sw("heater", "Heater"), sw("light", "Pool light"), sw("spa", "Spa"), PT],
+    hottub: [sw("jets", "Jets"), sw("heater", "Heater"), sw("light", "Light"), Object.assign({}, PT, { def: 102 })],
+    inground: [sw("pump", "Pump"), sw("heater", "Heater"), sw("light", "Pool light"), PT],
+    above: [sw("pump", "Pump"), sw("heater", "Heater"), sw("light", "Pool light"), PT],
+  };
+  icons.forEach((ic) => {
+    const ps = PP[ic.id]; if (!ps) return;
+    ic.parts = ps; const R = ic.render;
+    ic.render = (o) => {
+      if (!o.mf) return R(o);
+      const p = o.parts || {}, pv = o.pval || {}, s = {}; let any = false;
+      ps.forEach((q) => { if (q.type === "switch") { s[q.id] = !!p[q.id]; any = any || s[q.id]; } });
+      const t = pv.temp; s.temp = t == null || t === "" || !isFinite(+t) ? null : +t;
+      s.lc = o.pcolor && o.pcolor.light; s.ll = o.plevel && o.plevel.light != null ? +o.plevel.light : null;
+      PS = s; try { return R(Object.assign({}, o, { on: any })); } finally { PS = null; }
+    };
+  });
 
   (window.HDA = window.HDA || []).push({
     id: "pool", tab: "Pool & hot tub", group: "Outdoor", kind: "device",

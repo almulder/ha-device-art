@@ -5,10 +5,28 @@
   const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
   const RED = "#ff3b3b", GREEN = "#34d399", BLUE = "#59b4ff", AMB = "#ffb547";
 
+  // ---------- (parts) Multi-Function: keypads / panels get an Arm state stage (disarmed / home / away / night / alarm,
+  // like HSM or securityKeypad), smoke + CO alarms get two stages, Smoke and Carbon monoxide (clear / detected / tested).
+  // Stage values come in o.pval[id], used only as a Multi-Function Image (o.mf); a Device Image is drawn as before
+  // (on = armed away / sounding). Armed home / night read on the screen and light their mode key; alarm adds a red
+  // strobe behind the keypad; CO alone sounds in amber (smoke, or both, in red).
+  const COA = "#ff9a1f";
+  const ARM = { id: "arm", name: "Arm state", type: "stage", values: [["disarmed", "Disarmed"], ["home", "Armed home"], ["away", "Armed away"], ["night", "Armed night"], ["alarm", "Alarm"]], def: "disarmed" };
+  const SMK = [{ id: "smoke", name: "Smoke", type: "stage", values: [["clear", "Clear"], ["detected", "Smoke"], ["tested", "Test"]], def: "clear" },
+    { id: "co", name: "Carbon monoxide", type: "stage", values: [["clear", "Clear"], ["detected", "CO detected"], ["tested", "Test"]], def: "clear" }];
   function ctx(o) {
-    const c = o.color || "#f2f1ee", on = !!o.on, lv = o.level == null ? 1 : o.level;
-    return { c, on, lv, L: on ? .45 + .55 * lv : 0, id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, sp: 1.6 - .8 * lv };
+    const c = o.color || "#f2f1ee", lv = o.level == null ? 1 : o.level;
+    const pv = (k) => (o.mf && o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null), det = (v) => v === "detected" || v === "tested";
+    const arm = pv("arm"), sm = pv("smoke"), cm = pv("co"), alm = sm != null || cm != null ? det(sm) || det(cm) : null;
+    const on = arm ? arm !== "disarmed" : alm != null ? alm : !!o.on, co = !!alm && !det(sm);
+    return { c, on, lv, L: on ? .45 + .55 * lv : 0, id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, sp: 1.6 - .8 * lv,
+      mf: !!o.mf, st: arm || (on ? "away" : "disarmed"), alarm: arm === "alarm", co, ac: co ? COA : RED, ah: co ? "hA" : "hR", aw: co ? "#ffb35c" : "#ff6b6b" };
   }
+  const ARMT = { home: "ARMED HOME", night: "ARMED NIGHT", alarm: "ALARM" }, ARMS = { home: "HOME", night: "NIGHT", alarm: "ALARM" };
+  const armT = (x) => ARMT[x.st] || "ARMED AWAY", armS = (x, d) => ARMS[x.st] || d;
+  const homeish = (x) => x.st === "home" || x.st === "night";
+  // the alarm state: a red strobe glow behind the whole keypad
+  const alarmFx = (x, cx, cy, r) => (x.alarm ? `<g ${anim("strobe", .9, 0)}><circle cx="${cx || 100}" cy="${cy || 100}" r="${r || 92}" fill="${x.url("hR")}" opacity=".75"/></g>` : "");
   const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
   const lg = (id, a, x1, y1, x2, y2) => `<linearGradient id="${id}" x1="${x1 || 0}" y1="${y1 || 0}" x2="${x2 == null ? 1 : x2}" y2="${y2 || 0}">${stops(a)}</linearGradient>`;
   const rg = (id, a, cx, cy, r) => `<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r || .5}">${stops(a)}</radialGradient>`;
@@ -45,7 +63,7 @@ ${lg(id("brs"), [[0, "#7a5118"], [.4, "#f1cf7a"], [1, "#6e4a16"]])}
 ${rg(id("hR"), [[0, RED, .85], [.42, RED, .3], [1, RED, 0]])}
 ${rg(id("hG"), [[0, GREEN, .8], [.42, GREEN, .25], [1, GREEN, 0]])}
 ${rg(id("hB"), [[0, BLUE, .8], [.42, BLUE, .25], [1, BLUE, 0]])}
-${rg(id("hW"), [[0, "#fff4dc", .85], [.45, "#fff4dc", .25], [1, "#fff4dc", 0]])}
+${rg(id("hW"), [[0, "#fff4dc", .85], [.45, "#fff4dc", .25], [1, "#fff4dc", 0]])}${x.co ? rg(id("hA"), [[0, COA, .85], [.42, COA, .3], [1, COA, 0]]) : ""}
 <pattern id="${id("holes")}" width="4.4" height="4.4" patternUnits="userSpaceOnUse"><circle cx="2.2" cy="2.2" r=".95" fill="#000" fill-opacity=".38"/><circle cx="2.4" cy="2.5" r=".95" fill="#fff" fill-opacity=".14"/></pattern>
 <pattern id="${id("weave")}" width="2.4" height="2.4" patternUnits="userSpaceOnUse"><rect width="2.4" height="2.4" fill="#000" fill-opacity=".05"/><circle cx="1.2" cy="1.2" r=".55" fill="#000" fill-opacity=".22"/></pattern>
 <filter id="${id("bl")}" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="2.6"/></filter>
@@ -109,7 +127,7 @@ ${body}</svg>`;
     return s;
   }
   function led(x, cx, cy, r, col, lit, blink) {
-    const h = col === RED ? "hR" : col === GREEN ? "hG" : col === BLUE ? "hB" : "hW";
+    const h = col === RED ? "hR" : col === GREEN ? "hG" : col === BLUE ? "hB" : col === COA ? "hA" : "hW";
     if (!lit) return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#1b1e28"/><circle cx="${cx}" cy="${cy}" r="${f(r * .5)}" fill="${H.shade(col, -.5)}" opacity=".6"/>`;
     return `<g ${blink ? anim("blink", 1.1, 0) : ""}><circle cx="${cx}" cy="${cy}" r="${f(r * 4)}" fill="${x.url(h)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .4)}" fill="#fff" fill-opacity=".8"/></g>`;
   }
@@ -119,9 +137,9 @@ ${body}</svg>`;
     const arc = (r, a1, a2) => { const p = (a) => [cx + r * Math.cos(a * R), cy + r * Math.sin(a * R)]; const A = p(a1), B = p(a2); return `M${f(A[0])} ${f(A[1])}A${r} ${r} 0 0 1 ${f(B[0])} ${f(B[1])}`; };
     let w = ""; const d = x.sp * 1.2;
     [0, 180].forEach((a) => { for (let i = 0; i < 3; i++) { const rr = R0 + 8 + i * 9, sp = 34 - i * 4;
-      w += `<path d="${arc(rr, a - sp, a + sp)}" fill="none" stroke="#ff6b6b" stroke-width="${f(3.2 - i * .7)}" stroke-linecap="round" opacity="${(.9 - i * .22).toFixed(2)}" ${anim("wave", d, i * d * .22)}/>`; } });
-    return `<g ${anim("strobe", 1, 0)}><circle cx="${cx}" cy="${cy}" r="${f(R0 + 22)}" fill="${x.url("hR")}" opacity="${(x.L * .7).toFixed(2)}"/><circle cx="${cx}" cy="${cy}" r="${f(R0 + 3)}" fill="none" stroke="${RED}" stroke-width="2.4" opacity="${(x.L).toFixed(2)}"/></g>
-<g opacity="${(.5 + .5 * x.L).toFixed(2)}">${w}</g>${led(x, lx, ly, 1.8, RED, true, true)}`;
+      w += `<path d="${arc(rr, a - sp, a + sp)}" fill="none" stroke="${x.aw}" stroke-width="${f(3.2 - i * .7)}" stroke-linecap="round" opacity="${(.9 - i * .22).toFixed(2)}" ${anim("wave", d, i * d * .22)}/>`; } });
+    return `<g ${anim("strobe", 1, 0)}><circle cx="${cx}" cy="${cy}" r="${f(R0 + 22)}" fill="${x.url(x.ah)}" opacity="${(x.L * .7).toFixed(2)}"/><circle cx="${cx}" cy="${cy}" r="${f(R0 + 3)}" fill="none" stroke="${x.ac}" stroke-width="2.4" opacity="${(x.L).toFixed(2)}"/></g>
+<g opacity="${(.5 + .5 * x.L).toFixed(2)}">${w}</g>${led(x, lx, ly, 1.8, x.ac, true, true)}`;
   }
   function rkey(x, cx, cy, r, lit, glyph, ring) {
     return `<circle cx="${cx}" cy="${f(cy + .8)}" r="${r}" fill="#000" fill-opacity=".25"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${x.url("key")}"/>
@@ -151,68 +169,70 @@ ${inner ? `<circle cx="${cx}" cy="${cy}" r="${inner}" fill="${x.url("br")}"/><ci
   const ARMED = "ARMED AWAY", DIS = "DISARMED";
 
   const icons = [
-     fin({ id: "slim-white-keypad", name: "Slim white keypad", colors: [WH, GY, BK], render(o) {
+     fin({ id: "slim-white-keypad", name: "Slim white keypad", colors: [WH, GY, BK], parts: [ARM], render(o) {
       const x = ctx(o), B = rrp(52, 50, 96, 104, 16), lit = x.on;
       let k = ""; for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { const cx = 92 + c * 18, cy = 70 + r * 22; k += rkey(x, cx, cy, 7.2, lit, r === 3 && c !== 1 ? (c === 0 ? `<path d="M${cx - 2} ${cy}H${cx + 2}" stroke="#7b7884" stroke-width="1"/>` : `<path d="M${cx - 2} ${cy - 2}L${cx + 2} ${cy + 2}M${cx + 2} ${cy - 2}L${cx - 2} ${cy + 2}" stroke="#7b7884" stroke-width="1"/>`) : dot(cx, cy)); }
-      const modes = [[70, glyphShield(66, 70, .38, "#7b7884"), !lit], [92, glyphHome(66, 92, "#7b7884"), false], [114, glyphLock(66, 113, "#7b7884"), lit]];
+      const modes = [[70, glyphShield(66, 70, .38, "#7b7884"), !lit], [92, glyphHome(66, 92, "#7b7884"), lit && homeish(x)], [114, glyphLock(66, 113, "#7b7884"), lit && !homeish(x)]];
       let m = ""; modes.forEach(([cy, g, sel]) => { m += rkey(x, 66, cy, 7.2, lit, g, sel ? (lit ? RED : GREEN) : null) + (sel ? `<circle cx="66" cy="${cy}" r="10" fill="${x.url(lit ? "hR" : "hG")}" opacity=".6"/>` : ""); });
       m += `<circle cx="66" cy="136" r="7.2" fill="#000" fill-opacity=".25" transform="translate(0 .8)"/><circle cx="66" cy="136" r="7.2" fill="#e9e8ec"/><path d="M66 132.6V136.4M66 138.4V138.8" stroke="${RED}" stroke-width="1.6" stroke-linecap="round"/>`;
-      const F = drop(x, `<path d="${B}"/>`) + (lit ? `<path d="${rrp(46, 44, 108, 116, 20)}" fill="${x.url("hW")}" opacity="${(x.L * .45).toFixed(2)}"/>` : "") +
+      const F = alarmFx(x) + drop(x, `<path d="${B}"/>`) + (lit ? `<path d="${rrp(46, 44, 108, 116, 20)}" fill="${x.url("hW")}" opacity="${(x.L * .45).toFixed(2)}"/>` : "") +
         `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".2"/>${hl("M66 51H134", .6, 1)}${edge(B)}${m}${k}
 <path d="M78 58V148" stroke="#000" stroke-opacity=".08"/>${armLed(x, 100, 56, 1.4)}`;
       return scene(x, "wall", F);
     } }),
 
-     fin({ id: "round-edge-keypad", name: "Round-edge keypad", colors: [WH, BK], render(o) {
+     fin({ id: "round-edge-keypad", name: "Round-edge keypad", colors: [WH, BK], parts: [ARM], render(o) {
       const x = ctx(o), B = rrp(68, 34, 64, 132, 14), lit = x.on;
       let k = ""; for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { const cx = 84 + c * 16, cy = 100 + r * 15; k += rkey(x, cx, cy, 6, lit, dot(cx, cy)); }
-      const F = drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".2"/>
+      const F = alarmFx(x) + drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".2"/>
 <path d="M68 82V48Q68 34 82 34H118Q132 34 132 48V82Z" fill="${x.url("blk")}"/>${gl(x, "M70 80V48Q70 36 82 36H118Q130 36 130 48V58H70Z", .3)}
-${lit ? `<rect x="76" y="44" width="48" height="12" rx="2" fill="${RED}" opacity=".12"/>${txtC("ARMED", 100, 46, 6, "#ffd6d6", 1)}` : `${txtC("OFF", 100, 46, 6, "#c8f5de", 1)}`}
+${lit ? `<rect x="76" y="44" width="48" height="12" rx="2" fill="${RED}" opacity=".12"/>${txtC(armS(x, "ARMED"), 100, 46, 6, "#ffd6d6", 1)}` : `${txtC("OFF", 100, 46, 6, "#c8f5de", 1)}`}
 <circle cx="100" cy="69" r="7" fill="none" stroke="${lit ? RED : "#5b606b"}" stroke-width="1.4"/>${lit ? `<g opacity=".6"><circle cx="100" cy="69" r="11" fill="${x.url("hR")}" ${anim("pulse", 1.6, 0)}/></g>` : ""}
 ${k}<path d="M70 86H130" stroke="#000" stroke-opacity=".08"/>${edge(B)}${armLed(x, 124, 40, 1.3)}`;
       return scene(x, "sage", F);
     } }),
 
-     fin({ id: "classic-alpha-keypad", name: "Classic alpha keypad", colors: [WH, AL, GY], render(o) {
+     fin({ id: "classic-alpha-keypad", name: "Classic alpha keypad", colors: [WH, AL, GY], parts: [ARM], render(o) {
       const x = ctx(o), B = rrp(30, 50, 140, 100, 8), lit = x.on;
       const key = (kx, ky, w) => `<path d="${rrp(kx, ky + 1, w, 9, 2.4)}" fill="#000" fill-opacity=".3"/><path d="${rrp(kx, ky, w, 9, 2.4)}" fill="${x.url("rub")}"/>${lit ? `<path d="${rrp(kx, ky, w, 9, 2.4)}" fill="#e9f5b0" opacity=".14"/>` : ""}<path d="M${kx + w / 2 - 2} ${ky + 4.5}H${kx + w / 2 + 2}" stroke="#5c574b" stroke-width="1" stroke-linecap="round"/>`;
       let k = ""; for (let r = 0; r < 4; r++) { k += key(54, 96 + r * 12, 16); for (let c = 0; c < 3; c++) k += key(84 + c * 24, 96 + r * 12, 20); }
       let sp = ""; for (let i = 0; i < 5; i++) sp += `<path d="${rrp(40, 60 + i * 4.4, 20, 2, 1)}" fill="#000" fill-opacity=".4"/>`;
-      const F = drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".25"/>${hl("M38 51H162", .6, 1)}${sp}
-${lcd(x, 70, 58, 92, 24, lit ? ["ARMED AWAY", "EXIT NOW"] : ["DISARMED", "READY TO ARM"], "#1d2a12", lit ? "#d6f5a6" : "#c4dc96")}
+      const L2 = { home: "PERIMETER ON", night: "NIGHT STAY", alarm: "INTRUSION" };
+      const F = alarmFx(x) + drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".25"/>${hl("M38 51H162", .6, 1)}${sp}
+${lcd(x, 70, 58, 92, 24, lit ? [armT(x), L2[x.st] || "EXIT NOW"] : ["DISARMED", "READY TO ARM"], "#1d2a12", lit ? "#d6f5a6" : "#c4dc96")}
 ${led(x, 44, 88, 1.8, GREEN, !lit, false)}${armLed(x, 56, 88, 1.8)}${k}${edge(B)}`;
       return scene(x, "casing", F);
     } }),
 
-     fin({ id: "7-inch-touch-panel", name: "7-inch touch panel", colors: [WH, AL, GY], render(o) {
+     fin({ id: "7-inch-touch-panel", name: "7-inch touch panel", colors: [WH, AL, GY], parts: [ARM], render(o) {
       const x = ctx(o), B = rrp(26, 58, 148, 92, 10), lit = x.on, col = lit ? "#e5484d" : "#30a46c";
-      const F = drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".2"/>${hl("M36 59H164", .6, 1)}
+      const sel = x.mf && lit ? (x.st === "home" ? 1 : x.st === "night" ? 2 : 0) : -1;
+      const F = alarmFx(x) + drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".2"/>${hl("M36 59H164", .6, 1)}
 <path d="${rrp(36, 66, 128, 74, 3)}" fill="#e8ecf2"/><path d="${rrp(36, 66, 128, 74, 3)}" fill="none" stroke="#000" stroke-opacity=".5"/>
-<rect x="36" y="66" width="128" height="9" fill="#5f6b7d"/>${txt("12:45", 39, 68.4, 4.2, "#fff", .7)}${txtC(lit ? ARMED : "READY", 100, 68.4, 4.2, "#fff", .7)}
+<rect x="36" y="66" width="128" height="9" fill="#5f6b7d"/>${txt("12:45", 39, 68.4, 4.2, "#fff", .7)}${txtC(lit ? armT(x) : "READY", 100, 68.4, 4.2, "#fff", .7)}
 <g ${lit ? anim("pulse", 2, 0) : ""}>${glyphShield(90, 104, 1.6, col, H.mix(col, "#ffffff", .7))}</g>${glyphLock(90, 102, col)}
 ${[48, 60, 72].map((y) => `<circle cx="46" cy="${y + 34}" r="3" fill="none" stroke="#8a94a6" stroke-width="1"/>`).join("")}
-${[80, 94, 108, 122].map((y, i) => `<path d="${rrp(122, y, 34, 10, 2)}" fill="#4b5568"/>${txtC(["AWAY", "STAY", "NIGHT", "MORE"][i], 139, y + 2.6, 4.6, "#fff", .7)}`).join("")}
+${[80, 94, 108, 122].map((y, i) => `<path d="${rrp(122, y, 34, 10, 2)}" fill="${i === sel ? col : "#4b5568"}"/>${txtC(["AWAY", "STAY", "NIGHT", "MORE"][i], 139, y + 2.6, 4.6, "#fff", .7)}`).join("")}
 <path d="M36 66L80 66L50 140H36Z" fill="#fff" opacity=".12"/>${armLed(x, 30, 144, 1.4)}${edge(B)}`;
       return scene(x, "blush", F);
     } }),
 
-     fin({ id: "large-touch-panel", name: "Large touch panel", colors: [WH, GY], render(o) {
+     fin({ id: "large-touch-panel", name: "Large touch panel", colors: [WH, GY], parts: [ARM], render(o) {
       const x = ctx(o), B = rrp(24, 52, 152, 102, 12), lit = x.on, col = lit ? "#e5484d" : "#5cb85c";
-      const F = drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".18"/>${hl("M36 53H164", .6, 1)}
+      const F = alarmFx(x) + drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".18"/>${hl("M36 53H164", .6, 1)}
 <circle cx="100" cy="58" r="2" fill="#151824"/><circle cx="99.4" cy="57.4" r=".6" fill="#fff" fill-opacity=".5"/>
 <path d="${rrp(34, 63, 132, 72, 3)}" fill="#f7f8fa"/><path d="${rrp(34, 63, 132, 72, 3)}" fill="none" stroke="#000" stroke-opacity=".35"/>
 <rect x="34" y="63" width="132" height="8" fill="#e4e7ec"/>${txt("12:45", 37, 65, 4, "#5b6472", .6)}
-<path d="${rrp(42, 78, 40, 48, 3)}" fill="${col}"/>${glyphLock(62, 96, "#fff")}${txtC(lit ? "ARMED" : "READY", 62, 112, 4.6, "#fff", .8)}
+<path d="${rrp(42, 78, 40, 48, 3)}" fill="${col}"/>${glyphLock(62, 96, "#fff")}${txtC(lit ? armS(x, "ARMED") : "READY", 62, 112, 4.6, "#fff", .8)}
 ${lit ? `<g opacity=".18"><path d="${rrp(42, 78, 40, 48, 3)}" fill="#fff" ${anim("pulse", 2, 0)}/></g>` : ""}
 ${[0, 1, 2, 3].map((i) => `<path d="${rrp(90 + (i % 2) * 36, 78 + Math.floor(i / 2) * 25, 32, 21, 2)}" fill="#eef0f3" stroke="#d3d7dd" stroke-width=".6"/><circle cx="${100 + (i % 2) * 36}" cy="${88 + Math.floor(i / 2) * 25}" r="4" fill="${["#7aa7ff", "#ffcf6b", "#a78bfa", "#5fd3b0"][i]}" opacity=".8"/>`).join("")}
 <path d="${rrp(34, 140, 132, 9, 4)}" fill="${x.url("fab")}"/><path d="${rrp(34, 140, 132, 9, 4)}" fill="${x.url("weave")}"/>${armLed(x, 170, 58, 1.3)}${edge(B)}`;
       return scene(x, "slate", F);
     } }),
 
-     fin({ id: "camera-hub-panel", name: "Camera hub panel", colors: [WH, GY], render(o) {
+     fin({ id: "camera-hub-panel", name: "Camera hub panel", colors: [WH, GY], parts: [ARM], render(o) {
       const x = ctx(o), lit = x.on;
-      const F = `<ellipse cx="100" cy="152" rx="34" ry="5" fill="${x.url("sh")}"/>${drop(x, `<path d="${rrp(74, 44, 52, 108, 8)}"/>`, 3, 4)}
+      const F = alarmFx(x, 100, 96, 80) + `<ellipse cx="100" cy="152" rx="34" ry="5" fill="${x.url("sh")}"/>${drop(x, `<path d="${rrp(74, 44, 52, 108, 8)}"/>`, 3, 4)}
 <path d="${rrp(74, 96, 52, 56, 6)}" fill="${x.url("fab")}"/><path d="${rrp(74, 96, 52, 56, 6)}" fill="${x.url("weave")}"/><path d="${rrp(74, 96, 52, 56, 6)}" fill="${x.url("bh")}" opacity=".3"/>
 <path d="M74 100V52Q74 44 82 44H118Q126 44 126 52V100Z" fill="${x.url("blk")}"/>${gl(x, "M76 98V52Q76 46 82 46H118Q124 46 124 52V64H76Z", .3)}
 <circle cx="100" cy="66" r="9" fill="#05060a"/><circle cx="100" cy="66" r="6" fill="${x.url("lens")}"/><circle cx="98" cy="64" r="1.6" fill="#fff" fill-opacity=".6"/>
@@ -222,24 +242,25 @@ ${lit ? `<circle cx="100" cy="66" r="14" fill="${x.url("hR")}" opacity=".4"/>` :
       return scene(x, "cream", F, { shelf: 152 });
     } }),
 
-     fin({ id: "command-touchscreen", name: "Command touchscreen", colors: [WH, GY], render(o) {
+     fin({ id: "command-touchscreen", name: "Command touchscreen", colors: [WH, GY], parts: [ARM], render(o) {
       const x = ctx(o), B = rrp(26, 50, 148, 106, 10), lit = x.on, col = lit ? "#ef4444" : "#22c55e";
-      const F = drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".2"/>${hl("M36 51H164", .6, 1)}
+      const sel = !lit ? -1 : x.st === "home" ? 1 : x.st === "night" ? 2 : 0;
+      const F = alarmFx(x) + drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".2"/>${hl("M36 51H164", .6, 1)}
 <path d="${rrp(34, 58, 132, 76, 3)}" fill="#2457b8"/><path d="${rrp(34, 58, 132, 76, 3)}" fill="url(#${x.id("scr")})"/>
-${txtC(lit ? ARMED : DIS, 100, 62, 4.4, "#fff", .7)}
+${txtC(lit ? armT(x) : DIS, 100, 62, 4.4, "#fff", .7)}
 <circle cx="62" cy="96" r="17" fill="${col}"/><circle cx="62" cy="96" r="17" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.4"/>${glyphShield(62, 95, .9, "#fff")}
 ${lit ? `<g opacity=".5"><circle cx="62" cy="96" r="24" fill="${x.url("hR")}" ${anim("pulse", 2, 0)}/></g>` : ""}
-${[100, 124, 148].map((cx, i) => `<circle cx="${cx}" cy="96" r="9" fill="#fff" fill-opacity="${lit && i === 0 ? .95 : .2}"/><circle cx="${cx}" cy="96" r="9" fill="none" stroke="#fff" stroke-opacity=".7"/>${(i === 0 ? glyphLock : glyphHome)(cx, 95, lit && i === 0 ? "#2457b8" : "#fff")}`).join("")}
+${[100, 124, 148].map((cx, i) => `<circle cx="${cx}" cy="96" r="9" fill="#fff" fill-opacity="${i === sel ? .95 : .2}"/><circle cx="${cx}" cy="96" r="9" fill="none" stroke="#fff" stroke-opacity=".7"/>${(i === 0 ? glyphLock : glyphHome)(cx, 95, i === sel ? "#2457b8" : "#fff")}`).join("")}
 <path d="M34 58L84 58L52 134H34Z" fill="#fff" opacity=".08"/>
 ${[60, 80, 100, 120, 140].map((cx) => `<circle cx="${cx}" cy="145" r="1.8" fill="#000" fill-opacity=".25"/>`).join("")}${armLed(x, 160, 145, 1.5)}${edge(B)}`;
       return scene(x, "navy", F, { extra: lg(x.id("scr"), [[0, "#fff", .18], [1, "#000", .2]], 0, 0, 0, 1) });
     } }),
 
-     fin({ id: "smart-alarm-panel", name: "Smart alarm panel", colors: ["#1f3f78", "#1a1c22", "#2c6b3a"], colorLabel: "Board", render(o) {
+     fin({ id: "smart-alarm-panel", name: "Smart alarm panel", colors: ["#1f3f78", "#1a1c22", "#2c6b3a"], colorLabel: "Board", parts: [ARM], render(o) {
       const x = ctx(o), lit = x.on;
       let t = ""; for (let i = 0; i < 12; i++) { const tx = 30 + i * 10; t += `<path d="${rrp(tx, 68, 9, 12, 1)}" fill="${x.url("term")}"/><circle cx="${tx + 4.5}" cy="72" r="2" fill="${x.url("chrome")}"/><path d="M${tx + 3} 72H${tx + 6}" stroke="#333" stroke-width=".6"/><rect x="${tx + 1}" y="76" width="7" height="3" fill="#0d3a1a"/>`; }
-      let z = ""; for (let i = 0; i < 12; i++) z += led(x, 34 + i * 10, 88, 1.1, lit ? RED : GREEN, lit ? i % 4 === 0 : true, false);
-      const F = `${drop(x, `<path d="${rrp(24, 60, 152, 84, 4)}"/>`)}
+      let z = ""; for (let i = 0; i < 12; i++) z += led(x, 34 + i * 10, 88, 1.1, lit ? RED : GREEN, lit ? i % 4 === 0 : true, x.alarm && i % 4 === 0);
+      const F = `${alarmFx(x, 100, 102, 86)}${drop(x, `<path d="${rrp(24, 60, 152, 84, 4)}"/>`)}
 <path d="${rrp(24, 60, 152, 84, 4)}" fill="${H.shade(x.c, -.1)}"/><path d="${rrp(24, 60, 152, 84, 4)}" fill="url(#${x.id("pcbs")})"/>
 <path d="M40 100H90M40 104H70V122M100 96V130M120 100H160M130 104V128" fill="none" stroke="#c9b26a" stroke-opacity=".35" stroke-width=".8"/>
 ${t}${z}
@@ -250,33 +271,34 @@ ${armLed(x, 116, 132, 1.8)}<path d="M100 144V192M110 144V192" stroke="#e8e2d0" s
       return scene(x, "ply", F, { extra: lg(x.id("pcbs"), [[0, "#fff", .1], [1, "#000", .3]], 0, 0, 0, 1) });
     } }),
 
-     fin({ id: "wireless-keypad", name: "Wireless keypad", colors: [BK, WH], render(o) {
-      const x = ctx(o), B = rrp(70, 40, 60, 124, 10), lit = x.on, bl = lit ? "#ffd2c2" : "#bfe3ff";
+     fin({ id: "wireless-keypad", name: "Wireless keypad", colors: [BK, WH], parts: [ARM], render(o) {
+      const x = ctx(o), B = rrp(70, 40, 60, 124, 10), lit = x.on, bl = lit ? "#ffd2c2" : "#bfe3ff", sel = !lit ? -1 : homeish(x) ? 1 : 0;
       let k = ""; for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { const cx = 85 + c * 15, cy = 82 + r * 15;
         k += `<path d="${rrp(cx - 6, cy - 5, 12, 10, 2.4)}" fill="#000" fill-opacity=".35" transform="translate(0 .8)"/><path d="${rrp(cx - 6, cy - 5, 12, 10, 2.4)}" fill="${x.url("bvd")}"/><path d="M${cx - 1.6} ${cy}H${cx + 1.6}" stroke="${bl}" stroke-width="1.2" stroke-linecap="round" opacity="${lit ? 1 : .55}"/>`; }
-      const F = drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".3"/>${hl("M78 41H122", .4, 1)}
-${[[85, "AWAY"], [100, "HOME"], [115, "OFF"]].map(([cx, l], i) => `<path d="${rrp(cx - 6, 52, 12, 14, 2.4)}" fill="${x.url("bvd")}"/>${((c2) => i === 0 ? glyphLock(cx, 58, c2) : i === 1 ? glyphHome(cx, 59, c2) : glyphShield(cx, 59, .45, c2))((i === 0 && lit) ? RED : (i === 2 && !lit) ? GREEN : bl)}`).join("")}
+      const F = alarmFx(x) + drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".3"/>${hl("M78 41H122", .4, 1)}
+${[[85, "AWAY"], [100, "HOME"], [115, "OFF"]].map(([cx, l], i) => `<path d="${rrp(cx - 6, 52, 12, 14, 2.4)}" fill="${x.url("bvd")}"/>${((c2) => i === 0 ? glyphLock(cx, 58, c2) : i === 1 ? glyphHome(cx, 59, c2) : glyphShield(cx, 59, .45, c2))(i === sel ? RED : (i === 2 && !lit) ? GREEN : bl)}`).join("")}
 ${k}${lit ? `<path d="${B}" fill="${x.url("hR")}" opacity=".15"/>` : ""}${armLed(x, 100, 148, 1.8)}${edge(B)}`;
       return scene(x, "casing", F);
     } }),
 
-     fin({ id: "classic-lcd-keypad", name: "Classic LCD keypad", colors: [WH, AL, GY], render(o) {
+     fin({ id: "classic-lcd-keypad", name: "Classic LCD keypad", colors: [WH, AL, GY], parts: [ARM], render(o) {
       const x = ctx(o), B = rrp(38, 40, 124, 122, 8), lit = x.on;
       let k = ""; for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { const kx = 62 + c * 22, ky = 100 + r * 12; k += `<path d="${rrp(kx, ky + 1, 18, 8, 2)}" fill="#000" fill-opacity=".3"/><path d="${rrp(kx, ky, 18, 8, 2)}" fill="${x.url("rub")}"/>${lit ? `<path d="${rrp(kx, ky, 18, 8, 2)}" fill="#e9f5b0" opacity=".14"/>` : ""}`; }
-      const F = drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".25"/>${hl("M46 41H154", .6, 1)}
-${lcd(x, 50, 50, 84, 22, lit ? ["SYSTEM ARMED", "AWAY MODE"] : ["DISARMED", "READY TO ARM"], "#1d2a12", lit ? "#dcf5a0" : "#bcd48c")}
+      const L2 = { home: "STAY MODE", night: "NIGHT MODE" };
+      const F = alarmFx(x) + drop(x, `<path d="${B}"/>`) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("bh")}" opacity=".25"/>${hl("M46 41H154", .6, 1)}
+${lcd(x, 50, 50, 84, 22, lit ? (x.alarm ? ["ALARM", "INTRUSION"] : ["SYSTEM ARMED", L2[x.st] || "AWAY MODE"]) : ["DISARMED", "READY TO ARM"], "#1d2a12", lit ? "#dcf5a0" : "#bcd48c")}
 ${led(x, 144, 52, 1.6, GREEN, !lit, false)}${armLed(x, 144, 60, 1.6)}${led(x, 144, 68, 1.6, AMB, false, false)}
 ${[56, 78, 100, 122].map((kx) => `<path d="${rrp(kx, 80, 20, 8, 4)}" fill="${x.url("rub")}"/>`).join("")}${k}
 <path d="M42 150H158" stroke="#000" stroke-opacity=".25"/><path d="M42 151H158" stroke="#fff" stroke-opacity=".3"/>${edge(B)}`;
       return scene(x, "wall", F);
     } }),
 
-     fin({ id: "round-smoke-alarm", name: "Round smoke alarm", colors: [WH], render(o) {
+     fin({ id: "round-smoke-alarm", name: "Round smoke alarm", colors: [WH], parts: SMK, render(o) {
       const x = ctx(o), B = sq(100, 100, 120, .7), lit = x.on;
-      const ringC = lit ? RED : GREEN;
+      const ringC = lit ? x.ac : GREEN;
       const F = drop(x, `<path d="${B}"/>`, 3, 5) + `<path d="${B}" fill="${x.url("bv")}"/><path d="${B}" fill="${x.url("holes")}" opacity=".7"/><path d="${B}" fill="${x.url("bh")}" opacity=".18"/>
 <path d="${sq(100, 100, 116, .7)}" fill="none" stroke="#fff" stroke-opacity=".5"/><path d="${B}" fill="none" stroke="#000" stroke-opacity=".25"/>
-${lit ? `<g ${anim("strobe", 1, 0)}><circle cx="100" cy="100" r="44" fill="${x.url("hR")}" opacity="${(x.L * .7).toFixed(2)}"/></g>` : ""}
+${lit ? `<g ${anim("strobe", 1, 0)}><circle cx="100" cy="100" r="44" fill="${x.url(x.ah)}" opacity="${(x.L * .7).toFixed(2)}"/></g>` : ""}
 <circle cx="100" cy="100" r="26" fill="${x.url("br")}"/><circle cx="100" cy="100" r="26" fill="none" stroke="#000" stroke-opacity=".15"/>
 <circle cx="100" cy="100" r="22" fill="none" stroke="${ringC}" stroke-width="${lit ? 3.4 : 1.6}" opacity="${lit ? .95 : .45}" ${lit ? anim("blink", .8, 0) : ""}/>
 <circle cx="100" cy="100" r="18" fill="${x.url("br")}"/>${alarm(x, 100, 100, 58, 100, 100).replace(/<circle cx="100" cy="100" r="1\.[58]"[^>]*>/, "")}`;
@@ -293,12 +315,12 @@ ${alarm(x, 100, 100, 62, 100, 122)}`;
       return scene(x, "ceiling", F);
     } }),
 
-     fin({ id: "combo-smoke-and-co", name: "Combo smoke & CO", colors: [WH, AL], render(o) {
+     fin({ id: "combo-smoke-and-co", name: "Combo smoke & CO", colors: [WH, AL], parts: SMK, render(o) {
       const x = ctx(o);
       let sl = ""; for (let i = 0; i < 24; i++) { const a = i / 24 * 360; sl += `<path d="${rrp(98.5, 50, 3, 12, 1.5)}" fill="#000" fill-opacity=".22" transform="rotate(${a} 100 100)"/>`; }
       const F = disc(x, 100, 100, 54, 40) + sl + `<path d="${rrp(84, 106, 32, 15, 7.5)}" fill="#000" fill-opacity=".2" transform="translate(0 1)"/><path d="${rrp(84, 106, 32, 15, 7.5)}" fill="${x.url("bv")}"/><path d="${rrp(84, 106, 32, 15, 7.5)}" fill="none" stroke="#000" stroke-opacity=".25"/>
 <path d="M92 88H108" stroke="#000" stroke-opacity=".12" stroke-width="3" stroke-linecap="round"/><ellipse cx="90" cy="70" rx="14" ry="6" fill="#fff" fill-opacity=".3" transform="rotate(-25 90 70)"/>
-${alarm(x, 100, 100, 54, 122, 122)}`;
+${x.co ? txtC("CO", 100, 110.5, 6, COA, 1.2) : ""}${alarm(x, 100, 100, 54, 122, 122)}`;
       return scene(x, "ceiling", F);
     } }),
 
@@ -313,11 +335,11 @@ ${alarm(x, 100, 100, 58, 116, 112)}${x.on ? "" : led(x, 84, 112, 1.3, GREEN, tru
       return scene(x, "ceiling", F);
     } }),
 
-     fin({ id: "smart-smoke-co", name: "Smart smoke + CO", colors: [WH], render(o) {
+     fin({ id: "smart-smoke-co", name: "Smart smoke + CO", colors: [WH], parts: SMK, render(o) {
       const x = ctx(o), lit = x.on;
       let sl = ""; for (let i = 0; i < 40; i++) { const a = i / 40 * 360; sl += `<path d="M100 52L100 64" stroke="#000" stroke-opacity=".25" stroke-width="1.4" stroke-linecap="round" transform="rotate(${a} 100 100)"/>`; }
       const F = disc(x, 100, 100, 56, 0) + sl + `<circle cx="100" cy="100" r="34" fill="${x.url("br")}"/>
-<circle cx="100" cy="100" r="30" fill="none" stroke="${lit ? RED : "#d7f0dc"}" stroke-width="${lit ? 3 : 1.6}" opacity="${lit ? 1 : .8}" ${lit ? anim("blink", .8, 0) : ""}/>
+<circle cx="100" cy="100" r="30" fill="none" stroke="${lit ? x.ac : "#d7f0dc"}" stroke-width="${lit ? 3 : 1.6}" opacity="${lit ? 1 : .8}" ${lit ? anim("blink", .8, 0) : ""}/>
 <circle cx="100" cy="100" r="26" fill="${x.url("br")}"/><circle cx="100" cy="100" r="34" fill="none" stroke="#000" stroke-opacity=".2"/>
 ${alarm(x, 100, 100, 56, 100, 120)}`;
       return scene(x, "ceiling", F);

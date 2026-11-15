@@ -1,16 +1,60 @@
 # Device Art Card
 
-**Animated, realistic device drawings for your Home Assistant dashboard.** **1,528 drawings** in **17 categories** and 106 groups:
+**Animated, realistic device drawings for your Home Assistant dashboard.** **1,529 drawings** in **17 categories** and 106 groups:
 lights, fans, appliances, locks, sensors, plants and more. Builder cards and plant/tree builders add thousands more combinations. Each one comes alive with your device's state: lamps glow in the bulb's color, fans spin with their speed, washers
-show their cycle and doors open.
+show their cycle and doors open. **413 of them are multi-function:** each door, light, reading or stage can follow its own entity.
 
 ![Fans](docs/images/anim-fans.gif)
 ![Lights and glow](docs/images/anim-lights.gif)
 ![Things that move](docs/images/anim-home.gif)
 
-## What's new
+## What's new in 1.2.0: multi-function drawings
 
-**Update 2: people, pets and habitats** (57 new drawings, now **1,528** in all)
+![Multi-function drawings](docs/images/new-multifunction.png)
+
+**413 drawings** now have **parts**, and each part can follow its own entity. Turn on `multi_function: true` and tick
+only the parts your device really has.
+
+- **Tick only the parts your device has.** A part you leave out stays closed, off or blank, so the drawing shows what
+  your device can do and nothing more.
+- **Every door and drawer is its own sensor.** A 4-door fridge opens each door on its own; so do dishwasher drawers,
+  oven doors, washers, garage doors and enclosures. **One sensor can open several doors:** give the same entity to more than one part.
+- **Stages** for appliances, thermostats, vacuums and alarms: wash, rinse, dry and clean on a dishwasher; heat, cool and
+  idle on a thermostat; docked, cleaning, returning, charging and error on a robot vacuum; disarmed, home, away and
+  alarm on an alarm panel. Each stage has its own animation.
+- **Readings on the drawings:** fridge and freezer temperature, water temperature, enclosure temperature and humidity,
+  pump speed and more, shown on the device's own display.
+- **Lights with level and color:** a light part dims with its brightness and glows in its bulb's color.
+- **Ceiling fan light kits:** a new **Light kit** option on the ceiling fans. The fan and the light each follow their own
+  entity, and the light takes any color.
+- **New drawing: Stacked enclosures, 4 doors** (`habitats/pvcstack`), with a sensor for each door, lights, temperature
+  and humidity. That makes **1,529 drawings** in all.
+- **Device mode keeps the old look.** Without `multi_function`, a drawing follows one entity just as before. Your
+  current cards don't change.
+- **The [gallery](https://almulder.github.io/ha-device-art/)** has a **Multi-function** filter, an **N parts** badge on each
+  drawing, and a parts panel where you can try every part: tick it, open it, pick its stage or set its reading. The
+  **One device / Multi-function** switch shows both looks, and **Copy YAML** writes the `parts:` for you.
+
+| | |
+|---|---|
+| ![Ceiling fan with a light kit in two colors](docs/images/anim-mf-fan.gif) | ![4-door fridge, each door its own sensor](docs/images/anim-mf-fridge.gif) |
+| ![Dishwasher cycle stages](docs/images/anim-mf-dishwasher.gif) | ![Thermostat from heat to cool](docs/images/anim-mf-thermostat.gif) |
+| ![Robot vacuum states](docs/images/anim-mf-vacuum.gif) | ![Pool with pump, heater and light](docs/images/anim-mf-pool.gif) |
+
+![Stacked enclosures, 4 doors](docs/images/new-pvcstack.png)
+
+How to set it up: see [Multi-function cards (parts)](#multi-function-cards-parts) below.
+
+## Version history
+
+- **1.2.0:** multi-function drawings (parts, doors, stages, readings, light level and color), ceiling fan light kits,
+  the stacked enclosure, and the gallery's parts panel. See above.
+- **1.1.1:** boy hairstyles and outfits for the toddler.
+- **1.1.0:** the version line in the browser console, and update notes in this README.
+- **Update 2:** people, pets and habitats (57 new drawings, **1,528** in all). Details below.
+- **Update 1:** the first release, with 1,471 drawings in 16 categories.
+
+**Update 2: people, pets and habitats**
 
 ![People](docs/images/new-people.png)
 
@@ -34,7 +78,6 @@ show their cycle and doors open.
 preset color dots too, that's **over 4 billion**, and every drawing with a color picker takes any color on top of that. The
 plant and tree builders add 1,620 more plant-and-pot combinations.
 
-**Update 1:** the first release, with 1,471 drawings in 16 categories.
 
 ---
 
@@ -55,6 +98,7 @@ Almost everything on a drawing can be set. The pictures below show only a few of
 | **Color** (`color`) | The main color: a light's color (it follows a color bulb automatically), or a body, finish, fabric or flower color. |
 | **Second color** (`color2`) | A second part: lamp shades and globes, switch LEDs, fireplace surrounds, cooktop glass, doorbell rings. |
 | **Parts** (`parts`) | Parts of one device that switch on their own, each from its own entity: microwave, light and fan on an over-the-range microwave; oven and each burner on a range; washer and dryer in a pair. |
+| **Multi-function** (`multi_function: true`) | Each door, drawer, light, reading and stage follows its own entity, and the parts you leave out stay closed, off or blank. See [Multi-function cards](#multi-function-cards-parts). |
 | **Menus** (`options`) | Pick a look or a state: fridge style, washer cycle (wash, rinse, spin), range fuel and burners, outlet region (US, EU, UK, AU and more), fireplace surround and many more. Menus can follow an entity too (`options_from`). |
 | **Animation** (`animate: false`) | Still pictures only. Animation also turns off by itself when your device asks for reduced motion. |
 | **Name and state** (`show_name`, `show_state`, `name`) | Show or hide the label under the drawing. |
@@ -75,7 +119,7 @@ Almost everything on a drawing can be set. The pictures below show only a few of
 
 **Getting updates:** HACS shows "Update available" for each new version. After updating, reload the page
 (Ctrl+F5, or in the phone app: Settings → Companion App → Debugging → Reset frontend cache). To check your version,
-open the browser console: it shows `DEVICE-ART-CARD v1.1.1`.
+open the browser console: it shows `DEVICE-ART-CARD v1.2.0`.
 
 **Manual**
 1. Copy `dist/ha-device-art.js` to `config/www/`.
@@ -129,6 +173,126 @@ parts:
 
 Menu ids and values are shown in the gallery's **Copy YAML** output for each drawing.
 
+### Multi-function cards (parts)
+
+A drawing with parts can follow **one entity per part**. Add `multi_function: true` and list the parts your device has
+under `parts`, as `part id: entity`. The gallery shows each drawing's part ids (press **Copy YAML** in
+**Multi-function** mode), and every part has a type:
+
+| Part type | What it shows | Give it | Read from the entity |
+|---|---|---|---|
+| **switch** | A light, fan, pump, heater or screen that is on or off | a `light`, `switch`, `fan`, `input_boolean`... | On or off. A light's brightness and color follow it too; a fan's speed follows its percentage. |
+| **contact** | A door or drawer that opens | a `binary_sensor` or `cover` | Open (`on`, `open`, `opening`) or closed. |
+| **value** | A reading on the drawing (temperature, humidity, speed) | a `sensor`, `number` or `input_number`, or any entity with `attribute` | Its number (or the attribute's). |
+| **stage** | A cycle, mode or state, each with its own animation | a `sensor`, `select`, `climate`, `vacuum`..., or any entity with `attribute` | Its state (or the attribute), matched to a stage id or name, or through `map`. |
+
+Any part can read an **attribute** instead of the state: `{ entity, attribute }`, for example
+`temp: { entity: climate.hallway, attribute: current_temperature }` or
+`state: { entity: climate.hallway, attribute: hvac_action }`. A switch or contact part that reads an attribute is on
+when the value is an "on" word (`on`, `open`, `heating`...) or a number above 0; add `on_states: [...]` to choose.
+
+Rules:
+- A part **you leave out** stays closed, off or blank, so list only what your device really has.
+- **One entity can drive several parts**: give the same `binary_sensor` to two doors and they open together.
+- `entity` (the main one) still sets the name, the state text under the drawing and the tap action.
+- `part_names` gives parts your own names, for example `part_names: { d1: Gecko, d2: Snake }`.
+- A **stage** reads the entity's state (or its `attribute`). If your states have other names, use `{ entity, map }` to
+  turn them into the drawing's stage ids (the gallery's **Copy YAML** lists each part's stage ids).
+- Without `multi_function`, the drawing works as before: one entity, the switch parts follow it, and if `entity` is a
+  door sensor (`binary_sensor` or `cover`) every door opens with it.
+
+```yaml
+# a 4-door fridge: each door its own sensor, the inside light, and both temperatures
+type: custom:device-art-card
+art: fridgecfg/steel
+entity: sensor.fridge_temperature
+options: { style: flex4 }
+multi_function: true
+parts:
+  tl: binary_sensor.fridge_door_top_left
+  tr: binary_sensor.fridge_door_top_right
+  bl: binary_sensor.freezer_doors      # one sensor for both bottom doors:
+  br: binary_sensor.freezer_doors      # they open together
+  light: binary_sensor.fridge_door_top_left
+  temp: sensor.fridge_temperature
+  ftemp: sensor.freezer_temperature
+```
+
+```yaml
+# a ceiling fan with a light kit: the fan spins with its speed, the light dims and takes its bulb's color
+type: custom:device-art-card
+art: ceilingfan/classic
+entity: fan.bedroom_fan
+multi_function: true        # turns the light kit on (or set options: { kit: light })
+parts:
+  fan: fan.bedroom_fan
+  light: light.bedroom_fan_light
+```
+
+```yaml
+# a dishwasher: the door, and the cycle stage from the appliance's status sensor
+type: custom:device-art-card
+art: dishwasher/front
+entity: sensor.dishwasher_status
+multi_function: true
+parts:
+  door: binary_sensor.dishwasher_door
+  cycle:
+    entity: sensor.dishwasher_status
+    map: { "off": idle, ready: idle, washing: wash, rinsing: rinse, drying: dry, finished: done }
+```
+
+```yaml
+# a thermostat: mode, operating state, fan mode, room temperature and setpoint
+type: custom:device-art-card
+art: thermostat/learning
+entity: climate.hallway
+multi_function: true
+parts:
+  mode:
+    entity: climate.hallway                  # its state is the mode: off, heat, cool, auto...
+    map: { heat_cool: auto }
+  state:
+    entity: climate.hallway
+    attribute: hvac_action                   # idle, heating, cooling, fan
+  fan:
+    entity: climate.hallway
+    attribute: fan_mode                      # auto, on, circulate
+  temp:
+    entity: climate.hallway
+    attribute: current_temperature
+  sp:
+    entity: climate.hallway
+    attribute: temperature                   # the setpoint
+```
+
+```yaml
+# a robot vacuum: its state picks the stage (docked, cleaning, returning, charging, paused, error)
+type: custom:device-art-card
+art: vacuum/allinone
+entity: vacuum.downstairs
+multi_function: true
+parts:
+  state:
+    entity: vacuum.downstairs
+    map: { idle: docked }
+```
+
+```yaml
+# a pool: pump, heater and light each on their own, and the water temperature
+type: custom:device-art-card
+art: pool/inground
+entity: switch.pool_pump
+multi_function: true
+parts:
+  pump: switch.pool_pump
+  heater: switch.pool_heater
+  light: light.pool_light
+  temp: sensor.pool_water_temperature
+```
+
+![Try the parts in the gallery](docs/images/gallery-parts.png)
+
 ### All settings
 
 | Key | Example | Notes |
@@ -139,7 +303,9 @@ Menu ids and values are shown in the gallery's **Copy YAML** output for each dra
 | `color`, `color2` | `"#ffd27a"` | Override the colors. |
 | `options` | `{ style: flex4 }` | Fixed menu choices. |
 | `options_from` | `{ cycle: sensor.x }` or `{ cycle: { entity, map } }` | Menu choices that follow an entity's state. |
-| `parts` | `{ fan: fan.hood }` | Part id → entity. Parts without an entity follow the main one. |
+| `parts` | `{ fan: fan.hood }` | Part id → entity, or `{ entity, map }` for a stage part. Without `multi_function`, parts without an entity follow the main one. |
+| `multi_function` | `true` | Each part follows its own entity; parts left out stay closed, off or blank. |
+| `part_names` | `{ d1: Gecko }` | Your own names for the parts. |
 | `level`, `level_attribute`, `min`, `max` | `0.6`, `percentage`, `0`, `100` | Fixed level, or where to read it from. |
 | `on_states`, `on_above` | `[running, heating]`, `5` | What counts as "on" (default: on, open, playing, heating, cleaning, running and similar). |
 | `scenery` | `false` | Background off. |
@@ -175,7 +341,7 @@ Some cards are builders: pick the style, layout and extras from menus, and the d
 
 ## Every category
 
-A sample from each category, 1,528 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
+A sample from each category, 1,529 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
 
 | | |
 |---|---|

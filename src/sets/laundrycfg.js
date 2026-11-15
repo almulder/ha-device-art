@@ -203,7 +203,24 @@ ${extra || ""}</defs>`;
       s += `<circle class="${P}suds" cx="${n1(x)}" cy="${n1(wy + r * .3)}" r="${n1(b)}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width=".6" style="animation-delay:-${(i * .37).toFixed(2)}s"/>`; }
     return s;
   }
+  // (multi-function) an open door: the drum seen through the bare gasket, the laundry at rest, the door swung out on its
+  // hinge (washers to the left, dryers to the right), seen nearly edge-on
+  function doorOpen(o, k, cx, cy, R) {
+    const u = o.uid, gr = R * .74, id = `${u}-dr${k}`, sx = o.kind === "dry" ? 1 : -1, q = Object.assign({}, o, { on: false });
+    let s = `<circle cx="${cx}" cy="${n1(cy + R * .07)}" r="${n1(R + 1.2)}" fill="#000" fill-opacity=".3"/><circle cx="${cx}" cy="${cy}" r="${n1(R * .92)}" fill="url(#${u}-rub)"/>` +
+      `<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${n1(gr)}"/></clipPath><g clip-path="url(#${id})"><circle cx="${cx}" cy="${cy}" r="${n1(gr)}" fill="url(#${u}-drum)"/><circle cx="${cx}" cy="${cy}" r="${n1(gr)}" fill="url(#${u}-perf)"/>` +
+      drum(q, cx, cy, gr) + `<circle cx="${cx}" cy="${n1(cy - gr * .55)}" r="${n1(gr * .9)}" fill="#000" fill-opacity=".28"/></g>` +
+      `<circle cx="${cx}" cy="${cy}" r="${n1(gr)}" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="1.4"/>`;
+    const hx = cx + sx * R * .98, dcx = hx + sx * R * .36, rx = R * .4, ry = R * 1.02;
+    s += `<ellipse cx="${n1(dcx + sx * 2)}" cy="${n1(cy + 3)}" rx="${n1(rx)}" ry="${n1(ry)}" fill="#000" fill-opacity=".3"/>` +
+      `<ellipse cx="${n1(dcx)}" cy="${cy}" rx="${n1(rx)}" ry="${n1(ry)}" fill="url(#${u}-cr)"/><ellipse cx="${n1(dcx)}" cy="${cy}" rx="${n1(rx * .9)}" ry="${n1(ry * .93)}" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width=".7"/>` +
+      `<ellipse cx="${n1(dcx - sx * rx * .06)}" cy="${cy}" rx="${n1(rx * .62)}" ry="${n1(ry * .72)}" fill="#1a2028" fill-opacity=".8"/><ellipse cx="${n1(dcx - sx * rx * .06)}" cy="${cy}" rx="${n1(rx * .62)}" ry="${n1(ry * .72)}" fill="url(#${u}-gl)"/>` +
+      `<path d="M${n1(dcx - sx * rx * .3)} ${n1(cy - ry * .5)}Q${n1(dcx - sx * rx * .5)} ${cy} ${n1(dcx - sx * rx * .3)} ${n1(cy + ry * .4)}" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="1.2" stroke-linecap="round"/>` +
+      `<rect x="${n1(hx - 2)}" y="${n1(cy - R * .32)}" width="4" height="${n1(R * .22)}" rx="1" fill="#5d636b"/><rect x="${n1(hx - 2)}" y="${n1(cy + R * .1)}" width="4" height="${n1(R * .22)}" rx="1" fill="#5d636b"/>`;
+    return s;
+  }
   function door(o, k, cx, cy, R, opt) {
+    if (o.dopen) return doorOpen(o, k, cx, cy, R);
     opt = opt || {}; const u = o.uid, t = opt.t || "wash", gr = R * (opt.win || .74), id = `${u}-dr${k}`, on = o.on,
       wet = t === "wash" || (t === "combo" && o.level >= .5), dry = t === "dry" || (t === "combo" && !wet), ring = opt.ring || "chrome";
     let s = `<circle cx="${cx}" cy="${n1(cy + R * .07)}" r="${n1(R + 1.2)}" fill="#000" fill-opacity=".34"/>`;
@@ -278,6 +295,9 @@ ${extra || ""}</defs>`;
         `<ellipse cx="${cx}" cy="${n1(top)}" rx="${n1(w2 * 1.6)}" ry="${n1(w2 * .7)}" fill="#f4f6f8" stroke="#9aa1a9" stroke-width=".5"/></g>`; }
     return s + `</g><ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#000" stroke-opacity=".5" stroke-width="1.2"/>`;
   }
+  // (multi-function) the glass lid lifted up against the console, hinged at the back edge
+  const lidUp = (o, x, ty, w) => { const d = `M${x + 12} ${ty + 4}H${x + w - 12}L${x + w - 15} ${ty - 20}H${x + 15}Z`;
+    return `<path d="M${x + 12} ${ty + 4.6}H${x + w - 12}" stroke="#000" stroke-opacity=".5" stroke-width="1.6"/>` + glassLid(o, d) + `<path d="${d}" fill="none" stroke="#c9d1d8" stroke-width="1.6"/><path d="M${x + 18} ${ty - 16}L${x + 30} ${ty - 1}" stroke="#fff" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>`; };
   const glassLid = (o, d, tint) => `<path d="${d}" fill="${tint || "#16212b"}" fill-opacity=".35"/><path d="${d}" fill="url(#${o.uid}-gl)"/><path d="${d}" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width=".9"/>`;
 
   function steam(o, pts, s) {
@@ -354,10 +374,21 @@ ${extra || ""}</defs>`;
   const WCY = [["wash", "Wash"], ["fill", "Fill"], ["rinse", "Rinse"], ["spin", "Spin"], ["done", "Done"]];
   const DCY = [["dry", "Dry"], ["cool", "Cool down"], ["done", "Done"]];
   const CCY = [["wash", "Wash"], ["fill", "Fill"], ["rinse", "Rinse"], ["spin", "Spin"], ["dry", "Dry"], ["cool", "Cool down"], ["done", "Done"]];
+  // (multi-function) each machine's parts: its switch, its cycle stage (o.pval: idle = off) and its door / lid contact.
+  // As a Multi-Function Image a part left out is plain (switch off, no stage, door shut); the machine runs on its switch,
+  // or on its stage when only the stage is ticked. A stage given to a Device Image picks the cycle; its doors follow o.open.
+  // An open door stands the machine still.
+  const MFK = { wash: ["washer", "wcycle", "wdoor"], dry: ["dryer", "dcycle", "ddoor"], combo: [null, "wcycle", "wdoor"] };
   function M(o, part, opt, kind) {
-    const on = !!o.on && (!part || !o.parts || o.parts[part] !== false);
-    const cyc = (o.opt && o.opt[opt]) || (kind === "dry" ? "dry" : "wash");
-    return Object.assign({}, o, { on, cyc, kind, run: on && cyc !== "done" });
+    let on = !!o.on && (!part || !o.parts || o.parts[part] !== false);
+    let cyc = (o.opt && o.opt[opt]) || (kind === "dry" ? "dry" : "wash");
+    const ids = MFK[kind] || MFK.wash, pp = o.parts || {}, pv = o.pval || {}, st = pv[ids[1]] != null && pv[ids[1]] !== "" ? String(pv[ids[1]]) : null;
+    if (!o.mf && st == null && !o.open) return Object.assign({}, o, { on, cyc, kind, run: on && cyc !== "done" });
+    if (o.mf) on = part && pp[part] != null ? !!pp[part] : st != null;
+    if (st != null) { if (/^(idle|off)$/i.test(st)) on = false; else cyc = st; }
+    const dopen = o.mf ? !!pp[ids[2]] : !!o.open;
+    if (dopen) on = false;
+    return Object.assign({}, o, { on, cyc, kind, run: on && cyc !== "done", dopen });
   }
   const wob2 = (m, s) => `<g class="${m.run ? P + (m.cyc === "spin" ? "wobS" : "wob") : ""}">${s}</g>`;
   const tstr = (o) => { const m = mins(o); return Math.floor(m / 60) + ":" + ("0" + (m % 60)).slice(-2); };
@@ -495,7 +526,7 @@ ${extra || ""}</defs>`;
       const wet = o.on && /fill|wash|rinse/.test(o.cyc);
       s += `<path d="${lf}" fill="#0b0e12"/>` + (wet ? `<path d="M${x + 12} ${by - 11}H${x + w - 12}V${by - 6}H${x + 12}Z" fill="url(#${u}-${o.cyc === "wash" ? "ws" : "wt"})" opacity=".8"/>` : "") +
         cloth(o, 1, cx - 14, by - 9, .32, 70) + cloth(o, 4, cx + 10, by - 8.5, .3, -20) + glassLid(o, lf) + `<path d="M${x + 9} ${ty + 27.5}H${x + w - 9}" stroke="#9aa1a9" stroke-width="1.2"/>`;
-    } else s += `<path d="${lid}" fill="#0b0e12"/>` + tub2(o, k, cx, (ty + by) / 2 + 1, w * .37, (dk - 11) / 2, opt.tub) + glassLid(o, lid) + hl(x + 15, ty + 9, x + 30, ty + 8, 2, .3);
+    } else s += `<path d="${lid}" fill="#0b0e12"/>` + tub2(o, k, cx, (ty + by) / 2 + 1, w * .37, (dk - 11) / 2, opt.tub) + (o.dopen ? lidUp(o, x, ty, w) : glassLid(o, lid) + hl(x + 15, ty + 9, x + 30, ty + 8, 2, .3));
     s += box3(o, x, by, w, h - cH - dk, 0, 0) + `<path d="${rr(cx - 16, by + 2, 32, 4, 2)}" fill="#000" fill-opacity=".3"/>` + groove(`M${x} ${by + 10}H${x + w}`) +
       foot(x + 5, y + h - 1) + foot(x + w - 14, y + h - 1) + hl(x + 3, by + 4, x + 3, y + h - 4, 1.5, .3);
     return s;
@@ -556,6 +587,15 @@ ${extra || ""}</defs>`;
   const PED = { id: "ped", name: "Pedestal", values: [["none", "None"], ["yes", "Pedestal with drawer"]] };
   const WC = { id: "wcyc", name: "Washer cycle", values: WCY }, DC = { id: "dcyc", name: "Dryer cycle", values: DCY };
   const PARTS = [{ id: "washer", name: "Washer" }, { id: "dryer", name: "Dryer" }];
+  // (parts) Multi-Function: per machine its switch, its cycle stage and its door (the top-loader's lid); a machine's
+  // parts only when the Machines choice shows it
+  const WSTP = { id: "wcycle", name: "Washer cycle", type: "stage", values: [["idle", "Off"]].concat(WCY), def: "wash" };
+  const DSTP = { id: "dcycle", name: "Dryer cycle", type: "stage", values: [["idle", "Off"]].concat(DCY), def: "dry" };
+  const mfParts = (lidW, mach) => {
+    const w = mach ? { when: { opt: "mach", is: ["both", "washer"] } } : {}, d = mach ? { when: { opt: "mach", is: ["both", "dryer"] } } : {};
+    return [Object.assign({ id: "washer", name: "Washer" }, w), Object.assign({}, WSTP, w), Object.assign({ id: "wdoor", name: lidW ? "Washer lid" : "Washer door", type: "contact" }, w),
+      Object.assign({ id: "dryer", name: "Dryer" }, d), Object.assign({}, DSTP, d), Object.assign({ id: "ddoor", name: "Dryer door", type: "contact" }, d)];
+  };
   const opt = (o, k, d) => (o.opt && o.opt[k]) || d;
   const card = (id, name, colors, extra, render) => Object.assign({ id, name, colors, picker: true, colorLabel: "Finish", render }, extra);
   function ped(o, x, y, w, h, dx) { return pedestal(o, x, y, w, h, dx || 0); }
@@ -598,18 +638,18 @@ ${extra || ""}</defs>`;
     draw: (m, k, x, y, w, h) => m.kind === "dry" ? topDryer(m, k, x, y, w, h) : top2(m, k, x, y, w, h, { console: cLG, tub: { agit: true } }) };
 
   const FIN = { screen: [BBK, DST, WH, IVORY], dial: [WH, BST, GRPH, CHAMP, NAVY], top: [WH, GRPH, BST, CHAMP], compact: [WH, SS, GRPH] };
-  const std = (lay) => ({ parts: PARTS, options: [MACH].concat(lay ? [LAY] : []).concat([PED, WC, DC]) });
+  const std = (lay, lidW) => ({ parts: mfParts(lidW, true), options: [MACH].concat(lay ? [LAY] : []).concat([PED, WC, DC]) });
   const icons = [
     card("cfgscreen", "Front-load, screen", FIN.screen, std(true), (o) => svg(o, room(o, 150, "tile") + arrange(o, famScreen))),
     card("cfgdial", "Front-load, dial", FIN.dial, std(true), (o) => svg(o, room(o, 150, "wood") + arrange(o, famDial))),
-    card("cfgtop", "Top-load, glass lid", FIN.top, std(false), (o) => svg(o, room(o, 150, "tile") + arrange(o, famTop))),
+    card("cfgtop", "Top-load, glass lid", FIN.top, std(false, true), (o) => svg(o, room(o, 150, "tile") + arrange(o, famTop))),
     card("cfgcompact", "Compact 24-inch", FIN.compact, std(true), (o) => svg(o, room(o, 152, "wood") + arrange(o, famCompact))),
-    card("cfgtower", "Laundry tower", [BST, WH, GRPH, IVORY], { parts: PARTS, options: [PED, WC, DC] }, (o) => {
+    card("cfgtower", "Laundry tower", [BST, WH, GRPH, IVORY], { parts: mfParts(false, false), options: [PED, WC, DC] }, (o) => {
       const w = M(o, "washer", "wcyc", "wash"), d = M(o, "dryer", "dcyc", "dry"), hasPed = opt(o, "ped", "none") === "yes", Hp = hasPed ? 18 : 0, F = 178, h = F - Hp - 8;
       return svg(o, room(o, 174, "tile") + sh(o, 100, F + 1, 44, 4) + (hasPed ? ped(o, 62, F - Hp, 76, Hp, 6) : "") +
         wob2(w.run ? w : d, tower(o, w, d, 1, 62, F - Hp - h, 76, h, { dx: 6, Rw: .39, ring: "chrome", bh: 15,
           band: (x, y, ww, bh) => screen(d, x + ww * .24, y + bh / 2, bh * .3, AMB) + knob(w.on ? w : d, x + ww * .5, y + bh / 2, bh * .27, { dark: true }) + screen(w, x + ww * .76, y + bh / 2, bh * .3) }))); }),
-    card("cfgcombo", "All-in-one combo", [BST, WH, GRPH, BBK], { options: [PED, { id: "cycle", name: "Cycle", values: CCY }] }, (o) => {
+    card("cfgcombo", "All-in-one combo", [BST, WH, GRPH, BBK], { parts: [{ id: "wcycle", name: "Cycle", type: "stage", values: [["idle", "Off"]].concat(CCY), def: "wash" }, { id: "wdoor", name: "Door", type: "contact" }], options: [PED, { id: "cycle", name: "Cycle", values: CCY }] }, (o) => {
       const m = M(o, null, "cycle", "combo"), hasPed = opt(o, "ped", "none") === "yes", Hp = hasPed ? 28 : 0, F = 178, h = Math.min(140, F - Hp - 24);
       return svg(o, room(o, 156, "conc") + sh(o, 102, F + 1, 62, 6) + (hasPed ? ped(o, 50, F - Hp, 100, Hp, 8) : "") +
         wob2(m, fl2(m, 1, 50, F - Hp - h, 100, h, { dx: 8, ch: Math.round(h * .14), strip: true, Rw: .42, ring: "dark", hatch: true, kick: hasPed ? 0 : 6, panel: pLGcombo }))); }),

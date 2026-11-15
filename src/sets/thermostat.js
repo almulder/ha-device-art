@@ -14,15 +14,36 @@
   const METAL = [FIN.steel, FIN.brass, FIN.copper];
   const sw = (s) => s.split(" ").map((k) => FIN[k]);
 
+  // (multi-function) the thermostat's own readings as parts: o.pval.mode (off / heat / cool / auto / eco), o.pval.state
+  // (idle / heating / cooling / fan), o.pval.fan (auto / on / circulate), o.pval.temp (room) and o.pval.sp (setpoint).
+  // The display shows the setpoint and, when both are given, fades to the room temperature and back; Off reads OFF.
+  // Running (heating / cooling / fan only) lights the display; idle keeps it dim with the mode's mark. Without any of
+  // them (a Device Image) the drawing is today's: the slider is the setpoint, on = running.
+  function tsMF(o) {
+    const v = o.pval || {}, has = (k) => v[k] != null && v[k] !== "";
+    if (!["mode", "state", "fan", "temp", "sp"].some(has)) return null;
+    const m = has("mode") ? String(v.mode).toLowerCase() : null, s = has("state") ? String(v.state).toLowerCase() : null, fn = has("fan") ? String(v.fan).toLowerCase() : null;
+    const sp = has("sp") && isFinite(+v.sp) ? +v.sp : null, tp = has("temp") && isFinite(+v.temp) ? +v.temp : null, main = sp != null ? sp : tp;
+    const r = { mode: m, on: s ? /^(heating|cooling|fan)$/.test(s) : m ? m !== "off" : !!o.on, heat: null, fanOnly: s === "fan" };
+    if (main != null) { r.t = Math.round(main); r.lv = Math.max(0, Math.min(1, main < 45 ? (main - 15.5) / 13.3 : (main - 60) / 24)); r.heat = main < 45 ? main >= 21 : main >= 70; }
+    if (sp != null && tp != null && Math.round(sp) !== Math.round(tp)) r.t2 = Math.round(tp);
+    if (m === "off") { r.on = false; r.str = "OFF"; r.t2 = tp != null ? Math.round(tp) : null; }
+    if (m === "heat") r.heat = true; else if (m === "cool") r.heat = false; else if (sp != null && tp != null && (m === "auto" || m === "eco")) r.heat = tp < sp;
+    if (s === "heating") r.heat = true; else if (s === "cooling") r.heat = false;
+    if (s === "fan") { r.gc = "#3fcf9a"; r.heat = false; }
+    r.fan = s === "fan" || fn === "on" || fn === "circulate" ? true : null;
+    return r;
+  }
   function ctx(o) {
-    const c = (o.color || FIN.white).toLowerCase(), on = !!o.on, lv = o.level == null ? .5 : Math.max(0, Math.min(1, o.level));
-    const t = Math.round(60 + 24 * lv), heat = t >= 70, gc = heat ? "#ff8a2a" : "#36a6ff";
+    const R = tsMF(o), c = (o.color || FIN.white).toLowerCase(), on = R ? R.on : !!o.on, lv = R && R.lv != null ? R.lv : o.level == null ? .5 : Math.max(0, Math.min(1, o.level));
+    const t = R && R.t != null ? R.t : Math.round(60 + 24 * lv), heat = R && R.heat != null ? R.heat : t >= 70, gc = R && R.gc ? R.gc : heat ? "#ff8a2a" : "#36a6ff";
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
     const x = { c, on, lv, t, heat, gc, id, url, defs: [], have: {}, metal: METAL.indexOf(c) >= 0,
       hot: H.mix(gc, "#ffffff", .5), dk: H.hx(c).reduce((a, b) => a + b, 0) < 260 };
     x.dig = on ? H.mix(gc, "#ffffff", .42) : "#9aa0ab";
     x.ink = on ? H.shade(gc, -.78) : "#3c4238";
     x.add = (k, s) => { if (!x.have[k]) { x.have[k] = 1; x.defs.push(s); } };
+    if (R) { x.str = R.str || null; x.t2 = R.t2 != null ? R.t2 : null; x.fan = R.fan; x.mode = R.mode; x.fanOnly = R.fanOnly; }
     return x;
   }
 
@@ -124,7 +145,7 @@ ${x.defs.join("")}</defs>
       `<path d="M${f(X + 1)} ${f(Y + 1.2)} H${f(X + W - 1)}" stroke="#000" stroke-opacity=".3" stroke-width="1.4"/>` + (x.on ? `<rect class="${P}breathe" x="${f(X)}" y="${f(Y)}" width="${f(W)}" height="${f(Hh)}" rx="${r}" fill="#fff" opacity=".12"/>` : "");
   }
 
-  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
+  const SEG = { O: "abcdef", F: "aefg", 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
   function poly(x0, y0, x1, y1, t) {
     const h = t / 2;
     if (y0 === y1) return `${f(x0)},${f(y0)} ${f(x0 + h)},${f(y0 - h)} ${f(x1 - h)},${f(y0 - h)} ${f(x1)},${f(y0)} ${f(x1 - h)},${f(y0 + h)} ${f(x0 + h)},${f(y0 + h)}`;
@@ -138,7 +159,14 @@ ${x.defs.join("")}</defs>
     Object.keys(S).forEach((k) => { const lit = on.indexOf(k) >= 0; if (lit || ghost) s += `<polygon points="${poly(...S[k], t)}" fill="${col}"${lit ? "" : ` opacity="${ghost}"`}/>`; });
     return s;
   }
+  // the readout; with a second reading (x.t2) it fades between the two (the first alone without animation)
   function digits(x, cx, cy, h, col, o2) {
+    o2 = o2 || {};
+    if (o2.str || (!x.str && x.t2 == null)) return digits0(x, cx, cy, h, col, o2);
+    const a = digits0(x, cx, cy, h, col, x.str ? Object.assign({}, o2, { str: x.str, unit: "" }) : o2);
+    return x.t2 == null ? a : `<g class="${P}sa">${a}</g><g class="${P}sb">${digits0(x, cx, cy, h, col, Object.assign({}, o2, { str: String(x.t2) }))}</g>`;
+  }
+  function digits0(x, cx, cy, h, col, o2) {
     o2 = o2 || {}; const str = o2.str || String(x.t), w = h * .5, t = Math.max(.8, h * .13), sp = h * .24, n = str.length;
     const unit = o2.unit == null ? "deg" : o2.unit, uw = unit === "pct" ? h * .36 : unit ? h * .22 : 0;
     const tot = n * w + (n - 1) * sp + (uw ? sp * .8 + uw : 0); let ox = cx - tot / 2; const oy = cy - h / 2;
@@ -161,19 +189,25 @@ ${x.defs.join("")}</defs>
     return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="none" stroke="${col}" stroke-width=".17" stroke-linecap="round" stroke-linejoin="round">${d}</g>`;
   }
   const DROP = "M0 -1 C.35 -.45 .7 -.05 .7 .35 C.7 .75 .38 1 0 1 C-.38 1 -.7 .75 -.7 .35 C-.7 -.05 -.35 -.45 0 -1 Z";
+  const LEAF = "M-.85 .85 C-1 -.25 -.25 -1 .95 -.95 C1 .25 .25 1 -.85 .85 Z";
+  const leaf = (cx, cy, s, col, vein) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})"><path d="${LEAF}" fill="${col}"/><path d="M-.7 .7 L.5 -.5" stroke="${vein}" stroke-width=".14" stroke-linecap="round"/></g>`;
   function mode(x, cx, cy, s, o2) {
     o2 = o2 || {};
+    if (x.mode === "off") return "";
+    if (x.fanOnly) return `<g${x.on ? "" : ` opacity="${o2.idleOp || .35}"`}>${fanIcon(x, cx, cy, s * 1.05, x.on ? x.hot : o2.idle || "#8e939c")}</g>`;
+    if (x.mode === "eco") return x.on ? `<g class="${P}pulse">${o2.halo === false ? "" : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * 2.2)}" fill="${x.url("halo")}" opacity=".7"/>`}${leaf(cx, cy, s, "#5fc46e", "#d9f5c8")}</g>`
+      : `<g opacity="${o2.idleOp || .35}">${leaf(cx, cy, s, o2.idle || "#8e939c", o2.idle2 || "#5b6068")}</g>`;
     if (!x.on) return `<g opacity="${o2.idleOp || .35}">${x.heat ? flame(cx, cy, s, o2.idle || "#8e939c", o2.idle2 || "#5b6068") : flake(cx, cy, s, o2.idle || "#8e939c")}</g>`;
     const ic = x.heat ? flame(cx, cy, s, x.gc, "#ffe7a6") : flake(cx, cy, s, H.mix(x.gc, "#fff", .25));
     return `<g class="${P}pulse">${o2.halo === false ? "" : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * 2.2)}" fill="${x.url("halo")}" opacity=".7"/>`}${ic}</g>`;
   }
   function fanDots(x, cx, cy, gap, r, col) {
-    if (!x.on) return [-1, 0, 1].map((i) => `<circle cx="${f(cx + i * gap)}" cy="${cy}" r="${r}" fill="#888c94" opacity=".25"/>`).join("");
+    if (!(x.fan == null ? x.on : x.fan)) return [-1, 0, 1].map((i) => `<circle cx="${f(cx + i * gap)}" cy="${cy}" r="${r}" fill="#888c94" opacity=".25"/>`).join("");
     return [-1, 0, 1].map((i) => `<circle class="${P}dot" style="animation-delay:${((i + 1) * .3).toFixed(1)}s" cx="${f(cx + i * gap)}" cy="${cy}" r="${r}" fill="${col || x.hot}"/>`).join("");
   }
   function fanIcon(x, cx, cy, r, col) {
     let b = ""; for (let i = 0; i < 3; i++) b += `<path transform="rotate(${i * 120} ${cx} ${cy})" d="M${cx} ${cy} C${f(cx - r * .55)} ${f(cy - r * .35)} ${f(cx - r * .4)} ${f(cy - r)} ${cx} ${f(cy - r)} C${f(cx + r * .35)} ${f(cy - r)} ${f(cx + r * .3)} ${f(cy - r * .4)} ${cx} ${cy} Z" fill="${col}"/>`;
-    return `<g${x.on ? ` class="${P}spin" style="animation-duration:${(2.2 - x.lv * 1.4).toFixed(2)}s"` : ""}>${b}<circle cx="${cx}" cy="${cy}" r="${f(r * .18)}" fill="${col}"/></g>`;
+    return `<g${(x.fan == null ? x.on : x.fan) ? ` class="${P}spin" style="animation-duration:${(2.2 - x.lv * 1.4).toFixed(2)}s"` : ""}>${b}<circle cx="${cx}" cy="${cy}" r="${f(r * .18)}" fill="${col}"/></g>`;
   }
   function rise(x, pts, col, len, w) {
     if (!x.on) return "";
@@ -373,7 +407,7 @@ ${x.defs.join("")}</defs>
     } }),
 
      base({ id: "vent", name: "Smart vent", colors: sw("white black brass steel copper"), render(o) {
-      const x = ctx(o), open = x.on; let sl = "", air = "";
+      const x = ctx(o), open = o.mf ? !!(o.parts || {}).vent : x.on; let sl = "", air = "";
       for (let i = 0; i < 6; i++) { const y = 107 + i * 6;
         sl += open ? `<rect x="49" y="${y}" width="102" height="2.4" fill="${x.url("ring")}"/><rect x="49" y="${y + 2.4}" width="102" height="1" fill="#000" opacity=".4"/>`
           : `<rect x="49" y="${y - 1}" width="102" height="6" fill="${x.url("bdv")}"/><path d="M49 ${y + 4.8} H151" stroke="#000" stroke-opacity=".35" stroke-width=".8"/>`; }
@@ -413,7 +447,7 @@ ${x.defs.join("")}</defs>
         tb2 += `<rect x="${wx - 7}" y="128" width="14" height="9" rx="1" fill="#2f9e5b"/>` + screw(wx, 133, 2); });
       for (let i = 0; i < 4; i++) { const lx = 56 + i * 17;
         rl += `<rect x="${lx - 6}" y="104" width="12" height="16" rx="1.2" fill="#18181c"/><rect x="${lx - 6}" y="104" width="12" height="3" fill="#fff" opacity=".1"/>`;
-        leds += x.on && i < lit ? `<g class="${P}pulse" style="animation-delay:${(i * .3).toFixed(1)}s"><circle cx="${lx}" cy="92" r="5" fill="${x.url("halo")}"/><circle cx="${lx}" cy="92" r="2" fill="${x.hot}"/></g>` : `<circle cx="${lx}" cy="92" r="2" fill="#3a2a2a"/>`;
+        leds += (o.mf ? !!(o.parts || {})["z" + (i + 1)] : x.on && i < lit) ? `<g class="${P}pulse" style="animation-delay:${(i * .3).toFixed(1)}s"><circle cx="${lx}" cy="92" r="5" fill="${x.url("halo")}"/><circle cx="${lx}" cy="92" r="2" fill="${x.hot}"/></g>` : `<circle cx="${lx}" cy="92" r="2" fill="#3a2a2a"/>`;
         leds += `<rect x="${lx - 4}" y="97" width="8" height="1.4" fill="#fff" opacity=".5"/>`; }
       const b = slab(x, 32, 50, 136, 96, 5) + `<rect x="39" y="56" width="122" height="84" rx="2" fill="#000" opacity=".4"/><rect x="40" y="57" width="120" height="82" rx="2" fill="${x.url("pcb")}"/>` +
         `<path d="M48 80 H150 M48 84 H120 M140 84 V126" stroke="#9fd8b5" stroke-opacity=".18" stroke-width=".8" fill="none"/>` + w + tb + tb2 + rl + leds +
@@ -493,6 +527,23 @@ ${x.defs.join("")}</defs>
     } }),
   ];
 
+  // (parts) Multi-Function: mode, operating state and fan as stages, room temperature and setpoint as readings
+  // (heat-only models: mode off / heat / eco, no cooling, no fan); the zone panel's four relays z1..z4; the smart vent's
+  // damper and temperature.
+  const MODE = [["off", "Off"], ["heat", "Heat"], ["cool", "Cool"], ["auto", "Auto"], ["eco", "Eco"]];
+  const STATE = [["idle", "Idle"], ["heating", "Heating"], ["cooling", "Cooling"], ["fan", "Fan only"]];
+  const TEMPS = [{ id: "temp", name: "Temperature", type: "value", unit: "°", min: 40, max: 95, def: 68 }, { id: "sp", name: "Setpoint", type: "value", unit: "°", min: 45, max: 90, def: 70 }];
+  const tsParts = (heatOnly) => [
+    { id: "mode", name: "Mode", type: "stage", values: heatOnly ? MODE.filter((v) => v[0] !== "cool" && v[0] !== "auto") : MODE, def: "heat" },
+    { id: "state", name: "Operating state", type: "stage", values: heatOnly ? STATE.filter((v) => v[0] === "idle" || v[0] === "heating") : STATE, def: "heating" },
+  ].concat(heatOnly ? [] : [{ id: "fan", name: "Fan", type: "stage", values: [["auto", "Auto"], ["on", "On"], ["circulate", "Circulate"]], def: "auto" }]).concat(TEMPS);
+  const HEATONLY = ["baseboard", "radiant", "boiler"];
+  icons.forEach((ic) => {
+    if (["learning", "square", "dial", "programmable", "touchscreen", "pill", "withsensor", "baseboard", "splitwall", "remote", "ptac", "radiant", "boiler", "colorring", "mercury"].indexOf(ic.id) >= 0) ic.parts = tsParts(HEATONLY.indexOf(ic.id) >= 0);
+    if (ic.id === "zone") ic.parts = [1, 2, 3, 4].map((i) => ({ id: "z" + i, name: "Zone " + i }));
+    if (ic.id === "vent") ic.parts = [{ id: "vent", name: "Damper" }, TEMPS[0]];
+  });
+
   (window.HDA = window.HDA || []).push({
     id: "thermostat",
     tab: "Thermostats",
@@ -522,7 +573,12 @@ ${x.defs.join("")}</defs>
 @keyframes hda-thermostat-wave{0%,100%{opacity:.1}50%{opacity:.9}}
 .hda-anim .hda-thermostat-blink{animation:hda-thermostat-blink 1.3s steps(2,start) infinite}
 @keyframes hda-thermostat-blink{50%{opacity:.1}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-thermostat-breathe,.hda-anim .hda-thermostat-pulse,.hda-anim .hda-thermostat-dot,.hda-anim .hda-thermostat-spin,.hda-anim .hda-thermostat-rise,.hda-anim .hda-thermostat-blow,.hda-anim .hda-thermostat-wave,.hda-anim .hda-thermostat-blink{animation:none}}`,
+.hda-thermostat-sb{opacity:0}
+.hda-anim .hda-thermostat-sa{animation:hda-thermostat-sa 8s ease-in-out infinite}
+.hda-anim .hda-thermostat-sb{animation:hda-thermostat-sb 8s ease-in-out infinite}
+@keyframes hda-thermostat-sa{0%,42%{opacity:1}50%,92%{opacity:0}100%{opacity:1}}
+@keyframes hda-thermostat-sb{0%,42%{opacity:0}50%,92%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-thermostat-breathe,.hda-anim .hda-thermostat-pulse,.hda-anim .hda-thermostat-dot,.hda-anim .hda-thermostat-spin,.hda-anim .hda-thermostat-rise,.hda-anim .hda-thermostat-blow,.hda-anim .hda-thermostat-wave,.hda-anim .hda-thermostat-blink,.hda-anim .hda-thermostat-sa,.hda-anim .hda-thermostat-sb{animation:none}}`,
     icons,
   });
 })();

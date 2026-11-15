@@ -136,7 +136,9 @@
 `;
   const steam = (o, x, pts) => o.on ? pts.map((p, i) => `<circle class="${P}puff" cx="${p[0]}" cy="${p[1]}" r="${p[2] || 7}" fill="${x.rg([[0, "#fff", .6], [.6, "#fff", .18], [1, "#fff", 0]])}" style="animation-delay:-${(i * .9).toFixed(1)}s"/>`).join("") : "";
   const tempF = (o, lo, hi) => Math.round((lo + (hi - lo) * lvl(o)) / 5) * 5;
-  const TILT = { options: [{ id: "tilt", name: "Slats", values: [["open", "Tilted open"], ["half", "Half open"], ["closed", "Tilted shut"]] }] };
+  // (parts) Multi-Function: Tilt (slats open, %) and Lift (raised, %) as readings, like the shades set's blinds
+  const TILT = { options: [{ id: "tilt", name: "Slats", values: [["open", "Tilted open"], ["half", "Half open"], ["closed", "Tilted shut"]] }],
+    parts: [{ id: "tilt", name: "Tilt (open)", type: "value", unit: "%", min: 0, max: 100, def: 50 }, { id: "lift", name: "Lift (raised)", type: "value", unit: "%", min: 0, max: 100, def: 40 }] };
   const tiltOf = (o) => ({ open: 0, half: .5, closed: 1 })[(o.opt && o.opt.tilt) || "open"];
   const icons = [];
   const add = (id, name, colors, label, render, extra) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {}));
@@ -233,7 +235,9 @@
     return scene(x, back, ROLL(o, x, wx, wy, ww, wh, c, { box: 22, pitch: 7, bar: 6 }) + `<rect x="${wx + ww / 2 - 6}" y="${f(wy + (wh - 2) * (1 - amt(o)) + 2)}" width="12" height="3" rx="1.5" fill="#6a6f76"/>`); });
 
   function venetian(o, x, c, alu) {
-    const wx = 50, wy = 40, ww = 100, wh = 100, a = amt(o), t = o.on ? tiltOf(o) : 1;
+    // (multi-function) Tilt (slats open %) and Lift (raised %) readings in o.pval; a reading left out: slats shut, blind down
+    const rd = (k) => { const v = o.pval && o.pval[k]; return v != null && v !== "" && isFinite(+v) ? Math.max(0, Math.min(1, +v / 100)) : 0; };
+    const wx = 50, wy = 40, ww = 100, wh = 100, a = o.mf ? rd("lift") : amt(o), t = o.mf ? 1 - rd("tilt") : o.on ? tiltOf(o) : 1;
     const back = room(x, 180, "#5f6a72") + `<rect x="${wx - 7}" y="${wy - 7}" width="${ww + 14}" height="${wh + 14}" fill="#f1efe9"/>` + view(x, wx, wy, ww, wh) + `<path d="M${wx + ww / 2} ${wy}V${wy + wh}" stroke="#f1efe9" stroke-width="3"/><rect x="${wx - 11}" y="${wy + wh + 6}" width="${ww + 22}" height="6" fill="#ece9e2"/>`;
     const pitch = alu ? 4.4 : 8, stackH = (wh / pitch) * (alu ? .9 : 1.5) * a * .5 + 3;
     const bot = wy + 6 + (wh - 6 - stackH) * (1 - a) + stackH;
