@@ -13,11 +13,14 @@ const names = JSON.parse(read(join(SRC, "names.json")));
 // which sets ship: every set the catalog names, plus what the builder cards are made from
 const need = new Set();
 const BUILDER_SOURCES = { plantbuilder: ["plants", "flowers"], treebuilder: ["trees"] };
+// sets that draw another set's drawings inside them (bundled together, so no lazy loading is needed)
+const SET_DEPS = { doorcfg: ["lock", "lock2", "deadbolts"], camdoorbells: ["doorbell"] };
 const SKIP_BUILDERS = new Set(["moisture"]); // a full card UI of its own, not a single drawing
 for (const c of catalog) for (const s of c.subs) for (const k of s.items) {
   if (k.startsWith("builder:")) { const id = k.slice(8); if (SKIP_BUILDERS.has(id)) continue; need.add(id); (BUILDER_SOURCES[id] || []).forEach((x) => need.add(x)); }
   else need.add(k.split("/")[0]);
 }
+for (const id of [...need]) (SET_DEPS[id] || []).forEach((x) => need.add(x));
 // set id -> file: read each file's registered id
 const fileOf = {};
 for (const f of readdirSync(SETS).filter((f) => f.endsWith(".js"))) {

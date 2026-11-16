@@ -161,7 +161,7 @@ ${extra || ""}</defs>`;
 `;
 
   const ic = (id, name, colors, label, render) => ({ id, name, colors, picker: true, colorLabel: label, render });
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {

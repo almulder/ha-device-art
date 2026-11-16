@@ -1,12 +1,104 @@
 # Device Art Card
 
-**Animated, realistic device drawings for your Home Assistant dashboard.** **1,529 drawings** in **17 categories** and 106 groups:
+**Animated, realistic device drawings for your Home Assistant dashboard.** **1,596 drawings** in **17 categories** and 112 groups:
 lights, fans, appliances, locks, sensors, plants and more. Builder cards and plant/tree builders add thousands more combinations. Each one comes alive with your device's state: lamps glow in the bulb's color, fans spin with their speed, washers
-show their cycle and doors open. **413 of them are multi-function:** each door, light, reading or stage can follow its own entity.
+show their cycle and doors open. **428 of them are multi-function:** each door, light, reading or stage can follow its own entity.
 
 ![Fans](docs/images/anim-fans.gif)
 ![Lights and glow](docs/images/anim-lights.gif)
 ![Things that move](docs/images/anim-home.gif)
+
+## What's new in 1.3.0: new drawings, builders and menus
+
+![New in 1.3.0](docs/images/anim-130-new.gif)
+
+**72 new drawings** (65 more in all, because 7 older video doorbells are now styles of the new doorbell builder), and
+**new menus on 129 drawings** you already have. That makes **1,596 drawings** in all.
+
+**New drawings**
+
+- **Relays & modules:** in-wall relays and dimmers (1, 2 or 4 channels, dry contact, pilot wire), flying-lead and mini
+  relay boxes, relay boards, DIN-rail modules, a breaker row, a smart load center, LED controllers, plug-in repeaters,
+  Wi-Fi extenders and a generic device and sensor. Each channel can follow its own entity.
+- **Pergolas & radiator valves:** a louvered pergola (seen from outside and from below), a retractable sail, a patio
+  awning and a projector screen that open, close and stop part-way; three radiator valve heads (heat, eco, boost, off) on
+  panel, column or towel radiators; outdoor and curtain motion sensors and a window handle.
+- **Buttons & remotes:** a dial switch, puck knob, gesture cube, puck and ring buttons, handheld remotes, IR and RF
+  blasters, an e-paper scene panel, a touch sensor, a gesture sensor, a key tag and a beacon. Single, double and long
+  press each have their own look.
+- **Grow, UV, emergency & pool lights:** grow bars, clip-on lamps and shelf strips (full spectrum, red/blue or bloom), a
+  blacklight, a UV sanitizer, a twin-head emergency light and a lit EXIT sign (normal, battery, test), pendant and bulb
+  groups, an underwater pool light and a spa light.
+- **Leak sensors:** 7 leak sensors and a gateway, each in **14 places**: floor, toilet, sink, vanity, dishwasher, washer,
+  fridge, water heater pan, HVAC, tub, softener, floor drain, sump pit and crawl space, with probes and a freeze alarm.
+- **Smoke & CO alarm builder:** one card for 8 alarm styles: hardwired or battery; smoke, CO, heat or combo; voice;
+  normal, test and hush; wall or plug-in.
+- **Video doorbell builder:** one card for 17 doorbell styles, each with its own model, power or shape menu: ringing,
+  motion, live view and talking, night IR, flat, wedge and corner mounts, and a package light.
+- **Garage door builder:** 1 to 4 doors on 6 houses, single or double width, 10 door styles and 4 window styles, and each
+  door closed, opening, open, closing, partly open or not closed.
+- **Door & window builders:** front, back, patio and interior doors (12 front door styles, sidelights, transom, glass)
+  with a lock from the lock sets; windows on siding, brick, stucco and from inside (13 window types, grilles, glass,
+  screens, tilt and turn).
+
+![Relays and modules](docs/images/new-130-relays.png)
+![Pergolas, awnings and radiator valves](docs/images/new-130-covers.png)
+![Buttons and remotes](docs/images/new-130-buttons.png)
+![Grow, UV, emergency and pool lights](docs/images/new-130-lights.png)
+![Leak sensors](docs/images/new-130-leaks.png)
+![Smoke and CO alarm builder](docs/images/new-130-smoke.png)
+![Video doorbell builder](docs/images/new-130-doorbells.png)
+![Video doorbell builder, animated](docs/images/anim-130-doorbells.gif)
+![Garage door builder](docs/images/new-130-garage.png)
+![Door and window builders](docs/images/new-130-doors.png)
+
+**New menus on drawings you already have**
+
+- **Locks:** a **State** menu with **Locking**, **Unlocking** (bolt part-way, amber light, arrows) and **Jammed** (red
+  warning light and badge) on the smart locks and deadbolts. A `lock` entity can drive it:
+  `options_from: { state: lock.front_door }`.
+- **Heating & cooling:** **Mode** (heat/cool, heat, cool, auto, dry, fan, eco, off), **Preset** (boost, comfort, sleep,
+  away, frost) and **Swing** menus on thermostats, air conditioners, wall units and heaters, only where the device has them.
+- **Blinds and curtains:** a **Slats** menu (tilted open, half, shut) on venetian and vertical blinds, and **Opens**
+  (center, left or right) on curtains and panels; the motorized blinds show opening, closing and partial.
+- **Cameras:** a **State** menu (Live, Recording, Motion, Privacy, Offline), **Night IR**, and **Pan** on the pan-tilt heads.
+- **Switches:** **Gangs** (1 to 4 on one plate, each gang can follow its own entity), **Main / Aux**, and a **Control**
+  menu (paddle, rotary, slide or touch) on some dimmers; the fan controller gets speed steps.
+- **Plugs and outlets:** a **watt meter** on smart plugs, and each outlet shows a **plug with its cord** when it is on.
+- **Ceiling fans** keep their light kits from 1.2.0: the fan and the light are separate parts, each on its own entity.
+
+![Lock states](docs/images/new-130-locks.png)
+![Locking, unlocking and jammed](docs/images/anim-130-locks.gif)
+![Mode, Preset and Swing](docs/images/new-130-hvac.png)
+![Blind slats and curtain direction](docs/images/new-130-blinds.png)
+![Camera states](docs/images/new-130-cameras.png)
+![Switch gangs, plug meters and cords](docs/images/new-130-switches.png)
+
+**Your cards keep working.** Every drawing id and part id from 1.2.0 still works. The 7 older video doorbells
+(`doorbell/tall`, `doorbell/square`, `doorbell/wedge`, `doorbell/package`, `doorbell/intercom`, `doorbell/gatepost`,
+`doorbell/peephole`) left the picker, but a card that uses one shows the same look through the video doorbell builder.
+
+```yaml
+# a garage with two doors, each from its own cover
+type: custom:device-art-card
+art: garagecfg/brick
+entity: cover.garage_left
+options: { doors: "2" }
+options_from:
+  s1: cover.garage_left      # closed, opening, open, closing
+  s2: cover.garage_right
+```
+
+```yaml
+# a lock that shows locking, unlocking and jammed
+type: custom:device-art-card
+art: lock/keypad
+entity: lock.front_door
+options_from:
+  state: lock.front_door
+```
+
+The **[gallery](https://almulder.github.io/ha-device-art/)** has a **Show: New in 1.3.0** filter.
 
 ## What's new in 1.2.0: multi-function drawings
 
@@ -47,6 +139,8 @@ How to set it up: see [Multi-function cards (parts)](#multi-function-cards-parts
 
 ## Version history
 
+- **1.3.0:** 72 new drawings (relays, pergolas, buttons, grow/UV/emergency/pool lights, leak sensors) and builders for
+  smoke & CO alarms, video doorbells, garage doors, doors and windows; new menus on 129 drawings. See above.
 - **1.2.0:** multi-function drawings (parts, doors, stages, readings, light level and color), ceiling fan light kits,
   the stacked enclosure, and the gallery's parts panel. See above.
 - **1.1.1:** boy hairstyles and outfits for the toddler.
@@ -119,7 +213,7 @@ Almost everything on a drawing can be set. The pictures below show only a few of
 
 **Getting updates:** HACS shows "Update available" for each new version. After updating, reload the page
 (Ctrl+F5, or in the phone app: Settings → Companion App → Debugging → Reset frontend cache). To check your version,
-open the browser console: it shows `DEVICE-ART-CARD v1.2.0`.
+open the browser console: it shows `DEVICE-ART-CARD v1.3.0`.
 
 **Manual**
 1. Copy `dist/ha-device-art.js` to `config/www/`.
@@ -334,6 +428,18 @@ Some cards are builders: pick the style, layout and extras from menus, and the d
 **Fireplaces.** Surround (brick, stacked stone, tile, painted, wood, marble) in any color, mantel, and flame color.
 ![Fireplace](docs/images/options-fireplace-insert.png)
 
+**Garage door builder.** 1 to 4 doors on 6 houses; single or double; 10 door styles and 4 window styles; each door closed, opening, open, closing or partly open.
+![Garage door builder](docs/images/new-130-garage.png)
+
+**Door & window builders.** Front, back, patio and interior doors with a lock from the lock sets; 13 window types with grilles, glass and screens.
+![Door and window builders](docs/images/new-130-doors.png)
+
+**Video doorbell builder.** 17 styles, each with its own model, power or shape; ringing, motion, live view and talking; night IR; mounts.
+![Video doorbell builder](docs/images/new-130-doorbells.png)
+
+**Smoke & CO alarm builder.** 8 styles; hardwired or battery; smoke, CO, heat or combo; normal, test and hush.
+![Smoke and CO alarm builder](docs/images/new-130-smoke.png)
+
 **Plant & tree builder.** Any plant in any pot, in any pot and flower color; plants droop when they need water.
 ![Plant builder](docs/images/options-plantbuilder.png)
 
@@ -341,7 +447,7 @@ Some cards are builders: pick the style, layout and extras from menus, and the d
 
 ## Every category
 
-A sample from each category, 1,529 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
+A sample from each category, 1,596 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
 
 | | |
 |---|---|

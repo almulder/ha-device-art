@@ -7,9 +7,6 @@
 
   const pon = (o, id) => (o.parts && o.parts[id] != null ? !!o.parts[id] : !!o.on);
   const LC = (o) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor.light || "") ? o.pcolor.light : null);
-  // the parts: a light kit = a fan (the blades spin) and a light (the kit glows); the rest = the fan alone
-  // the "kit" option: "none" = the fan alone (a light kit hidden, a built-in light unlit), "light" = fan + light kit;
-  // the Light part only counts with the kit (Multi-Function Images sets kit = light)
   const LK = [{ id: "fan", name: "Fan" }, { id: "light", name: "Light", when: { opt: "kit", is: ["light"] } }];
   const KITOPT = [{ id: "kit", name: "Light kit", values: [["none", "Fan only"], ["light", "Fan + light"]] }];
 
@@ -18,8 +15,6 @@
     const stops = (a) => a.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] == null ? "" : ` stop-opacity="${s[2]}"`}/>`).join("");
     const k = {
       u, o, on: !!o.on, lv: Math.max(0.05, Math.min(1, +o.level || 0)),
-      // (parts) "fan" and "light", each its own on (o.parts[id], else the drawing's one on) and level (o.plevel[id]);
-      // the light kit glows in the light's color (o.pcolor.light), else today's warm white
       fn: { on: pon(o, "fan"), lv: Math.max(0.05, Math.min(1, o.plevel && o.plevel.fan != null ? +o.plevel.fan || 0 : +o.level || 0)) },
       kit: !!(o.opt && o.opt.kit === "light"),
       lt: { on: pon(o, "light") && !!(o.opt && o.opt.kit === "light"), a: o.plevel && o.plevel.light != null ? f(0.35 + 0.65 * Math.max(0, Math.min(1, +o.plevel.light || 0))) : 1 },
@@ -137,19 +132,16 @@
   const glowCast = (k, ...a) => (k.lt.on ? cast(k, ...a) : "");   // (a new kit: its light on the floor, the fan's own shadow stays)
   const finial = (k, cx, y, c, r = 2.8) => `<circle cx="${cx}" cy="${f(y)}" r="${r}" fill="${mg(k, c)}"/>`;
   const LEDOFF = [[0, "#e4e6ec"], [0.75, "#b1b4bd"], [1, "#767983"]];
-  // a flat LED disc in a trim ring (twin heads)
   function ledDisc(k, cx, y, r, c) {
     const disc = k.lt.on ? k.rad("lring", [[0, k.HOT], [0.6, k.lc("#fff1d6", 0.7)], [0.9, k.W], [1, sh(k.W, -0.2)]]) : k.rad("lringoff", LEDOFF, 0.45, 0.4, 0.6);
     return ell(cx, y, r + 1.8, mg(k, c)) + ell(cx, y + 0.4, r, disc) + (k.lt.on ? ell(cx, y + 0.4, r, "none", ` stroke="#fff" stroke-opacity=".75" stroke-width=".9"`) : band(cx, y + 0.4, r, "#fff", 0.3));
   }
-  // a thin ring light round a cap (minimal, propeller)
   function ringLight(k, cx, y, r, c, kind = "satin") {
     const lit = k.lt.on;
     return ell(cx, y, r + 2.4, mg(k, c, kind)) + ell(cx, y + 0.3, r, "none", ` stroke="${lit ? k.W : "#cfd3da"}" stroke-width="3.2"${lit ? "" : ` stroke-opacity=".9"`}`) +
       (lit ? ell(cx, y + 0.3, r, "none", ` stroke="${k.HOT}" stroke-width="1.4"`) + ell(cx, y + 0.3, r + 2.6, "none", ` stroke="${k.W}" stroke-opacity=".35" stroke-width="2"`) : band(cx, y + 0.3, r, "#000", 0.2, 0.8)) +
       ell(cx, y + 0.3, r - 2.2, mg(k, c, kind));
   }
-  // an Edison bulb in a wire cage (industrial)
   function cagedBulb(k, cx, y, s, cage) {
     const lit = k.lt.on, bulb = `M${f(cx - 3 * s)} ${f(y + 6 * s)}C${f(cx - 3 * s)} ${f(y + 10 * s)} ${f(cx - 9 * s)} ${f(y + 13 * s)} ${f(cx - 9 * s)} ${f(y + 20 * s)}C${f(cx - 9 * s)} ${f(y + 27 * s)} ${f(cx - 4.5 * s)} ${f(y + 30 * s)} ${cx} ${f(y + 30 * s)}C${f(cx + 4.5 * s)} ${f(y + 30 * s)} ${f(cx + 9 * s)} ${f(y + 27 * s)} ${f(cx + 9 * s)} ${f(y + 20 * s)}C${f(cx + 9 * s)} ${f(y + 13 * s)} ${f(cx + 3 * s)} ${f(y + 10 * s)} ${f(cx + 3 * s)} ${f(y + 6 * s)}Z`;
     const fil = `M${f(cx - 2.5 * s)} ${f(y + 11 * s)}L${f(cx - 4 * s)} ${f(y + 21 * s)}L${f(cx - 1.4 * s)} ${f(y + 17 * s)}L${cx} ${f(y + 22 * s)}L${f(cx + 1.4 * s)} ${f(y + 17 * s)}L${f(cx + 4 * s)} ${f(y + 21 * s)}L${f(cx + 2.5 * s)} ${f(y + 11 * s)}`;
@@ -160,7 +152,6 @@
       `<path d="${wires}" fill="none" stroke="${cage}" stroke-width="1.3"/>` + ell(cx, y + 19 * s, 11.2 * s, "none", ` stroke="${cage}" stroke-width="1.3"`) +
       ell(cx, y + 33 * s, 3.2 * s, mg(k, cage, "matte"));
   }
-  // a galvanized barn shade with its bulb peeking out (windmill)
   function barn(k, cx, y, r, c) {
     const d = `M${cx - 4.5} ${y + 5}L${cx + 4.5} ${y + 5}C${cx + 8} ${y + 10} ${f(cx + r - 2)} ${y + 13} ${cx + r} ${y + 18}A${r} ${f(r * PK)} 0 0 1 ${cx - r} ${y + 18}C${f(cx - r + 2)} ${y + 13} ${cx - 8} ${y + 10} ${cx - 4.5} ${y + 5}Z`;
     const inside = k.lt.on ? k.rad("barnin", [[0, k.HOT], [0.5, k.W], [1, sh(k.W, -0.3)]]) : k.rad("barnin", [[0, "#3a3d42"], [1, "#1c1e22"]]);
@@ -169,7 +160,6 @@
       ell(cx, y + 18, r - 1.3, inside) + ell(cx, y + 18, r, "none", ` stroke="${sh(c, -0.35)}" stroke-width="1.6"`) +
       ell(cx, y + 18.6, f(r * 0.36), k.lt.on ? k.HOT : "#d9d4c8", k.lt.on ? "" : ` fill-opacity=".85"`);
   }
-  // a seeded amber glass bell (palm leaf)
   function bell(k, cx, y, r, dep) {
     const d = `M${cx - 5} ${y}C${cx - 6} ${f(y + dep * 0.35)} ${cx - r} ${f(y + dep * 0.5)} ${cx - r} ${y + dep}A${r} ${f(r * PK)} 0 0 0 ${cx + r} ${y + dep}C${cx + r} ${f(y + dep * 0.5)} ${cx + 6} ${f(y + dep * 0.35)} ${cx + 5} ${y}Z`;
     const seeds = [[-8, 0.62, 0.9], [-3, 0.5, 0.7], [4, 0.58, 0.8], [9, 0.78, 0.7], [-11, 0.86, 0.6], [0, 0.74, 0.9], [6, 0.92, 0.6], [-5, 0.95, 0.7], [2, 0.36, 0.6], [12, 0.97, 0.5]]
@@ -178,7 +168,6 @@
       `<path d="M${cx - 7} ${f(y + dep * 0.45)}C${f(cx - r + 3)} ${f(y + dep * 0.62)} ${f(cx - r + 2)} ${f(y + dep * 0.82)} ${f(cx - r + 3)} ${f(y + dep * 0.95)}" stroke="#fff" stroke-opacity=".45" stroke-width="1.6" fill="none" stroke-linecap="round"/>` +
       ell(cx, y + dep, r, "none", ` stroke="${sh("#c9a46a", -0.2)}" stroke-width="1.6"`);
   }
-  // a woven rattan dome, the bulb's glow through the weave (rattan)
   function wovenDome(k, cx, y, r, dep, weave, c) {
     const d = `M${cx - 5} ${y}C${f(cx - r * 0.75)} ${y + 2} ${cx - r} ${f(y + dep * 0.55)} ${cx - r} ${y + dep}A${r} ${f(r * PK)} 0 0 0 ${cx + r} ${y + dep}C${cx + r} ${f(y + dep * 0.55)} ${f(cx + r * 0.75)} ${y + 2} ${cx + 5} ${y}Z`;
     const back = k.lt.on ? k.rad("domein", [[0, k.HOT], [0.6, k.W], [1, sh(k.W, -0.25)]], 0.5, 0.7, 0.7) : sh(c, -0.6);

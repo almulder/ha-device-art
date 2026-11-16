@@ -16,10 +16,33 @@
   const rg = (id, a, cx, cy, r) => `<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r || .5}">${stops(a)}</radialGradient>`;
 
   function pal(c) { const h = H(); return { l: h.shade(c, .55), m: c, d: h.shade(c, -.3), k: h.shade(c, -.58), e: h.shade(c, -.45) }; }
+  const AMB = "#ffb020", JAM = "#ff3b30";
+  const LSTATE = [["auto", "From on/off"], ["locked", "Locked"], ["unlocked", "Unlocked"], ["locking", "Locking"], ["unlocking", "Unlocking"], ["jammed", "Jammed"]];
+  const lockState = (o) => { const s = o.opt && o.opt.state; return s && s !== "auto" ? s : (o.on ? "locked" : "unlocked"); };
   function ctx(o) {
-    const u = o.uid, on = !!o.on, lv = o.level == null ? 1 : o.level;
-    return { o, u, on, B: .35 + .65 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p: pal(o.color || BLK), st: on ? GRN : RED, n: 0 };
+    const u = o.uid, ls = lockState(o), on = ls !== "unlocked", lv = o.level == null ? 1 : o.level;
+    const mv = ls === "locking" ? 1 : ls === "unlocking" ? -1 : 0, jam = ls === "jammed", mid = !!mv || jam;
+    return { o, u, on, ls, mv, jam, mid, fr: ls === "locked" ? 1 : ls === "unlocked" ? 0 : .5, B: .35 + .65 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p: pal(o.color || BLK),
+      st: jam ? JAM : mv ? AMB : on ? GRN : RED, hk: jam ? "hj" : mv ? "ha" : on ? "hg" : "hr", cls: jam ? P + "jblink" : mv ? P + "mblink" : on ? P + "breath" : "", n: 0 };
   }
+  const mcls = (x, a, b, m1, m2, j) => x.mid ? `${P}${x.jam ? j : x.mv > 0 ? m1 : m2}` : `${P}${x.on ? a : b}`;
+  function arrows(x, cx, cy, dir) {
+    if (!x.mv) return "";
+    let s = ""; for (let i = 0; i < 3; i++) s += `<path class="${P}chev${i}" d="M${f(-4.6 + i * 3.4)} -2.8L${f(-1.8 + i * 3.4)} 0L${f(-4.6 + i * 3.4)} 2.8"/>`;
+    return `<g transform="translate(${f(cx)} ${f(cy)}) rotate(${{ r: 0, d: 90, l: 180, u: 270 }[dir]})" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${s.replace(/ class="[^"]*"/g, "")}</g>` +
+      `<g transform="translate(${f(cx)} ${f(cy)}) rotate(${{ r: 0, d: 90, l: 180, u: 270 }[dir]})" fill="none" stroke="${AMB}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${s}</g>`;
+  }
+  function mark(x, cx, cy, s) {
+    if (x.jam) return `<g class="${P}jblink"><path d="M${f(cx)} ${f(cy - s * .48)}L${f(cx + s * .52)} ${f(cy + s * .42)}H${f(cx - s * .52)}Z" fill="${JAM}" stroke="${JAM}" stroke-width="${f(s * .1)}" stroke-linejoin="round"/></g>` +
+      `<path d="M${f(cx)} ${f(cy - s * .16)}V${f(cy + s * .1)}" stroke="#fff" stroke-width="${f(s * .11)}" stroke-linecap="round"/><circle cx="${f(cx)}" cy="${f(cy + s * .26)}" r="${f(s * .065)}" fill="#fff"/>`;
+    const r = s * .36, cw = x.mv > 0, a0 = -Math.PI / 2 + (cw ? .5 : -.5), a1 = a0 + (cw ? 1 : -1) * Math.PI * 1.45;
+    const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx2 = -Math.sin(a1) * (cw ? 1 : -1), ty2 = Math.cos(a1) * (cw ? 1 : -1), hs = s * .2;
+    const head = `M${f(ex + tx2 * hs)} ${f(ey + ty2 * hs)}L${f(ex - ty2 * hs * .9)} ${f(ey + tx2 * hs * .9)}L${f(ex + ty2 * hs * .9)} ${f(ey - tx2 * hs * .9)}Z`;
+    return `<g class="${P}${cw ? "spin" : "spinr"}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * .5)}" fill="none"/><path d="M${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))}A${f(r)} ${f(r)} 0 1 ${cw ? 1 : 0} ${f(ex)} ${f(ey)}" fill="none" stroke="${AMB}" stroke-width="${f(s * .11)}" stroke-linecap="round"/><path d="${head}" fill="${AMB}"/></g>`;
+  }
+  const word = (x, cx, cy, s) => x.mid ? tx(cx, cy, s, x.jam ? JAM : AMB, x.jam ? "JAMMED" : x.mv > 0 ? "LOCKING" : "UNLOCKING") : "";
+  const badge = (x) => x.jam ? `<g class="${P}badge"><circle cx="26" cy="26" r="11" fill="#000" fill-opacity=".45" transform="translate(1 1.6)"/><circle cx="26" cy="26" r="11" fill="#1c1416"/><circle cx="26" cy="26" r="10.3" fill="none" stroke="${JAM}" stroke-width="1.3"/>` +
+    `<path d="M26 19.2L32.4 30.6H19.6Z" fill="${AMB}" stroke="${AMB}" stroke-width="1.2" stroke-linejoin="round"/><path d="M26 23.2V27" stroke="#1c1416" stroke-width="1.6" stroke-linecap="round"/><circle cx="26" cy="29" r=".95" fill="#1c1416"/></g>` : "";
 
   function defs(x, extra) {
     const p = x.p, id = x.id;
@@ -40,7 +63,7 @@ ${lg(id("gap"), [[0, "#000", .9], [1, "#14121c", .9]])}
 ${rg(id("sh"), [[0, "#000", .55], [.6, "#000", .2], [1, "#000", 0]])}
 ${rg(id("hg"), [[0, GRN, .85], [.45, GRN, .28], [1, GRN, 0]])}
 ${rg(id("hr"), [[0, RED, .85], [.45, RED, .28], [1, RED, 0]])}
-${rg(id("hk"), [[0, KEY, .55], [.6, KEY, .18], [1, KEY, 0]])}
+${rg(id("hk"), [[0, KEY, .55], [.6, KEY, .18], [1, KEY, 0]])}${x.mid ? rg(id("ha"), [[0, AMB, .85], [.45, AMB, .28], [1, AMB, 0]]) + rg(id("hj"), [[0, JAM, .9], [.45, JAM, .32], [1, JAM, 0]]) : ""}
 ${rg(id("vig"), [[0, "#000", 0], [.62, "#000", .06], [1, "#000", .5]], .5, .48, .74)}
 <clipPath id="${id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>
 <filter id="${id("bl")}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2"/></filter>
@@ -80,7 +103,7 @@ ${extra || ""}</defs>`;
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x, extra)}
 <g class="hda-bg"><g clip-path="${x.url("wc")}">${surface(x, kind, tex)}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/>${after || ""}</g>
 <rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g>
-${hw}</svg>`;
+${hw}${badge(x)}</svg>`;
   }
   function jamb(x, E, c1, c2) {
     c1 = c1 || "#c9ccd2"; c2 = c2 || "#8c919a"; const g = x.id("jb" + (x.n++));
@@ -96,20 +119,20 @@ ${hw}</svg>`;
   const hole = (E, y, hh) => `<g class="hda-bg"><rect x="${E + 5}" y="${f(y - hh / 2 - 1.2)}" width="10" height="${f(hh + 2.4)}" rx="1" fill="#050508"/></g>`;
 
   function bolt(x, E, y, L, h, shape, steady) {
-    const k = x.id("bc" + (x.n++)), out = steady || x.on, y0 = y - h / 2;
+    const k = x.id("bc" + (x.n++)), fr = steady ? 1 : x.fr, out = fr >= 1, y0 = y - h / 2;
     let body;
     if (shape === "latch") body = `<path d="M${E - 2} ${f(y0)}H${E + L - 5}L${E + L} ${f(y + h / 2)}H${E - 2}Z" fill="${x.url("bolt")}"/><path d="M${E + L - 5} ${f(y0)}L${E + L} ${f(y + h / 2)}" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/>`;
     else if (shape === "hook") body = `<path d="M${E - 2} ${f(y0)}H${E + L}V${f(y0 + h + 5)}H${E + L - 5}V${f(y0 + h)}H${E - 2}Z" fill="${x.url("bolt")}"/><path d="M${E} ${f(y0 + .6)}H${E + L - .6}" stroke="#fff" stroke-opacity=".6" stroke-width=".8"/>`;
     else body = `<path d="${rr(E - 2, y0, L + 2, h, 1.6)}" fill="${x.url("bolt")}"/><path d="M${E} ${f(y0 + .9)}H${E + L - 1.5}" stroke="#fff" stroke-opacity=".7" stroke-width=".9"/><path d="M${E + L - .6} ${f(y0 + 1.5)}V${f(y0 + h - 1.5)}" stroke="#000" stroke-opacity=".3"/>`;
-    const cls = steady ? "" : ` class="${P}${out ? "bo" : "bi"}"`;
+    const cls = steady ? "" : ` class="${mcls(x, "bo", "bi", "mxo", "mxi", "jx")}"`;
     const bt = `${hole(E, y, h + (shape === "hook" ? 5 : 0))}<clipPath id="${k}"><rect x="${E}" y="0" width="${200 - E}" height="200"/></clipPath>
-<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${-L - 3} 0)"`}><g${cls}>${body}</g></g></g>`;
+<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${fr ? f(-(L + 3) * (1 - fr)) : -L - 3} 0)"`}><g${cls}>${body}</g></g></g>` + (steady ? "" : arrows(x, E + 11, y - h / 2 - 8, x.mv > 0 ? "r" : "l"));
     return bt;
   }
   function boltUp(x, cx, edgeY, L, w) {
-    const k = x.id("bc" + (x.n++)), out = x.on;
+    const k = x.id("bc" + (x.n++)), out = x.fr >= 1, dy = out ? 0 : x.fr ? f((L + 3) * (1 - x.fr)) : L + 3;
     return `<rect x="${f(cx - w / 2 - 1.2)}" y="${edgeY - L - 1}" width="${f(w + 2.4)}" height="${L + 1}" rx="1" fill="#050508"/><clipPath id="${k}"><rect x="0" y="0" width="200" height="${edgeY}"/></clipPath>
-<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(0 ${L + 3})"`}><g class="${P}${out ? "buo" : "bui"}"><path d="${rr(cx - w / 2, edgeY - L, w, L + 2, 1.4)}" fill="${x.url("bv")}"/><path d="M${f(cx - w / 2 + .9)} ${edgeY - L + 1}V${edgeY}" stroke="#fff" stroke-opacity=".6" stroke-width=".8"/></g></g></g>`;
+<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(0 ${dy})"`}><g class="${mcls(x, "buo", "bui", "myo", "myi", "jy")}"><path d="${rr(cx - w / 2, edgeY - L, w, L + 2, 1.4)}" fill="${x.url("bv")}"/><path d="M${f(cx - w / 2 + .9)} ${edgeY - L + 1}V${edgeY}" stroke="#fff" stroke-opacity=".6" stroke-width=".8"/></g></g></g>` + arrows(x, cx + w / 2 + 7, edgeY - L / 2, x.mv > 0 ? "u" : "d");
   }
 
   const shd = (x, d, dx, dy, op) => `<path d="${d}" transform="translate(${dx == null ? 2.5 : dx} ${dy == null ? 4 : dy})" fill="#000" opacity="${op || .5}" filter="${x.url("bl")}"/>`;
@@ -138,14 +161,15 @@ ${hw}</svg>`;
   }
   function led(x, cx, cy, r) {
     r = r || 1.8; const c = x.st;
-    return `<circle class="${x.on ? P + "breath" : ""}" cx="${cx}" cy="${cy}" r="${f(r + 6)}" fill="${x.url(x.on ? "hg" : "hr")}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .4)}" fill="#fff" fill-opacity=".85"/>`;
+    return `<circle class="${x.cls}" cx="${cx}" cy="${cy}" r="${f(r + 6)}" fill="${x.url(x.hk)}"/><circle${x.mid ? ` class="${x.cls}"` : ""} cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .4)}" fill="#fff" fill-opacity=".85"/>`;
   }
   function ring(x, cx, cy, r, w) {
     const c = x.st;
-    return `<g class="${x.on ? P + "breath" : ""}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-opacity=".28" stroke-width="${f(w + 5)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-opacity=".18" stroke-width="${f(w + 10)}"/></g>
+    return `<g class="${x.cls}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-opacity=".28" stroke-width="${f(w + 5)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-opacity=".18" stroke-width="${f(w + 10)}"/></g>
 <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-width="${w}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="${f(w * .3)}"/>`;
   }
   function glyph(x, cx, cy, s, c) {
+    if (x.mid) return mark(x, cx, cy, s * 1.15);
     c = c || x.st; const lk = x.on, ly = lk ? 0 : -s * .16;
     return `<path d="M${f(cx - s * .28)} ${f(cy - s * .05 + ly)}V${f(cy - s * .3 + ly)}A${f(s * .28)} ${f(s * .28)} 0 0 1 ${f(cx + s * .28)} ${f(cy - s * .3 + ly)}V${f(cy - s * (lk ? .05 : .2) + ly)}" fill="none" stroke="${c}" stroke-width="${f(s * .12)}" stroke-linecap="round"/>
 <path d="${rr(cx - s * .42, cy - s * .08, s * .84, s * .62, s * .1)}" fill="${c}"/><circle cx="${f(cx)}" cy="${f(cy + s * .2)}" r="${f(s * .08)}" fill="#000" fill-opacity=".45"/>`;
@@ -172,7 +196,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
   const N10 = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 
   const icons = [];
-  const add = (id, name, def, fn) => icons.push({ id, name, colors: sw(def), picker: true, colorLabel: "Finish", render: (o) => fn(ctx(o)) });
+  const add = (id, name, def, fn) => icons.push({ id, name, colors: sw(def), picker: true, colorLabel: "Finish", options: [{ id: "state", name: "State", values: LSTATE }], render: (o) => fn(ctx(o)) });
 
   add("keypad", "Keypad deadbolt", NIC, (x) => {
     const E = 164, d = rr(98, 38, 46, 116, 15);
@@ -189,7 +213,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const glass = rr(94.5, 32.5, 39, 123, 6.5);
     const hw = jamb(x, E, "#b48a5e", "#6e4b2c") + strike(x, E, 100) + bolt(x, E, 100, 15, 9) + plate(x, d) +
       `<path d="${glass}" fill="${x.url("scr")}"/>` + (x.on ? `<path d="${glass}" fill="${KEY}" fill-opacity="${f(.07 * x.B)}"/>` : "") +
-      pad(x, 96, 46, 3, N12, 11, 11, 2.5, 6, "touch") + ring(x, 114, 136, 8, 1.6) + glyph(x, 114, 136, 9) +
+      pad(x, 96, 46, 3, N12, 11, 11, 2.5, 6, "touch") + ring(x, 114, 136, 8, 1.6) + glyph(x, 114, 136, 9) + word(x, 114, 40, 5.2) +
       `<path d="M94.5 39C104 34 120 33 133.5 36V60C118 52 104 51 94.5 56Z" fill="#fff" fill-opacity=".08"/><path d="${glass}" fill="none" stroke="#fff" stroke-opacity=".14"/>`;
     return scene(x, "oak", tex, hw);
   });
@@ -197,7 +221,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
   add("retrofit", "Retrofit lock", WHT, (x) => {
     const E = 166, cx = 106, cy = 100;
     const tex = panel(20, 20, 50, 70) + panel(20, 110, 50, 70) + speck(5, 30);
-    const knob = `<g transform="rotate(${x.on ? 90 : 0} ${cx} ${cy})"><g class="${P}${x.on ? "rl" : "ru"}">
+    const knob = `<g transform="rotate(${90 * x.fr} ${cx} ${cy})"><g class="${mcls(x, "rl", "ru", "mrl", "mru", "jr")}">
 <path d="${rr(cx - 6.5, cy - 24, 13, 48, 6.5)}" fill="#000" opacity=".35" transform="translate(1.5 2)"/><path d="${rr(cx - 6.5, cy - 24, 13, 48, 6.5)}" fill="${x.url("f")}"/>
 <path d="M${cx - 3} ${cy - 21}V${cy + 21}" stroke="#fff" stroke-opacity=".45" stroke-width="1.4" stroke-linecap="round"/><circle cx="${cx}" cy="${cy - 17}" r="1.6" fill="${x.st}"/></g></g>`;
     const hw = jamb(x, E, "#d6d9de", "#9da2ab") + strike(x, E, cy) + bolt(x, E, cy, 15, 9) +
@@ -239,8 +263,6 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     return scene(x, "walnut", tex, hw);
   });
 
-  // (parts) Multi-Function: Lock (on = locked), Doorbell (a stage: idle / ringing) and Door (a contact: open swings the
-  // door edge away from the jamb, the bolt showing in the gap). A Device Image (no o.mf) is drawn exactly as before.
   const VPARTS = [{ id: "lock", name: "Lock", type: "switch" }, { id: "bell", name: "Doorbell", type: "stage", values: [["idle", "Idle"], ["ringing", "Ringing"]], def: "idle" },
     { id: "door", name: "Door", type: "contact" }];
   add("video", "Video doorbell lock", NIC, (x0) => {
@@ -267,10 +289,10 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
   add("btpadlock", "Bluetooth padlock", NIC, (x) => {
     let tex = ""; for (let i = 0; i < 6; i++) tex += `<path d="${rr(40 + i * 21, 20, 9, 30, 4.5)}" fill="#000" fill-opacity=".38"/><path d="M${44 + i * 21} 22V48" stroke="#fff" stroke-opacity=".08"/>`;
     tex += `<path d="M8 176H192" stroke="#000" stroke-opacity=".3" stroke-width="2"/>` + speck(9, 50, .5);
-    const lift = x.on ? 0 : -10, shk = `M98 116V86A13.5 13.5 0 0 1 125 86V116`;
+    const lift = -10 * (1 - x.fr), shk = `M98 116V86A13.5 13.5 0 0 1 125 86V116`;
     const hw = `<path d="${rr(88, 60, 46, 50, 6)}" fill="#000" fill-opacity=".3"/><path d="${rr(90, 62, 42, 46, 5)}" fill="${x.url("stv")}"/><path d="${rr(90, 62, 42, 46, 5)}" fill="none" stroke="#000" stroke-opacity=".3"/>
 <path d="${rr(104, 58, 14, 34, 3)}" fill="${x.url("stl")}"/><rect x="107.5" y="72" width="7" height="12" rx="3" fill="#0a0a0d"/>` +
-      `<g transform="translate(0 ${lift})"><g class="${P}${x.on ? "sl" : "su"}"><path d="${shk}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="7.5" transform="translate(2 3)"/>
+      `<g transform="translate(0 ${lift})"><g class="${mcls(x, "sl", "su", "msl", "msu", "jy")}"><path d="${shk}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="7.5" transform="translate(2 3)"/>
 <path d="${shk}" fill="none" stroke="#5d646c" stroke-width="7.5"/><path d="${shk}" fill="none" stroke="#e6eaee" stroke-width="4"/><path d="M96.5 112V86A15 15 0 0 1 104 73" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.2"/></g></g>` +
       plate(x, rr(82, 108, 59, 58, 14), { fill: "fv", gloss: .45 }) + `<path d="${rr(82, 108, 59, 58, 14)}" fill="${x.url("f")}" opacity=".35"/>` +
       led(x, 111.5, 124, 2) + `<circle cx="111.5" cy="145" r="7.5" fill="#000" fill-opacity=".3"/><circle cx="111.5" cy="144.4" r="7" fill="${x.url("fs")}"/>` + glyph(x, 111.5, 144, 7, x.p.k) +
@@ -285,11 +307,11 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
       for (let bx = 8 - (row % 2) * 12; bx < 134; bx += 24) { const v = r(); tex += `<rect x="${f(bx + .8)}" y="${f(y + .8)}" width="22.4" height="9.4" rx="1" fill="${v > .5 ? "#000" : "#e09a7c"}" fill-opacity="${(.04 + v * .1).toFixed(2)}"/><path d="M${bx} ${y}v11" stroke="#c9b8a8" stroke-opacity=".16" stroke-width="1.5"/>`; }
       tex += `<path d="M8 ${y}H134" stroke="#c9b8a8" stroke-opacity=".18" stroke-width="1.5"/>`;
     }
-    const lift = x.on ? 0 : -20;
+    const lift = -20 * (1 - x.fr);
     let gd = `<rect x="146" y="20" width="50" height="172" fill="#c8ccd2"/>`;
     for (let y = 20; y < 191; y += 34.4) gd += `<rect x="146" y="${f(y)}" width="50" height="34" fill="url(#${x.u}-gdp)"/><rect x="154" y="${f(y + 7)}" width="42" height="20" rx="1.5" fill="#000" fill-opacity=".08"/><path d="M154 ${f(y + 27)}h42" stroke="#fff" stroke-opacity=".4"/><path d="M146 ${f(y + 33)}h50" stroke="#000" stroke-opacity=".35" stroke-width="1.4"/>`;
     const after = `<rect x="134" y="8" width="66" height="192" fill="#050508"/><rect x="146" y="150" width="50" height="50" fill="#16151c"/><path d="M146 176H196" stroke="#2c2a35"/><rect x="150" y="186" width="46" height="6" fill="#3a3842"/>` +
-      `<g transform="translate(0 ${lift})"><g class="${P}${x.on ? "gl" : "gu"}">${gd}</g></g>` +
+      `<g transform="translate(0 ${lift})"><g class="${mcls(x, "gl", "gu", "mgl", "mgu", "jy")}">${gd}</g></g>` +
       `<rect x="134" y="8" width="12" height="192" fill="url(#${x.u}-trim)"/><path d="M146 8V200" stroke="#000" stroke-opacity=".4"/><rect x="134" y="8" width="66" height="12" fill="url(#${x.u}-trim2)"/>`;
     const extra = lg(x.id("gdp"), [[0, "#e4e7eb"], [1, "#a6abb3"]], 0, 0, 0, 1) + lg(x.id("trim"), [[0, "#d9dce0"], [1, "#9298a1"]]) + lg(x.id("trim2"), [[0, "#d9dce0"], [1, "#9298a1"]], 0, 0, 0, 1);
     const box = rr(52, 50, 54, 112, 10);
@@ -323,7 +345,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const hw = `<g class="hda-bg"><path d="${rr(E + 6, 92, 12, 34, 2)}" fill="${x.url("stv")}"/></g>` + bolt(x, E, 104, 17, 9, "hook") +
       plate(x, rr(116, 44, 22, 116, 8), { fill: "f" }) + led(x, 127, 56, 1.8) +
       `<path d="${rr(120, 70, 14, 44, 7)}" fill="#000" fill-opacity=".35"/><path d="${rr(121, 71, 12, 42, 6)}" fill="${x.p.k}"/>` +
-      `<g transform="translate(0 ${x.on ? 0 : -16})"><g class="${P}${x.on ? "tl" : "tu"}"><path d="${rr(121.5, 92, 11, 20, 5.5)}" fill="${x.url("fs")}"/><path d="M124.5 95v14" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linecap="round"/></g></g>` +
+      `<g transform="translate(0 ${-16 * (1 - x.fr)})"><g class="${mcls(x, "tl", "tu", "mtl", "mtu", "jy")}"><path d="${rr(121.5, 92, 11, 20, 5.5)}" fill="${x.url("fs")}"/><path d="M124.5 95v14" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linecap="round"/></g></g>` +
       `<path d="${rr(121, 124, 12, 26, 6)}" fill="#000" fill-opacity=".4"/>` + glyph(x, 127, 137, 8, x.on ? GRN : "#9aa0a8");
     return scene(x, "plaster", speck(19, 90, 1), hw, glass, after);
   });
@@ -335,7 +357,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const sc = rr(101.5, 46.5, 23, 26, 3);
     const hw = jamb(x, E, "#d1b48c", "#8c6b45") + strike(x, E, 112, 26) + bolt(x, E, 112, 13, 9, "latch") +
       plate(x, rr(97, 40, 32, 46, 6)) + `<path d="${sc}" fill="${x.url("scr")}"/>` + pad(x, 102.5, 48, 3, ["1", "2", "3", "4", "5", "6", "7", "8", "9"], 6, 6.5, 2, 2, "touch") +
-      `<rect x="103" y="77" width="20" height="3" rx="1.5" fill="${x.st}"/><rect class="${x.on ? P + "breath" : ""}" x="99" y="74" width="28" height="9" rx="4.5" fill="${x.url(x.on ? "hg" : "hr")}"/>` +
+      `<rect x="103" y="77" width="20" height="3" rx="1.5" fill="${x.st}"/><rect class="${x.cls}" x="99" y="74" width="28" height="9" rx="4.5" fill="${x.url(x.hk)}"/>` +
       ring(x, 113, 112, 15.5, 1.4) + lever(x, 113, 112, 58, 13);
     return scene(x, "maple", tex, hw, lite);
   });
@@ -401,7 +423,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
       `<rect x="22" y="44" width="8" height="24" rx="3" fill="${x.url("stl")}"/><rect x="22" y="132" width="8" height="24" rx="3" fill="${x.url("stl")}"/>` +
       plate(x, rr(56, 40, 74, 66, 8)) + `<path d="${rr(62, 46, 62, 48, 4)}" fill="#000" fill-opacity=".3"/>` + pad(x, 64.5, 48, 4, N12, 12, 9, 2.5, 3, "btn") + led(x, 93, 100, 1.6) +
       `${shd(x, circ(82, 144, 24), 2, 4)}${spokes}<circle cx="82" cy="144" r="10" fill="${x.url("fs")}"/><circle cx="82" cy="144" r="10" fill="none" stroke="${x.p.e}" stroke-width=".7"/><circle cx="79" cy="141" r="3" fill="#fff" fill-opacity=".3"/>` +
-      `<g class="${x.on ? P + "breath" : ""}"><rect x="112" y="136" width="26" height="16" rx="3" fill="${x.url(x.on ? "hg" : "hr")}"/></g><path d="${rr(114, 139, 22, 10, 2)}" fill="${x.url("scr")}"/>` + glyph(x, 125, 144.5, 7);
+      `<g class="${x.cls}"><rect x="112" y="136" width="26" height="16" rx="3" fill="${x.url(x.hk)}"/></g><path d="${rr(114, 139, 22, 10, 2)}" fill="${x.url("scr")}"/>` + glyph(x, 125, 144.5, 7);
     return scene(x, "gunwall", "", hw, body);
   });
 
@@ -409,11 +431,11 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     let tex = ""; const r = rnd(33);
     for (let bx = 8; bx < 192; bx += 26) tex += `<rect x="${bx}" y="8" width="26" height="184" fill="${r() > .5 ? "#fff" : "#000"}" fill-opacity="${(.02 + r() * .06).toFixed(2)}"/><path d="M${bx} 8V192" stroke="#1a0b06" stroke-opacity=".7" stroke-width="2"/>`;
     tex += grain(77, 8, 190);
-    const lift = x.on ? 0 : -10, shk = `M101 118V90A12 12 0 0 1 125 90V118`;
+    const lift = -10 * (1 - x.fr), shk = `M101 118V90A12 12 0 0 1 125 90V118`;
     const hasp = lg(x.id("galv"), [[0, "#c9ced3"], [.5, "#8d949b"], [1, "#5a6067"]], 0, 0, 0, 1);
     const hw = `${shd(x, rr(30, 74, 84, 22, 3))}<path d="${rr(30, 74, 84, 22, 3)}" fill="url(#${x.u}-galv)"/><path d="M30 74.6H114" stroke="#fff" stroke-opacity=".5"/><rect x="26" y="72" width="8" height="26" rx="3" fill="url(#${x.u}-galv)"/>` + screw(44, 85) + screw(64, 85) +
       `<path d="${rr(102, 70, 22, 30, 3)}" fill="#000" fill-opacity=".35"/><path d="${rr(104, 68, 18, 30, 3)}" fill="url(#${x.u}-galv)"/><rect x="109" y="74" width="8" height="12" rx="3.5" fill="#0a0a0d"/>` +
-      `<g transform="translate(0 ${lift})"><g class="${P}${x.on ? "sl" : "su"}"><path d="${shk}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="9" transform="translate(2 3)"/><path d="${shk}" fill="none" stroke="#4c5259" stroke-width="9"/><path d="${shk}" fill="none" stroke="#d3d8dd" stroke-width="5"/><path d="M99.5 114V90A13.5 13.5 0 0 1 106 79" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.3"/></g></g>` +
+      `<g transform="translate(0 ${lift})"><g class="${mcls(x, "sl", "su", "msl", "msu", "jy")}"><path d="${shk}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="9" transform="translate(2 3)"/><path d="${shk}" fill="none" stroke="#4c5259" stroke-width="9"/><path d="${shk}" fill="none" stroke="#d3d8dd" stroke-width="5"/><path d="M99.5 114V90A13.5 13.5 0 0 1 106 79" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.3"/></g></g>` +
       `${shd(x, rr(84, 110, 58, 66, 10), 3, 5, .6)}<path d="${rr(84, 110, 58, 66, 10)}" fill="${x.url("rub")}"/>` +
       `<path d="${rr(90, 114, 46, 58, 7)}" fill="${x.url("fv")}"/><path d="${rr(90, 114, 46, 58, 7)}" fill="${x.url("fx")}"/><path d="${rr(90, 114, 46, 58, 7)}" fill="${x.url("gl")}" opacity=".3"/><path d="${rr(90, 114, 46, 58, 7)}" fill="none" stroke="${x.p.e}" stroke-width=".7"/>` +
       fingerprint(x, 113, 136, 9) + ring(x, 113, 136, 11, 1.4) + led(x, 113, 160, 1.6) + `<path d="M86 122V164M140 122V164" stroke="#fff" stroke-opacity=".1" stroke-width="1.4"/>`;
@@ -428,7 +450,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const keeper = `<path d="${rr(105, 88, 12, 30, 1.5)}" fill="${x.url("fd")}"/><path d="M105.5 88.5H116.5" stroke="#fff" stroke-opacity=".45"/><path d="${rr(105, 88, 12, 30, 1.5)}" fill="none" stroke="${x.p.e}" stroke-width=".6"/>`;
     const hw = plate(x, rr(102, 50, 22, 106, 3)) + screw(113, 57) + screw(113, 149) +
       `<path d="${rr(104, 86, 15, 34, 1.5)}" fill="#050508"/>` +
-      `<g transform="translate(${x.on ? 0 : 7} 0)"><g class="${P}${x.on ? "kl" : "ku"}">${keeper}</g></g>` +
+      `<g transform="translate(${7 * (1 - x.fr)} 0)"><g class="${mcls(x, "kl", "ku", "mkl", "mku", "jx")}">${keeper}</g></g>` + arrows(x, 111, 80, x.mv > 0 ? "l" : "r") +
       `<path d="M${Dn - 2} 97H108L112 103H${Dn - 2}Z" fill="${x.url("bolt")}"/><path d="M108 97L112 103" stroke="#fff" stroke-opacity=".5"/>` +
       plate(x, rr(170, 72, 18, 50, 5), { fill: "fv" }) + led(x, 179, 82, 1.6) +
       `<path d="M174 100a7 7 0 0 1 10 0M176 104a4 4 0 0 1 6 0" fill="none" stroke="${x.on ? KEY : "#8b93a0"}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="${x.on ? .9 : .5}"/><circle cx="179" cy="108" r="1" fill="${x.on ? KEY : "#8b93a0"}"/>` +
@@ -445,7 +467,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const hw = jamb(x, E, "#6a4c38", "#2e1f16") + strike(x, E, 114, 22) + bolt(x, E, 114, 10, 7, "latch", true) + strike(x, E, 150) + bolt(x, E, 150, 15, 9) +
       `<g class="hda-bg">${plate(x, rr(42, 28, 38, 18, 3)) + tx(61, 37, 10, x.p.k, "214")}</g>` +
       plate(x, rr(102, 28, 34, 150, 10)) + `<path d="${rd}" fill="${x.url("scr")}"/>` + (x.on ? `<g class="${P}pulse">${arcs(KEY, f(.5 + .5 * x.B))}</g>` : arcs("#8b93a0", .35)) +
-      `<g class="${x.on ? P + "breath" : ""}"><rect x="104" y="86" width="30" height="10" rx="5" fill="${x.url(x.on ? "hg" : "hr")}"/></g><rect x="108" y="89.5" width="22" height="3" rx="1.5" fill="${x.st}"/>` +
+      `<g class="${x.cls}"><rect x="104" y="86" width="30" height="10" rx="5" fill="${x.url(x.hk)}"/></g><rect x="108" y="89.5" width="22" height="3" rx="1.5" fill="${x.st}"/>` +
       lever(x, 119, 114, 58, 0, true) + `<path d="${rr(113, 144, 12, 14, 6)}" fill="#000" fill-opacity=".35"/><path d="${rr(114, 144, 10, 12, 5)}" fill="${x.url("f")}"/><path d="M119 147v6" stroke="#000" stroke-opacity=".6" stroke-width="1.4"/>`;
     return scene(x, "veneer", tex, hw, sheen);
   });
@@ -484,6 +506,52 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
 @keyframes hda-lock-pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .hda-anim .hda-lock-breath{animation:hda-lock-breath 2.8s ease-in-out infinite}
 @keyframes hda-lock-breath{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-lock-mxo,.hda-lock-mxi,.hda-lock-jx,.hda-lock-myo,.hda-lock-myi,.hda-lock-jy,.hda-lock-mrl,.hda-lock-mru,.hda-lock-jr,.hda-lock-spin,.hda-lock-spinr{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-lock-mxo{animation:hda-lock-mxo 1.8s ease-in-out infinite}
+@keyframes hda-lock-mxo{0%{transform:translateX(-50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock-mxi{animation:hda-lock-mxi 1.8s ease-in-out infinite}
+@keyframes hda-lock-mxi{0%{transform:translateX(50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock-myo{animation:hda-lock-myo 1.8s ease-in-out infinite}
+@keyframes hda-lock-myo{0%{transform:translateY(50%)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-myi{animation:hda-lock-myi 1.8s ease-in-out infinite}
+@keyframes hda-lock-myi{0%{transform:translateY(-50%)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mrl{animation:hda-lock-mrl 1.8s ease-in-out infinite}
+@keyframes hda-lock-mrl{0%{transform:rotate(-45deg)}65%,100%{transform:rotate(0)}}
+.hda-anim .hda-lock-mru{animation:hda-lock-mru 1.8s ease-in-out infinite}
+@keyframes hda-lock-mru{0%{transform:rotate(45deg)}65%,100%{transform:rotate(0)}}
+.hda-anim .hda-lock-msl{animation:hda-lock-msl 1.8s ease-in-out infinite}
+@keyframes hda-lock-msl{0%{transform:translateY(-5px)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-msu{animation:hda-lock-msu 1.8s ease-in-out infinite}
+@keyframes hda-lock-msu{0%{transform:translateY(5px)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mgl{animation:hda-lock-mgl 2.4s ease-in-out infinite}
+@keyframes hda-lock-mgl{0%{transform:translateY(-10px)}70%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mgu{animation:hda-lock-mgu 2.4s ease-in-out infinite}
+@keyframes hda-lock-mgu{0%{transform:translateY(10px)}70%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mtl{animation:hda-lock-mtl 1.8s ease-in-out infinite}
+@keyframes hda-lock-mtl{0%{transform:translateY(-8px)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mtu{animation:hda-lock-mtu 1.8s ease-in-out infinite}
+@keyframes hda-lock-mtu{0%{transform:translateY(8px)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mkl{animation:hda-lock-mkl 1.8s ease-in-out infinite}
+@keyframes hda-lock-mkl{0%{transform:translateX(3.5px)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock-mku{animation:hda-lock-mku 1.8s ease-in-out infinite}
+@keyframes hda-lock-mku{0%{transform:translateX(-3.5px)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock-jx{animation:hda-lock-jx 2.2s linear infinite}
+@keyframes hda-lock-jx{0%,40%,100%{transform:translateX(0)}8%,24%{transform:translateX(1.2px)}16%,32%{transform:translateX(-1.2px)}}
+.hda-anim .hda-lock-jy{animation:hda-lock-jy 2.2s linear infinite}
+@keyframes hda-lock-jy{0%,40%,100%{transform:translateY(0)}8%,24%{transform:translateY(1.2px)}16%,32%{transform:translateY(-1.2px)}}
+.hda-anim .hda-lock-jr{animation:hda-lock-jr 2.2s linear infinite}
+@keyframes hda-lock-jr{0%,40%,100%{transform:rotate(0)}8%,24%{transform:rotate(4deg)}16%,32%{transform:rotate(-4deg)}}
+.hda-anim .hda-lock-mblink{animation:hda-lock-mblink .9s steps(1,end) infinite}
+@keyframes hda-lock-mblink{0%,55%{opacity:1}56%,100%{opacity:.2}}
+.hda-anim .hda-lock-jblink{animation:hda-lock-jblink .5s steps(1,end) infinite}
+@keyframes hda-lock-jblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
+.hda-anim .hda-lock-chev0,.hda-anim .hda-lock-chev1,.hda-anim .hda-lock-chev2{animation:hda-lock-chev 1.2s ease-in-out infinite}
+.hda-anim .hda-lock-chev1{animation-delay:.2s}.hda-anim .hda-lock-chev2{animation-delay:.4s}
+@keyframes hda-lock-chev{0%,100%{opacity:.25}35%{opacity:1}}
+.hda-anim .hda-lock-spin{animation:hda-lock-spin 1.4s linear infinite}
+@keyframes hda-lock-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.hda-anim .hda-lock-spinr{animation:hda-lock-spinr 1.4s linear infinite}
+@keyframes hda-lock-spinr{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
 @media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-lock-"]{animation:none!important}}`;
 
   (window.HDA = window.HDA || []).push({
@@ -491,8 +559,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     tab: "Smart locks",
     group: "More",
     kind: "device",
-    intro: "Twenty smart locks, each on its own bit of door, gate or frame. On means LOCKED: the bolt slides out into the strike, the status light turns green and keypads light up; off means UNLOCKED: bolt pulled back, red light. The slider sets keypad brightness; the color is the hardware finish.",
-    
+    intro: "Twenty smart locks, each on its own bit of door, gate or frame. On means LOCKED: the bolt slides out into the strike, the status light turns green and keypads light up; off means UNLOCKED: bolt pulled back, red light. The State menu also shows Locking and Unlocking (bolt part-way, amber light blinking, arrows) and Jammed (bolt stuck half out, red warning light and badge). The slider sets keypad brightness; the color is the hardware finish.",
     css,
     icons,
   });

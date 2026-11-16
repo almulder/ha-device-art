@@ -191,7 +191,7 @@ ${extra || ""}</defs>`;
 @keyframes hda-habitats-sway{0%{transform:rotate(-6deg)}100%{transform:rotate(6deg)}}
 `;
   const BG = (s) => `<g class="hda-bg">${s}</g>`;
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // (multi-function) o.parts holds only the parts the user ticked. A part left out follows the one device as a Device
   // Image (no o.mf: a switch follows o.on, a door or drawer o.open, as today) and stays off / closed / blank, never
   // animated, as a Multi-Function Image (o.mf). The readings (temp, hum) come from o.pval when o.mf, else from the
   // slider and the Humidity menu (as today). Every door and drawer is its own contact part.

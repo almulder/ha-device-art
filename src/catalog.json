@@ -55,7 +55,8 @@
      "pendant/artichoke",
      "lights2/globe3",
      "lights2/edison5",
-     "bulbs/cord"
+     "bulbs/cord",
+     "lights9/pendantgroup"
     ]
    },
    {
@@ -152,7 +153,8 @@
      "bulbs/t30",
      "lights2/g40",
      "lights2/t45",
-     "lights2/candlefil"
+     "lights2/candlefil",
+     "lights9/bulbgroup"
     ]
    },
    {
@@ -179,6 +181,19 @@
      "mirror/pendants",
      "mirror/antifog",
      "mirror/floor"
+    ]
+   },
+   {
+    "id": "special",
+    "name": "Grow, UV & emergency lights",
+    "items": [
+     "lights9/growbar",
+     "lights9/clipgrow",
+     "lights9/growstrip",
+     "lights9/blacklight",
+     "lights9/uvsanitizer",
+     "lights9/twinhead",
+     "lights9/exitsign"
     ]
    }
   ]
@@ -612,7 +627,7 @@
    },
    {
     "id": "radiators",
-    "name": "Radiators & towel warmers",
+    "name": "Radiators, valves & towel warmers",
     "items": [
      "heating/panelrad",
      "heating/columnrad",
@@ -621,7 +636,10 @@
      "heating/towelrail",
      "heater/towel",
      "air2/curved-bar-towel-ladder",
-     "air2/freestand"
+     "air2/freestand",
+     "covers2/trvround",
+     "covers2/trvsquare",
+     "covers2/trvdisplay"
     ]
    },
    {
@@ -1132,7 +1150,8 @@
      "media/curved-tv",
      "media/outdoor-tv",
      "media/projector",
-     "media/ust"
+     "media/ust",
+     "covers2/projscreen"
     ]
    },
    {
@@ -1414,15 +1433,9 @@
     "id": "doorbells",
     "name": "Doorbells & chimes",
     "items": [
-     "doorbell/tall",
-     "doorbell/square",
-     "doorbell/wedge",
-     "doorbell/package",
+     "camdoorbells/bell",
      "doorbell/brass",
      "doorbell/lighted",
-     "doorbell/intercom",
-     "doorbell/gatepost",
-     "doorbell/peephole",
      "doorbell/plugin",
      "doorbell/tubes",
      "doorbell/smartchime",
@@ -1458,6 +1471,20 @@
      "lock/strike",
      "lock/card",
      "speakers/touch-deadbolt"
+    ]
+   },
+   {
+    "id": "doors",
+    "name": "Doors & windows",
+    "items": [
+     "doorcfg/front",
+     "doorcfg/back",
+     "doorcfg/patio",
+     "doorcfg/interior",
+     "windowcfg/winsiding",
+     "windowcfg/winbrick",
+     "windowcfg/winstucco",
+     "windowcfg/wininside"
     ]
    },
    {
@@ -1509,6 +1536,7 @@
     "id": "smoke",
     "name": "Smoke & CO alarms",
     "items": [
+     "smoke/alarm",
      "safety/round-smoke-alarm",
      "safety/combo-smoke-and-co",
      "safety/hardwired-smoke-alarm",
@@ -1546,7 +1574,11 @@
      "sensor/washer",
      "sensor/bed",
      "sensor/soil",
-     "sensor/button"
+     "sensor/button",
+     "covers2/pirdome",
+     "covers2/pirbox",
+     "covers2/curtainpir",
+     "covers2/handle"
     ]
    },
    {
@@ -1573,6 +1605,25 @@
      "switch/nightlight",
      "switch/button",
      "switch/industrial"
+    ]
+   },
+   {
+    "id": "buttons",
+    "name": "Buttons & remotes",
+    "items": [
+     "buttons/dial",
+     "buttons/knob",
+     "buttons/cube",
+     "buttons/puck",
+     "buttons/ring",
+     "buttons/remote",
+     "buttons/ir",
+     "buttons/rf",
+     "buttons/eink",
+     "buttons/touch",
+     "buttons/gesture",
+     "buttons/keytag",
+     "buttons/beacon"
     ]
    },
    {
@@ -1621,6 +1672,24 @@
      "plug/floorbox",
      "plug/popup",
      "plug/undercab"
+    ]
+   },
+   {
+    "id": "relays",
+    "name": "Relays & modules",
+    "items": [
+     "relays/inwall",
+     "relays/leads",
+     "relays/minibox",
+     "relays/board",
+     "relays/din",
+     "relays/cunit",
+     "relays/loadc",
+     "relays/ledctl",
+     "relays/plugrep",
+     "relays/extender",
+     "relays/generic",
+     "relays/sensor"
     ]
    }
   ]
@@ -1732,6 +1801,20 @@
     ]
    },
    {
+    "id": "leaks",
+    "name": "Leak sensors",
+    "items": [
+     "leaks/squarepuck",
+     "leaks/teardrop",
+     "leaks/slim",
+     "leaks/roundmini",
+     "leaks/dropdetector",
+     "leaks/floodfreeze",
+     "leaks/zprobe",
+     "leaks/gateway"
+    ]
+   },
+   {
     "id": "sump",
     "name": "Sump pumps",
     "items": [
@@ -1791,9 +1874,25 @@
     ]
    },
    {
+    "id": "pergolas",
+    "name": "Pergolas, awnings & sails",
+    "items": [
+     "covers2/pergola",
+     "covers2/pergolaup",
+     "covers2/sail",
+     "covers2/awning"
+    ]
+   },
+   {
     "id": "garage",
     "name": "Garage doors & openers",
     "items": [
+     "garagecfg/siding",
+     "garagecfg/brick",
+     "garagecfg/stucco",
+     "garagecfg/stone",
+     "garagecfg/batten",
+     "garagecfg/modern",
      "garage/raised",
      "garage/double",
      "garage/carriage",
@@ -1919,7 +2018,8 @@
      "pool/heater",
      "pool/salt",
      "yard2/variable-speed-pool-pump",
-     "yard2/above-ground-filter-pump"
+     "yard2/above-ground-filter-pump",
+     "lights9/poollight"
     ]
    },
    {
@@ -1943,7 +2043,8 @@
      "home2/finnish",
      "home2/cube",
      "heating/barrel",
-     "heating/cabin"
+     "heating/cabin",
+     "lights9/spalight"
     ]
    },
    {

@@ -201,7 +201,7 @@
     if (x.on) s += seg(weight(x), cx - 9, cy - 25, 3, 6, light ? "#111" : "#f2f2f2") + `<g class="${P}breath">${glow(x, cx, cy - 22, 20, "#ffffff", .22)}</g>`;
     return scene(x, scaleBack(x), s);
   }
-  function eufy(x) {
+  function slimScale(x) {
     const cx = 100, cy = 138, light = H().hx(x.c).reduce((a, b) => a + b, 0) > 380, ln = light ? "#a9b0b6" : "#4c535b";
     let s = slab(x, cx, cy, 116, 64, x.lg([[0, sh(x.c, .1)], [1, sh(x.c, -.08)]], 0, 0, 0, 1), sh(x.c, -.4));
     s += `<path d="M${cx} ${cy - 18}V${cy + 32}M${cx - 60} ${cy + 4}H${cx + 60}" stroke="${ln}" stroke-opacity=".7" stroke-width=".6"/><path d="${rr(cx - 6, cy, 12, 8, 3)}" fill="${sh(x.c, -.2)}"/>`;
@@ -417,7 +417,7 @@
   add("hot-air-brush", "Hot-air brush", ["#7b4bb3", "#2aa7a0", "#c99582", "#d23c5a"], "Accent", revlon);
   add("hotel_dryer", "Wall hotel dryer", ["#f2f2ef", "#2a2a2d", "#b9bdc2"], "Body", hotel);
   add("smart-glass-scale", "Smart glass scale", ["#1d1e21", "#f4f4f2"], "Glass", withings);
-  add("slim-smart-scale", "Slim smart scale", ["#f4f4f2", "#1d1e21"], "Glass", eufy);
+  add("slim-smart-scale", "Slim smart scale", ["#f4f4f2", "#1d1e21"], "Glass", slimScale);
   add("dial_scale", "Analog dial scale", ["#f1ece0", "#b8d8c8", "#9a9ea4", "#c9a0a8"], "Body", dialScale);
   add("tall-pet-feeder", "Tall pet feeder", ["#f2f2ef", "#2a2a2d"], "Body", granary);
   add("wide-pet-feeder", "Wide pet feeder", ["#2f3a4d", "#4a4d52", "#f2f2ef"], "Body", smartfeed);

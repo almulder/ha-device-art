@@ -91,13 +91,6 @@ ${digits("10:08", X + W * .07, Y + Hh * .64, Hh * .22, "#ffffff")}
   const led = (x, cx, cy, col, cls) => x.on ? `<circle cx="${cx}" cy="${cy}" r="5" fill="${col}" opacity=".25"/><circle class="${cls || ""}" cx="${cx}" cy="${cy}" r="1.8" fill="${col}"/>` : `<circle cx="${cx}" cy="${cy}" r="1.4" fill="#000" opacity=".25"/>`;
   const base = (o) => Object.assign({ picker: true, colorLabel: "Color" }, o);
 
-  // ---------- (parts) Multi-Function: the two thermostats and the smoke & CO alarm ----------
-  // Thermostats: o.pval.mode (off / heat / cool / auto / eco), state (idle / heating / cooling / fan), fan (auto / on /
-  // circulate) as stages, temp (room) and sp (setpoint) as readings. As a Multi-Function Image the display stays awake:
-  // the setpoint big (OFF when off), the room temperature small under it, a mark for what it does (flame, snowflake, leaf,
-  // fan) and, on the round one, the ring arc from the room temperature to the setpoint in the running color.
-  // Alarm: o.pval.smoke and o.pval.co (clear / detected / tested): smoke blinks the ring red, CO amber, a test blue;
-  // all clear leaves the ring dark. Without readings (a Device Image) both are drawn as before.
   const TMODE = { id: "mode", name: "Mode", type: "stage", values: [["off", "Off"], ["heat", "Heat"], ["cool", "Cool"], ["auto", "Auto"], ["eco", "Eco"]], def: "heat" };
   const TPARTS = [TMODE,
     { id: "state", name: "Operating state", type: "stage", values: [["idle", "Idle"], ["heating", "Heating"], ["cooling", "Cooling"], ["fan", "Fan only"]], def: "heating" },
@@ -107,7 +100,6 @@ ${digits("10:08", X + W * .07, Y + Hh * .64, Hh * .22, "#ffffff")}
     { id: "co", name: "Carbon monoxide", type: "stage", values: [["clear", "Clear"], ["detected", "CO detected"], ["tested", "Test"]], def: "clear" }];
   const pvs = (o, ks) => { const v = o.pval || {}, r = {}; let any = false; ks.forEach((k) => { if (v[k] != null && v[k] !== "") { r[k] = String(v[k]).toLowerCase(); any = true; } }); return any ? r : null; };
   const TCOL = { heat: "#ff8a2a", cool: "#3c9cff", fan: "#3fcf9a", eco: "#5fc46e", idle: "#9aa0a8" };
-  // what the thermostat says: { main (string), room (string or null), run: heat / cool / fan / null, mark: heat / cool / eco / fan / null }
   function tRead(v) {
     const num = (k) => (v[k] != null && isFinite(+v[k]) ? Math.round(+v[k]) : null), sp = num("sp"), tp = num("temp"), m = v.mode || null, s = v.state || null;
     const run = s === "heating" ? "heat" : s === "cooling" ? "cool" : s === "fan" ? "fan" : null;
@@ -147,15 +139,93 @@ ${digits("10:08", X + W * .07, Y + Hh * .64, Hh * .22, "#ffffff")}
     return `<circle cx="100" cy="100" r="40" fill="#fff" opacity=".7"/>` + (R.run ? `<circle class="${P}breath" cx="100" cy="100" r="40" fill="${col}" opacity=".08"/>` : "") +
       dC(R.main, 100, 98 - h / 2, h, col) + (R.mark ? tMark(R.mark, 100, 74, 4, col) : "") + (R.room ? dC(R.room, 100, 117, 8.5, "#7d838b") : "");
   }
-  // the alarm ring: smoke red, CO amber, test blue (blinking); all clear dark
   function alarmRing(x, v) {
     const sm = v.smoke, cm = v.co, det = (s) => s === "detected", col = det(sm) ? "#ff3b30" : det(cm) ? "#ffa31a" : sm === "tested" || cm === "tested" ? "#3c8dff" : null;
     if (!col) return `<circle cx="100" cy="92" r="20" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="2"/>`;
     const cls = det(sm) || det(cm) ? "blink" : "breath";
     return `<g class="${P}${cls}"><circle cx="100" cy="92" r="46" fill="${col}" opacity=".12"/><circle cx="100" cy="92" r="20" fill="none" stroke="${col}" stroke-width="3.4" opacity=".95"/><circle cx="100" cy="92" r="26" fill="none" stroke="${col}" stroke-width="6" opacity=".25"/></g>`;
   }
+  function lockMark(ls, cx, cy, s) {
+    const AMB = "#ffb020", JAM = "#ff3b30";
+    if (ls === "jammed") return `<g class="${P}jblink"><path d="M${f(cx)} ${f(cy - s * .48)}L${f(cx + s * .52)} ${f(cy + s * .42)}H${f(cx - s * .52)}Z" fill="${JAM}" stroke="${JAM}" stroke-width="${f(s * .1)}" stroke-linejoin="round"/></g>` +
+      `<path d="M${f(cx)} ${f(cy - s * .16)}V${f(cy + s * .1)}" stroke="#fff" stroke-width="${f(s * .11)}" stroke-linecap="round"/><circle cx="${f(cx)}" cy="${f(cy + s * .26)}" r="${f(s * .065)}" fill="#fff"/>` +
+      `<circle cx="26" cy="26" r="11" fill="#000" fill-opacity=".45" transform="translate(1 1.6)"/><circle cx="26" cy="26" r="11" fill="#1c1416"/><circle cx="26" cy="26" r="10.3" fill="none" stroke="${JAM}" stroke-width="1.3"/>` +
+      `<path d="M26 19.2L32.4 30.6H19.6Z" fill="${AMB}" stroke="${AMB}" stroke-width="1.2" stroke-linejoin="round"/><path d="M26 23.2V27" stroke="#1c1416" stroke-width="1.6" stroke-linecap="round"/><circle cx="26" cy="29" r=".95" fill="#1c1416"/>`;
+    if (ls !== "locking" && ls !== "unlocking") return "";
+    const r = s * .36, cw = ls === "locking", a0 = -Math.PI / 2 + (cw ? .5 : -.5), a1 = a0 + (cw ? 1 : -1) * Math.PI * 1.45;
+    const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx = -Math.sin(a1) * (cw ? 1 : -1), ty = Math.cos(a1) * (cw ? 1 : -1), hs = s * .2;
+    return `<g class="${P}${cw ? "spin" : "spinr"}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * .5)}" fill="none"/><path d="M${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))}A${f(r)} ${f(r)} 0 1 ${cw ? 1 : 0} ${f(ex)} ${f(ey)}" fill="none" stroke="${AMB}" stroke-width="${f(s * .11)}" stroke-linecap="round"/>` +
+      `<path d="M${f(ex + tx * hs)} ${f(ey + ty * hs)}L${f(ex - ty * hs * .9)} ${f(ey + tx * hs * .9)}L${f(ex + ty * hs * .9)} ${f(ey - tx * hs * .9)}Z" fill="${AMB}"/></g>`;
+  }
   const first = (c, l) => [c].concat(l.filter((k) => k !== c));
 
+  const CK = (() => {
+    const g = (n) => (+n).toFixed(1);
+    const STATE = { id: "state", name: "State", values: [["auto", "From on/off"], ["live", "Live"], ["rec", "Recording"], ["motion", "Motion"], ["privacy", "Privacy"], ["offline", "Offline"]] };
+    const BELL = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+    const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] };
+    const IRA = { id: "ir", name: "Night IR", values: [["auto", "Auto"], ["off", "Off"], ["on", "On"]] };
+    const PAN = { id: "pan", name: "Pan", values: [["center", "Center"], ["left", "Left"], ["right", "Right"]] };
+    const cam = (o) => { const s = (o.opt || {}).state || "auto"; return s === "auto" ? (o.on ? "on" : "off") : s; };
+    const bell = (o) => o.on ? ((o.opt || {}).state || "ring") : "idle";
+    const active = (s) => s === "on" || s === "live" || s === "rec" || s === "motion";
+    const COL = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940", privacy: "#c9ced6", offline: "#8a8f98" };
+    const LED = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940" };
+    function badge(s, bx, by) {
+      const c = COL[s]; if (!c) return "";
+      bx = bx == null ? 28 : bx; by = by == null ? 28 : by;
+      let gl = "";
+      if (s === "rec") gl = `<circle cx="${bx}" cy="${by}" r="7" fill="${c}" opacity=".22"/><g class="${P}ckblink"><circle cx="${bx}" cy="${by}" r="4.4" fill="${c}"/><circle cx="${g(bx - 1.4)}" cy="${g(by - 1.4)}" r="1.3" fill="#fff" fill-opacity=".6"/></g>`;
+      else if (s === "live") gl = `<circle cx="${bx}" cy="${by}" r="2.3" fill="${c}"/><path d="M${g(bx - 3.2)} ${g(by - 3.6)}A5 5 0 0 0 ${g(bx - 3.2)} ${g(by + 3.6)}M${g(bx + 3.2)} ${g(by - 3.6)}A5 5 0 0 1 ${g(bx + 3.2)} ${g(by + 3.6)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path class="${P}ckglow" d="M${g(bx - 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 0 ${g(bx - 5.6)} ${g(by + 5.4)}M${g(bx + 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 1 ${g(bx + 5.6)} ${g(by + 5.4)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "motion") gl = `<g class="${P}ckglow" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="${g(bx + 1.2)}" cy="${g(by - 5.6)}" r="1.9" fill="${c}" stroke="none"/>` +
+        `<path d="M${g(bx + .4)} ${g(by - 2.8)}L${g(bx - 1)} ${g(by + 2)}L${g(bx - 4.4)} ${g(by + 6.2)}M${g(bx - 1)} ${g(by + 2)}L${g(bx + 2.6)} ${g(by + 3.4)}L${g(bx + 3.4)} ${g(by + 6.6)}M${g(bx - 4.6)} ${g(by - .6)}L${g(bx + .4)} ${g(by - 2.8)}L${g(bx + 4)} ${g(by)}"/></g>`;
+      else if (s === "privacy") gl = `<path d="M${g(bx - 6.4)} ${by}Q${bx} ${g(by - 6)} ${g(bx + 6.4)} ${by}Q${bx} ${g(by + 6)} ${g(bx - 6.4)} ${by}Z" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="${bx}" cy="${by}" r="2" fill="${c}"/>` +
+        `<path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "offline") gl = `<circle cx="${bx}" cy="${g(by + 4)}" r="1.2" fill="${c}"/><path d="M${g(bx - 2.8)} ${g(by + 1.2)}A4 4 0 0 1 ${g(bx + 2.8)} ${g(by + 1.2)}M${g(bx - 5.3)} ${g(by - 1.3)}A7.5 7.5 0 0 1 ${g(bx + 5.3)} ${g(by - 1.3)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#ff5a5a" stroke-width="1.5" stroke-linecap="round"/>`;
+      return `<g><circle cx="${g(bx + 1)}" cy="${g(by + 1.6)}" r="11" fill="#000" fill-opacity=".45"/><circle cx="${bx}" cy="${by}" r="11" fill="#16181e"/><circle cx="${bx}" cy="${by}" r="10.2" fill="none" stroke="${c}" stroke-width="1.3"/>` +
+        `<path d="M${g(bx - 7)} ${g(by - 6)}A9 9 0 0 1 ${g(bx + 6)} ${g(by - 7)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>${gl}</g>`;
+    }
+    const motion = (cx, cy, r) => [0, 1].map((i) => `<circle class="${P}ckring" style="animation-delay:${(-i * .8).toFixed(1)}s" cx="${g(cx)}" cy="${g(cy)}" r="${g(r * (1.3 + i * .5))}" fill="none" stroke="#ffa940" stroke-opacity="${i ? .4 : .75}" stroke-width="${i ? 1.4 : 1.8}"${i ? ` stroke-dasharray="3 3"` : ""}/>`).join("");
+    function cap(u, k, cx, cy, r, col) {
+      const id = `${u}-ckc${k}`;
+      return `<defs><radialGradient id="${id}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${H.shade(col, .55)}"/><stop offset=".6" stop-color="${col}"/><stop offset="1" stop-color="${H.shade(col, -.45)}"/></radialGradient></defs>` +
+        `<circle cx="${g(cx)}" cy="${g(cy + r * .14)}" r="${g(r)}" fill="#000" fill-opacity=".4"/><circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="url(#${id})"/>` +
+        `<path d="M${g(cx - r * .97)} ${g(cy)}H${g(cx + r * .97)}" stroke="${H.shade(col, -.5)}" stroke-width="${g(Math.max(.8, r * .09))}"/><path d="M${g(cx - r * .9)} ${g(cy + r * .1)}H${g(cx + r * .9)}" stroke="#fff" stroke-opacity=".28" stroke-width="${g(Math.max(.5, r * .05))}"/>` +
+        `<circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="none" stroke="#000" stroke-opacity=".38" stroke-width=".8"/><ellipse cx="${g(cx - r * .32)}" cy="${g(cy - r * .5)}" rx="${g(r * .36)}" ry="${g(r * .15)}" fill="#fff" fill-opacity=".4" transform="rotate(-18 ${g(cx - r * .32)} ${g(cy - r * .5)})"/>`;
+    }
+    const irDots = (cx, cy, R, n, rr) => { let s = ""; rr = rr || 1.1;
+      for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, px = g(cx + Math.cos(a) * R), py = g(cy + Math.sin(a) * R);
+        s += `<circle cx="${px}" cy="${py}" r="${g(rr * 3)}" fill="#ff3a4a" opacity=".22"/><circle cx="${px}" cy="${py}" r="${g(rr)}" fill="#ff3a4a"/>`; }
+      return s; };
+    function bellOver(s, cx, ly, lr, w) {
+      if (s === "motion") return `<g class="${P}ckglow">` + [0, 1].map((i) => { const r = lr + 5 + i * 6; return `<path d="M${g(cx - r)} ${g(ly - 2)}A${g(r)} ${g(r)} 0 0 1 ${g(cx + r)} ${g(ly - 2)}" fill="none" stroke="#ff8a6a" stroke-opacity="${(.8 - i * .3).toFixed(2)}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>`; }).join("") + `</g>`;
+      if (s === "live") return `<g class="${P}ckglow"><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.9)}" fill="#6aa8ff" opacity=".22"/><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.05)}" fill="none" stroke="#6aa8ff" stroke-opacity=".8" stroke-width="1.4"/></g>` +
+        `<circle class="${P}ckblink" cx="${g(cx + w / 2 + 7)}" cy="${g(ly - lr)}" r="3" fill="#ff3b3b"/>`;
+      if (s === "talk") return [0, 1, 2].map((i) => `<path class="${P}ckwave" style="animation-delay:${(-i * .4).toFixed(1)}s" d="M${g(cx + w / 2 + 4 + i * 6)} ${g(ly - 6 - i * 2)}q${g(5 + i)} ${g(6 + i * 2)} 0 ${g(12 + i * 4)}" fill="none" stroke="#7ee7ff" stroke-opacity="${(.9 - i * .2).toFixed(2)}" stroke-width="1.5" stroke-linecap="round"/>`).join("");
+      return "";
+    }
+    const css = `
+.${P}ckring{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}ckblink{animation:${P}ckblink 1.1s steps(1,end) infinite}
+@keyframes ${P}ckblink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .${P}ckring{animation:${P}ckring 1.6s ease-out infinite}
+@keyframes ${P}ckring{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.hda-anim .${P}ckglow{animation:${P}ckglow 1.8s ease-in-out infinite}
+@keyframes ${P}ckglow{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-anim .${P}ckwave{animation:${P}ckwave 1.3s ease-out infinite}
+@keyframes ${P}ckwave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}ckblink,.hda-anim .${P}ckring,.hda-anim .${P}ckglow,.hda-anim .${P}ckwave{animation:none!important}}`;
+    return { STATE, BELL, IR, IRA, PAN, cam, bell, active, LED, badge, motion, cap, irDots, bellOver, css };
+  })();
+
+  function camX(o) { const cs = CK.cam(o), dead = cs === "offline";
+    const x = ctx(Object.assign({}, o, { on: CK.active(cs), color: dead ? H.mix(o.color || SNOW, "#80838a", .7) : o.color }));
+    x.cs = cs; x.ir = (o.opt || {}).ir === "on" && cs !== "privacy" && !dead; x.u = o.uid; return x; }
+  const camLed = (x, cx, cy) => led(x, cx, cy, CK.LED[x.cs] || "#34d17a", x.cs === "live" ? "" : P + "blink");
+  const camOver = (x, cx, cy, lr) => (x.ir ? CK.irDots(cx, cy, lr * 1.75, 8, 1) : "") + (x.cs === "motion" ? CK.motion(cx, cy, lr * 1.3) : "") + (x.cs === "privacy" ? CK.cap(x.u, 0, cx, cy, lr * 1.25, x.c) : "") + CK.badge(x.cs);
+  const camDim = (x, s) => x.cs === "offline" ? `<g opacity=".8">${s}</g>` : s;
   const icons = [
     base({ id: "vase-speaker", name: "Vase speaker", colors: ["#6f747c", CORAL, "#b8774f", "#34363a", "#9cc3c9"], render(o) {
       const x = ctx(o), cx = 100;
@@ -260,14 +330,20 @@ ${x.on ? `<ellipse class="${P}ring" cx="100" cy="146" rx="52" ry="9" fill="url(#
 <path d="M70 120 C70 104 74 96 80 93" stroke="#fff" stroke-opacity=".55" stroke-width="2.4" fill="none" stroke-linecap="round"/>`));
     } }),
 
-    base({ id: "round-learning-thermostat", name: "Round learning thermostat", colors: ["#d6d9de", "#d9c08a", "#2a2b2e"], colorLabel: "Ring", parts: TPARTS, render(o) {
-      const x = ctx(o), TV = pvs(o, ["mode", "state", "fan", "temp", "sp"]);
+    base({ id: "round-learning-thermostat", name: "Round learning thermostat", colors: ["#d6d9de", "#d9c08a", "#2a2b2e"], colorLabel: "Ring", parts: TPARTS,
+      options: [{ id: "mode", name: "Mode", values: [["heat", "Heat"], ["off", "Off"], ["cool", "Cool"], ["heatcool", "Heat/Cool"], ["eco", "Eco"]] }], render(o) {
+      const x = ctx(o), TV = pvs(o, ["mode", "state", "fan", "temp", "sp"]), md = (o.opt && o.opt.mode) || "heat", off = x.on && md === "off";
+      if (off) x.on = false;
+      const mc = { heat: "#ff8a2a", cool: "#36a6ff", heatcool: "#ff8a2a", eco: "#7fcf3a" }[md] || "#ff8a2a", A = Math.PI;
+      const leafG = `<g transform="translate(100 128) scale(4.2)"><path d="M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z" fill="${mc}"/><path d="M-.8 .8 L.35 -.35" stroke="#000" stroke-opacity=".35" stroke-width=".14" stroke-linecap="round"/></g>`;
       const arc = (r, a0, a1) => { const p = (a) => `${f(100 + Math.cos(a) * r)} ${f(100 + Math.sin(a) * r)}`; return `M${p(a0)} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${p(a1)}`; };
       return svg(x, fin(x, `${wallBg(x)}<circle cx="102" cy="104" r="58" fill="#000" opacity=".3"/>
 <circle cx="100" cy="100" r="58" fill="${x.url("met")}"/><circle cx="100" cy="100" r="54" fill="#000" opacity=".25"/><circle cx="100" cy="100" r="53" fill="${x.url("blk")}"/>
 ${TV ? learningMF(x, TV) : x.on ? `<path d="${arc(44, Math.PI * .75, Math.PI * 2.25)}" stroke="#ffffff" stroke-opacity=".15" stroke-width="3" fill="none" stroke-linecap="round"/>
-<path d="${arc(44, Math.PI * .75, Math.PI * 1.55)}" stroke="#ff8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="${f(100 + Math.cos(Math.PI * 1.55) * 44)}" cy="${f(100 + Math.sin(Math.PI * 1.55) * 44)}" r="3.4" fill="#fff"/>
-${digits("71", 78, 82, 34, "#ffffff")}<rect x="86" y="126" width="28" height="3" rx="1.5" fill="#ff8a2a" opacity=".85"/>` : ""}
+${md === "heatcool" ? `<path d="${arc(44, A * .75, A * 1.3)}" stroke="#ff8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><path d="${arc(44, A * 1.62, A * 2.1)}" stroke="#36a6ff" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="${f(100 + Math.cos(A * 1.3) * 44)}" cy="${f(100 + Math.sin(A * 1.3) * 44)}" r="3.4" fill="#fff"/><circle cx="${f(100 + Math.cos(A * 1.62) * 44)}" cy="${f(100 + Math.sin(A * 1.62) * 44)}" r="3.4" fill="#fff"/>`
+  : `<path d="${arc(44, A * .75, A * 1.55)}" stroke="${mc}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="${f(100 + Math.cos(A * 1.55) * 44)}" cy="${f(100 + Math.sin(A * 1.55) * 44)}" r="3.4" fill="#fff"/>`}
+${digits("71", 78, 82, 34, "#ffffff")}${md === "eco" ? leafG : md === "heatcool" ? `<rect x="86" y="126" width="13" height="3" rx="1.5" fill="#ff8a2a" opacity=".85"/><rect x="101" y="126" width="13" height="3" rx="1.5" fill="#36a6ff" opacity=".85"/>` : `<rect x="86" y="126" width="28" height="3" rx="1.5" fill="${mc}" opacity=".85"/>`}` : ""}
+${!TV && off ? digits("OFF", 76, 89, 22, "#8a8f98") : ""}
 <circle cx="100" cy="100" r="53" fill="${x.url("glass")}"/>`));
     } }),
 
@@ -288,30 +364,30 @@ ${AV ? alarmRing(x, AV) : x.on ? `<circle class="${P}breath" cx="100" cy="92" r=
 <circle cx="100" cy="92" r="15" fill="${x.url("pl")}"/>`));
     } }),
 
-    base({ id: "indoor-cam-wired", name: "Indoor cam, wired", colors: [SNOW, FOG, LINEN, SAND], render(o) {
-      const x = ctx(o);
+    base({ id: "indoor-cam-wired", name: "Indoor cam, wired", colors: [SNOW, FOG, LINEN, SAND], options: [CK.STATE, CK.IR], render(o) {
+      const x = camX(o);
       return svg(x, fin(x, `${shelf(x, 152)}${shadow(100, 153, 34, 4)}
-<ellipse cx="100" cy="150" rx="26" ry="5" fill="${H.shade(x.c, -.2)}"/><path d="M74 150 C74 144 126 144 126 150" fill="${x.url("plv")}"/>
+${camDim(x, `<ellipse cx="100" cy="150" rx="26" ry="5" fill="${H.shade(x.c, -.2)}"/><path d="M74 150 C74 144 126 144 126 150" fill="${x.url("plv")}"/>
 <path d="M90 112 C92 124 92 134 82 147 H118 C108 134 108 124 110 112 Z" fill="${x.url("plv")}"/>
 <circle cx="100" cy="82" r="35" fill="${x.url("pl")}"/>
 <circle cx="100" cy="84" r="25" fill="${x.url("blk")}"/><circle cx="100" cy="84" r="25" fill="${x.url("glass")}"/>
 <circle cx="100" cy="84" r="9" fill="#0a0b10"/><circle cx="100" cy="84" r="5" fill="#1d2a44"/><circle cx="98" cy="82" r="1.6" fill="#fff" opacity=".6"/>
-${led(x, 100, 66, "#34d17a", P + "blink")}`));
+${camLed(x, 100, 66)}`)}${camOver(x, 100, 84, 9)}`));
     } }),
 
-    base({ id: "battery-cam", name: "Battery cam", colors: [SNOW, FOG, ASH], render(o) {
-      const x = ctx(o); let sid = ""; for (let y = 10; y < 200; y += 12) sid += `<path d="M0 ${y} H200" stroke="#000" stroke-opacity=".15"/>`;
+    base({ id: "battery-cam", name: "Battery cam", colors: [SNOW, FOG, ASH], options: [CK.STATE, CK.IR], render(o) {
+      const x = camX(o); let sid = ""; for (let y = 10; y < 200; y += 12) sid += `<path d="M0 ${y} H200" stroke="#000" stroke-opacity=".15"/>`;
       return svg(x, fin(x, `<g class="hda-bg"><rect width="200" height="200" fill="#8c95b0" opacity=".3"/>${sid}</g>
-<rect x="118" y="70" width="34" height="44" rx="4" fill="#d9d6e0"/><circle cx="135" cy="92" r="9" fill="#bdb9c6"/><path d="M135 92 L112 96" stroke="#bdb9c6" stroke-width="6"/>
+${camDim(x, `<rect x="118" y="70" width="34" height="44" rx="4" fill="#d9d6e0"/><circle cx="135" cy="92" r="9" fill="#bdb9c6"/><path d="M135 92 L112 96" stroke="#bdb9c6" stroke-width="6"/>
 <rect x="64" y="42" width="54" height="116" rx="27" fill="#000" opacity=".25" transform="translate(3 4)"/>
 <rect x="64" y="42" width="54" height="116" rx="27" fill="${x.url("pl")}"/>
 <circle cx="91" cy="70" r="21" fill="${x.url("blk")}"/><circle cx="91" cy="70" r="21" fill="${x.url("glass")}"/>
 <circle cx="91" cy="70" r="9" fill="#0a0b10"/><circle cx="91" cy="70" r="5" fill="#1d2a44"/><circle cx="89" cy="68" r="1.6" fill="#fff" opacity=".6"/>
-${led(x, 91, 88, "#34d17a", P + "blink")}`));
+${camLed(x, 91, 88)}`)}${camOver(x, 91, 70, 9)}`));
     } }),
 
-    base({ id: "battery-video-doorbell", name: "Battery video doorbell", colors: [SNOW, IVY, LINEN, ASH], render(o) {
-      const x = ctx(o);
+    base({ id: "battery-video-doorbell", name: "Battery video doorbell", colors: [SNOW, IVY, LINEN, ASH], options: [CK.BELL, CK.IR], render(o) {
+      const st = CK.bell(o), x = ctx(Object.assign({}, o, { on: st === "ring" })), ir = (o.opt || {}).ir === "on";
       return svg(x, fin(x, `<g class="hda-bg"><rect width="200" height="200" fill="#5a4a3c" opacity=".45"/><rect x="0" y="0" width="44" height="200" fill="#e9e6df" opacity=".85"/><rect x="40" y="0" width="6" height="200" fill="#bdb9c6"/></g>
 <rect x="80" y="30" width="40" height="140" rx="20" fill="#000" opacity=".25" transform="translate(3 4)"/>
 <rect x="80" y="30" width="40" height="140" rx="20" fill="${x.url("pl")}"/>
@@ -319,16 +395,18 @@ ${led(x, 91, 88, "#34d17a", P + "blink")}`));
 <circle cx="100" cy="54" r="7" fill="#0a0b10"/><circle cx="100" cy="54" r="4" fill="#1d2a44"/><circle cx="98.6" cy="52.6" r="1.2" fill="#fff" opacity=".6"/>
 <circle cx="100" cy="142" r="12" fill="${H.shade(x.c, -.08)}"/>
 ${x.on ? `<circle class="${P}breath" cx="100" cy="142" r="12" fill="none" stroke="#fff" stroke-width="2.6"/><circle cx="100" cy="142" r="17" fill="none" stroke="#fff" stroke-width="5" opacity=".2"/>` : `<circle cx="100" cy="142" r="12" fill="none" stroke="#000" stroke-opacity=".15" stroke-width="1.6"/>`}
-<circle cx="100" cy="142" r="9" fill="${x.url("pl")}"/>`));
+<circle cx="100" cy="142" r="9" fill="${x.url("pl")}"/>${ir ? CK.irDots(100, 54, 12, 6, 1) : ""}${CK.bellOver(st, 100, 54, 7, 40)}`));
     } }),
 
-    base({ id: "touch-deadbolt", name: "Touch deadbolt", colors: ["#b8bcc0", "#4a3b30", "#c9a95a", "#2c2d30"], colorLabel: "Finish", render(o) {
-      const x = ctx(o); let keys = "";
+    base({ id: "touch-deadbolt", name: "Touch deadbolt", colors: ["#b8bcc0", "#4a3b30", "#c9a95a", "#2c2d30"], colorLabel: "Finish",
+      options: [{ id: "state", name: "State", values: [["auto", "From on/off"], ["locked", "Locked"], ["unlocked", "Unlocked"], ["locking", "Locking"], ["unlocking", "Unlocking"], ["jammed", "Jammed"]] }], render(o) {
+      const sv = o.opt && o.opt.state, ls = sv && sv !== "auto" ? sv : (o.on ? "locked" : "unlocked");
+      const x = ctx(Object.assign({}, o, { on: ls !== "unlocked" })); let keys = "";
       for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { if (r === 3 && c !== 1) continue; keys += x.on ? `<circle cx="${88 + c * 12}" cy="${70 + r * 18}" r="2.4" fill="#ffffff"/><circle cx="${88 + c * 12}" cy="${70 + r * 18}" r="5" fill="#bfe4ff" opacity=".18"/>` : `<circle cx="${88 + c * 12}" cy="${70 + r * 18}" r="1.4" fill="#fff" opacity=".08"/>`; }
       return svg(x, fin(x, `<g class="hda-bg"><rect width="200" height="200" fill="#6b4428" opacity=".6"/>${[30, 70, 130, 170].map((xx) => `<path d="M${xx} 0 V200" stroke="#000" stroke-opacity=".15"/>`).join("")}</g>
 <rect x="76" y="40" width="48" height="124" rx="8" fill="#000" opacity=".3" transform="translate(2 4)"/>
 <rect x="76" y="40" width="48" height="124" rx="8" fill="${x.url("met")}"/><rect x="80" y="46" width="40" height="112" rx="6" fill="${x.url("blk")}"/><rect x="80" y="46" width="40" height="112" rx="6" fill="${x.url("glass")}"/>
-${keys}`));
+${keys}${lockMark(ls, 100, 145, 12)}`));
     } }),
 
     base({ id: "plug-in-hub", name: "Plug-in hub", colors: [SNOW, "#e8e3da"], render(o) {
@@ -348,13 +426,19 @@ ${led(x, 100, 96, "#ffffff", P + "breath")}`));
 @keyframes ${P}dot{0%,100%{opacity:1}50%{opacity:.45}}
 @keyframes ${P}breath{0%,100%{opacity:1}50%{opacity:.5}}
 @keyframes ${P}blink{0%{opacity:1}85%{opacity:.25}}
-@media (prefers-reduced-motion:reduce){.hda-anim .${P}dot,.hda-anim .${P}breath,.hda-anim .${P}blink,.hda-anim .${P}ring{animation:none}}`;
+.${P}spin,.${P}spinr{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}spin{animation:${P}spin 1.4s linear infinite}
+.hda-anim .${P}spinr{animation:${P}spinr 1.4s linear infinite}
+.hda-anim .${P}jblink{animation:${P}jblink .5s steps(1,end) infinite}
+@keyframes ${P}spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes ${P}spinr{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
+@keyframes ${P}jblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}dot,.hda-anim .${P}breath,.hda-anim .${P}blink,.hda-anim .${P}ring,.hda-anim .${P}spin,.hda-anim .${P}spinr,.hda-anim .${P}jblink{animation:none}}`;
 
   (window.HDA = window.HDA || []).push({
     id: "speakers", tab: "Smart home speakers & displays A", group: "Home", kind: "device",
     levelLabel: "Volume", onWord: "Listening", offWord: "Off",
-    intro: "Twenty smart home devices on shelves, counters, walls and doors: speakers, smart displays, streamers, mesh Wi-Fi, thermostats, a smoke alarm, cameras, the doorbell, a deadbolt and a plug-in hub. On shows the four breathing dots, ambient screens and status lights; the slider sets volume.",
-    
-    css, icons,
+    intro: "Twenty smart home devices on shelves, counters, walls and doors: speakers, smart displays, streamers, mesh Wi-Fi, thermostats, a smoke alarm, cameras, the doorbell, a deadbolt and a plug-in hub. On shows the four breathing dots, ambient screens and status lights; the slider sets volume. The cameras show Live, Recording, Motion, Privacy or Offline with a Night IR menu, the doorbell has its own State menu, the deadbolt shows Locking, Unlocking and Jammed, and the round thermostat adds Mode.",
+    css: css + CK.css, icons,
   });
 })();

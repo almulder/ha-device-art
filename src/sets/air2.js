@@ -86,8 +86,6 @@
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
     const x = { o, c, on: !!o.on, lv, id, url, defs: [], have: {}, metal: METAL.indexOf(c) >= 0, parts: o.parts || null, opt: o.opt || {},
       dk: H.hx(c).reduce((a, b) => a + b, 0) < 300 };
-    // (parts) o.parts holds only the ticked parts; a part left out follows the one device as a Device Image (no o.mf)
-    // and stays off / closed as a Multi-Function Image (o.mf). x.zon = any zone part on (the pump / heat of a zone set).
     x.mf = !!o.mf;
     x.part = (k) => (x.parts && x.parts[k] != null ? !!x.parts[k] : !x.mf && x.on);
     x.zon = (n) => { for (let i = 1; i <= n; i++) if (x.part("z" + i)) return true; return false; };
@@ -95,6 +93,40 @@
     x.dur = (a, b) => Math.max(.3, a - b * lv).toFixed(2);
     return x;
   }
+
+  const MAC = { cool: ICE, heat: WARM, auto: "#9ff0a8", dry: "#6fe3d6", fan: "#d5dbe2", eco: "#bfee9a" };
+  function hv(x) {
+    const md = x.opt.mode || "cool"; if (md === "off") x.on = false;
+    x.mode = md; x.mc = MAC[md] || ICE; x.preset = x.opt.preset || "none"; x.swing = x.opt.swing || "off";
+    x.add("mg", rg(x.id("mg"), [[0, x.mc, .6], [.45, x.mc, .2], [1, x.mc, 0]]));
+    x.glow = x.url(md === "cool" ? "cool" : "mg");
+    return x;
+  }
+  const G1 = (cx, cy, s, b, col, fill) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="${fill ? col : "none"}" stroke="${fill ? "none" : col}" stroke-width=".22" stroke-linecap="round" stroke-linejoin="round">${b}</g>`;
+  function mglyph(m, cx, cy, s, col) {
+    if (m === "heat") return G1(cx, cy, s, `<path d="M0 -1 C.55 -.5 .78 -.05 .6 .38 C.47 .76 .16 .98 0 .98 C-.16 .98 -.5 .78 -.6 .38 C-.7 -.04 -.38 -.32 -.22 -.62 C-.14 -.3 .02 -.26 .07 -.44 C.12 -.64 .06 -.84 0 -1 Z"/>`, col, 1);
+    if (m === "cool") return G1(cx, cy, s, `<path d="M0 -.95 V.95 M-.82 -.47 L.82 .47 M-.82 .47 L.82 -.47"/>`, col);
+    if (m === "auto") return G1(cx, cy, s, `<path d="M-.62 .85 L0 -.85 L.62 .85 M-.38 .25 H.38"/>`, col);
+    if (m === "dry") return G1(cx, cy, s, `<path d="M0 -1 C.35 -.45 .7 -.05 .7 .35 C.7 .75 .38 1 0 1 C-.38 1 -.7 .75 -.7 .35 C-.7 -.05 -.35 -.45 0 -1 Z"/>`, col, 1);
+    if (m === "fan") { let b = ""; for (let i = 0; i < 3; i++) b += `<path transform="rotate(${i * 120})" d="M0 0 C-.5 -.3 -.38 -.95 0 -.95 C.32 -.95 .3 -.38 0 0 Z"/>`; return G1(cx, cy, s, b + `<circle r=".16"/>`, col, 1); }
+    if (m === "eco") return G1(cx, cy, s, `<path d="M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z"/>`, col, 1) + G1(cx, cy, s, `<path d="M-.8 .8 L.35 -.35" stroke-opacity=".4"/>`, "#000");
+    return "";
+  }
+  function pglyph(p, cx, cy, s, col) {
+    if (p === "boost") return G1(cx, cy, s, `<path d="M.2 -1 L-.6 .12 H-.02 L-.22 1 L.6 -.15 H.02 Z"/>`, col, 1);
+    if (p === "comfort") return G1(cx, cy, s, `<path d="M-.5 .1 V-.55 H.5 V.1 M-.85 .55 V-.05 H-.5 V.15 H.5 V-.05 H.85 V.55 Z M-.7 .55 V.8 M.7 .55 V.8"/>`, col);
+    if (p === "sleep") return G1(cx, cy, s, `<path d="M.3 -.9 A.92 .92 0 1 0 .9 .35 A.7 .7 0 0 1 .3 -.9 Z"/>`, col, 1);
+    if (p === "away") return G1(cx, cy, s, `<path d="M-.85 -.02 L0 -.82 L.85 -.02 M-.6 -.25 V.82 H.6 V-.25 M-.18 .82 V.32 H.18 V.82"/>`, col);
+    return "";
+  }
+  const hvMark = (x, cx, cy, s) => x.on ? (x.mode !== "cool" ? mglyph(x.mode, cx, cy, s, x.mc) : "") + (x.preset !== "none" ? pglyph(x.preset, cx - s * 2.8, cy, s, x.mc) : "") : "";
+  const swV = (x, s) => x.on && (x.swing === "vertical" || x.swing === "both") ? `<g class="${P}swv">${s}</g>` : s;
+  function swH(x, X, Y, W) {
+    if (!x.on || (x.swing !== "horizontal" && x.swing !== "both")) return ""; let s = "";
+    for (let i = 0; i < 12; i++) s += `<rect x="${f(X + W * (i + .5) / 12 - .7)}" y="${Y}" width="1.4" height="7" rx=".7" fill="#16181c" opacity=".55"/>`;
+    return `<g class="${P}swh">${s}</g>`;
+  }
+  const swAir = (x, s) => x.on && x.swing !== "off" ? `<g class="${P}${x.swing === "vertical" ? "swy" : "swx"}">${s}</g>` : s;
 
   function scene(x, wall, floor, body, sc) {
     sc = sc || 1; const w = WALL[wall] || WALL.plaster;
@@ -174,40 +206,40 @@ ${x.defs.join("")}</defs>
 
   const icons = [
     base({ id: "boxy-wall-split", name: "Boxy wall split", colors: ["#f4f5f2", "#c9ccd1", "#2a2b30", "#e9e3d6"], render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a); fin(x);
-      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="120" rx="78" ry="34" fill="${x.url("cool")}" opacity=".35"/>` : "") +
+      const x = hv(ctx(o)), S = (a) => H.shade(x.c, a); fin(x);
+      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="120" rx="78" ry="34" fill="${x.glow}" opacity=".35"/>` : "") +
         drop(x, `<path d="M24 58 Q24 54 28 54 H172 Q176 54 176 58 V100 Q176 104 172 104 H28 Q24 104 24 100 Z"/>`, 3, 6, .5) +
         `<path d="M24 58 Q24 54 28 54 H172 Q176 54 176 58 V100 Q176 104 172 104 H28 Q24 104 24 100 Z" fill="${x.url("bdv")}"/>` +
         `<path d="M28 60 Q100 57 172 60" fill="none" stroke="#fff" stroke-opacity="${x.dk ? .25 : .85}" stroke-width="1.2"/><path d="M26 92 H174" stroke="#000" stroke-opacity=".12"/>` +
-        `<path d="M30 96 H170 L166 104 H34 Z" fill="#14161a" opacity=".85"/>` + vane(x, 32, 101, 136, x.on, S(.05)) +
-        led(x, 152, 92, 1.1, "#7ee08a", x.on) + led(x, 158, 92, 1.1, "#ffb347", x.on && x.lv > .7) +
+        `<path d="M30 96 H170 L166 104 H34 Z" fill="#14161a" opacity=".85"/>` + swV(x, vane(x, 32, 101, 136, x.on, S(.05))) + swH(x, 34, 100, 132) +
+        led(x, 152, 92, 1.1, "#7ee08a", x.on) + led(x, 158, 92, 1.1, "#ffb347", x.on && x.lv > .7) + hvMark(x, 143, 92, 2.2) +
         `<path d="M134 82 H162" stroke="#000" stroke-opacity=".08"/>` +
-        wisps(x, [[46, 110], [70, 112], [96, 112], [122, 112], [148, 110]], ICE, 40);
+        swAir(x, wisps(x, [[46, 110], [70, 112], [96, 112], [122, 112], [148, 110]], x.mc, 40));
       return scene(x, "sage", null, b);
     } }),
     base({ id: "faceted-wall-split", name: "Faceted wall split", colors: ["#c9ccd1", "#f4f5f2", "#2a2b30"], render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a); fin(x);
+      const x = hv(ctx(o)), S = (a) => H.shade(x.c, a); fin(x);
       x.add("emu", lg(x.id("emu"), [[0, S(.45)], [.5, S(.1)], [1, S(-.12)]], 0, 0, 0, 1) + lg(x.id("emu2"), [[0, S(-.15)], [1, S(-.45)]], 0, 0, 0, 1));
       const front = "M22 58 H178 V84 L172 98 H28 L22 84 Z";
-      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="118" rx="80" ry="32" fill="${x.url("cool")}" opacity=".35"/>` : "") +
+      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="118" rx="80" ry="32" fill="${x.glow}" opacity=".35"/>` : "") +
         drop(x, `<path d="${front}"/>`, 3, 6, .5) + `<path d="M24 54 H176 L178 58 H22 Z" fill="${S(.4)}"/>` +
         `<path d="M22 58 H178 V84 H22 Z" fill="${x.url("emu")}"/><path d="M22 84 H178 L172 98 H28 Z" fill="${x.url("emu2")}"/>` + brushR(x, 23, 59, 154, 24) +
         `<path d="M22 84 H178" stroke="#fff" stroke-opacity=".55" stroke-width=".9"/><path d="M24 59 H176" stroke="#fff" stroke-opacity=".6"/>` +
-        `<path d="M28 98 H172 L169 102 H31 Z" fill="#111317"/>` + vane(x, 30, 100, 140, x.on, S(-.1)) +
-        `<rect x="150" y="88" width="10" height="2.4" rx="1.2" fill="${x.on ? "#cfeaff" : "#000"}" opacity="${x.on ? .9 : .15}"/>` +
-        wisps(x, [[48, 110], [76, 112], [104, 112], [132, 112], [156, 110]], ICE, 42);
+        `<path d="M28 98 H172 L169 102 H31 Z" fill="#111317"/>` + swV(x, vane(x, 30, 100, 140, x.on, S(-.1))) + swH(x, 32, 99, 136) +
+        `<rect x="150" y="88" width="10" height="2.4" rx="1.2" fill="${x.on ? (x.mode === "cool" ? "#cfeaff" : x.mc) : "#000"}" opacity="${x.on ? .9 : .15}"/>` + hvMark(x, 143, 89.2, 2.2) +
+        swAir(x, wisps(x, [[48, 110], [76, 112], [104, 112], [132, 112], [156, 110]], x.mc, 42));
       return scene(x, "linen", null, b);
     } }),
     base({ id: "mirror-glass-wall-split", name: "Mirror-glass wall split", colors: ["#2a2b30", "#f4f5f2", "#7a2e3a"], colorLabel: "Glass", render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a);
+      const x = hv(ctx(o)), S = (a) => H.shade(x.c, a);
       x.add("mir", lg(x.id("mir"), [[0, S(.35)], [.5, x.c], [1, S(-.45)]], 0, 0, 0, 1));
-      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="120" rx="78" ry="32" fill="${x.url("cool")}" opacity=".35"/>` : "") +
+      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="120" rx="78" ry="32" fill="${x.glow}" opacity=".35"/>` : "") +
         drop(x, rr(22, 54, 156, 50, 4), 3, 6, .55) + `<rect x="22" y="54" width="156" height="50" rx="4" fill="${S(-.35)}"/>` +
         `<rect x="24" y="55.5" width="152" height="40" rx="3" fill="${x.url("mir")}"/><path d="M40 55.5 L70 95.5 H86 L56 55.5 Z M90 55.5 L104 95.5 H110 L96 55.5 Z" fill="#fff" opacity=".08"/>` +
         `<rect x="24" y="55.5" width="152" height="40" rx="3" fill="${x.url("gloss")}"/>` +
-        `<path d="M26 96 H174 L170 104 H30 Z" fill="#14161a"/>` + vane(x, 28, 101, 144, x.on, "#e6e8eb") +
-        (x.on ? `<g opacity=".95">${digits(x, 154, 76, 8, "#e9f4ff", coolTemp(x), { deg: 1 })}</g>` : "") +
-        wisps(x, [[46, 112], [72, 114], [100, 114], [128, 114], [154, 112]], ICE, 40);
+        `<path d="M26 96 H174 L170 104 H30 Z" fill="#14161a"/>` + swV(x, vane(x, 28, 101, 144, x.on, "#e6e8eb")) + swH(x, 30, 100, 140) +
+        (x.on ? `<g opacity=".95">${digits(x, 154, 76, 8, "#e9f4ff", coolTemp(x), { deg: 1 })}</g>` : "") + hvMark(x, 138, 76, 2.4) +
+        swAir(x, wisps(x, [[46, 112], [72, 114], [100, 114], [128, 114], [154, 112]], x.mc, 40));
       return scene(x, "navy", null, b);
     } }),
 
@@ -305,8 +337,6 @@ ${x.defs.join("")}</defs>
       return scene(x, "ply", [166, "concrete"], b);
     } }),
 
-    // (parts) six zone loops z1..z6 (a zone valve / actuator each): an open loop flows (its flow meter bobs, its floor
-    // pipe runs hot); the pump runs while any zone is open. As a Device Image every loop follows the one device, as before.
     base({ id: "pumpstation", name: "Manifold + pump station", colorLabel: "Pump", colors: ["#2f8f4e", "#c8322b", "#2f6fb5", "#1f2023"],
       parts: [1, 2, 3, 4, 5, 6].map((i) => ({ id: "z" + i, name: "Zone " + i })), render(o) {
       const x = ctx(o), S = (a) => H.shade(x.c, a), zone = x.mf || !!o.parts;
@@ -325,8 +355,6 @@ ${x.defs.join("")}</defs>
         (x.on && !zone ? `<rect class="${P}breathe" x="56" y="128" width="112" height="50" fill="${x.url("warm")}" opacity=".25"/>` : "");
       return scene(x, "ply", null, b);
     } }),
-    // (parts) Heat (the mat warms, the stat's heat mark lights) and Floor temperature (a value, shown on the stat; left
-    // out, the stat shows the set level as before). One mat = one zone, as the real floor-heat thermostats report.
     base({ id: "elecmat", name: "Electric mat + stat", colors: ["#f2f1ee", "#2a2b30", "#c9ccd1"],
       parts: [{ id: "heat", name: "Heat", type: "switch" }, { id: "temp", name: "Floor temperature", type: "value", unit: "°F", min: 50, max: 95, def: 78 }], render(o) {
       const x = ctx(o), S = (a) => H.shade(x.c, a), stat = x.on; fin(x);
@@ -345,8 +373,6 @@ ${x.defs.join("")}</defs>
         glossR(x, 80, 52, 40, 44, 3) + `<path d="M100 116 V146" stroke="#cfcfcd" stroke-width="2" stroke-dasharray="3 2"/>`;
       return scene(x, "denim", null, b);
     } }),
-    // (parts) three zones z1..z3 (two runs of the loop each, top to bottom): a zone on = its runs pulse and warm the floor.
-    // As a Device Image the whole loop follows the one device, as before.
     base({ id: "pexloops", name: "PEX floor loops", colorLabel: "Pipe", colors: ["#e4572e", "#f0a020", "#f2f1ee", "#2f6fb5"],
       parts: [1, 2, 3].map((i) => ({ id: "z" + i, name: "Zone " + i })), render(o) {
       const x = ctx(o), S = (a) => H.shade(x.c, a), zone = x.mf || !!o.parts;
@@ -417,7 +443,6 @@ ${x.defs.join("")}</defs>
       return scene(x, "plaster", null, b);
     } }),
 
-    // (parts) Fan (the air flows) and Mode (a stage: cool / heat, from the thermostat mode; left out, the Mode option)
     base({ id: "loop-purifier-heater", name: "Loop purifier heater", options: [{ id: "mode", name: "Mode", values: [["cool", "Cool"], ["heat", "Heat"]] }], colors: ["#f2f1ee", "#2a2b30", "#c9ccd1", "#c9a457"], colorLabel: "Trim",
       parts: [{ id: "fan", name: "Fan", type: "switch" }, { id: "mode", name: "Mode", type: "stage", values: [["cool", "Cool"], ["heat", "Heat"]], def: "cool" }], render(o) {
       const x = ctx(o), st = o.pval && o.pval.mode != null ? String(o.pval.mode) : null, heat = (st || x.opt.mode) === "heat", S = (a) => H.shade(x.c, a);
@@ -450,6 +475,11 @@ ${x.defs.join("")}</defs>
     } }),
   ];
 
+  const HVO = [{ id: "mode", name: "Mode", values: [["cool", "Cool"], ["off", "Off"], ["heat", "Heat"], ["auto", "Auto"], ["dry", "Dry"], ["fan", "Fan"], ["eco", "Eco"]] },
+    { id: "preset", name: "Preset", values: [["none", "None"], ["boost", "Boost"], ["comfort", "Comfort"], ["sleep", "Sleep"], ["away", "Away"]], when: { opt: "mode", is: ["cool", "heat", "auto", "dry", "fan", "eco"] } },
+    { id: "swing", name: "Swing", values: [["off", "Off"], ["vertical", "Vertical"], ["horizontal", "Horizontal"], ["both", "Both"]], when: { opt: "mode", is: ["cool", "heat", "auto", "dry", "fan", "eco"] } }];
+  icons.forEach((ic) => { if (ic.id === "boxy-wall-split" || ic.id === "faceted-wall-split" || ic.id === "mirror-glass-wall-split") ic.options = HVO; });
+
   (window.HDA = window.HDA || []).push({
     id: "air2",
     tab: "More heating & cooling",
@@ -457,8 +487,7 @@ ${x.defs.join("")}</defs>
     kind: "device",
     levelLabel: "Power",
     onWord: "Running", offWord: "Off",
-    intro: "Wall-unit ACs, radiators, towel warmers, diesel heaters, underfloor heating, zoned ventilation and loop purifiers. On runs it; the slider sets fan speed or heat. Ventilation units switch each damper zone on its own.",
-    
+    intro: "Wall-unit ACs, radiators, towel warmers, diesel heaters, underfloor heating, zoned ventilation and loop purifiers. On runs it; the slider sets fan speed or heat. The wall units add Mode, Preset and Swing menus (air color, indicator glyphs, swinging louvers). Ventilation units switch each damper zone on its own.",
     css: `.hda-air2-breathe,.hda-air2-pulse,.hda-air2-spin{transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-air2-breathe{animation:hda-air2-breathe 4s ease-in-out infinite}
 @keyframes hda-air2-breathe{50%{opacity:.4}}
@@ -481,7 +510,18 @@ ${x.defs.join("")}</defs>
 @keyframes hda-air2-down{0%{opacity:0;transform:translate(0,-6px)}30%{opacity:.9}100%{opacity:0;transform:translate(0,14px)}}
 .hda-anim .hda-air2-bob{animation:hda-air2-bob 1.6s ease-in-out infinite}
 @keyframes hda-air2-bob{50%{transform:translate(0,-2px)}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-air2-breathe,.hda-anim .hda-air2-pulse,.hda-anim .hda-air2-spin,.hda-anim .hda-air2-fall,.hda-anim .hda-air2-goR,.hda-anim .hda-air2-goL,.hda-anim .hda-air2-rise,.hda-anim .hda-air2-up,.hda-anim .hda-air2-down,.hda-anim .hda-air2-bob{animation:none}}`,
+.hda-air2-swv{transform-box:fill-box;transform-origin:50% 0}
+.hda-anim .hda-air2-swv{animation:hda-air2-swv 6s ease-in-out infinite}
+@keyframes hda-air2-swv{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.45)}}
+.hda-air2-swh{transform-box:fill-box;transform-origin:50% 0}
+.hda-anim .hda-air2-swh{animation:hda-air2-swh 5s ease-in-out infinite}
+@keyframes hda-air2-swh{0%,100%{transform:skewX(-14deg)}50%{transform:skewX(14deg)}}
+.hda-air2-swx,.hda-air2-swy{transform-box:fill-box;transform-origin:50% 0}
+.hda-anim .hda-air2-swx{animation:hda-air2-swx 5s ease-in-out infinite}
+@keyframes hda-air2-swx{0%,100%{transform:skewX(-12deg)}50%{transform:skewX(12deg)}}
+.hda-anim .hda-air2-swy{animation:hda-air2-swy 6s ease-in-out infinite}
+@keyframes hda-air2-swy{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.7)}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-air2-swv,.hda-anim .hda-air2-swh,.hda-anim .hda-air2-swx,.hda-anim .hda-air2-swy,.hda-anim .hda-air2-breathe,.hda-anim .hda-air2-pulse,.hda-anim .hda-air2-spin,.hda-anim .hda-air2-fall,.hda-anim .hda-air2-goR,.hda-anim .hda-air2-goL,.hda-anim .hda-air2-rise,.hda-anim .hda-air2-up,.hda-anim .hda-air2-down,.hda-anim .hda-air2-bob{animation:none}}`,
     icons,
   });
 })();

@@ -103,7 +103,7 @@ ${extra || ""}</defs>`;
   }
   const trapLed = (x, cx, cy) => led(cx, cy, 1.8, x.on ? "#ff4a4f" : "#7dff9a", true, 0, x.on);
   const base = (o) => Object.assign({ picker: true, colorLabel: "Finish" }, o);
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // (multi-function) o.parts holds only the parts the user ticked. A part left out follows the one device as a Device
   // Image (no o.mf, exactly as today) and stays off / dark, never blinking, as a Multi-Function Image (o.mf). Status
   // parts (a box online, the internet up, activity, on battery) are contacts; a reading is o.pval[id].
   const MF = {

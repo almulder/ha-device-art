@@ -277,10 +277,6 @@
 
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {});
   const BODY = ["#eef0f2", "#2c2f36", "#9fc5b8", "#e8c9a6", "#8fb4d9"];
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
-  // Image (no o.mf, as today) and stays off / closed / blank, never animated, as a Multi-Function Image (o.mf). A value
-  // part's reading is o.pval[id] (a number), a stage part's value o.pval[id] (one of its stage ids). Pieces that exist
-  // only as parts (the aquarium's heater and thermometer, the pet door's mode arrows) are drawn only when o.mf.
   const MF = {
     has: (o, k) => !!(o.parts && o.parts[k] != null),
     on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
@@ -290,6 +286,68 @@
   };
   const lit = (x, k) => Object.assign({}, x, { on: true, L: k == null ? .8 : k });
 
+  const CK = (() => {
+    const g = (n) => (+n).toFixed(1);
+    const STATE = { id: "state", name: "State", values: [["auto", "From on/off"], ["live", "Live"], ["rec", "Recording"], ["motion", "Motion"], ["privacy", "Privacy"], ["offline", "Offline"]] };
+    const BELL = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+    const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] };
+    const IRA = { id: "ir", name: "Night IR", values: [["auto", "Auto"], ["off", "Off"], ["on", "On"]] };
+    const PAN = { id: "pan", name: "Pan", values: [["center", "Center"], ["left", "Left"], ["right", "Right"]] };
+    const cam = (o) => { const s = (o.opt || {}).state || "auto"; return s === "auto" ? (o.on ? "on" : "off") : s; };
+    const bell = (o) => o.on ? ((o.opt || {}).state || "ring") : "idle";
+    const active = (s) => s === "on" || s === "live" || s === "rec" || s === "motion";
+    const COL = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940", privacy: "#c9ced6", offline: "#8a8f98" };
+    const LED = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940" };
+    function badge(s, bx, by) {
+      const c = COL[s]; if (!c) return "";
+      bx = bx == null ? 28 : bx; by = by == null ? 28 : by;
+      let gl = "";
+      if (s === "rec") gl = `<circle cx="${bx}" cy="${by}" r="7" fill="${c}" opacity=".22"/><g class="${P}ckblink"><circle cx="${bx}" cy="${by}" r="4.4" fill="${c}"/><circle cx="${g(bx - 1.4)}" cy="${g(by - 1.4)}" r="1.3" fill="#fff" fill-opacity=".6"/></g>`;
+      else if (s === "live") gl = `<circle cx="${bx}" cy="${by}" r="2.3" fill="${c}"/><path d="M${g(bx - 3.2)} ${g(by - 3.6)}A5 5 0 0 0 ${g(bx - 3.2)} ${g(by + 3.6)}M${g(bx + 3.2)} ${g(by - 3.6)}A5 5 0 0 1 ${g(bx + 3.2)} ${g(by + 3.6)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path class="${P}ckglow" d="M${g(bx - 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 0 ${g(bx - 5.6)} ${g(by + 5.4)}M${g(bx + 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 1 ${g(bx + 5.6)} ${g(by + 5.4)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "motion") gl = `<g class="${P}ckglow" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="${g(bx + 1.2)}" cy="${g(by - 5.6)}" r="1.9" fill="${c}" stroke="none"/>` +
+        `<path d="M${g(bx + .4)} ${g(by - 2.8)}L${g(bx - 1)} ${g(by + 2)}L${g(bx - 4.4)} ${g(by + 6.2)}M${g(bx - 1)} ${g(by + 2)}L${g(bx + 2.6)} ${g(by + 3.4)}L${g(bx + 3.4)} ${g(by + 6.6)}M${g(bx - 4.6)} ${g(by - .6)}L${g(bx + .4)} ${g(by - 2.8)}L${g(bx + 4)} ${g(by)}"/></g>`;
+      else if (s === "privacy") gl = `<path d="M${g(bx - 6.4)} ${by}Q${bx} ${g(by - 6)} ${g(bx + 6.4)} ${by}Q${bx} ${g(by + 6)} ${g(bx - 6.4)} ${by}Z" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="${bx}" cy="${by}" r="2" fill="${c}"/>` +
+        `<path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "offline") gl = `<circle cx="${bx}" cy="${g(by + 4)}" r="1.2" fill="${c}"/><path d="M${g(bx - 2.8)} ${g(by + 1.2)}A4 4 0 0 1 ${g(bx + 2.8)} ${g(by + 1.2)}M${g(bx - 5.3)} ${g(by - 1.3)}A7.5 7.5 0 0 1 ${g(bx + 5.3)} ${g(by - 1.3)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#ff5a5a" stroke-width="1.5" stroke-linecap="round"/>`;
+      return `<g><circle cx="${g(bx + 1)}" cy="${g(by + 1.6)}" r="11" fill="#000" fill-opacity=".45"/><circle cx="${bx}" cy="${by}" r="11" fill="#16181e"/><circle cx="${bx}" cy="${by}" r="10.2" fill="none" stroke="${c}" stroke-width="1.3"/>` +
+        `<path d="M${g(bx - 7)} ${g(by - 6)}A9 9 0 0 1 ${g(bx + 6)} ${g(by - 7)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>${gl}</g>`;
+    }
+    const motion = (cx, cy, r) => [0, 1].map((i) => `<circle class="${P}ckring" style="animation-delay:${(-i * .8).toFixed(1)}s" cx="${g(cx)}" cy="${g(cy)}" r="${g(r * (1.3 + i * .5))}" fill="none" stroke="#ffa940" stroke-opacity="${i ? .4 : .75}" stroke-width="${i ? 1.4 : 1.8}"${i ? ` stroke-dasharray="3 3"` : ""}/>`).join("");
+    function cap(u, k, cx, cy, r, col) {
+      const id = `${u}-ckc${k}`;
+      return `<defs><radialGradient id="${id}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${H.shade(col, .55)}"/><stop offset=".6" stop-color="${col}"/><stop offset="1" stop-color="${H.shade(col, -.45)}"/></radialGradient></defs>` +
+        `<circle cx="${g(cx)}" cy="${g(cy + r * .14)}" r="${g(r)}" fill="#000" fill-opacity=".4"/><circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="url(#${id})"/>` +
+        `<path d="M${g(cx - r * .97)} ${g(cy)}H${g(cx + r * .97)}" stroke="${H.shade(col, -.5)}" stroke-width="${g(Math.max(.8, r * .09))}"/><path d="M${g(cx - r * .9)} ${g(cy + r * .1)}H${g(cx + r * .9)}" stroke="#fff" stroke-opacity=".28" stroke-width="${g(Math.max(.5, r * .05))}"/>` +
+        `<circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="none" stroke="#000" stroke-opacity=".38" stroke-width=".8"/><ellipse cx="${g(cx - r * .32)}" cy="${g(cy - r * .5)}" rx="${g(r * .36)}" ry="${g(r * .15)}" fill="#fff" fill-opacity=".4" transform="rotate(-18 ${g(cx - r * .32)} ${g(cy - r * .5)})"/>`;
+    }
+    const irDots = (cx, cy, R, n, rr) => { let s = ""; rr = rr || 1.1;
+      for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, px = g(cx + Math.cos(a) * R), py = g(cy + Math.sin(a) * R);
+        s += `<circle cx="${px}" cy="${py}" r="${g(rr * 3)}" fill="#ff3a4a" opacity=".22"/><circle cx="${px}" cy="${py}" r="${g(rr)}" fill="#ff3a4a"/>`; }
+      return s; };
+    function bellOver(s, cx, ly, lr, w) {
+      if (s === "motion") return `<g class="${P}ckglow">` + [0, 1].map((i) => { const r = lr + 5 + i * 6; return `<path d="M${g(cx - r)} ${g(ly - 2)}A${g(r)} ${g(r)} 0 0 1 ${g(cx + r)} ${g(ly - 2)}" fill="none" stroke="#ff8a6a" stroke-opacity="${(.8 - i * .3).toFixed(2)}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>`; }).join("") + `</g>`;
+      if (s === "live") return `<g class="${P}ckglow"><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.9)}" fill="#6aa8ff" opacity=".22"/><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.05)}" fill="none" stroke="#6aa8ff" stroke-opacity=".8" stroke-width="1.4"/></g>` +
+        `<circle class="${P}ckblink" cx="${g(cx + w / 2 + 7)}" cy="${g(ly - lr)}" r="3" fill="#ff3b3b"/>`;
+      if (s === "talk") return [0, 1, 2].map((i) => `<path class="${P}ckwave" style="animation-delay:${(-i * .4).toFixed(1)}s" d="M${g(cx + w / 2 + 4 + i * 6)} ${g(ly - 6 - i * 2)}q${g(5 + i)} ${g(6 + i * 2)} 0 ${g(12 + i * 4)}" fill="none" stroke="#7ee7ff" stroke-opacity="${(.9 - i * .2).toFixed(2)}" stroke-width="1.5" stroke-linecap="round"/>`).join("");
+      return "";
+    }
+    const css = `
+.${P}ckring{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}ckblink{animation:${P}ckblink 1.1s steps(1,end) infinite}
+@keyframes ${P}ckblink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .${P}ckring{animation:${P}ckring 1.6s ease-out infinite}
+@keyframes ${P}ckring{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.hda-anim .${P}ckglow{animation:${P}ckglow 1.8s ease-in-out infinite}
+@keyframes ${P}ckglow{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-anim .${P}ckwave{animation:${P}ckwave 1.3s ease-out infinite}
+@keyframes ${P}ckwave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}ckblink,.hda-anim .${P}ckring,.hda-anim .${P}ckglow,.hda-anim .${P}ckwave{animation:none!important}}`;
+    return { STATE, BELL, IR, IRA, PAN, cam, bell, active, LED, badge, motion, cap, irDots, bellOver, css };
+  })();
+
+  const camWrap = (u, cs, body, cx, cy, lr, c) => (cs === "offline" ? `<g opacity=".8">${body}</g>` : body) + (cs === "motion" ? CK.motion(cx, cy, lr * 1.3) : "") + (cs === "privacy" ? CK.cap(u, 0, cx, cy, lr * 1.3, c) : "") + CK.badge(cs);
   const icons = [
     ic("feeder", "Automatic feeder", sw(BODY, "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
       const back = wallB(x, "cream", 8, 130) + kickB(x, 130) + tileFloor(x, 130);
@@ -329,8 +387,6 @@
       return scene(x, back, body); }),
 
     ic("litter", "Self-cleaning litter", sw(["#eef0f2", "#2c2f36", "#8e959e", "#c9b99a", "#6d8fb3"], "#eef0f2"), "Body", (o) => {
-      // (parts) State: cycling turns the drum (as on today); ready = a green light, full = amber (the drawer handle too),
-      // error = a blinking red light; left out = the drum still, the light off
       const st = o.mf ? MF.st(o, "state") : null, x = X(o.mf ? Object.assign({}, o, { on: st === "cycling" }) : o), c = o.color;
       const scol = { ready: GREEN, cycling: "#7ee7ff", full: "#ffb547", error: "#ff5a4f" }[st];
       const back = wallB(x, "lav", 8, 142) + baseB(x, 142, "#8a6142");
@@ -352,8 +408,6 @@
       return scene(x, back, body); }, { parts: [{ id: "state", name: "State", type: "stage", values: [["ready", "Ready"], ["cycling", "Cycling"], ["full", "Drawer full"], ["error", "Error"]], def: "ready" }] }),
 
     ic("door", "Smart pet door", sw(["#eef0f2", "#2c2f36", "#8a6142", "#9aa1aa", "#c9b99a"], "#eef0f2"), "Body", (o) => {
-      // (parts) Mode: locked = the latch bar, a red light and a shut padlock; in / out / both = unlocked, arrows on the
-      // display show the way; left out = unlocked, no arrows. Flap (contact): open = the flap swung up (a pet going through).
       const md = o.mf ? MF.st(o, "mode") : null, x = X(o.mf ? Object.assign({}, o, { on: md !== "locked" }) : o), c = o.color, fo = o.mf && MF.on(o, "flap");
       const wood = "#7d5a3e";
       const back = `<rect x="8" y="8" width="184" height="168" fill="${x.lg([[0, H.shade(wood, .1)], [1, H.shade(wood, -.25)]], 0, 0, 1, 0)}"/>` +
@@ -376,25 +430,23 @@
           (md === "out" || md === "both" ? `<path d="M112 166H103M105.5 164L103 166L105.5 168" fill="none" stroke="#bff5d6" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>` : "") : "");
       return scene(x, back, body); }, { parts: [{ id: "mode", name: "Mode", type: "stage", values: [["both", "In & out"], ["in", "In only"], ["out", "Out only"], ["locked", "Locked"]], def: "both" }, { id: "flap", name: "Flap", type: "contact" }] }),
 
-    ic("treatcam", "Treat camera", sw(["#eef0f2", "#2c2f36", "#9fc5b8", "#f2c6a8", "#8e959e"], "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("treatcam", "Treat camera", sw(["#eef0f2", "#2c2f36", "#9fc5b8", "#f2c6a8", "#8e959e"], "#eef0f2"), "Body", (o) => { const cs = CK.cam(o), dead = cs === "offline", x = X(Object.assign({}, o, { on: CK.active(cs) })), c = dead ? H.mix(o.color || "#eef0f2", "#80838a", .7) : o.color, ir = (o.opt || {}).ir === "on" && cs !== "privacy" && !dead;
       const back = wallB(x, "sage", 8, 126) + baseB(x, 126, "#7a5638");
       const treat = (cx, cy) => `<path d="M${f(cx - 3.4)} ${f(cy - 1.2)}h6.8a1.6 1.6 0 1 1 0 2.4h-6.8a1.6 1.6 0 1 1 0-2.4z" fill="#b97a3f"/><path d="M${f(cx - 3)} ${f(cy - .8)}h6" stroke="#fff" stroke-opacity=".35" stroke-width=".6"/>`;
       const body = `<ellipse cx="100" cy="160" rx="44" ry="6" fill="#000" fill-opacity=".4"/>` +
-        (x.on ? `<path d="M86 122Q60 92 34 128" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.2" stroke-dasharray="2 3"/>` : "") +
+        (cs === "on" ? `<path d="M86 122Q60 92 34 128" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.2" stroke-dasharray="2 3"/>` : "") +
         box(x, 64, 44, 72, 112, 20, 3, 4, c) +
         `<rect x="70" y="52" width="60" height="46" rx="16" fill="${x.lg([[0, "#272a31"], [1, "#0a0b0e"]])}"/><path d="M76 58Q100 50 124 58" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="1.6" stroke-linecap="round"/>` +
         `<circle cx="100" cy="75" r="13" fill="#2c2f36"/><circle cx="100" cy="75" r="10" fill="${x.rg([[0, "#4f6fa8"], [.4, "#1a2440"], [1, "#05070c"]], .4, .38, .6)}"/><circle cx="100" cy="75" r="4" fill="#06080d"/><circle cx="96.5" cy="71.5" r="2.4" fill="#fff" fill-opacity=".6"/>` +
-        [0, 1, 2, 3].map((i) => `<circle cx="${80 + (i % 2) * 40}" cy="${63 + Math.floor(i / 2) * 24}" r="1.2" fill="#3a1a1a"/>`).join("") +
-        (x.on ? `<g class="${P}blink">${led(x, 120, 61, 1.3, "#ff3b3b")}</g>` : led(x, 120, 61, 1.3, "#ff3b3b")) +
+        [0, 1, 2, 3].map((i) => `<circle cx="${80 + (i % 2) * 40}" cy="${63 + Math.floor(i / 2) * 24}" r="1.2" fill="${ir ? "#ff3a4a" : "#3a1a1a"}"/>${ir ? `<circle cx="${80 + (i % 2) * 40}" cy="${63 + Math.floor(i / 2) * 24}" r="4" fill="#ff3a4a" opacity=".25"/>` : ""}`).join("") +
+        (x.on ? `<g class="${cs === "live" ? "" : P + "blink"}">${led(x, 120, 61, 1.3, CK.LED[cs] || "#ff3b3b")}</g>` : led(x, 120, 61, 1.3, "#ff3b3b")) +
         [0, 1, 2, 3, 4].map((i) => `<circle cx="${92 + i * 4}" cy="106" r=".9" fill="${H.shade(c, -.5)}"/>`).join("") +
         `<ellipse cx="100" cy="127" rx="16" ry="9" fill="${H.shade(c, -.38)}"/><ellipse cx="100" cy="128" rx="14" ry="7.5" fill="#0d0e11"/>` + treat(96, 131) + treat(104, 132) +
-        (x.on ? [0, 1].map((i) => `<g class="${P}toss" style="animation-delay:${(-i * 1.1).toFixed(1)}s">${treat(90, 124)}</g>`).join("") : "") +
+        (cs === "on" ? [0, 1].map((i) => `<g class="${P}toss" style="animation-delay:${(-i * 1.1).toFixed(1)}s">${treat(90, 124)}</g>`).join("") : "") +
         `<rect x="88" y="146" width="24" height="3" rx="1.5" fill="${H.shade(c, -.25)}"/>`;
-      return scene(x, back, body); }),
+      return scene(x, back, camWrap(o.uid, cs, body, 100, 75, 10, c)); }, { options: [CK.STATE, CK.IR] }),
 
     ic("aquarium", "Aquarium", sw(["#bfe3ff", "#ffffff", "#7ad3ff", "#c4a8ff", "#ffd8a8", "#7ef0c0"], "#bfe3ff"), "Light", (o) => {
-      // (parts) Light = the hood light and its rays, Filter = the bubbles, Heater = a glass heater in the back corner (glows
-      // orange when on), Temperature = a stick-on thermometer on the glass; heater and thermometer only when ticked (o.mf)
       const x = X(MF.as(o, "light")), c = o.color, xf = MF.as(o, "filter"), hh = o.mf && MF.has(o, "heater"), ho = hh && MF.on(o, "heater"), wt = o.mf ? MF.val(o, "temp") : null;
       const back = wallB(x, "navy", 8, 192);
       const top = x.on ? H.mix(H.mix(c, "#1a6a96", .5), "#0c2a3d", 1 - x.lv * .8) : "#0f1c26", bot = x.on ? "#0b2638" : "#070e14";
@@ -463,7 +515,7 @@
         (x.on ? `<path d="M100 122Q128 68 158 92" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1.2" stroke-dasharray="2 3"/><g class="${P}launch">${tball(x, 140, 82, 6.5)}</g>` : tball(x, 160, 170, 6.5));
       return scene(x, back, body); }),
 
-    ic("birdcam", "Bird feeder camera", sw(["#6b8f5e", "#eef0f2", "#8a6142", "#2c2f36", "#c9b99a"], "#6b8f5e"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("birdcam", "Bird feeder camera", sw(["#6b8f5e", "#eef0f2", "#8a6142", "#2c2f36", "#c9b99a"], "#6b8f5e"), "Body", (o) => { const cs = CK.cam(o), dead = cs === "offline", x = X(Object.assign({}, o, { on: CK.active(cs) })), c = dead ? H.mix(o.color || "#eef0f2", "#80838a", .7) : o.color, ir = (o.opt || {}).ir === "on" && cs !== "privacy" && !dead;
       const back = skyB(x, 128) + treeLine(x, 128) + grassB(x, 128, "#4b7536", 41);
       const cp = clipU(x, "seed", `<rect x="74" y="80" width="52" height="40" rx="3"/>`);
       const sh = 40 * x.lv; let seeds = ""; const r = rnd(12);
@@ -479,9 +531,9 @@
         `<path d="M112 56L132 68L126 72L106 60Z" fill="${x.lg([[0, "#2f5592"], [1, "#101c33"]])}" stroke="#aab3bd" stroke-width=".8"/>` +
         `<rect x="54" y="122" width="92" height="7" rx="2" fill="${x.lg([[0, "#8a6142"], [1, "#4f3522"]])}"/><path d="M54 122.6H146" stroke="#fff" stroke-opacity=".3"/>` +
         `<rect x="86" y="128" width="28" height="14" rx="5" fill="${x.lg([[0, "#2c2f36"], [1, "#0e1013"]])}"/><circle cx="100" cy="135" r="5" fill="${x.rg([[0, "#4f6fa8"], [.5, "#1a2440"], [1, "#05070c"]], .4, .38, .6)}"/><circle cx="98.4" cy="133.4" r="1.4" fill="#fff" fill-opacity=".6"/>` +
-        (x.on ? `<g class="${P}blink">${led(x, 109, 132, 1, "#ff3b3b")}</g>` : led(x, 109, 132, 1, "#ff3b3b")) +
+        (x.on ? `<g class="${cs === "live" ? "" : P + "blink"}">${led(x, 109, 132, 1, CK.LED[cs] || "#ff3b3b")}</g>` : led(x, 109, 132, 1, "#ff3b3b")) +
         `<ellipse cx="120" cy="121" rx="8" ry="2" fill="#c9b48a"/>` + bird;
-      return scene(x, back, body); }),
+      return scene(x, back, camWrap(o.uid, cs, body, 100, 135, 5, "#2c2f36")); }, { options: [CK.STATE] }),
 
     ic("collar", "Collar on dock", sw(["#e0483e", "#3a6fd8", "#2f8f5e", "#2c2f36", "#f2a541", "#c47ad8"], "#e0483e"), "Strap", (o) => { const x = X(o), c = o.color;
       const back = tileB(x, 8, 118, "#e9e1d2") + counterB(x, 118, "#cfd0d6");
@@ -547,8 +599,7 @@
   (window.HDA = window.HDA || []).push({
     id: "pets", tab: "Pet devices", group: "Home", kind: "device",
     intro: "Ten pet gadgets on kitchen floors, in the yard and on the counter. On means working: kibble drops into the bowl, the fountain flows, the litter globe turns, the pet door unlocks, treats fly, fish swim under the light, the bed glows warm, balls launch. The slider is the level: food, water, light, warmth or battery.",
-    
     levelLabel: "Level", onWord: "On", offWord: "Off",
-    css, icons,
+    css: css + CK.css, icons,
   });
 })();

@@ -14,11 +14,6 @@
   const METAL = [FIN.steel, FIN.brass, FIN.copper];
   const sw = (s) => s.split(" ").map((k) => FIN[k]);
 
-  // (multi-function) the thermostat's own readings as parts: o.pval.mode (off / heat / cool / auto / eco), o.pval.state
-  // (idle / heating / cooling / fan), o.pval.fan (auto / on / circulate), o.pval.temp (room) and o.pval.sp (setpoint).
-  // The display shows the setpoint and, when both are given, fades to the room temperature and back; Off reads OFF.
-  // Running (heating / cooling / fan only) lights the display; idle keeps it dim with the mode's mark. Without any of
-  // them (a Device Image) the drawing is today's: the slider is the setpoint, on = running.
   function tsMF(o) {
     const v = o.pval || {}, has = (k) => v[k] != null && v[k] !== "";
     if (!["mode", "state", "fan", "temp", "sp"].some(has)) return null;
@@ -34,16 +29,50 @@
     r.fan = s === "fan" || fn === "on" || fn === "circulate" ? true : null;
     return r;
   }
+  const MC = { heat: "#ff8a2a", cool: "#36a6ff", auto: "#3ecf6e", dry: "#1fc8b4", fan: "#9aa3ad", eco: "#7fcf3a" };
+  const ML = { heatcool: "Heat/Cool", off: "Off", heat: "Heat", cool: "Cool", auto: "Auto", dry: "Dry", fan: "Fan", eco: "Eco" };
+  const PL = { none: "None", boost: "Boost", comfort: "Comfort", sleep: "Sleep", away: "Away", frost: "Frost" };
+  function hvOpts(modes, presets) {
+    const a = [{ id: "mode", name: "Mode", values: modes.split(" ").map((k) => [k, ML[k]]) }];
+    if (presets) a.push({ id: "preset", name: "Preset", values: ("none " + presets).split(" ").map((k) => [k, PL[k]]),
+      when: { opt: "mode", is: modes.split(" ").filter((k) => k !== "off") } });
+    return a;
+  }
+  const LEAF = "M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z";
+  function leaf(cx, cy, s, col) {
+    return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})"><path d="${LEAF}" fill="${col}"/><path d="M-.8 .8 L.35 -.35" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".14" stroke-linecap="round"/></g>`;
+  }
+  function power(cx, cy, s, col) {
+    return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="none" stroke="${col}" stroke-width=".2" stroke-linecap="round"><path d="M-.5 -.55 A.75 .75 0 1 0 .5 -.55"/><path d="M0 -.95 V-.1"/></g>`;
+  }
+  function pglyph(p, cx, cy, s, col) {
+    const g = (b, fill) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="${fill ? col : "none"}" stroke="${fill ? "none" : col}" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round">${b}</g>`;
+    if (p === "boost") return g(`<path d="M.2 -1 L-.6 .12 H-.02 L-.22 1 L.6 -.15 H.02 Z"/>`, 1);
+    if (p === "comfort") return g(`<path d="M-.5 .1 V-.55 H.5 V.1 M-.85 .55 V-.05 H-.5 V.15 H.5 V-.05 H.85 V.55 Z M-.7 .55 V.8 M.7 .55 V.8"/>`);
+    if (p === "sleep") return g(`<path d="M.3 -.9 A.92 .92 0 1 0 .9 .35 A.7 .7 0 0 1 .3 -.9 Z"/>`, 1);
+    if (p === "away") return g(`<path d="M-.85 -.02 L0 -.82 L.85 -.02 M-.6 -.25 V.82 H.6 V-.25 M-.18 .82 V.32 H.18 V.82"/>`);
+    if (p === "frost") return g(`<path d="M0 -.95 V.95 M-.82 -.47 L.82 .47 M-.82 .47 L.82 -.47 M-.25 -.75 L0 -.52 L.25 -.75 M-.25 .75 L0 .52 L.25 .75"/>`);
+    return "";
+  }
+  function fanG(cx, cy, s, col) {
+    let b = ""; for (let i = 0; i < 3; i++) b += `<path transform="rotate(${i * 120})" d="M0 0 C-.5 -.3 -.38 -.95 0 -.95 C.32 -.95 .3 -.38 0 0 Z"/>`;
+    return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="${col}">${b}<circle r=".16"/></g>`;
+  }
+  const rc = (x, a, b) => (x.mode === "heatcool" || x.mode === "heat" || x.mode === "cool" ? (x.heat ? a : b) : x.hot);
+
   function ctx(o) {
-    const R = tsMF(o), c = (o.color || FIN.white).toLowerCase(), on = R ? R.on : !!o.on, lv = R && R.lv != null ? R.lv : o.level == null ? .5 : Math.max(0, Math.min(1, o.level));
-    const t = R && R.t != null ? R.t : Math.round(60 + 24 * lv), heat = R && R.heat != null ? R.heat : t >= 70, gc = R && R.gc ? R.gc : heat ? "#ff8a2a" : "#36a6ff";
+    const R = tsMF(o), op = o.opt || {}, md = op.mode || "heatcool", pr = op.preset || "none";
+    const c = (o.color || FIN.white).toLowerCase(), on = R ? R.on : !!o.on && md !== "off", lv = R && R.lv != null ? R.lv : o.level == null ? .5 : Math.max(0, Math.min(1, o.level));
+    const t = R && R.t != null ? R.t : Math.round(60 + 24 * lv), heat = R && R.heat != null ? R.heat : md === "heat" ? true : md === "cool" ? false : t >= 70;
+    const gc = R ? (R.gc || (R.mode === "eco" ? MC.eco : heat ? "#ff8a2a" : "#36a6ff")) : MC[md] || (heat ? "#ff8a2a" : "#36a6ff");
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
-    const x = { c, on, lv, t, heat, gc, id, url, defs: [], have: {}, metal: METAL.indexOf(c) >= 0,
+    const x = { c, on, lv, t, heat, gc, id, url, defs: [], have: {}, metal: METAL.indexOf(c) >= 0, mode: md, preset: pr,
+      bi: md === "fan" ? 2 : md === "auto" || md === "eco" || md === "dry" ? -1 : heat ? 0 : 1,
       hot: H.mix(gc, "#ffffff", .5), dk: H.hx(c).reduce((a, b) => a + b, 0) < 260 };
     x.dig = on ? H.mix(gc, "#ffffff", .42) : "#9aa0ab";
     x.ink = on ? H.shade(gc, -.78) : "#3c4238";
     x.add = (k, s) => { if (!x.have[k]) { x.have[k] = 1; x.defs.push(s); } };
-    if (R) { x.str = R.str || null; x.t2 = R.t2 != null ? R.t2 : null; x.fan = R.fan; x.mode = R.mode; x.fanOnly = R.fanOnly; }
+    if (R) { x.str = R.str || null; x.t2 = R.t2 != null ? R.t2 : null; x.fan = R.fan; x.mode = R.mode || md; if (R.mode) x.preset = "none"; x.fanOnly = R.fanOnly; }
     return x;
   }
 
@@ -159,7 +188,6 @@ ${x.defs.join("")}</defs>
     Object.keys(S).forEach((k) => { const lit = on.indexOf(k) >= 0; if (lit || ghost) s += `<polygon points="${poly(...S[k], t)}" fill="${col}"${lit ? "" : ` opacity="${ghost}"`}/>`; });
     return s;
   }
-  // the readout; with a second reading (x.t2) it fades between the two (the first alone without animation)
   function digits(x, cx, cy, h, col, o2) {
     o2 = o2 || {};
     if (o2.str || (!x.str && x.t2 == null)) return digits0(x, cx, cy, h, col, o2);
@@ -167,8 +195,8 @@ ${x.defs.join("")}</defs>
     return x.t2 == null ? a : `<g class="${P}sa">${a}</g><g class="${P}sb">${digits0(x, cx, cy, h, col, Object.assign({}, o2, { str: String(x.t2) }))}</g>`;
   }
   function digits0(x, cx, cy, h, col, o2) {
-    o2 = o2 || {}; const str = o2.str || String(x.t), w = h * .5, t = Math.max(.8, h * .13), sp = h * .24, n = str.length;
-    const unit = o2.unit == null ? "deg" : o2.unit, uw = unit === "pct" ? h * .36 : unit ? h * .22 : 0;
+    o2 = o2 || {}; const off = !o2.str && x.mode === "off" && o2.unit !== "pct", str = o2.str || (off ? "OFF" : String(x.t)), w = h * .5, t = Math.max(.8, h * .13), sp = h * .24, n = str.length;
+    const unit = off ? "" : o2.unit == null ? "deg" : o2.unit, uw = unit === "pct" ? h * .36 : unit ? h * .22 : 0;
     const tot = n * w + (n - 1) * sp + (uw ? sp * .8 + uw : 0); let ox = cx - tot / 2; const oy = cy - h / 2;
     let s = "";
     for (let i = 0; i < n; i++) { s += digit(str[i], ox, oy, w, h, t, col, o2.ghost); ox += w + sp; }
@@ -189,17 +217,23 @@ ${x.defs.join("")}</defs>
     return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="none" stroke="${col}" stroke-width=".17" stroke-linecap="round" stroke-linejoin="round">${d}</g>`;
   }
   const DROP = "M0 -1 C.35 -.45 .7 -.05 .7 .35 C.7 .75 .38 1 0 1 C-.38 1 -.7 .75 -.7 .35 C-.7 -.05 -.35 -.45 0 -1 Z";
-  const LEAF = "M-.85 .85 C-1 -.25 -.25 -1 .95 -.95 C1 .25 .25 1 -.85 .85 Z";
-  const leaf = (cx, cy, s, col, vein) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})"><path d="${LEAF}" fill="${col}"/><path d="M-.7 .7 L.5 -.5" stroke="${vein}" stroke-width=".14" stroke-linecap="round"/></g>`;
+  function mglyph(x, cx, cy, s, idle, idle2) {
+    const m = x.mode;
+    if (m === "off") return power(cx, cy, s, idle || "#8e939c");
+    if (m === "auto") return flame(cx - s * .8, cy, s * .66, idle || MC.heat, idle ? idle2 || "#5b6068" : "#ffe7a6") + flake(cx + s * .8, cy, s * .66, idle || H.mix(MC.cool, "#fff", .25));
+    if (m === "dry") return `<path d="${DROP}" transform="translate(${f(cx)} ${f(cy)}) scale(${f(s * .9)})" fill="${idle || x.gc}"/>`;
+    if (m === "fan") return fanG(cx, cy, s, idle || H.shade(x.gc, -.12));
+    if (m === "eco") return leaf(cx, cy, s * .9, idle || x.gc);
+    if (idle) return x.heat ? flame(cx, cy, s, idle, idle2 || "#5b6068") : flake(cx, cy, s, idle);
+    return x.heat ? flame(cx, cy, s, x.gc, "#ffe7a6") : flake(cx, cy, s, H.mix(x.gc, "#fff", .25));
+  }
   function mode(x, cx, cy, s, o2) {
     o2 = o2 || {};
-    if (x.mode === "off") return "";
     if (x.fanOnly) return `<g${x.on ? "" : ` opacity="${o2.idleOp || .35}"`}>${fanIcon(x, cx, cy, s * 1.05, x.on ? x.hot : o2.idle || "#8e939c")}</g>`;
-    if (x.mode === "eco") return x.on ? `<g class="${P}pulse">${o2.halo === false ? "" : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * 2.2)}" fill="${x.url("halo")}" opacity=".7"/>`}${leaf(cx, cy, s, "#5fc46e", "#d9f5c8")}</g>`
-      : `<g opacity="${o2.idleOp || .35}">${leaf(cx, cy, s, o2.idle || "#8e939c", o2.idle2 || "#5b6068")}</g>`;
-    if (!x.on) return `<g opacity="${o2.idleOp || .35}">${x.heat ? flame(cx, cy, s, o2.idle || "#8e939c", o2.idle2 || "#5b6068") : flake(cx, cy, s, o2.idle || "#8e939c")}</g>`;
-    const ic = x.heat ? flame(cx, cy, s, x.gc, "#ffe7a6") : flake(cx, cy, s, H.mix(x.gc, "#fff", .25));
-    return `<g class="${P}pulse">${o2.halo === false ? "" : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * 2.2)}" fill="${x.url("halo")}" opacity=".7"/>`}${ic}</g>`;
+    if (!x.on) return `<g opacity="${o2.idleOp || .35}">${mglyph(x, cx, cy, s, o2.idle || "#8e939c", o2.idle2)}</g>`;
+    const pg = x.preset !== "none", mx = pg ? cx - s * 1.3 : cx;
+    return `<g class="${P}pulse">${o2.halo === false ? "" : `<circle cx="${f(mx)}" cy="${f(cy)}" r="${f(s * 2.2)}" fill="${x.url("halo")}" opacity=".7"/>`}${mglyph(x, mx, cy, s)}</g>` +
+      (pg ? pglyph(x.preset, cx + s * 1.4, cy, s * .85, H.shade(x.gc, -.1)) : "");
   }
   function fanDots(x, cx, cy, gap, r, col) {
     if (!(x.fan == null ? x.on : x.fan)) return [-1, 0, 1].map((i) => `<circle cx="${f(cx + i * gap)}" cy="${cy}" r="${r}" fill="#888c94" opacity=".25"/>`).join("");
@@ -333,7 +367,7 @@ ${x.defs.join("")}</defs>
       let kn = ""; for (let i = 0; i < 24; i++) { const a = i * 15, p0 = pt(100, 104, 13, a), p1 = pt(100, 104, 15, a); kn += `<path d="M${f(p0[0])} ${f(p0[1])} L${f(p1[0])} ${f(p1[1])}" stroke="#000" stroke-opacity=".2" stroke-width="1"/>`; }
       const b = `<g class="hda-bg">` + drop(x, rr(8, 150, 184, 30, 2), 0, 4, .55) + `<rect x="4" y="150" width="192" height="30" rx="2" fill="${x.url("bb")}"/>` + slots +
         `<path d="M4 150.8 H196" stroke="#fff" stroke-opacity=".8"/><path d="M4 166 H196" stroke="#000" stroke-opacity=".1"/>` +
-        rise(x, [[30, 147], [62, 147], [94, 147], [126, 147], [158, 147]], x.heat ? "#ffb070" : "#9dd4ff", 26, 1.2) + `</g>` +
+        rise(x, [[30, 147], [62, 147], [94, 147], [126, 147], [158, 147]], rc(x, "#ffb070", "#9dd4ff"), 26, 1.2) + `</g>` +
         wallGlow(x, 100, 90, 58) + slab(x, 74, 44, 52, 90, 6) + screw(100, 49.5, 1.6) + screw(100, 128.5, 1.6) +
         lcd(x, 84, 55, 32, 17, 2) + digits(x, 100, 63.5, 11, x.ink, { ghost: .07 }) + tk +
         drop(x, `<circle cx="100" cy="104" r="15"/>`, 2, 4, .6) + `<circle cx="100" cy="104" r="15" fill="${x.url("knob")}"/>` + kn + `<circle cx="100" cy="103" r="12" fill="${x.url("bdr")}"/>` +
@@ -371,8 +405,8 @@ ${x.defs.join("")}</defs>
       const x = ctx(o); let slats = "", louv = "";
       for (let i = 0; i < 16; i++) slats += `<path d="M${33 + i * 8.6} 68 l3 10" stroke="#000" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/><path d="M${34.6 + i * 8.6} 68 l3 10" stroke="#fff" stroke-opacity="${x.dk ? .1 : .4}" stroke-width=".7"/>`;
       for (let y = 124; y < 162; y += 4.4) louv += `<path d="M30 ${y} H170" stroke="#000" stroke-opacity=".42" stroke-width="2"/><path d="M30 ${f(y + 1.4)} H170" stroke="#fff" stroke-opacity="${x.dk ? .08 : .35}" stroke-width=".6"/>`;
-      let modeB = ""; for (let i = 0; i < 3; i++) modeB += btn(x, 92 + i * 13, 103, 10, 6, 3) + `<circle cx="${92 + i * 13}" cy="96" r="1.1" fill="${x.on && i === (x.heat ? 0 : 1) ? x.hot : "#555"}"/>`;
-      const b = rise(x, [[44, 64], [70, 64], [96, 64], [122, 64], [148, 64]], x.heat ? "#ffb070" : "#a6dbff", 30, 1.5) +
+      let modeB = ""; for (let i = 0; i < 3; i++) modeB += btn(x, 92 + i * 13, 103, 10, 6, 3) + `<circle cx="${92 + i * 13}" cy="96" r="1.1" fill="${x.on && i === x.bi ? x.hot : "#555"}"/>`;
+      const b = rise(x, [[44, 64], [70, 64], [96, 64], [122, 64], [148, 64]], rc(x, "#ffb070", "#a6dbff"), 30, 1.5) +
         `<g class="hda-bg"><rect x="8" y="172" width="184" height="20" fill="#2a2420"/><path d="M8 172 H192" stroke="#000" stroke-opacity=".4" stroke-width="2"/></g>` +
         slab(x, 20, 60, 160, 114, 6, { v: 1 }) + `<rect x="28" y="66" width="144" height="14" rx="2" fill="#000" opacity=".55"/>` + slats +
         `<rect x="28" y="88" width="144" height="26" rx="3" fill="#000" opacity=".12"/>` + lcd(x, 36, 92, 36, 18, 2) + digits(x, 54, 101, 11.5, x.ink, { ghost: .07 }) + modeB +
@@ -392,6 +426,7 @@ ${x.defs.join("")}</defs>
         rise(x, [[30, 168], [58, 176], [142, 176], [170, 168], [44, 186], [156, 186]], x.hot, 22, 1.2) + `</g>` +
         wallGlow(x, 100, 90, 64) + slab(x, 66, 46, 68, 84, 9) + screen(x, 72, 52, 56, 58, 5) +
         digits(x, 100, 72, 19, x.dig, { glow: 1 }) + (x.on ? `<g class="${P}pulse">${waves}</g>` : waves) + `<path d="M84 107 H116" stroke="${x.on ? x.hot : "#777c86"}" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>` +
+        (x.on && x.preset !== "none" ? pglyph(x.preset, 119, 98, 3.4, x.hot) : "") +
         glossR(x, 72, 52, 56, 58, 5) + [86, 100, 114].map((cx) => `<circle cx="${cx}" cy="119" r="2.4" fill="#000" opacity=".15"/><circle cx="${cx}" cy="118.6" r="1.5" fill="${x.dk ? "#777" : "#bbb"}"/>`).join("");
       return scene(x, "tile", b);
     } }),
@@ -490,7 +525,7 @@ ${x.defs.join("")}</defs>
         drop(x, rr(110, 126, 24, 30, 3), 2, 4, .5) + `<rect x="110" y="126" width="24" height="30" rx="3" fill="${x.url("pump")}"/>` +
         `<rect x="128" y="130" width="22" height="22" rx="4" fill="${x.url("mot")}"/>` + [133, 138, 143].map((a) => `<path d="M${a} 133 V149" stroke="#000" stroke-opacity=".35"/>`).join("") +
         `<circle cx="146" cy="134" r="1.4" fill="${x.on ? "#69db7c" : "#333"}"${x.on ? ` class="${P}blink"` : ""}/>` +
-        rise(x, [[78, 120], [122, 104], [78, 178], [122, 186]], x.heat ? "#ffb070" : "#a6dbff", 18, 1.2) +
+        rise(x, [[78, 120], [122, 104], [78, 178], [122, 186]], rc(x, "#ffb070", "#a6dbff"), 18, 1.2) +
         wallGlow(x, 100, 62, 60) + slab(x, 52, 28, 96, 70, 4) + `<rect x="59" y="35" width="52" height="28" rx="2" fill="#000" opacity=".25"/>` +
         lcd(x, 61, 37, 48, 24, 2) + digits(x, 79, 49, 14, x.ink, { ghost: .07 }) + mode(x, 100, 47, 3.6, { halo: false, idle: x.ink, idleOp: .2 }) +
         knob(129, 46) + knob(129, 77) + [64, 72, 80].map((a, i) => ledDot(x, a, 76, 1.4).replace(/class="[^"]*"/, i === 1 ? `class="${P}pulse"` : `class="${P}pulse" style="animation-delay:.${i * 4}s"`)).join("") +
@@ -527,9 +562,6 @@ ${x.defs.join("")}</defs>
     } }),
   ];
 
-  // (parts) Multi-Function: mode, operating state and fan as stages, room temperature and setpoint as readings
-  // (heat-only models: mode off / heat / eco, no cooling, no fan); the zone panel's four relays z1..z4; the smart vent's
-  // damper and temperature.
   const MODE = [["off", "Off"], ["heat", "Heat"], ["cool", "Cool"], ["auto", "Auto"], ["eco", "Eco"]];
   const STATE = [["idle", "Idle"], ["heating", "Heating"], ["cooling", "Cooling"], ["fan", "Fan only"]];
   const TEMPS = [{ id: "temp", name: "Temperature", type: "value", unit: "°", min: 40, max: 95, def: 68 }, { id: "sp", name: "Setpoint", type: "value", unit: "°", min: 45, max: 90, def: 70 }];
@@ -543,6 +575,13 @@ ${x.defs.join("")}</defs>
     if (ic.id === "zone") ic.parts = [1, 2, 3, 4].map((i) => ({ id: "z" + i, name: "Zone " + i }));
     if (ic.id === "vent") ic.parts = [{ id: "vent", name: "Damper" }, TEMPS[0]];
   });
+  const SMART = ["heatcool off heat cool fan eco", "comfort sleep away"], SPLIT = ["heatcool off heat cool auto dry fan eco", "boost comfort sleep"],
+    HEATONLY_O = ["heat off eco", "comfort sleep away frost"];
+  const HV = { learning: SMART, square: SMART, touchscreen: SMART, pill: SMART, withsensor: SMART, colorring: SMART,
+    programmable: ["heatcool off heat cool fan", "sleep away"], dial: ["heatcool off heat cool"], mercury: ["heatcool off heat cool fan"],
+    zone: ["heatcool off heat cool fan"], splitwall: SPLIT, remote: SPLIT, ptac: ["heatcool off heat cool auto fan eco"],
+    baseboard: HEATONLY_O, radiant: HEATONLY_O, boiler: ["heat off eco", "boost comfort sleep away frost"] };
+  icons.forEach((ic) => { const h = HV[ic.id]; if (h) ic.options = hvOpts(h[0], h[1]); });
 
   (window.HDA = window.HDA || []).push({
     id: "thermostat",
@@ -551,8 +590,7 @@ ${x.defs.join("")}</defs>
     kind: "device",
     levelLabel: "Setpoint",
     onWord: "Running", offWord: "Idle",
-    
-    
+    intro: "Twenty thermostats and climate controls on real walls. The slider is the setpoint (60–84°F), drawn in segment digits. Running glows orange for heating (70°F and up) or blue for cooling; Idle dims the display. Mode and Preset menus (only the ones each control has) recolor the display: heat orange, cool blue, auto green, dry teal, fan gray, eco leaf green. Body (or Ring) changes the finish.",
     css: `.hda-thermostat-breathe,.hda-thermostat-pulse,.hda-thermostat-spin{transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-thermostat-breathe{animation:hda-thermostat-breathe 4.2s ease-in-out infinite}
 @keyframes hda-thermostat-breathe{50%{opacity:.35;transform:scale(.97)}}

@@ -94,7 +94,7 @@ html, body { overflow-x: hidden; }
 body.sheetmode { background: #140b3a !important; }
 .sheetmode #wrapEl { grid-template-columns: 1fr !important; }
 .sheet h2 { margin: 6px 4px 12px; font-size: 22px; }
-.sgrid { display: grid; grid-template-columns: repeat(var(--scols, 6), 1fr); gap: 10px; }
+.sgrid { display: grid; grid-template-columns: repeat(var(--scols, 6), minmax(0, 1fr)); gap: 10px; }
 .stile { background: rgba(32,20,80,.52); border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 8px; text-align: center; }
 .stile .art { aspect-ratio: 1/1; border-radius: 10px; overflow: hidden; }
 .stile .art svg { width: 100%; height: 100%; display: block; }
@@ -142,6 +142,9 @@ body.sheetmode { background: #140b3a !important; }
       manual card in your dashboard. Install the card with HACS (or add <code>ha-device-art.js</code> as a dashboard resource), then set <code>entity</code> to your own device.
       <br><b>Multi-function drawings</b> (the <b>N parts</b> badge) can follow one entity per part: tick only the parts your device has, open each door or drawer,
       pick a stage (cycle, mode, state) and set the readings. Switch <b>Mode</b> to <b>One device</b> for the classic single-entity look.
+      <br><b>New in 1.3.0:</b> relays and modules, pergolas and radiator valves, buttons and remotes, grow, UV and emergency lights, leak sensors,
+      and builders for smoke and CO alarms, video doorbells, garage doors, doors and windows (pick <b>Show: New in 1.3.0</b>). Many drawings also got new menus:
+      lock states, HVAC mode, preset and swing, camera states, switch gangs, plug meters and more. Every menu and color can be mixed, so there are far more looks than any picture shows.
     </div>
     <div id="body"></div>
   </main>
@@ -157,7 +160,11 @@ body.sheetmode { background: #140b3a !important; }
   const RM = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const P = new URLSearchParams(location.search);
   const view = { on: P.get("on") !== "0", scene: P.get("scene") !== "0", cat: P.get("cat") || "", sub: P.get("sub") || "", q: "",
-    mfOnly: P.get("filter") === "mf", mf: P.get("mode") !== "one" };
+    mfOnly: P.get("filter") === "mf", newOnly: P.get("filter") === "new", mf: P.get("mode") !== "one" };
+  /* the drawings that are new in 1.3.0 (the Show: New filter) */
+  const NEW_SETS = ["relays", "covers2", "buttons", "lights9", "leaks", "smoke", "camdoorbells", "garagecfg", "doorcfg", "windowcfg"];
+  const isNew = (k) => { const it = DA.items[k]; return !!(it && it.set && NEW_SETS.indexOf(it.set.id) >= 0); };
+  const keep = (k) => (!view.mfOnly || hasParts(k)) && (!view.newOnly || isNew(k));
   const LVL = { light: "Brightness", fan: "Speed", plant: "Water" };
   const tiles = new Map(); /* key -> per-tile state */
   let uidN = 0;
@@ -323,7 +330,7 @@ body.sheetmode { background: #140b3a !important; }
   }
   /* ----- layout ----- */
   const catOf = (id) => DA.catalog.filter((c) => c.id === id)[0];
-  const itemsOf = (sub) => sub.items.filter((k) => DA.items[k] && (!view.mfOnly || hasParts(k)));
+  const itemsOf = (sub) => sub.items.filter((k) => DA.items[k] && keep(k));
   const subsOf = (c) => c.subs.filter((s) => itemsOf(s).length);
   function renderSide() {
     $("#side").innerHTML = DA.catalog.map((c) => {
@@ -336,7 +343,7 @@ body.sheetmode { background: #140b3a !important; }
   function renderSegs() {
     $("#f-on").innerHTML = [["1", "On"], ["0", "Off"]].map(([v, l]) => `<button type="button" data-on="${v}" aria-pressed="${(v === "1") === view.on}">${l}</button>`).join("");
     $("#f-scene").innerHTML = [["1", "Show"], ["0", "Hide"]].map(([v, l]) => `<button type="button" data-scene="${v}" aria-pressed="${(v === "1") === view.scene}">${l}</button>`).join("");
-    $("#f-filter").innerHTML = [["0", "All"], ["1", "Multi-function"]].map(([v, l]) => `<button type="button" data-filter="${v}" aria-pressed="${(v === "1") === view.mfOnly}">${l}</button>`).join("");
+    $("#f-filter").innerHTML = [["0", "All"], ["1", "Multi-function"], ["2", "New in 1.3.0"]].map(([v, l]) => `<button type="button" data-filter="${v}" aria-pressed="${v === (view.mfOnly ? "1" : view.newOnly ? "2" : "0")}">${l}</button>`).join("");
     $("#f-mode").innerHTML = [["0", "One device"], ["1", "Multi-function"]].map(([v, l]) => `<button type="button" data-mode="${v}" aria-pressed="${(v === "1") === view.mf}">${l}</button>`).join("");
   }
   /* keep the open category and group valid for the current filter */
@@ -353,7 +360,7 @@ body.sheetmode { background: #140b3a !important; }
     if (card) { const k = DA.resolve(card); if (k) { injectCss([k]); $("#body").innerHTML = `<div class="solo">${tileHTML(k)}</div>`; return; } }
     if (show) return renderShowcase(show);
     if (P.get("sheet") || P.get("pick")) return renderSheet(P.get("sheet") || "", +(P.get("n") || 2));
-    if (view.q) { const q = view.q.toLowerCase(); keys = DA.order.filter((k) => (!view.mfOnly || hasParts(k)) && (DA.items[k].name + " " + k).toLowerCase().indexOf(q) >= 0); title = `Search: ${view.q}`; sub = `${keys.length} drawings`; }
+    if (view.q) { const q = view.q.toLowerCase(); keys = DA.order.filter((k) => keep(k) && (DA.items[k].name + " " + k).toLowerCase().indexOf(q) >= 0); title = `Search: ${view.q}`; sub = `${keys.length} drawings`; }
     else {
       fixCat();
       const c = catOf(view.cat) || DA.catalog[0]; view.cat = c.id;
@@ -362,14 +369,17 @@ body.sheetmode { background: #140b3a !important; }
     }
     injectCss(keys);
     $("#body").innerHTML = `<section class="sect"><h2>${esc(title)} <small>${esc(sub)}</small></h2>${keys.length ? `<div class="grid">${keys.map(tileHTML).join("")}</div>` : `<div class="empty">Nothing found.</div>`}</section>`;
-    $("#counts").innerHTML = `<b>${DA.order.length}</b> drawings · <b>${DA.order.filter(hasParts).length}</b> multi-function`;
+    $("#counts").innerHTML = `<b>${DA.order.length}</b> drawings · <b>${DA.order.filter(hasParts).length}</b> multi-function · <b>${DA.order.filter(isNew).length}</b> new`;
   }
   /* a picture sheet for the README: a few drawings from every subcategory of one category, art and name only */
   function renderSheet(catId, n) {
     const c = catOf(catId) || { name: P.get("title") || "", subs: [] };
-    const keys = (P.get("pick") || "").split(",").filter(Boolean).map((x) => DA.resolve(x)).filter(Boolean); c.subs.forEach((s) => { const it = itemsOf(s).filter((k) => !DA.items[k].builder); const step = Math.max(1, Math.floor(it.length / n)); for (let i = 0; i < n && i * step < it.length; i++) keys.push(it[i * step]); });
+    /* pick=key or key@opt:value;opt:value (on:0 = off, color:hex) — the same drawing can be picked more than once with other menus */
+    const keys = (P.get("pick") || "").split(",").filter(Boolean).map((x, i) => { const [a, b] = x.split("@"), k = DA.resolve(a); if (!k || !b) return k;
+      const st = { opt: {} }; b.split(";").forEach((kv) => { const [o, v] = kv.split(":"); if (o === "on") st.on = v !== "0"; else if (o === "color") st.color = "#" + v; else if (o === "level") st.level = +v; else if (o === "label") st.label = decodeURIComponent(v); else st.opt[o] = v; });
+      const k2 = k + "#p" + i; DA.items[k2] = DA.items[k]; tiles.set(k2, st); return k2; }).filter(Boolean); c.subs.forEach((s) => { const it = itemsOf(s).filter((k) => !DA.items[k].builder); const step = Math.max(1, Math.floor(it.length / n)); for (let i = 0; i < n && i * step < it.length; i++) keys.push(it[i * step]); });
     injectCss(keys);
-    $("#body").innerHTML = `<section class="sheet"><h2>${esc(c.name)}</h2><div class="sgrid">${keys.map((k) => `<div class="stile"><div class="art ${view.scene ? "" : "hda-nobg"} ${RM ? "" : "hda-anim"}">${artHTML(k, stateOf(k))}</div><span>${esc(DA.items[k].name)}</span></div>`).join("")}</div></section>`;
+    $("#body").innerHTML = `<section class="sheet"><h2>${esc(c.name)}</h2><div class="sgrid">${keys.map((k) => `<div class="stile"><div class="art ${view.scene ? "" : "hda-nobg"} ${RM ? "" : "hda-anim"}">${artHTML(k, stateOf(k))}</div><span>${esc((tiles.get(k) || {}).label || DA.items[k].name)}</span></div>`).join("")}</div></section>`;
   }
   /* a grid of different menu and color combinations of one drawing */
   function renderShowcase(art) {
@@ -384,7 +394,7 @@ body.sheetmode { background: #140b3a !important; }
     const seen = new Set(); const uniq = combos.filter((c) => { const s = JSON.stringify(c); if (seen.has(s)) return false; seen.add(s); return true; }).slice(0, 12);
     if (P.get("clean")) {
       document.body.classList.add("sheetmode");
-      const lbl = (c) => it.builder ? [c.plant, c.pot].filter(Boolean).join(" · ") : (ic.options || []).map((op) => { const v = op.values.find((x) => x[0] === (c.opt || {})[op.id]); return v ? v[1] : ""; }).filter((x) => x && !/^(none|no)$/i.test(x)).slice(0, 2).join(" · ");
+      const lbl = (c) => it.builder ? [c.plant, c.pot].filter(Boolean).join(" · ") : (ic.options || []).filter((op) => !op.when || [].concat(op.when.is).indexOf((c.opt || {})[op.when.opt]) >= 0).map((op) => { const v = op.values.find((x) => x[0] === (c.opt || {})[op.id]); return v ? v[1] : ""; }).filter((x) => x && !/^(none|no)$/i.test(x)).slice(0, 2).join(" · ");
       $("#body").innerHTML = `<section class="sheet"><h2>${esc(P.get("title") || it.name)}</h2><div class="sgrid">${uniq.map((c, i) => { const k2 = k + "#" + i; tiles.set(k2, Object.assign({}, c)); DA.items[k2] = it;
         return `<div class="stile"><div class="art ${view.scene ? "" : "hda-nobg"} ${RM ? "" : "hda-anim"}">${artHTML(k2, stateOf(k2))}</div><span>${esc(lbl(c) || "look " + (i + 1))}</span></div>`; }).join("")}</div></section>`;
       return;
@@ -400,7 +410,7 @@ body.sheetmode { background: #140b3a !important; }
     if (t.dataset.sub) { e.preventDefault(); view.sub = t.dataset.sub; view.q = ""; $("#q").value = ""; history.replaceState(null, "", `?cat=${view.cat}&sub=${view.sub}`); renderSide(); renderBody(); window.scrollTo(0, 0); return; }
     if (t.dataset.on) { view.on = t.dataset.on === "1"; tiles.forEach((s) => { delete s.on; delete s.parts; delete s.ps; }); renderSegs(); renderBody(); return; }
     if (t.dataset.scene) { view.scene = t.dataset.scene === "1"; renderSegs(); renderBody(); return; }
-    if (t.dataset.filter) { view.mfOnly = t.dataset.filter === "1"; if (!view.q) fixCat(); renderSegs(); renderSide(); renderBody(); return; }
+    if (t.dataset.filter) { view.mfOnly = t.dataset.filter === "1"; view.newOnly = t.dataset.filter === "2"; if (!view.q) fixCat(); renderSegs(); renderSide(); renderBody(); return; }
     if (t.dataset.mode) { view.mf = t.dataset.mode === "1"; tiles.forEach((s) => { delete s.mf; }); renderSegs(); renderBody(); return; }
     const tile = t.closest(".tile"); if (!tile) return;
     const k = tile.dataset.k, s = tiles.get(k) || {}; tiles.set(k, s); const c = stateOf(k);

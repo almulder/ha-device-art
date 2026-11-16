@@ -3248,6 +3248,8 @@ window.HDAPA = window.HDAPA || {};
   const sw = (a) => [a].concat(AIRS.filter((c) => c !== a));
   const WH = "#eceef0", OFF = "#e3e1da", GY = "#a7adb4", DG = "#4a4f57", TR = "#f1efe9";
 
+  const MAIR = { cool: ICE, heat: WARM, dry: "#7fe6da", fan: FANG, auto: "#a8f0b4", eco: "#c4eea0" };
+  const MDISP = { cool: "#8fd8ff", heat: "#ffb070", dry: "#7fe8dc", fan: "#e8eef5", auto: "#9ff0a8", eco: "#c2f07a" };
   function modeOf(c) {
     const x = H.hx(c), mx = Math.max(x[0], x[1], x[2]), mn = Math.min(x[0], x[1], x[2]);
     if (x[0] - x[2] > 50 && x[0] >= x[1]) return "heat";
@@ -3256,11 +3258,6 @@ window.HDAPA = window.HDAPA || {};
     return "cool";
   }
 
-  // (parts) every unit: Mode, Operating state and Fan speed, each a stage part (o.pval[id] = one of its stage ids), like a
-  // thermostat in Hubitat (thermostatMode, thermostatOperatingState, the fan speed). As a Multi-Function Image (o.mf):
-  // the state picks the air (cooling = cool air, heating = warm, fan only = plain, idle = no air but the display stays
-  // lit); left out, the mode does (auto follows the state, else cool); Mode off = the unit off; the speed sets the air's
-  // pace (low / medium / high; auto = medium). A stage left out is not used; a Device Image is drawn as before.
   const ACP = [
     { id: "mode", name: "Mode", type: "stage", values: [["off", "Off"], ["cool", "Cool"], ["heat", "Heat"], ["dry", "Dry"], ["fan", "Fan only"], ["auto", "Auto"]], def: "cool" },
     { id: "state", name: "Operating state", type: "stage", values: [["idle", "Idle"], ["cooling", "Cooling"], ["heating", "Heating"], ["fan", "Fan only"]], def: "cooling" },
@@ -3294,10 +3291,15 @@ window.HDAPA = window.HDAPA || {};
       dur(a, b) { return Math.max(0.25, a - b * k.lv).toFixed(2); },
       svg(body) {
         const tile = rr(6, 6, 188, 188, 16), cp = k.clip(tile);
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="${P}svg" aria-hidden="true"><defs>${defs.join("")}</defs>` +
+        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="${P}svg${k.swing ? ` ${P}sw-${k.swing}` : ""}" aria-hidden="true"><defs>${defs.join("")}</defs>` +
           `<g${cp}>${body}</g><path class="hda-bg" d="${tile}" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="1"/></svg>`;
       },
     };
+    const op = o.opt || {}, mm = op.mode;
+    if (mm === "off") k.on = false;
+    else if (mm && mm !== o.hvDef && MAIR[mm]) { k.mode = mm; k.dcol = MDISP[mm]; if (AIRS.indexOf(String(c).toLowerCase()) >= 0) k.c = MAIR[mm]; }
+    k.preset = op.preset || "none"; k.swing = op.swing || "";
+    k.sweep = k.on && (k.swing === "horizontal" || k.swing === "both");
     return k;
   }
 
@@ -3341,9 +3343,9 @@ window.HDAPA = window.HDAPA || {};
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${p}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${k.lin("fsh", [[0, "#000", 0.1], [0.5, "#fff", 0.08], [1, "#000", 0.35]], 0, 0, 0, 1)}"/>`;
   }
 
-  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
-  function dispCol(k) { return { heat: "#ffb070", cool: "#8fd8ff", dry: "#9ef0c0", fan: "#e8eef5" }[k.mode]; }
-  function temp(k) { return k.mode === "heat" ? 68 + Math.round(6 * k.lv) : k.mode === "cool" ? 76 - Math.round(10 * k.lv) : k.mode === "dry" ? 74 : 75; }
+  const SEG = { A: "abcefg", 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
+  function dispCol(k) { return k.dcol || { heat: "#ffb070", cool: "#8fd8ff", dry: "#9ef0c0", fan: "#e8eef5" }[k.mode]; }
+  function temp(k) { return k.mode === "heat" ? 68 + Math.round(6 * k.lv) : k.mode === "cool" ? 76 - Math.round(10 * k.lv) : k.mode === "dry" ? 74 : k.mode === "auto" ? 72 : k.mode === "eco" ? 78 : 75; }
   function digW(h, str) { const w = h * 0.56, t = Math.max(0.6, h * 0.15), g = h * 0.24; let s = 0; for (const ch of String(str)) s += ch === "°" ? t * 3.2 : w + g; return s; }
   function digits(x, y, h, str, col) {
     const w = h * 0.56, t = Math.max(0.6, h * 0.15), g = h * 0.24; let s = "", cx = x;
@@ -3358,8 +3360,24 @@ window.HDAPA = window.HDAPA || {};
     }
     return s;
   }
+  function pglyph(p, cx, cy, s, col) {
+    const g = (b, fill) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${f(s)})" fill="${fill ? col : "none"}" stroke="${fill ? "none" : col}" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round">${b}</g>`;
+    if (p === "boost") return g(`<path d="M.2 -1 L-.6 .12 H-.02 L-.22 1 L.6 -.15 H.02 Z"/>`, 1);
+    if (p === "comfort") return g(`<path d="M-.5 .1 V-.55 H.5 V.1 M-.85 .55 V-.05 H-.5 V.15 H.5 V-.05 H.85 V.55 Z M-.7 .55 V.8 M.7 .55 V.8"/>`);
+    if (p === "sleep") return g(`<path d="M.3 -.9 A.92 .92 0 1 0 .9 .35 A.7 .7 0 0 1 .3 -.9 Z"/>`, 1);
+    if (p === "away") return g(`<path d="M-.85 -.02 L0 -.82 L.85 -.02 M-.6 -.25 V.82 H.6 V-.25 M-.18 .82 V.32 H.18 V.82"/>`);
+    if (p === "frost") return g(`<path d="M0 -.95 V.95 M-.82 -.47 L.82 .47 M-.82 .47 L.82 -.47 M-.25 -.75 L0 -.52 L.25 -.75 M-.25 .75 L0 .52 L.25 .75"/>`);
+    return "";
+  }
+  function vanes(k, x, y, w, h) {
+    if (!k.sweep) return ""; let s = ""; const n = Math.max(4, Math.round(w / 10));
+    for (let i = 0; i < n; i++) { const xx = x + (w * (i + 0.5)) / n; s += `<rect x="${f(xx - 0.7)}" y="${f(y)}" width="1.4" height="${f(h)}" rx=".7" fill="#1d2228" opacity=".6"/>`; }
+    return `<g class="${P}vane" style="animation-duration:5s">${s}</g>`;
+  }
   function glyph(k, x, y, s, col) {
     const m = k.mode;
+    if (m === "auto") { const h = s * 1.1; return digits(x - h * 0.28, y - h / 2, h, "A", col); }
+    if (m === "eco") return `<g transform="translate(${x} ${y}) scale(${f(s * 0.6)})"><path d="M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z" fill="${col}"/><path d="M-.8 .8 L.35 -.35" stroke="#000" stroke-opacity=".35" stroke-width=".14" stroke-linecap="round"/></g>`;
     if (m === "heat") { let r = `<circle cx="${x}" cy="${y}" r="${f(s * 0.32)}" fill="${col}"/>`; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; r += line(`M${f(x + Math.cos(a) * s * 0.5)} ${f(y + Math.sin(a) * s * 0.5)}L${f(x + Math.cos(a) * s * 0.75)} ${f(y + Math.sin(a) * s * 0.75)}`, col, 1, s * 0.1); } return r; }
     if (m === "dry") return `<path d="M${x} ${f(y - s * 0.7)}C${f(x + s * 0.45)} ${f(y - s * 0.1)} ${f(x + s * 0.5)} ${f(y + s * 0.2)} ${x} ${f(y + s * 0.6)}C${f(x - s * 0.5)} ${f(y + s * 0.2)} ${f(x - s * 0.45)} ${f(y - s * 0.1)} ${x} ${f(y - s * 0.7)}Z" fill="${col}"/>`;
     if (m === "fan") { let r = ""; for (let i = 0; i < 3; i++) r += `<path transform="translate(${x} ${y}) rotate(${i * 120})" d="M0 0C${f(s * 0.2)} ${f(-s * 0.2)} ${f(s * 0.2)} ${f(-s * 0.6)} 0 ${f(-s * 0.7)}C${f(-s * 0.25)} ${f(-s * 0.5)} ${f(-s * 0.15)} ${f(-s * 0.2)} 0 0Z" fill="${col}"/>`; return r + `<circle cx="${x}" cy="${y}" r="${f(s * 0.12)}" fill="${col}"/>`; }
@@ -3370,10 +3388,11 @@ window.HDAPA = window.HDAPA || {};
     const col = dispCol(k);
     let s = R(x - 0.8, y - 0.8, w + 1.6, h + 1.6, 2, "#9aa0a6", ` opacity=".5"`) + R(x, y, w, h, 1.6, k.lin("dsp", [[0, "#05070b"], [1, "#1a2028"]], 0, 0, 0, 1));
     if (k.on || k.idle) {
-      const str = q.str != null ? q.str : temp(k) + "°", dh = h * (q.dh || 0.6), gw = q.glyph ? dh * 1.2 : 0, tw = digW(dh, str) + gw;
+      const str = q.str != null ? q.str : temp(k) + "°", dh = h * (q.dh || 0.6), gw = q.glyph ? dh * 1.2 : 0, pw = k.preset !== "none" ? dh * 0.95 : 0, tw = digW(dh, str) + gw + pw;
       const x0 = x + (w - tw) / 2 + gw, y0 = y + (h - dh) / 2;
       s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.6" fill="${k.rad("dgl" + col.slice(1), [[0, col, 0.35], [1, col, 0]])}"/>` + digits(x0, y0, dh, str, col);
       if (q.glyph) s += glyph(k, x0 - gw * 0.6, y + h / 2, dh * 0.62, col);
+      if (pw) s += pglyph(k.preset, x0 + digW(dh, str) + pw * 0.3, y + h / 2, dh * 0.36, col);
     }
     return s + `<path d="M${f(x + 1)} ${f(y + h - 1)}L${f(x + w * 0.45)} ${f(y + 1)}H${f(x + w * 0.62)}L${f(x + 1 + w * 0.17)} ${f(y + h - 1)}Z" fill="#fff" opacity=".07"/>`;
   }
@@ -3397,7 +3416,7 @@ window.HDAPA = window.HDAPA || {};
       s += `<g class="${P}flow" style="animation-duration:${d}s;animation-delay:-${f((i * 0.37 % 1) * d)}s"><path d="${p}" fill="none" stroke="${gs}" stroke-width="${(q.w || 5) + 2}" stroke-linecap="round" transform="translate(.6 1.2)"/><path d="${p}" fill="none" stroke="${g}" stroke-width="${q.w || 5}" stroke-opacity=".5" stroke-linecap="round"/><path d="${p}" fill="none" stroke="${g}" stroke-width="${q.tw || 1.6}" stroke-linecap="round"/></g>`;
       if (q.mist) for (let j = 0; j < 2; j++) s += `<g opacity=".8"><circle class="${P}flow" style="animation-duration:${d}s;animation-delay:-${f(((i * 0.37 + j * 0.5) % 1) * d)}s" cx="${f(L * (0.35 + j * 0.25))}" cy="${f(oy + s1 * 0.5)}" r=".9" fill="#fff"/></g>`;
     }
-    return `<g transform="translate(${f(x)} ${f(y)}) rotate(${ang})">${s}</g>`;
+    return `<g transform="translate(${f(x)} ${f(y)}) rotate(${ang})">${k.sweep ? `<g class="${P}sweep">${s}</g>` : s}</g>`;
   }
   function wash(k, cx, cy, rx, ry, a = 0.45) { if (!k.on) return ""; return `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${k.rad("ws" + k.c.slice(1), [[0, k.c, a], [1, k.c, 0]])}"/>`; }
   function shimmer(k, x, y, w, n = 3) {
@@ -3411,7 +3430,7 @@ window.HDAPA = window.HDAPA || {};
     const c = q.c || WH, h = (q.h || 7) * (0.6 + 0.4 * k.lv);
     if (!k.on) return `<path d="M${x + 2} ${y}H${x + w - 2}" stroke="#000" stroke-opacity=".35" stroke-width=".9"/>` + hl(x + 3, y + 1, x + w - 3, y + 1, 0.5, 0.7);
     return R(x, y - 1.6, w, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:${q.sd || 6}s"><path d="M${x + 1} ${y + 1.6}H${x + w - 1}L${f(x + w - 4)} ${f(y + 1.6 + h)}H${f(x + 4)}Z" fill="${k.lin("flp" + c.slice(1), [[0, sh(c, -0.35)], [1, sh(c, 0.25)]], 0, 0, 0, 1)}"/>` +
-      hl(x + 5, y + 1.6 + h, x + w - 5, y + 1.6 + h, 0.6, 0.8) + `</g>`;
+      hl(x + 5, y + 1.6 + h, x + w - 5, y + 1.6 + h, 0.6, 0.8) + `</g>` + vanes(k, x + 3, y - 1.6, w - 6, 3.2 + h * 0.8);
   }
 
   function rotor(k, cx, cy, r, q = {}) {
@@ -3523,7 +3542,7 @@ window.HDAPA = window.HDAPA || {};
       b += sky(k, "dusk", 42, 86, 116, 34, { seed: 2, city: 1, hz: 0.1 }) + `<path d="${rr(64, 98, 72, 30, 4)}" fill="#3a3f48" opacity=".85"/>` + vslats(k, 70, 104, 60, 18, 3, "#7d848c") + `<rect x="42" y="86" width="116" height="34" fill="#cfe3f2" opacity=".12"/>`;
       b += rail(k, 42, 118, 116, 8) + sill(k, 28, 144, 144);
       b += shadow(k, 100, 186, 52, 4, 0.5) + box(k, 52, 122, 96, 60, 14, B) + R(60, 128, 80, 6, 3, "#0b0e12", ` opacity="${k.on ? 0.9 : 0.25}"`) + `<path d="${rr(52, 122, 96, 22, 11)}" fill="#fff" opacity=".12"/>` +
-        mesh(k, 62, 152, 76, 22, B, 4) + display(k, 86, 139, 28, 10, { glyph: 1 }) + led(k, 140, 140, "#7dd3fc", 1);
+        mesh(k, 62, 152, 76, 22, B, 4) + display(k, 86, 139, 28, 10, { glyph: 1 }) + led(k, 140, 140, k.dcol || "#7dd3fc", 1);
       b += wash(k, 100, 126, 46, 10) + air(k, 100, 126, -90, { len: 30, sp: 14, cu: 5, fan: 0.5, n: 3 + Math.round(k.lv * 2) });
       return k.svg(b); } });
 
@@ -3548,7 +3567,7 @@ window.HDAPA = window.HDAPA || {};
       b += hose(k, "M96 74C122 66 152 76 157 106", 12);
       b += shadow(k, 66, 166, 36, 5, 0.6) + box(k, 36, 32, 62, 128, 12, B) + `<path d="${rr(36, 32, 62, 30, 12)}" fill="#fff" opacity=".18"/>`;
       b += R(42, 40, 50, 5, 2, "#0b0e12", ` opacity="${k.on ? 0.9 : 0.3}"`) + flap(k, 42, 44, 50, { c: B, h: 6 }) + R(50, 58, 34, 10, 3, pv(k, sh(B, -0.08))) + display(k, 55, 59.5, 24, 7, { glyph: 1 });
-      b += mesh(k, 44, 80, 46, 56, B, 6) + `<rect x="62" y="146" width="10" height="4" rx="1" fill="#2c3036"/>` + led(k, 88, 63, "#7dd3fc", 0.9);
+      b += mesh(k, 44, 80, 46, 56, B, 6) + `<rect x="62" y="146" width="10" height="4" rx="1" fill="#2c3036"/>` + led(k, 88, 63, k.dcol || "#7dd3fc", 0.9);
       b += `<ellipse cx="46" cy="161" rx="5" ry="3" fill="#2b2f35"/><ellipse cx="88" cy="161" rx="5" ry="3" fill="#2b2f35"/>`;
       b += wash(k, 67, 40, 32, 9) + air(k, 67, 38, -100, { len: 34, sp: 13, cu: 6, fan: 0.5, n: 3 + Math.round(k.lv) }) + shimmer(k, 178, 98, 10, 1);
       return k.svg(b); } });
@@ -3560,7 +3579,7 @@ window.HDAPA = window.HDAPA || {};
       b += hose(k, "M112 70C96 50 52 66 46 104", 11, "#cfd3d7") + hose(k, "M120 78C110 92 40 80 26 104", 11, "#cfd3d7") + R(42, 100, 8, 4, 1, "#3f84d8") + R(22, 100, 8, 4, 1, "#e0653f");
       b += shadow(k, 128, 170, 46, 5, 0.6) + box3(k, 90, 54, 76, 108, 10, 8, B, 6);
       b += R(96, 60, 64, 22, 3, pv(k, sh(B, 0.25))) + vslats(k, 99, 63, 58, 16, 3.6, sh(B, 0.2)) + `<g class="${k.on ? P + "vane" : ""}">${k.on ? `<rect x="99" y="63" width="58" height="16" fill="#0b0e12" opacity=".2"/>` : ""}</g>`;
-      b += R(104, 88, 48, 12, 3, k.lin("blk", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1)) + display(k, 108, 90, 26, 8, { glyph: 1 }) + led(k, 140, 94, "#34d399", 1) + led(k, 146, 94, "#7dd3fc", 1);
+      b += R(104, 88, 48, 12, 3, k.lin("blk", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1)) + display(k, 108, 90, 26, 8, { glyph: 1 }) + led(k, 140, 94, "#34d399", 1) + led(k, 146, 94, k.dcol || "#7dd3fc", 1);
       b += slats(k, 100, 108, 56, 46, 3.6, B) + `<ellipse cx="98" cy="164" rx="5" ry="3" fill="#25292e"/><ellipse cx="160" cy="164" rx="5" ry="3" fill="#25292e"/>`;
       b += wash(k, 128, 72, 40, 12) + air(k, 128, 72, -80, { len: 34, sp: 14, cu: 5, fan: 0.5, n: 3 + Math.round(k.lv) });
       return k.svg(b); } });
@@ -3573,7 +3592,7 @@ window.HDAPA = window.HDAPA || {};
       b += `<path d="M28 74C30 84 170 84 172 74" fill="#000" opacity=".2"/>` + `<path d="M24 46C24 38 30 34 40 34H160C170 34 176 38 176 46V66C176 76 170 82 160 82H40C30 82 24 76 24 66Z" fill="${pv(k, B)}"/>` +
         `<path d="M24 46C24 38 30 34 40 34H160C170 34 176 38 176 46V66C176 76 170 82 160 82H40C30 82 24 76 24 66Z" fill="${edge(k)}"/>` + hl(40, 35.5, 160, 35.5, 0.8, 1.2) + `<path d="M28 44C28 40 34 38 42 38H158" stroke="#fff" stroke-opacity=".6" stroke-width="2" fill="none" stroke-linecap="round"/>`;
       b += `<path d="M24 66H176" stroke="#000" stroke-opacity=".12" stroke-width=".8"/>` + display(k, 132, 50, 24, 10, { glyph: 1 }) + led(k, 124, 55, "#34d399", 0.9) + R(30, 38, 140, 3, 1.5, k.pat("top", 3, 3, `<rect width="2" height="3" fill="#000" fill-opacity=".14"/>`));
-      if (k.on) b += R(34, 76, 132, 5, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M34 80H166L162 ${f(90 + 4 * k.lv)}H38Z" fill="${k.lin("flp2", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/>` + hl(40, f(89 + 4 * k.lv), 160, f(89 + 4 * k.lv), 0.7, 0.8) + `</g>`;
+      if (k.on) b += R(34, 76, 132, 5, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M34 80H166L162 ${f(90 + 4 * k.lv)}H38Z" fill="${k.lin("flp2", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/>` + hl(40, f(89 + 4 * k.lv), 160, f(89 + 4 * k.lv), 0.7, 0.8) + `</g>` + vanes(k, 38, 76, 124, 13);
       else b += `<path d="M36 79H164" stroke="#000" stroke-opacity=".3" stroke-width=".9"/>`;
       b += wash(k, 100, 90, 70, 12) + air(k, 100, 92, 100, { len: 54, sp: 22, cu: 6, fan: 0.4, n: 3 + Math.round(k.lv * 2), w: 6 });
       return k.svg(b); } });
@@ -3660,7 +3679,7 @@ window.HDAPA = window.HDAPA || {};
       b += shadow(k, 106, 170, 48, 5, 0.6) + box3(k, 62, 36, 76, 128, 16, 12, B, 6);
       b += `<path d="M138 42L152 32V150L138 162Z" fill="${k.pat("hc", 5.2, 9, `<path d="M2.6 0L5.2 1.5V4.5L2.6 6L0 4.5V1.5Z M2.6 6V9" fill="#d8c79a" stroke="#6b5a35" stroke-width=".6"/>`)}"/><path d="M138 42L152 32V150L138 162Z" fill="#000" opacity=".25"/>`;
       if (k.on) b += `<g opacity=".18"><path class="${P}pulse" d="M138 42L152 32V150L138 162Z" fill="#7dc8ff"/></g>`;
-      b += R(70, 44, 60, 14, 3, k.lin("blk2", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1)) + display(k, 74, 47, 26, 8, { glyph: 1 }) + led(k, 108, 51, "#34d399", 1) + led(k, 115, 51, "#7dd3fc", 1) + led(k, 122, 51, "#7dd3fc", 1);
+      b += R(70, 44, 60, 14, 3, k.lin("blk2", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1)) + display(k, 74, 47, 26, 8, { glyph: 1 }) + led(k, 108, 51, "#34d399", 1) + led(k, 115, 51, k.dcol || "#7dd3fc", 1) + led(k, 122, 51, k.dcol || "#7dd3fc", 1);
       b += R(70, 64, 60, 50, 4, "#0b0e12", ` opacity=".85"`);
       for (let i = 0; i < 7; i++) b += `<g${k.on ? ` class="${P}swing" style="animation-duration:5s;animation-delay:-${i * 0.12}s"` : ""}><rect x="71" y="${65 + i * 7}" width="58" height="${k.on ? 3.5 : 6}" rx="1.2" fill="${pv(k, B)}"/></g>`;
       b += vslats(k, 72, 120, 56, 10, 4, B);
@@ -3674,10 +3693,10 @@ window.HDAPA = window.HDAPA || {};
     render(o) { const k = K(o), B = "#f6f7f8";
       let b = wall(k, "#c6bfb2", { cx: 0.6, cy: 0.6 }) + `<rect x="0" y="0" width="200" height="12" fill="${pv(k, "#e8e3da")}"/>`;
       b += `<path d="M-10 22C-10 16 -6 14 0 14H120C128 14 132 18 132 24V40C132 46 128 50 120 50H0Z" fill="${pv(k, B)}"/>` + `<path d="M-10 22C-10 16 -6 14 0 14H120C128 14 132 18 132 24V40C132 46 128 50 120 50H0Z" fill="${edge(k)}"/>` + hl(0, 15.5, 120, 15.5, 0.8) + display(k, 92, 24, 20, 8);
-      if (k.on) b += R(4, 46, 122, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M4 50H126L122 58H8Z" fill="${k.lin("flp3", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>`; else b += line("M6 48H124", "#000", 0.3, 0.9);
+      if (k.on) b += R(4, 46, 122, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M4 50H126L122 58H8Z" fill="${k.lin("flp3", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>` + vanes(k, 8, 46, 114, 11); else b += line("M6 48H124", "#000", 0.3, 0.9);
       b += air(k, 64, 60, 100, { len: 36, sp: 22, cu: 5, n: 3 + Math.round(k.lv) });
       b += `<rect x="80" y="92" width="84" height="84" rx="16" fill="#000" opacity=".3" transform="translate(2 3)"/>` + box(k, 80, 90, 84, 84, 16, B) + R(88, 98, 68, 68, 11, k.lin("cg", [[0, "#1d232b"], [1, "#07090c"]], 0, 0, 0, 1));
-      if (k.on || k.idle) { const col = dispCol(k), t = temp(k) + "", tw = digW(26, t); b += `<circle cx="122" cy="132" r="32" fill="${k.rad("cgl" + col.slice(1), [[0, col, 0.22], [1, col, 0]])}"/>` + digits(122 - tw / 2 - 2, 116, 26, t, col) + `<circle cx="${f(122 + tw / 2 + 2)}" cy="118" r="2.2" fill="none" stroke="${col}" stroke-width="1.4"/>` + glyph(k, 104, 155, 6, col) + `<rect x="114" y="154" width="${f(24 * k.lv + 4)}" height="2.4" rx="1.2" fill="${col}"/><rect x="114" y="154" width="28" height="2.4" rx="1.2" fill="${col}" opacity=".2"/>`; }
+      if (k.on || k.idle) { const col = dispCol(k), t = temp(k) + "", tw = digW(26, t); b += `<circle cx="122" cy="132" r="32" fill="${k.rad("cgl" + col.slice(1), [[0, col, 0.22], [1, col, 0]])}"/>` + digits(122 - tw / 2 - 2, 116, 26, t, col) + `<circle cx="${f(122 + tw / 2 + 2)}" cy="118" r="2.2" fill="none" stroke="${col}" stroke-width="1.4"/>` + glyph(k, 104, 155, 6, col) + `<rect x="114" y="154" width="${f(24 * k.lv + 4)}" height="2.4" rx="1.2" fill="${col}"/><rect x="114" y="154" width="28" height="2.4" rx="1.2" fill="${col}" opacity=".2"/>` + pglyph(k.preset, 148, 155, 3.4, col); }
       b += `<path d="M88 112L114 98H156V106L88 140Z" fill="#fff" opacity=".05"/>` + `<circle cx="122" cy="94" r="1.6" fill="#1a1f25"/>`;
       if (k.on) for (let i = 0; i < 3; i++) b += `<path class="${P}chase" style="animation-delay:-${f((2 - i) * 0.4)}s" d="M${f(100 - i * 9)} ${f(86 - i * 6)}A${14 + i * 10} ${14 + i * 10} 0 0 1 ${f(126 - i * 2)} ${f(80 - i * 10)}" fill="none" stroke="#e6b3ff" stroke-opacity=".75" stroke-width="1.6" stroke-linecap="round" transform="rotate(-18 122 94)"/>`;
       return k.svg(b); } });
@@ -3717,7 +3736,7 @@ window.HDAPA = window.HDAPA || {};
       b += `<path d="M10 88C10 80 30 78 54 79C78 78 98 80 98 88C98 92 90 90 84 92C76 90 70 92 62 90C52 92 44 90 36 92C26 90 18 92 10 88Z" fill="#fff"/>` + `<path d="M24 92v6M44 92v4M70 92v7" stroke="#e6f3ff" stroke-width="2" stroke-linecap="round"/>`;
       b += pipe("M96 112H110", 4, "#f2f3f4") + shimmer(k, 26, 82, 32, 2);
       b += `<path d="M122 34C122 28 126 26 132 26H186C192 26 196 28 196 34V52C196 58 192 62 186 62H132C126 62 122 58 122 52Z" fill="${pv(k, "#f7f8f9")}"/>` + hl(132, 27.5, 186, 27.5, 0.8) + display(k, 166, 36, 22, 9, { glyph: 1 });
-      if (k.on) b += R(126, 58, 66, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M126 62H192L189 69H129Z" fill="${k.lin("flp4", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>`; else b += line("M128 60H190", "#000", 0.3, 0.9);
+      if (k.on) b += R(126, 58, 66, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M126 62H192L189 69H129Z" fill="${k.lin("flp4", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>` + vanes(k, 129, 58, 60, 10); else b += line("M128 60H190", "#000", 0.3, 0.9);
       b += wash(k, 158, 74, 40, 12, 0.55) + air(k, 158, 70, 100, { len: 60, sp: 18, cu: 6, fan: 0.4, n: 2 + Math.round(k.lv * 2) });
       const SO = "#5f7c8c"; b += `<g class="hda-bg">` + shadow(k, 166, 176, 44, 3, 0.6) + R(136, 120, 70, 34, 8, pv(k, sh(SO, 0.08))) + `<path d="M144 126C156 122 176 122 196 126" stroke="#000" stroke-opacity=".18" stroke-width="1" fill="none"/>` + R(132, 144, 72, 24, 5, pv(k, SO)) + hl(138, 145, 198, 145, 0.35, 1.4) + R(126, 136, 16, 34, 6, pv(k, sh(SO, -0.06))) + hl(130, 138, 138, 138, 0.4, 1.2) + R(150, 132, 22, 16, 5, pv(k, "#e7c27a")) + `<rect x="134" y="168" width="4" height="6" fill="#3a2a1c"/><rect x="194" y="168" width="4" height="6" fill="#3a2a1c"/></g>`;
       return k.svg(b); } });
@@ -3728,7 +3747,7 @@ window.HDAPA = window.HDAPA || {};
       b += R(124, 20, 56, 30, 1, pv(k, "#dddcd7")) + R(124, 106, 56, 18, 1, pv(k, "#dddcd7"));
       b += box(k, 128, 48, 48, 60, 6, B) + vslats(k, 134, 56, 22, 44, 3.4, B) + R(160, 56, 12, 44, 3, k.lin("blk3", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1));
       b += k.on ? `<rect x="128" y="104" width="48" height="2" rx="1" fill="${k.c}"/><rect x="128" y="102" width="48" height="6" fill="${k.rad("strp" + k.c.slice(1), [[0, k.c, 0.6], [1, k.c, 0]])}"/>` : "";
-      b += display(k, 161, 60, 10, 12, { str: temp(k) + "", dh: 0.5 }) + led(k, 166, 92, "#7dd3fc", 1);
+      b += display(k, 161, 60, 10, 12, { str: temp(k) + "", dh: 0.5 }) + led(k, 166, 92, k.dcol || "#7dd3fc", 1);
       if (k.on) b += `<g class="${P}vane" style="animation-duration:6s"><rect x="134" y="56" width="22" height="44" fill="${k.c}" opacity=".08"/></g>`;
       b += sill(k, 8, 128, 184) + floor(k, 178);
       b += `<g transform="rotate(-8 60 160)"><rect x="40" y="132" width="40" height="66" rx="7" fill="#15181d"/><rect x="43" y="138" width="34" height="56" rx="4" fill="${k.lin("ph", [[0, "#1f2a3c"], [1, "#0c1220"]], 0, 0, 0, 1)}"/>`;
@@ -3757,11 +3776,27 @@ window.HDAPA = window.HDAPA || {};
       return k.svg(b); } });
 
   icons.forEach((i) => { i.parts = ACP; });
+  const ML = { off: "Off", heat: "Heat", cool: "Cool", auto: "Auto", dry: "Dry", fan: "Fan", eco: "Eco" };
+  const PL = { none: "None", boost: "Boost", comfort: "Comfort", sleep: "Sleep", away: "Away", frost: "Frost" };
+  const SWL = { vertical: "Vertical", off: "Off", horizontal: "Horizontal", both: "Both" };
+  const ROOM = ["cool off dry fan eco", "boost sleep"], SPLIT = ["cool off heat auto dry fan eco", "boost comfort sleep away"], SW4 = "vertical off horizontal both";
+  const HV = { window: ROOM, ushape: ROOM, saddle: ROOM, portable: [ROOM[0], ROOM[1], SW4], dualhose: ROOM, wall: ["cool off heat fan eco", "sleep"],
+    minisplit: [SPLIT[0], SPLIT[1], SW4], cassette: [SPLIT[0], SPLIT[1], "vertical off"], console: [SPLIT[0], SPLIT[1], SW4], remote: [SPLIT[0], SPLIT[1], SW4],
+    condenser: ["cool off heat auto dry"], ptac: ["cool off heat auto fan eco", "sleep"], central: ["cool off fan"], swamp: ["cool off fan", null, "vertical off"],
+    rv: ["cool off heat fan"], desk: ["cool off fan"], heatpump: ["heat off cool auto dry fan eco", SPLIT[1], SW4], smart: ["cool off dry fan eco"],
+    attic: ["cool off heat auto fan"] };
+  icons.forEach((ic) => { const h = HV[ic.id]; if (!h) return;
+    const modes = h[0].split(" "), on = modes.filter((m) => m !== "off"), when = { opt: "mode", is: on };
+    ic.options = [{ id: "mode", name: "Mode", values: modes.map((m) => [m, ML[m]]) }];
+    if (h[1]) ic.options.push({ id: "preset", name: "Preset", values: ("none " + h[1]).split(" ").map((p) => [p, PL[p]]), when });
+    if (h[2]) ic.options.push({ id: "swing", name: "Swing", values: h[2].split(" ").map((v) => [v, SWL[v]]), when });
+    const r0 = ic.render, def = modes[0];
+    ic.render = function (o) { return r0.call(this, Object.assign({}, o, { hvDef: def })); };
+  });
 
   (window.HDA = window.HDA || []).push({
     id: "ac", tab: "Air conditioners", group: "Air", kind: "device",
-    intro: "Window, portable, split, central and rooftop units, each in its own spot. On, flaps open and swing, air ribbons flow out in the air color (cool, heat, dry or fan), outdoor fans spin and the display shows the set temperature. Speed sets the fan speed.",
-    
+    intro: "Window, portable, split, central and rooftop units, each in its own spot. On, flaps open and swing, air ribbons flow out in the air color (cool, heat, dry or fan), outdoor fans spin and the display shows the set temperature. Speed sets the fan speed. Mode, Preset and Swing menus (only what each unit has) set the display and air color and sweep the louvers.",
     css: `
 .hda-ac-svg{overflow:hidden}
 .hda-ac-spin{transform-box:fill-box;transform-origin:50% 50%}
@@ -3788,7 +3823,10 @@ window.HDAPA = window.HDAPA || {};
 @keyframes hda-ac-drip{0%{opacity:0;transform:translateY(0)}20%{opacity:1}100%{opacity:0;transform:translateY(16px)}}
 .hda-anim .hda-ac-wave{animation:hda-ac-wave 2.2s linear infinite}
 @keyframes hda-ac-wave{from{transform:translateX(0)}to{transform:translateX(8px)}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-ac-spin,.hda-anim .hda-ac-flow,.hda-anim .hda-ac-swing,.hda-anim .hda-ac-vane,.hda-anim .hda-ac-pulse,.hda-anim .hda-ac-chase,.hda-anim .hda-ac-rise,.hda-anim .hda-ac-drip,.hda-anim .hda-ac-wave{animation:none}}
+.hda-anim .hda-ac-sw-off .hda-ac-swing,.hda-anim .hda-ac-sw-horizontal .hda-ac-swing{animation:none}
+.hda-anim .hda-ac-sweep{animation:hda-ac-sweep 5s ease-in-out infinite}
+@keyframes hda-ac-sweep{0%,100%{transform:skewY(-9deg)}50%{transform:skewY(9deg)}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-ac-sweep,.hda-anim .hda-ac-spin,.hda-anim .hda-ac-flow,.hda-anim .hda-ac-swing,.hda-anim .hda-ac-vane,.hda-anim .hda-ac-pulse,.hda-anim .hda-ac-chase,.hda-anim .hda-ac-rise,.hda-anim .hda-ac-drip,.hda-anim .hda-ac-wave{animation:none}}
 `,
     icons,
   });
@@ -3882,8 +3920,6 @@ window.HDAPA = window.HDAPA || {};
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
     const x = { o, c, on: !!o.on, lv, id, url, defs: [], have: {}, metal: METAL.indexOf(c) >= 0, parts: o.parts || null, opt: o.opt || {},
       dk: H.hx(c).reduce((a, b) => a + b, 0) < 300 };
-    // (parts) o.parts holds only the ticked parts; a part left out follows the one device as a Device Image (no o.mf)
-    // and stays off / closed as a Multi-Function Image (o.mf). x.zon = any zone part on (the pump / heat of a zone set).
     x.mf = !!o.mf;
     x.part = (k) => (x.parts && x.parts[k] != null ? !!x.parts[k] : !x.mf && x.on);
     x.zon = (n) => { for (let i = 1; i <= n; i++) if (x.part("z" + i)) return true; return false; };
@@ -3891,6 +3927,40 @@ window.HDAPA = window.HDAPA || {};
     x.dur = (a, b) => Math.max(.3, a - b * lv).toFixed(2);
     return x;
   }
+
+  const MAC = { cool: ICE, heat: WARM, auto: "#9ff0a8", dry: "#6fe3d6", fan: "#d5dbe2", eco: "#bfee9a" };
+  function hv(x) {
+    const md = x.opt.mode || "cool"; if (md === "off") x.on = false;
+    x.mode = md; x.mc = MAC[md] || ICE; x.preset = x.opt.preset || "none"; x.swing = x.opt.swing || "off";
+    x.add("mg", rg(x.id("mg"), [[0, x.mc, .6], [.45, x.mc, .2], [1, x.mc, 0]]));
+    x.glow = x.url(md === "cool" ? "cool" : "mg");
+    return x;
+  }
+  const G1 = (cx, cy, s, b, col, fill) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="${fill ? col : "none"}" stroke="${fill ? "none" : col}" stroke-width=".22" stroke-linecap="round" stroke-linejoin="round">${b}</g>`;
+  function mglyph(m, cx, cy, s, col) {
+    if (m === "heat") return G1(cx, cy, s, `<path d="M0 -1 C.55 -.5 .78 -.05 .6 .38 C.47 .76 .16 .98 0 .98 C-.16 .98 -.5 .78 -.6 .38 C-.7 -.04 -.38 -.32 -.22 -.62 C-.14 -.3 .02 -.26 .07 -.44 C.12 -.64 .06 -.84 0 -1 Z"/>`, col, 1);
+    if (m === "cool") return G1(cx, cy, s, `<path d="M0 -.95 V.95 M-.82 -.47 L.82 .47 M-.82 .47 L.82 -.47"/>`, col);
+    if (m === "auto") return G1(cx, cy, s, `<path d="M-.62 .85 L0 -.85 L.62 .85 M-.38 .25 H.38"/>`, col);
+    if (m === "dry") return G1(cx, cy, s, `<path d="M0 -1 C.35 -.45 .7 -.05 .7 .35 C.7 .75 .38 1 0 1 C-.38 1 -.7 .75 -.7 .35 C-.7 -.05 -.35 -.45 0 -1 Z"/>`, col, 1);
+    if (m === "fan") { let b = ""; for (let i = 0; i < 3; i++) b += `<path transform="rotate(${i * 120})" d="M0 0 C-.5 -.3 -.38 -.95 0 -.95 C.32 -.95 .3 -.38 0 0 Z"/>`; return G1(cx, cy, s, b + `<circle r=".16"/>`, col, 1); }
+    if (m === "eco") return G1(cx, cy, s, `<path d="M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z"/>`, col, 1) + G1(cx, cy, s, `<path d="M-.8 .8 L.35 -.35" stroke-opacity=".4"/>`, "#000");
+    return "";
+  }
+  function pglyph(p, cx, cy, s, col) {
+    if (p === "boost") return G1(cx, cy, s, `<path d="M.2 -1 L-.6 .12 H-.02 L-.22 1 L.6 -.15 H.02 Z"/>`, col, 1);
+    if (p === "comfort") return G1(cx, cy, s, `<path d="M-.5 .1 V-.55 H.5 V.1 M-.85 .55 V-.05 H-.5 V.15 H.5 V-.05 H.85 V.55 Z M-.7 .55 V.8 M.7 .55 V.8"/>`, col);
+    if (p === "sleep") return G1(cx, cy, s, `<path d="M.3 -.9 A.92 .92 0 1 0 .9 .35 A.7 .7 0 0 1 .3 -.9 Z"/>`, col, 1);
+    if (p === "away") return G1(cx, cy, s, `<path d="M-.85 -.02 L0 -.82 L.85 -.02 M-.6 -.25 V.82 H.6 V-.25 M-.18 .82 V.32 H.18 V.82"/>`, col);
+    return "";
+  }
+  const hvMark = (x, cx, cy, s) => x.on ? (x.mode !== "cool" ? mglyph(x.mode, cx, cy, s, x.mc) : "") + (x.preset !== "none" ? pglyph(x.preset, cx - s * 2.8, cy, s, x.mc) : "") : "";
+  const swV = (x, s) => x.on && (x.swing === "vertical" || x.swing === "both") ? `<g class="${P}swv">${s}</g>` : s;
+  function swH(x, X, Y, W) {
+    if (!x.on || (x.swing !== "horizontal" && x.swing !== "both")) return ""; let s = "";
+    for (let i = 0; i < 12; i++) s += `<rect x="${f(X + W * (i + .5) / 12 - .7)}" y="${Y}" width="1.4" height="7" rx=".7" fill="#16181c" opacity=".55"/>`;
+    return `<g class="${P}swh">${s}</g>`;
+  }
+  const swAir = (x, s) => x.on && x.swing !== "off" ? `<g class="${P}${x.swing === "vertical" ? "swy" : "swx"}">${s}</g>` : s;
 
   function scene(x, wall, floor, body, sc) {
     sc = sc || 1; const w = WALL[wall] || WALL.plaster;
@@ -3970,40 +4040,40 @@ ${x.defs.join("")}</defs>
 
   const icons = [
     base({ id: "boxy-wall-split", name: "Boxy wall split", colors: ["#f4f5f2", "#c9ccd1", "#2a2b30", "#e9e3d6"], render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a); fin(x);
-      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="120" rx="78" ry="34" fill="${x.url("cool")}" opacity=".35"/>` : "") +
+      const x = hv(ctx(o)), S = (a) => H.shade(x.c, a); fin(x);
+      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="120" rx="78" ry="34" fill="${x.glow}" opacity=".35"/>` : "") +
         drop(x, `<path d="M24 58 Q24 54 28 54 H172 Q176 54 176 58 V100 Q176 104 172 104 H28 Q24 104 24 100 Z"/>`, 3, 6, .5) +
         `<path d="M24 58 Q24 54 28 54 H172 Q176 54 176 58 V100 Q176 104 172 104 H28 Q24 104 24 100 Z" fill="${x.url("bdv")}"/>` +
         `<path d="M28 60 Q100 57 172 60" fill="none" stroke="#fff" stroke-opacity="${x.dk ? .25 : .85}" stroke-width="1.2"/><path d="M26 92 H174" stroke="#000" stroke-opacity=".12"/>` +
-        `<path d="M30 96 H170 L166 104 H34 Z" fill="#14161a" opacity=".85"/>` + vane(x, 32, 101, 136, x.on, S(.05)) +
-        led(x, 152, 92, 1.1, "#7ee08a", x.on) + led(x, 158, 92, 1.1, "#ffb347", x.on && x.lv > .7) +
+        `<path d="M30 96 H170 L166 104 H34 Z" fill="#14161a" opacity=".85"/>` + swV(x, vane(x, 32, 101, 136, x.on, S(.05))) + swH(x, 34, 100, 132) +
+        led(x, 152, 92, 1.1, "#7ee08a", x.on) + led(x, 158, 92, 1.1, "#ffb347", x.on && x.lv > .7) + hvMark(x, 143, 92, 2.2) +
         `<path d="M134 82 H162" stroke="#000" stroke-opacity=".08"/>` +
-        wisps(x, [[46, 110], [70, 112], [96, 112], [122, 112], [148, 110]], ICE, 40);
+        swAir(x, wisps(x, [[46, 110], [70, 112], [96, 112], [122, 112], [148, 110]], x.mc, 40));
       return scene(x, "sage", null, b);
     } }),
     base({ id: "faceted-wall-split", name: "Faceted wall split", colors: ["#c9ccd1", "#f4f5f2", "#2a2b30"], render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a); fin(x);
+      const x = hv(ctx(o)), S = (a) => H.shade(x.c, a); fin(x);
       x.add("emu", lg(x.id("emu"), [[0, S(.45)], [.5, S(.1)], [1, S(-.12)]], 0, 0, 0, 1) + lg(x.id("emu2"), [[0, S(-.15)], [1, S(-.45)]], 0, 0, 0, 1));
       const front = "M22 58 H178 V84 L172 98 H28 L22 84 Z";
-      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="118" rx="80" ry="32" fill="${x.url("cool")}" opacity=".35"/>` : "") +
+      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="118" rx="80" ry="32" fill="${x.glow}" opacity=".35"/>` : "") +
         drop(x, `<path d="${front}"/>`, 3, 6, .5) + `<path d="M24 54 H176 L178 58 H22 Z" fill="${S(.4)}"/>` +
         `<path d="M22 58 H178 V84 H22 Z" fill="${x.url("emu")}"/><path d="M22 84 H178 L172 98 H28 Z" fill="${x.url("emu2")}"/>` + brushR(x, 23, 59, 154, 24) +
         `<path d="M22 84 H178" stroke="#fff" stroke-opacity=".55" stroke-width=".9"/><path d="M24 59 H176" stroke="#fff" stroke-opacity=".6"/>` +
-        `<path d="M28 98 H172 L169 102 H31 Z" fill="#111317"/>` + vane(x, 30, 100, 140, x.on, S(-.1)) +
-        `<rect x="150" y="88" width="10" height="2.4" rx="1.2" fill="${x.on ? "#cfeaff" : "#000"}" opacity="${x.on ? .9 : .15}"/>` +
-        wisps(x, [[48, 110], [76, 112], [104, 112], [132, 112], [156, 110]], ICE, 42);
+        `<path d="M28 98 H172 L169 102 H31 Z" fill="#111317"/>` + swV(x, vane(x, 30, 100, 140, x.on, S(-.1))) + swH(x, 32, 99, 136) +
+        `<rect x="150" y="88" width="10" height="2.4" rx="1.2" fill="${x.on ? (x.mode === "cool" ? "#cfeaff" : x.mc) : "#000"}" opacity="${x.on ? .9 : .15}"/>` + hvMark(x, 143, 89.2, 2.2) +
+        swAir(x, wisps(x, [[48, 110], [76, 112], [104, 112], [132, 112], [156, 110]], x.mc, 42));
       return scene(x, "linen", null, b);
     } }),
     base({ id: "mirror-glass-wall-split", name: "Mirror-glass wall split", colors: ["#2a2b30", "#f4f5f2", "#7a2e3a"], colorLabel: "Glass", render(o) {
-      const x = ctx(o), S = (a) => H.shade(x.c, a);
+      const x = hv(ctx(o)), S = (a) => H.shade(x.c, a);
       x.add("mir", lg(x.id("mir"), [[0, S(.35)], [.5, x.c], [1, S(-.45)]], 0, 0, 0, 1));
-      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="120" rx="78" ry="32" fill="${x.url("cool")}" opacity=".35"/>` : "") +
+      const b = (x.on ? `<ellipse class="${P}breathe" cx="100" cy="120" rx="78" ry="32" fill="${x.glow}" opacity=".35"/>` : "") +
         drop(x, rr(22, 54, 156, 50, 4), 3, 6, .55) + `<rect x="22" y="54" width="156" height="50" rx="4" fill="${S(-.35)}"/>` +
         `<rect x="24" y="55.5" width="152" height="40" rx="3" fill="${x.url("mir")}"/><path d="M40 55.5 L70 95.5 H86 L56 55.5 Z M90 55.5 L104 95.5 H110 L96 55.5 Z" fill="#fff" opacity=".08"/>` +
         `<rect x="24" y="55.5" width="152" height="40" rx="3" fill="${x.url("gloss")}"/>` +
-        `<path d="M26 96 H174 L170 104 H30 Z" fill="#14161a"/>` + vane(x, 28, 101, 144, x.on, "#e6e8eb") +
-        (x.on ? `<g opacity=".95">${digits(x, 154, 76, 8, "#e9f4ff", coolTemp(x), { deg: 1 })}</g>` : "") +
-        wisps(x, [[46, 112], [72, 114], [100, 114], [128, 114], [154, 112]], ICE, 40);
+        `<path d="M26 96 H174 L170 104 H30 Z" fill="#14161a"/>` + swV(x, vane(x, 28, 101, 144, x.on, "#e6e8eb")) + swH(x, 30, 100, 140) +
+        (x.on ? `<g opacity=".95">${digits(x, 154, 76, 8, "#e9f4ff", coolTemp(x), { deg: 1 })}</g>` : "") + hvMark(x, 138, 76, 2.4) +
+        swAir(x, wisps(x, [[46, 112], [72, 114], [100, 114], [128, 114], [154, 112]], x.mc, 40));
       return scene(x, "navy", null, b);
     } }),
 
@@ -4101,8 +4171,6 @@ ${x.defs.join("")}</defs>
       return scene(x, "ply", [166, "concrete"], b);
     } }),
 
-    // (parts) six zone loops z1..z6 (a zone valve / actuator each): an open loop flows (its flow meter bobs, its floor
-    // pipe runs hot); the pump runs while any zone is open. As a Device Image every loop follows the one device, as before.
     base({ id: "pumpstation", name: "Manifold + pump station", colorLabel: "Pump", colors: ["#2f8f4e", "#c8322b", "#2f6fb5", "#1f2023"],
       parts: [1, 2, 3, 4, 5, 6].map((i) => ({ id: "z" + i, name: "Zone " + i })), render(o) {
       const x = ctx(o), S = (a) => H.shade(x.c, a), zone = x.mf || !!o.parts;
@@ -4121,8 +4189,6 @@ ${x.defs.join("")}</defs>
         (x.on && !zone ? `<rect class="${P}breathe" x="56" y="128" width="112" height="50" fill="${x.url("warm")}" opacity=".25"/>` : "");
       return scene(x, "ply", null, b);
     } }),
-    // (parts) Heat (the mat warms, the stat's heat mark lights) and Floor temperature (a value, shown on the stat; left
-    // out, the stat shows the set level as before). One mat = one zone, as the real floor-heat thermostats report.
     base({ id: "elecmat", name: "Electric mat + stat", colors: ["#f2f1ee", "#2a2b30", "#c9ccd1"],
       parts: [{ id: "heat", name: "Heat", type: "switch" }, { id: "temp", name: "Floor temperature", type: "value", unit: "°F", min: 50, max: 95, def: 78 }], render(o) {
       const x = ctx(o), S = (a) => H.shade(x.c, a), stat = x.on; fin(x);
@@ -4141,8 +4207,6 @@ ${x.defs.join("")}</defs>
         glossR(x, 80, 52, 40, 44, 3) + `<path d="M100 116 V146" stroke="#cfcfcd" stroke-width="2" stroke-dasharray="3 2"/>`;
       return scene(x, "denim", null, b);
     } }),
-    // (parts) three zones z1..z3 (two runs of the loop each, top to bottom): a zone on = its runs pulse and warm the floor.
-    // As a Device Image the whole loop follows the one device, as before.
     base({ id: "pexloops", name: "PEX floor loops", colorLabel: "Pipe", colors: ["#e4572e", "#f0a020", "#f2f1ee", "#2f6fb5"],
       parts: [1, 2, 3].map((i) => ({ id: "z" + i, name: "Zone " + i })), render(o) {
       const x = ctx(o), S = (a) => H.shade(x.c, a), zone = x.mf || !!o.parts;
@@ -4213,7 +4277,6 @@ ${x.defs.join("")}</defs>
       return scene(x, "plaster", null, b);
     } }),
 
-    // (parts) Fan (the air flows) and Mode (a stage: cool / heat, from the thermostat mode; left out, the Mode option)
     base({ id: "loop-purifier-heater", name: "Loop purifier heater", options: [{ id: "mode", name: "Mode", values: [["cool", "Cool"], ["heat", "Heat"]] }], colors: ["#f2f1ee", "#2a2b30", "#c9ccd1", "#c9a457"], colorLabel: "Trim",
       parts: [{ id: "fan", name: "Fan", type: "switch" }, { id: "mode", name: "Mode", type: "stage", values: [["cool", "Cool"], ["heat", "Heat"]], def: "cool" }], render(o) {
       const x = ctx(o), st = o.pval && o.pval.mode != null ? String(o.pval.mode) : null, heat = (st || x.opt.mode) === "heat", S = (a) => H.shade(x.c, a);
@@ -4246,6 +4309,11 @@ ${x.defs.join("")}</defs>
     } }),
   ];
 
+  const HVO = [{ id: "mode", name: "Mode", values: [["cool", "Cool"], ["off", "Off"], ["heat", "Heat"], ["auto", "Auto"], ["dry", "Dry"], ["fan", "Fan"], ["eco", "Eco"]] },
+    { id: "preset", name: "Preset", values: [["none", "None"], ["boost", "Boost"], ["comfort", "Comfort"], ["sleep", "Sleep"], ["away", "Away"]], when: { opt: "mode", is: ["cool", "heat", "auto", "dry", "fan", "eco"] } },
+    { id: "swing", name: "Swing", values: [["off", "Off"], ["vertical", "Vertical"], ["horizontal", "Horizontal"], ["both", "Both"]], when: { opt: "mode", is: ["cool", "heat", "auto", "dry", "fan", "eco"] } }];
+  icons.forEach((ic) => { if (ic.id === "boxy-wall-split" || ic.id === "faceted-wall-split" || ic.id === "mirror-glass-wall-split") ic.options = HVO; });
+
   (window.HDA = window.HDA || []).push({
     id: "air2",
     tab: "More heating & cooling",
@@ -4253,8 +4321,7 @@ ${x.defs.join("")}</defs>
     kind: "device",
     levelLabel: "Power",
     onWord: "Running", offWord: "Off",
-    intro: "Wall-unit ACs, radiators, towel warmers, diesel heaters, underfloor heating, zoned ventilation and loop purifiers. On runs it; the slider sets fan speed or heat. Ventilation units switch each damper zone on its own.",
-    
+    intro: "Wall-unit ACs, radiators, towel warmers, diesel heaters, underfloor heating, zoned ventilation and loop purifiers. On runs it; the slider sets fan speed or heat. The wall units add Mode, Preset and Swing menus (air color, indicator glyphs, swinging louvers). Ventilation units switch each damper zone on its own.",
     css: `.hda-air2-breathe,.hda-air2-pulse,.hda-air2-spin{transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-air2-breathe{animation:hda-air2-breathe 4s ease-in-out infinite}
 @keyframes hda-air2-breathe{50%{opacity:.4}}
@@ -4277,7 +4344,18 @@ ${x.defs.join("")}</defs>
 @keyframes hda-air2-down{0%{opacity:0;transform:translate(0,-6px)}30%{opacity:.9}100%{opacity:0;transform:translate(0,14px)}}
 .hda-anim .hda-air2-bob{animation:hda-air2-bob 1.6s ease-in-out infinite}
 @keyframes hda-air2-bob{50%{transform:translate(0,-2px)}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-air2-breathe,.hda-anim .hda-air2-pulse,.hda-anim .hda-air2-spin,.hda-anim .hda-air2-fall,.hda-anim .hda-air2-goR,.hda-anim .hda-air2-goL,.hda-anim .hda-air2-rise,.hda-anim .hda-air2-up,.hda-anim .hda-air2-down,.hda-anim .hda-air2-bob{animation:none}}`,
+.hda-air2-swv{transform-box:fill-box;transform-origin:50% 0}
+.hda-anim .hda-air2-swv{animation:hda-air2-swv 6s ease-in-out infinite}
+@keyframes hda-air2-swv{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.45)}}
+.hda-air2-swh{transform-box:fill-box;transform-origin:50% 0}
+.hda-anim .hda-air2-swh{animation:hda-air2-swh 5s ease-in-out infinite}
+@keyframes hda-air2-swh{0%,100%{transform:skewX(-14deg)}50%{transform:skewX(14deg)}}
+.hda-air2-swx,.hda-air2-swy{transform-box:fill-box;transform-origin:50% 0}
+.hda-anim .hda-air2-swx{animation:hda-air2-swx 5s ease-in-out infinite}
+@keyframes hda-air2-swx{0%,100%{transform:skewX(-12deg)}50%{transform:skewX(12deg)}}
+.hda-anim .hda-air2-swy{animation:hda-air2-swy 6s ease-in-out infinite}
+@keyframes hda-air2-swy{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.7)}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-air2-swv,.hda-anim .hda-air2-swh,.hda-anim .hda-air2-swx,.hda-anim .hda-air2-swy,.hda-anim .hda-air2-breathe,.hda-anim .hda-air2-pulse,.hda-anim .hda-air2-spin,.hda-anim .hda-air2-fall,.hda-anim .hda-air2-goR,.hda-anim .hda-air2-goL,.hda-anim .hda-air2-rise,.hda-anim .hda-air2-up,.hda-anim .hda-air2-down,.hda-anim .hda-air2-bob{animation:none}}`,
     icons,
   });
 })();
@@ -5169,7 +5247,7 @@ ${dots}<circle class="${P_}blink" cx="9" cy="66" r="2" fill="#ffd9a0"/><circle c
   const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
 
   // (multi-function) parts: Power (switch), Mute (switch), Volume (value, %) and, where the drawing has a display,
-  // Input (stage). o.parts holds only the parts the owner ticked; as a Device Image (no o.mf) the drawing is exactly as
+  // Input (stage). o.parts holds only the parts the user ticked; as a Device Image (no o.mf) the drawing is exactly as
   // today (on = playing, the slider = the volume). As a Multi-Function Image (o.mf): on = the Power part (left out =
   // on), the volume = o.pval.volume (left out = "--" on the display), Mute = a muted-speaker sign on the display and
   // the meters at rest, Input = the source's short name on the display.
@@ -6490,6 +6568,939 @@ ${items}<rect x="20" y="${y}" width="160" height="9" rx="1.5" fill="${x.url("woo
 })();
 
 (function () {
+  "use strict";
+  const P = "hda-buttons-";
+  const H = () => window.HDAH;
+  const f = (v) => (Math.round(v * 10) / 10).toString();
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  const FONT = `font-family="Segoe UI, Roboto, Arial, sans-serif"`;
+
+  function X(o, d1, d2) {
+    const d = []; let n = 0;
+    const st = (a) => a.map(([of, c, op]) => `<stop offset="${of}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+    const x = { o, d,
+      opt: (k, def) => (o.opt && o.opt[k]) || def,
+      c1: o.color || d1, c2: o.color2 || d2,
+      lv: cl(o.level == null ? .6 : +o.level || 0, 0, 1),
+      lg(a, x1, y1, x2, y2) { const id = `${o.uid}-g${n++}`; d.push(`<linearGradient id="${id}" x1="${x1 == null ? 0 : x1}" y1="${y1 == null ? 0 : y1}" x2="${x2 == null ? 0 : x2}" y2="${y2 == null ? 1 : y2}">${st(a)}</linearGradient>`); return `url(#${id})`; },
+      rg(a, cx, cy, r) { const id = `${o.uid}-g${n++}`; d.push(`<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r == null ? .5 : r}">${st(a)}</radialGradient>`); return `url(#${id})`; },
+      blur(sd) { const id = `${o.uid}-b${n++}`; d.push(`<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${sd}"/></filter>`); return `url(#${id})`; } };
+    x.on = !!o.on; x.anim = !!o.anim;
+    x.hot = H().mix(x.c1, "#ffffff", .55);
+    return x;
+  }
+  function pal(c) {
+    const h = H(), m = /^#?([0-9a-f]{6})$/i.exec(c || ""), n = m ? parseInt(m[1], 16) : 0xdddddd;
+    const lum = (((n >> 16) & 255) * .3 + ((n >> 8) & 255) * .59 + (n & 255) * .11) / 255, lt = lum > .7;
+    return { l: h.shade(c, lt ? .5 : .32), m: c, d: h.shade(c, lt ? -.14 : -.3), k: h.shade(c, lt ? -.34 : -.55), lt, dark: lum < .3 };
+  }
+  const shadow = (x, cx, cy, rx, ry, op) => `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${x.rg([[0, "#000", op == null ? .5 : op], [1, "#000", 0]])}"/>`;
+  const drop = (x, shape, dx, dy, op, sd) => `<g transform="translate(${dx} ${dy})" opacity="${op}" filter="${x.blur(sd || 3)}" fill="#000">${shape}</g>`;
+  function wrap(x, bg, item) {
+    const c = `${x.o.uid}-card`, vig = x.rg([[0, "#000", 0], [.65, "#000", .06], [1, "#000", .42]], .5, .46, .75);
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="${c}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>${x.d.join("")}</defs>` +
+      `<g clip-path="url(#${c})"><g class="hda-bg">${bg}<rect width="200" height="200" fill="${vig}"/></g>${item}</g>` +
+      `<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g></svg>`;
+  }
+  const firstIs = (op, v) => Object.assign({}, op, { values: [op.values.find((p) => p[0] === v)].concat(op.values.filter((p) => p[0] !== v)) });
+
+  function wall(x, tone, seed) {
+    const w = tone || "#8d8796"; let s = `<rect width="200" height="200" fill="${x.lg([[0, H().shade(w, .1)], [1, H().shade(w, -.24)]])}"/>`, k = seed || 7;
+    for (let i = 0; i < 120; i++) { k = (k * 16807) % 2147483647; const a = k % 200; k = (k * 16807) % 2147483647; const b = k % 200; s += `<circle cx="${a}" cy="${b}" r="${f(.4 + (k % 7) / 10)}" fill="${k % 2 ? "#fff" : "#000"}" opacity=".07"/>`; }
+    return s + `<rect width="200" height="200" fill="${x.rg([[0, "#fff", .12], [1, "#fff", 0]], .35, .2, .7)}"/>`;
+  }
+  function desk(x, y, tone, wood) {
+    const wd = wood || "#8a5a36";
+    let s = wall(x, tone || "#7f8794", 3) + `<rect y="${y}" width="200" height="${200 - y}" fill="${x.lg([[0, H().shade(wd, .12)], [1, H().shade(wd, -.4)]])}"/>`;
+    for (let i = 0; i < 9; i++) { const yy = y + 6 + i * i * 1.3 + i * 4; s += `<path d="M0 ${f(yy)}C50 ${f(yy - 2)} 120 ${f(yy + 3)} 200 ${f(yy - 1)}" fill="none" stroke="${i % 2 ? "#000" : "#fff"}" stroke-opacity="${i % 2 ? .12 : .07}" stroke-width="${f(.8 + i * .15)}"/>`; }
+    return s + `<rect y="${y}" width="200" height="2" fill="#fff" opacity=".22"/><rect y="${y - 3}" width="200" height="3" fill="#000" opacity=".18"/>`;
+  }
+  function tiles(x) {
+    let s = `<rect width="200" height="200" fill="#d9dcd8"/>`;
+    for (let row = 0, y = 0; y < 200; y += 16, row++) for (let bx = -(row % 2) * 17; bx < 200; bx += 34)
+      s += `<rect x="${bx + 1}" y="${y + 1}" width="32" height="14" rx="2" fill="${x.lg([[0, "#f4f5f2"], [1, "#d3d6d2"]])}"/><path d="M${bx + 4} ${y + 3.5}H${bx + 20}" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".8"/>`;
+    return s + `<rect width="200" height="200" fill="${x.lg([[0, "#000", .05], [1, "#000", .35]])}"/>`;
+  }
+
+  const halo = (x, cx, cy, r, c, op) => `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${x.rg([[0, c, op == null ? .6 : op], [.45, c, (op == null ? .6 : op) * .35], [1, c, 0]])}"/>`;
+  const led = (x, cx, cy, r, c, lit, blink) => lit
+    ? `<g${blink ? ` class="${P}blink"` : ""}>${halo(x, cx, cy, r * 4.5, c, .7)}<circle cx="${cx}" cy="${cy}" r="${r}" fill="${H().mix(c, "#fff", .5)}"/></g>`
+    : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#000" opacity=".35"/>`;
+  function waves(x, cx, cy, ang, spread, c, n, r0, step) {
+    let s = ""; const a0 = (ang - spread / 2) * Math.PI / 180, a1 = (ang + spread / 2) * Math.PI / 180;
+    for (let i = 0; i < (n || 3); i++) {
+      const r = (r0 || 10) + i * (step || 8);
+      s += `<path class="${P}wave" style="animation-delay:${(i * .3).toFixed(2)}s" d="M${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))}A${r} ${r} 0 0 1 ${f(cx + r * Math.cos(a1))} ${f(cy + r * Math.sin(a1))}" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" opacity="${(.95 - i * .22).toFixed(2)}"/>`;
+    }
+    return `<g>${s}</g>`;
+  }
+  const ACTION = { id: "act", name: "Action", values: [["single", "Single press"], ["double", "Double press"], ["long", "Long press"]] };
+  const ACT_TAG = { single: "1×", double: "2×", long: "Hold" };
+  function chip(x, txt, c) {
+    const w = 10 + txt.length * 5.6;
+    return `<g><rect x="${f(182 - w)}" y="18" width="${f(w)}" height="15" rx="7.5" fill="#000" opacity=".55"/><rect x="${f(182 - w)}" y="18" width="${f(w)}" height="15" rx="7.5" fill="none" stroke="${c}" stroke-opacity=".7"/>` +
+      `<text x="${f(182 - w / 2)}" y="28.8" text-anchor="middle" ${FONT} font-size="9" font-weight="600" fill="#fff">${txt}</text></g>`;
+  }
+
+  function dialSwitch(o) {
+    const x = X(o, "#ffb347", "#f2f1ee"), p = pal(x.c2), lv = x.lv, cx = 100, cy = 100;
+    const bg = wall(x, "#7b8790", 5);
+    let s = drop(x, `<rect x="52" y="52" width="96" height="96" rx="18"/>`, 3, 6, .55, 4);
+    s += `<rect x="52" y="52" width="96" height="96" rx="18" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 1)}"/>` +
+      `<rect x="52.6" y="52.6" width="94.8" height="94.8" rx="17.4" fill="none" stroke="#fff" stroke-opacity="${p.lt ? .9 : .25}" stroke-width="1.2"/>` +
+      `<rect x="55" y="55" width="90" height="90" rx="15.5" fill="none" stroke="#000" stroke-opacity=".12"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="42.5" fill="none" stroke="#000" stroke-opacity=".4" stroke-width="4.4"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="42.5" fill="none" stroke="${x.c1}" stroke-opacity="${x.on ? .14 : .06}" stroke-width="2.6"/>`;
+    if (x.on) {
+      const dash = `pathLength="100" stroke-dasharray="${f(Math.max(lv * 100, 1.5))} 100" transform="rotate(-90 ${cx} ${cy})"`;
+      s += `<g class="${P}breathe"><circle cx="${cx}" cy="${cy}" r="42.5" fill="none" stroke="${x.c1}" stroke-width="9" opacity=".45" filter="${x.blur(2.6)}" ${dash}/></g>` +
+        `<circle cx="${cx}" cy="${cy}" r="42.5" fill="none" stroke="${x.c1}" stroke-width="3" stroke-linecap="round" ${dash}/>` +
+        `<circle cx="${cx}" cy="${cy}" r="42.5" fill="none" stroke="${x.hot}" stroke-width="1.2" stroke-linecap="round" ${dash}/>`;
+    }
+    const ang = lv * 300 - 150;
+    let ticks = ""; for (let i = 0; i < 48; i++) ticks += `<path d="M${cx} ${cy - 39.4}V${cy - 35.6}" transform="rotate(${i * 7.5} ${cx} ${cy})"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="40" fill="${x.lg([[0, p.l], [.45, p.m], [1, p.k]], 0, 0, .3, 1)}"/>` +
+      `<g class="${x.on ? P + "nudge" : ""}"><g transform="rotate(${f(ang)} ${cx} ${cy})"><g stroke="${p.k}" stroke-opacity=".55" stroke-width="1.1">${ticks}</g>` +
+      `<path d="M${cx} ${cy - 39.6}V${cy - 34}" stroke="${x.on ? x.c1 : p.k}" stroke-width="2.4" stroke-linecap="round"/></g></g>` +
+      `<circle cx="${cx}" cy="${cy}" r="40" fill="none" stroke="#fff" stroke-opacity="${p.lt ? .7 : .2}" stroke-width=".8"/>`;
+    s += `<circle cx="${cx}" cy="${cy + 1.4}" r="33" fill="#000" opacity=".3"/><circle cx="${cx}" cy="${cy}" r="32.6" fill="${x.rg([[0, p.l], [.75, p.m], [1, p.d]], .4, .35, .75)}"/>` +
+      `<g stroke="${p.k}" stroke-opacity=".5" stroke-width="1.4"><path d="M${cx - 31} ${cy}H${cx + 31}M${cx} ${cy - 31}V${cy + 31}"/></g>` +
+      `<g stroke="#fff" stroke-opacity="${p.lt ? .8 : .15}" stroke-width=".7"><path d="M${cx - 31} ${cy + 1}H${cx + 31}M${cx + 1} ${cy - 31}V${cy + 31}"/></g>`;
+    const dots = [[-14, -14, 1], [14, -14, 2], [-14, 14, 3], [14, 14, 4]];
+    s += dots.map(([dx, dy, k]) => { let g = ""; for (let i = 0; i < k; i++) g += `<circle cx="${f(cx + dx + (i - (k - 1) / 2) * 3.4)}" cy="${cy + dy}" r="1.1"/>`; return g; }).join("").replace(/^/, `<g fill="${p.k}" opacity=".55">`) + `</g>`;
+    s += `<path d="M${cx - 24} ${cy - 16}A28 28 0 0 1 ${cx + 6} ${cy - 29}" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity="${p.lt ? .85 : .3}"/>`;
+    return wrap(x, bg, s);
+  }
+
+  function knob(o) {
+    const x = X(o, "#7cc4ff", "#2c2e33"), p = pal(x.c2), lv = x.lv, cx = 100, ty = 90, by = 122, rx = 38, ry = 13;
+    const bg = desk(x, 112, "#6f7a86", "#7a5233");
+    let s = shadow(x, cx, 132, 58, 13, .6);
+    const N = 28, bR = 45, bRy = 15.5, bY = 127;
+    const dot = (i, front) => { const th = Math.PI / 2 + (i / N) * Math.PI * 2, sn = Math.sin(th); if ((sn > 0) !== front) return "";
+      const px = cx + bR * Math.cos(th), py = bY + bRy * sn, lit = x.on && i / N < lv - .001;
+      return lit ? `<circle cx="${f(px)}" cy="${f(py)}" r="2.6" fill="${x.c1}" opacity=".5" filter="${x.blur(1.6)}"/><circle cx="${f(px)}" cy="${f(py)}" r="1.4" fill="${x.hot}"/>`
+        : `<circle cx="${f(px)}" cy="${f(py)}" r="1.2" fill="#fff" opacity="${front ? .18 : .1}"/>`; };
+    s += `<ellipse cx="${cx}" cy="${bY + 2}" rx="${bR + 2}" ry="${bRy + 1.5}" fill="${x.lg([[0, "#d7dbe0"], [1, "#7d838b"]])}"/><ellipse cx="${cx}" cy="${bY}" rx="${bR + 2}" ry="${bRy + 1}" fill="${x.lg([[0, "#eef1f4"], [1, "#a9afb7"]])}"/>`;
+    if (x.on) s += `<g class="${P}breathe"><ellipse cx="${cx}" cy="${bY + 3}" rx="${bR + 10}" ry="${bRy + 7}" fill="${x.rg([[.55, x.c1, .5], [1, x.c1, 0]])}"/></g>`;
+    let back = "", front = ""; for (let i = 0; i < N; i++) { back += dot(i, false); front += dot(i, true); }
+    s += back;
+    s += `<path d="M${cx - rx} ${ty}V${by}A${rx} ${ry} 0 0 0 ${cx + rx} ${by}V${ty}Z" fill="${x.lg([[0, p.k], [.18, p.d], [.38, p.l], [.6, p.m], [1, p.k]], 0, 0, 1, 0)}"/>`;
+    let ribs = ""; const rot = lv * 5.2;
+    for (let k = 0; k < 40; k++) { const th = k / 40 * Math.PI * 2 + rot, sn = Math.sin(th); if (sn <= .05) continue;
+      const px = cx + rx * Math.cos(th), o1 = (sn * .45).toFixed(2);
+      ribs += `<path d="M${f(px)} ${f(ty + ry * sn + 3)}V${f(by + ry * sn - 2)}" stroke="#000" stroke-opacity="${o1}" stroke-width="1"/><path d="M${f(px + .9)} ${f(ty + ry * sn + 3)}V${f(by + ry * sn - 2)}" stroke="#fff" stroke-opacity="${(sn * .14).toFixed(2)}" stroke-width=".6"/>`; }
+    s += ribs + front;
+    const ma = -Math.PI / 2 + lv * Math.PI * 1.66 - Math.PI * .83;
+    s += `<ellipse cx="${cx}" cy="${ty}" rx="${rx}" ry="${ry}" fill="${x.lg([[0, p.l], [1, p.m]])}"/><ellipse cx="${cx}" cy="${ty + .8}" rx="${rx - 6}" ry="${ry - 4}" fill="${x.lg([[0, p.d], [1, p.l]])}" opacity=".7"/>` +
+      `<circle cx="${f(cx + 24 * Math.cos(ma))}" cy="${f(ty + 7.6 * Math.sin(ma))}" r="2" fill="${x.on ? x.hot : (p.lt ? p.k : p.l)}"/>` +
+      `<path d="M${cx - 30} ${ty - 5}Q${cx - 6} ${ty - 13} ${cx + 18} ${ty - 11}" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".45"/>`;
+    return wrap(x, bg, s);
+  }
+
+  const PIPS = { 1: [[20, 20]], 2: [[11, 11], [29, 29]], 3: [[10, 10], [20, 20], [30, 30]], 4: [[11, 11], [29, 11], [11, 29], [29, 29]],
+    5: [[10, 10], [30, 10], [20, 20], [10, 30], [30, 30]], 6: [[11, 9], [29, 9], [11, 20], [29, 20], [11, 31], [29, 31]] };
+  function cube(o) {
+    const x = X(o, "#f2f1ee"), p = pal(x.c1), g = x.opt("gest", "flip"), face = x.opt("face", "1");
+    const bg = desk(x, 120, "#857c8c", "#6b4a33");
+    const act = x.on, mv = act ? { flip: "flip", rotate: "", shake: "shake", tap: "tapc" }[g] : "";
+    let s = `<g class="${act && g === "flip" ? P + "flipsh" : ""}">${shadow(x, 100, 150, 52, 10, .6)}</g>`;
+    if (act && g === "rotate") {
+      const arr = (a) => `<path d="M${f(62 * Math.cos(-1))} ${f(62 * Math.sin(-1))}A62 62 0 0 1 ${f(62 * Math.cos(.3))} ${f(62 * Math.sin(.3))}" transform="rotate(${a})" fill="none" stroke="${x.hot}" stroke-width="5" stroke-linecap="round"/>` +
+        `<path d="M0 -10L12 0L0 10Z" transform="rotate(${a}) rotate(${f(.3 * 57.3)}) translate(62 0) rotate(90)" fill="${x.hot}"/>`;
+      s += `<g transform="translate(100 112) scale(1 .38)"><g class="${P}spin">${arr(0)}${arr(180)}</g></g>`;
+    }
+    const top = "M100 60L140 82L100 104L60 82Z", left = "M60 82L100 104L100 148L60 126Z", right = "M100 104L140 82L140 126L100 148Z";
+    let c = `<path d="M100 60L140 82L140 126L100 148L60 126L60 82Z" fill="${p.d}" stroke="${p.d}" stroke-width="12" stroke-linejoin="round"/>` +
+      `<path d="${top}" fill="${x.lg([[0, p.l], [1, H().mix(p.l, p.m, .5)]])}" stroke="${p.l}" stroke-width="10" stroke-linejoin="round"/>` +
+      `<path d="${left}" fill="${x.lg([[0, p.m], [1, p.d]], 0, 0, 1, 1)}" stroke="${p.m}" stroke-width="8" stroke-linejoin="round" stroke-opacity=".6"/>` +
+      `<path d="${right}" fill="${x.lg([[0, p.d], [1, p.k]], 0, 0, 1, 1)}" stroke="${p.d}" stroke-width="8" stroke-linejoin="round" stroke-opacity=".6"/>` +
+      `<path d="M60 82L100 104L140 82" fill="none" stroke="#fff" stroke-opacity="${p.lt ? .75 : .25}" stroke-width="1.6" stroke-linejoin="round"/>` +
+      `<path d="M100 104V148" stroke="#000" stroke-opacity=".12" stroke-width="1.2"/>`;
+    c += `<g transform="matrix(1 .55 -1 .55 100 60)">${(PIPS[face] || PIPS[1]).map(([u, v]) => `<circle cx="${u}" cy="${v}" r="3.6" fill="${p.k}" opacity=".35"/><circle cx="${u - .5}" cy="${v - .5}" r="3" fill="${p.d}" opacity=".6"/>`).join("")}</g>` +
+      `<g transform="matrix(1 .55 0 1.15 60 82)"><circle cx="20" cy="20" r="8" fill="none" stroke="${p.k}" stroke-opacity=".35" stroke-width="1.6"/><circle cx="20" cy="20" r="2" fill="${p.k}" opacity=".3"/></g>` +
+      `<g transform="matrix(1 -.55 0 1.15 100 104)"><rect x="17" y="34" width="6" height="2" rx="1" fill="${act ? x.hot : "#000"}" opacity="${act ? 1 : .3}"/></g>` +
+      `<path d="M72 80L100 64.6" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity="${p.lt ? .7 : .3}"/>`;
+    s += `<g class="${mv ? P + mv : ""}">${c}</g>`;
+    if (act && g === "shake") s += `<g stroke="${x.hot}" stroke-width="3" stroke-linecap="round" fill="none" class="${P}blink"><path d="M44 86Q38 104 44 122M34 92Q29 104 34 116M156 86Q162 104 156 122M166 92Q171 104 166 116"/></g>`;
+    if (act && g === "flip") s += `<g fill="none" stroke="${x.hot}" stroke-width="4" stroke-linecap="round"><path d="M58 50Q100 18 142 50"/></g><path d="M134 40L146 54L130 56Z" fill="${x.hot}"/>`;
+    if (act && g === "tap") {
+      s += [0, 1, 2].map((i) => `<ellipse class="${P}rip" style="animation-delay:${(i * .35).toFixed(2)}s" cx="100" cy="82" rx="${16 + i * 9}" ry="${f((16 + i * 9) * .55)}" fill="none" stroke="${x.hot}" stroke-width="2.4" opacity="${(.9 - i * .25).toFixed(2)}"/>`).join("");
+    }
+    if (act) s += chip(x, { flip: "Flip", rotate: "Rotate", shake: "Shake", tap: "Tap" }[g], x.hot);
+    return wrap(x, bg, s);
+  }
+
+  function rippleSet(x, a, shape) {
+    if (a === "long") return "";
+    const n = a === "double" ? 2 : 1;
+    let s = ""; for (let i = 0; i < n; i++) s += shape(i).replace("<", `<`).replace(/^<(\w+)/, `<$1 class="${P}rip${a === "double" ? "2" : ""}" style="animation-delay:${(i * .3).toFixed(2)}s"`);
+    return s;
+  }
+  function puck(o) {
+    const x = X(o, "#ffffff", "#f2f1ee"), p = pal(x.c2), a = x.opt("act", "single"), cx = 100, ty = 100, rx = 46, ry = 16, h = 14;
+    const bg = desk(x, 104, "#7a8696", "#9a7048");
+    let s = shadow(x, cx, ty + h + 10, 64, 16, .6);
+    if (x.on) s += `<ellipse cx="${cx}" cy="${ty + h + 4}" rx="62" ry="17" fill="${x.rg([[.5, x.c1, .55], [1, x.c1, 0]])}"/>`;
+    s += `<path d="M${cx - rx} ${ty}V${ty + h}A${rx} ${ry} 0 0 0 ${cx + rx} ${ty + h}V${ty}Z" fill="${x.lg([[0, p.k], [.25, p.d], [.45, p.l], [.7, p.m], [1, p.k]], 0, 0, 1, 0)}"/>` +
+      `<path d="M${cx - rx + 2} ${ty + h - 1}A${rx - 2} ${ry - 1} 0 0 0 ${cx + rx - 2} ${ty + h - 1}" fill="none" stroke="#000" stroke-opacity=".25"/>`;
+    s += `<ellipse cx="${cx}" cy="${ty + 2}" rx="${rx}" ry="${ry}" fill="none" stroke="${x.on ? x.c1 : "#000"}" stroke-opacity="${x.on ? .9 : .25}" stroke-width="2.6"/>`;
+    if (x.on && a === "long") s += `<ellipse class="${P}fill" cx="${cx}" cy="${ty + 2}" rx="${rx}" ry="${ry}" pathLength="100" stroke-dasharray="100 100" fill="none" stroke="${x.hot}" stroke-width="3.2" stroke-linecap="round" transform="rotate(180 ${cx} ${ty + 2})"/>`;
+    if (x.on) s += `<ellipse cx="${cx}" cy="${ty + 2}" rx="${rx}" ry="${ry}" fill="none" stroke="${x.c1}" stroke-width="9" opacity=".35" filter="${x.blur(2.4)}"/>`;
+    const topG = `<ellipse cx="${cx}" cy="${ty + 1}" rx="${rx - 3}" ry="${ry - 1.5}" fill="${p.d}"/><ellipse cx="${cx}" cy="${ty}" rx="${rx - 3.5}" ry="${ry - 2}" fill="${x.rg([[0, "#fff", p.lt ? 1 : .35], [.35, p.l], [1, p.m]], .42, .3, .7)}"/>` +
+      `<path d="M${cx - 30} ${ty - 6}Q${cx - 4} ${ty - 14} ${cx + 20} ${ty - 11}" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="${p.lt ? .9 : .3}"/>` +
+      `<ellipse cx="${cx}" cy="${ty}" rx="8" ry="2.8" fill="none" stroke="${p.k}" stroke-opacity=".25"/>`;
+    s += `<g transform="translate(0 ${x.on && !x.anim ? 1.6 : 0})"><g class="${x.on ? P + "p-" + a : ""}">${topG}</g></g>`;
+    if (x.on) s += rippleSet(x, a, (i) => `<ellipse cx="${cx}" cy="${ty + 2}" rx="${rx + 8 + i * 10}" ry="${f(ry + 3 + i * 3.5)}" fill="none" stroke="${x.hot}" stroke-width="2" opacity="${(.8 - i * .25).toFixed(2)}"/>`) + chip(x, ACT_TAG[a], x.c1);
+    return wrap(x, bg, s);
+  }
+  function ringBtn(o) {
+    const x = X(o, "#5ad1ff", "#f2f1ee"), p = pal(x.c2), a = x.opt("act", "single"), cx = 100, cy = 100;
+    const bg = tiles(x);
+    let s = drop(x, `<rect x="62" y="62" width="76" height="76" rx="18"/>`, 3, 6, .5, 3.5);
+    s += `<rect x="62" y="62" width="76" height="76" rx="18" fill="${x.lg([[0, p.l], [.55, p.m], [1, p.d]], 0, 0, 1, 1)}"/>` +
+      `<rect x="62.6" y="62.6" width="74.8" height="74.8" rx="17.4" fill="none" stroke="#fff" stroke-opacity="${p.lt ? .9 : .25}" stroke-width="1.2"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="30" fill="#000" opacity=".28"/><circle cx="${cx}" cy="${cy}" r="28.6" fill="none" stroke="${x.on ? x.c1 : "#fff"}" stroke-opacity="${x.on ? 1 : .2}" stroke-width="2.4"/>`;
+    if (x.on) s += `<g class="${P}breathe">${halo(x, cx, cy, 44, x.c1, .45)}</g><circle cx="${cx}" cy="${cy}" r="28.6" fill="none" stroke="${x.hot}" stroke-width="1"/>`;
+    if (x.on && a === "long") s += `<circle class="${P}fill" cx="${cx}" cy="${cy}" r="28.6" pathLength="100" stroke-dasharray="100 100" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>`;
+    const btn = `<circle cx="${cx}" cy="${cy + 1.6}" r="25" fill="${p.k}" opacity=".5"/><circle cx="${cx}" cy="${cy}" r="25" fill="${x.rg([[0, "#fff", p.lt ? 1 : .3], [.45, p.l], [1, p.d]], .4, .32, .75)}"/>` +
+      `<path d="M${cx - 17} ${cy - 11}A21 21 0 0 1 ${cx + 4} ${cy - 21}" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="${p.lt ? .9 : .3}"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="5" fill="none" stroke="${p.k}" stroke-opacity=".28" stroke-width="1.2"/>`;
+    s += `<g transform="${x.on && !x.anim ? `translate(${cx} ${cy}) scale(.95) translate(${-cx} ${-cy})` : ""}"><g class="${x.on ? P + "s-" + a : ""}">${btn}</g></g>`;
+    if (x.on) s += rippleSet(x, a, (i) => `<circle cx="${cx}" cy="${cy}" r="${36 + i * 9}" fill="none" stroke="${x.c1}" stroke-width="2.2" opacity="${(.8 - i * .25).toFixed(2)}"/>`) + chip(x, ACT_TAG[a], x.c1);
+    return wrap(x, bg, s);
+  }
+
+  function remote(o) {
+    const x = X(o, "#7dff9a", "#f2f1ee"), p = pal(x.c2), st = x.opt("style", "light");
+    const bg = desk(x, 150, "#6d6878", "#5a3d2a") + `<ellipse cx="160" cy="50" rx="60" ry="46" fill="${x.rg([[0, "#ffe2a8", .25], [1, "#ffe2a8", 0]])}"/>`;
+    const ink = p.dark ? "#cfd2d8" : "#4a4d55";
+    const bodyFill = x.lg([[0, p.k], [.12, p.d], [.32, p.l], [.6, p.m], [1, p.k]], 0, 0, 1, 0);
+    const key = (kx, ky, w, h2, r, lit) => `<rect x="${kx}" y="${ky + 1.2}" width="${w}" height="${h2}" rx="${r}" fill="#000" opacity=".3"/>` +
+      `<rect x="${kx}" y="${ky}" width="${w}" height="${h2}" rx="${r}" fill="${x.lg([[0, p.l], [1, p.d]])}" stroke="${lit ? x.c1 : "#000"}" stroke-opacity="${lit ? 1 : .15}" stroke-width="${lit ? 1.6 : .8}"/>`;
+    let r = "", tip = [100, 30];
+    if (st === "tv") {
+      tip = [100, 24];
+      r += `<rect x="82" y="24" width="36" height="150" rx="17" fill="${bodyFill}"/><rect x="82.5" y="24.5" width="35" height="149" rx="16.5" fill="none" stroke="#fff" stroke-opacity=".18"/>` +
+        `<circle cx="91" cy="37" r="3.6" fill="#c8343a"/><circle cx="90.4" cy="36.3" r="1.2" fill="#fff" opacity=".5"/><circle cx="110" cy="37" r="1.6" fill="#000" opacity=".4"/>` +
+        `<circle cx="100" cy="68" r="15" fill="#000" opacity=".3"/><circle cx="100" cy="67" r="15" fill="${x.lg([[0, p.l], [1, p.d]])}" stroke="#000" stroke-opacity=".2"/>` +
+        `<g fill="${ink}" opacity=".7"><path d="M100 54.6l2.6 3h-5.2zM100 79.4l2.6-3h-5.2zM87.6 67l3-2.6v5.2zM112.4 67l-3-2.6v5.2z"/></g>` +
+        `<circle cx="100" cy="67" r="7" fill="${x.lg([[0, p.l], [1, p.m]])}" stroke="${x.on ? x.c1 : "#000"}" stroke-opacity="${x.on ? 1 : .2}" stroke-width="${x.on ? 1.8 : .8}"/>` +
+        [89, 100, 111].map((bx) => `<circle cx="${bx}" cy="94" r="4.2" fill="#000" opacity=".3"/><circle cx="${bx}" cy="93.4" r="4.2" fill="${x.lg([[0, p.l], [1, p.d]])}"/>`).join("") +
+        `<rect x="86" y="106" width="9" height="30" rx="4.5" fill="${x.lg([[0, p.l], [1, p.d]])}" stroke="#000" stroke-opacity=".2"/><rect x="105" y="106" width="9" height="30" rx="4.5" fill="${x.lg([[0, p.l], [1, p.d]])}" stroke="#000" stroke-opacity=".2"/>` +
+        `<g stroke="${ink}" stroke-width="1.2" stroke-linecap="round" opacity=".7"><path d="M88.4 111H92.6M90.5 109V113M88.4 131H92.6M107.4 111l2.1 -2l2.1 2M107.4 130l2.1 2l2.1 -2"/></g>` +
+        [146, 154, 162].map((y) => `<circle cx="100" cy="${y}" r=".8" fill="#000" opacity=".5"/>`).join("");
+    } else if (st === "scene") {
+      tip = [100, 52];
+      r += `<rect x="68" y="52" width="64" height="100" rx="15" fill="${bodyFill}"/><rect x="68.5" y="52.5" width="63" height="99" rx="14.5" fill="none" stroke="#fff" stroke-opacity=".3"/>`;
+      const cells = [[74, 66, 1], [102, 66, 2], [74, 106, 3], [102, 106, 4]];
+      r += cells.map(([kx, ky, k]) => key(kx, ky, 24, 36, 7, x.on && k === 2) + `<text x="${kx + 12}" y="${ky + 22.5}" text-anchor="middle" ${FONT} font-size="13" font-weight="600" fill="${x.on && k === 2 ? x.c1 : ink}" opacity=".8">${k}</text>`).join("");
+    } else {
+      tip = [100, 40];
+      r += `<rect x="78" y="40" width="44" height="122" rx="13" fill="${bodyFill}"/><rect x="78.5" y="40.5" width="43" height="121" rx="12.5" fill="none" stroke="#fff" stroke-opacity=".3"/>` +
+        key(85, 52, 30, 20, 5, x.on) + key(85, 79, 30, 16, 4) + key(85, 118, 30, 16, 4) + key(85, 140, 30, 16, 5) +
+        `<circle cx="100" cy="106.4" r="5.6" fill="#000" opacity=".3"/><circle cx="100" cy="106" r="5.6" fill="${x.lg([[0, p.l], [1, p.d]])}"/>` +
+        `<g stroke="${ink}" stroke-width="1.4" stroke-linecap="round" fill="none" opacity=".75"><path d="M96 89.4l4-3.6l4 3.6M96 123.6l4 3.6l4-3.6M96.4 148H103.6"/>` +
+        `<path d="M96.6 59.2A4.8 4.8 0 1 0 103.4 59.2M100 56.6V62" stroke="${x.on ? x.c1 : ink}"/></g>`;
+    }
+    const sh = drop(x, r.match(/<rect [^>]*>/)[0].replace(/fill="[^"]*"/, ""), 4, 8, .5, 4);
+    let s = `<g transform="rotate(-8 100 100)${st === "tv" ? " translate(12 22) scale(.86)" : ""}">${sh}${r}${led(x, tip[0], tip[1] + 6, 1.4, x.c1, x.on, true)}`;
+    if (x.on) s += waves(x, tip[0], tip[1] - 2, -90, 70, x.hot, 3, 9, 8);
+    s += `</g>`;
+    return wrap(x, bg, s);
+  }
+
+  function irBlaster(o) {
+    const x = X(o, "#ff5a7a", "#1e1f24"), p = pal(x.c2), cx = 100, ty = 92, by = 140, rx = 34, ry = 11;
+    const bg = desk(x, 140, "#5f6672", "#4a3426") +
+      `<rect x="14" y="20" width="62" height="40" rx="2" fill="#0b0c10"/><rect x="16" y="22" width="58" height="34" fill="${x.lg([[0, "#1d2433"], [1, "#0b0f18"]], 0, 0, 1, 1)}"/><path d="M18 24L50 24L22 50Z" fill="#fff" opacity=".05"/><rect x="40" y="60" width="10" height="8" fill="#15161a"/>`;
+    let s = shadow(x, cx, by + 4, 50, 9, .65);
+    s += `<path d="M${cx - rx} ${ty}V${by - 4}Q${cx - rx} ${by + ry - 2} ${cx} ${by + ry - 1}Q${cx + rx} ${by + ry - 2} ${cx + rx} ${by - 4}V${ty}Z" fill="${x.lg([[0, p.k], [.25, p.d], [.42, p.l], [.6, p.m], [1, p.k]], 0, 0, 1, 0)}"/>`;
+    s += `<path d="M${cx - rx} 100A${rx} ${ry} 0 0 0 ${cx + rx} 100V120A${rx} ${ry} 0 0 1 ${cx - rx} 120Z" fill="${x.lg([[0, "#000", .85], [.4, "#3a1820", .9], [.55, "#5a2430", .85], [1, "#000", .9]], 0, 0, 1, 0)}"/>` +
+      `<path d="M${cx - 18} 104V128" stroke="#fff" stroke-opacity=".18" stroke-width="4"/>`;
+    if (x.on) s += `<path d="M${cx - rx} 100A${rx} ${ry} 0 0 0 ${cx + rx} 100V120A${rx} ${ry} 0 0 1 ${cx - rx} 120Z" fill="${x.c1}" opacity=".22" class="${P}blink"/>`;
+    s += `<ellipse cx="${cx}" cy="${ty}" rx="${rx}" ry="${ry}" fill="${x.lg([[0, p.l], [1, p.k]])}"/><ellipse cx="${cx - 8}" cy="${ty - 3}" rx="16" ry="4" fill="#fff" opacity=".22"/>` +
+      `<path d="M${cx - rx + 2} ${ty + 1}A${rx - 2} ${ry - 1} 0 0 0 ${cx + rx - 2} ${ty + 1}" fill="none" stroke="#fff" stroke-opacity=".2"/>`;
+    s += led(x, cx + 14, 132, 1.2, "#5ab8ff", x.on, false);
+    if (x.on) s += waves(x, cx - rx - 2, 110, 180, 70, x.hot, 3, 6, 9) + waves(x, cx + rx + 2, 110, 0, 70, x.hot, 3, 6, 9) + waves(x, cx, ty - 8, -90, 60, x.hot, 3, 6, 9);
+    return wrap(x, bg, s);
+  }
+  function rfBridge(o) {
+    const x = X(o, "#ff8a3d", "#f2f1ee"), p = pal(x.c2);
+    const bg = desk(x, 150, "#7d8590", "#7a5233");
+    let s = shadow(x, 100, 152, 52, 8, .6);
+    s += `<path d="M126 74L132 30" stroke="#16171b" stroke-width="7" stroke-linecap="round"/><path d="M125 70L131 32" stroke="#fff" stroke-opacity=".18" stroke-width="1.4" stroke-linecap="round"/>` +
+      `<rect x="120" y="68" width="12" height="8" rx="2" fill="${x.lg([[0, "#d0d3d8"], [1, "#6b7079"]], 0, 0, 1, 0)}"/>`;
+    s += `<rect x="58" y="74" width="84" height="78" rx="11" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 1)}"/>` +
+      `<rect x="58" y="74" width="84" height="12" rx="11" fill="#fff" opacity="${p.lt ? .5 : .12}"/><rect x="58.6" y="74.6" width="82.8" height="76.8" rx="10.4" fill="none" stroke="#fff" stroke-opacity="${p.lt ? .9 : .2}" stroke-width="1.2"/>` +
+      `<path d="M62 144H138" stroke="#000" stroke-opacity=".1" stroke-width="3"/>` +
+      `<rect x="70" y="112" width="60" height="22" rx="4" fill="#15171c"/><rect x="72" y="114" width="56" height="18" rx="3" fill="${x.lg([[0, "#22252d"], [1, "#0d0f13"]])}"/>` +
+      `<g fill="#6a7180" opacity=".75"><rect x="78" y="120" width="20" height="2" rx="1"/><rect x="78" y="125" width="30" height="2" rx="1"/></g>`;
+    s += led(x, 76, 96, 1.6, "#5ab8ff", true, false) + led(x, 88, 96, 1.6, x.c1, x.on, true);
+    s += [0, 1, 2, 3].map((i) => `<rect x="${104 + i * 7}" y="94" width="4" height="4" rx="1" fill="#000" opacity=".12"/>`).join("");
+    if (x.on) s += waves(x, 132, 30, 0, 80, x.hot, 3, 9, 9) + waves(x, 132, 30, 180, 80, x.hot, 3, 9, 9);
+    return wrap(x, bg, s);
+  }
+
+  const LABELS = { scenes: ["Morning", "Movie", "Dinner", "Night", "Away", "All off"], rooms: ["Kitchen", "Living", "Bedroom", "Office", "Porch", "Garage"] };
+  function ico(k, cx, cy, c) {
+    const st = `fill="none" stroke="${c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"`;
+    switch (k) {
+      case 0: return `<g ${st}><circle cx="${cx}" cy="${cy}" r="3"/><path d="M${cx} ${cy - 6}v1.4M${cx} ${cy + 4.6}v1.4M${cx - 6} ${cy}h1.4M${cx + 4.6} ${cy}h1.4"/></g>`;
+      case 1: return `<g ${st}><rect x="${cx - 5}" y="${cy - 3.5}" width="10" height="7" rx="1"/><path d="M${cx - 1.4} ${cy - 1.6}l3 1.6l-3 1.6z" fill="${c}"/></g>`;
+      case 2: return `<g ${st}><path d="M${cx - 3} ${cy - 5}v10M${cx - 4.6} ${cy - 5}v3q1.6 2 3.2 0v-3M${cx + 3} ${cy + 5}v-10q-2.4 2-1 5h1"/></g>`;
+      case 3: return `<g ${st}><path d="M${cx + 2} ${cy - 5}a5 5 0 1 0 3 8a4 4 0 0 1 -3 -8z"/></g>`;
+      case 4: return `<g ${st}><path d="M${cx - 5} ${cy}l5 -4.6l5 4.6M${cx - 3.4} ${cy - 1}v5h6.8v-5"/></g>`;
+      default: return `<g ${st}><path d="M${cx - 2.6} ${cy - 3.4}a4.6 4.6 0 1 0 5.2 0M${cx} ${cy - 5.4}v4.4"/></g>`;
+    }
+  }
+  function eink(o) {
+    const x = X(o, "#7dff9a", "#f2f1ee"), p = pal(x.c2), n = +x.opt("layout", "4"), lab = LABELS[x.opt("labels", "scenes")] || LABELS.scenes;
+    const bg = wall(x, "#8c8478", 9);
+    const X0 = 42, Y0 = 44, W = 116, Hh = 112, rows = n / 2;
+    let s = drop(x, `<rect x="${X0}" y="${Y0}" width="${W}" height="${Hh}" rx="12"/>`, 3, 6, .5, 4);
+    s += `<rect x="${X0}" y="${Y0}" width="${W}" height="${Hh}" rx="12" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 1)}"/>` +
+      `<rect x="${X0 + .6}" y="${Y0 + .6}" width="${W - 1.2}" height="${Hh - 1.2}" rx="11.4" fill="none" stroke="#fff" stroke-opacity="${p.lt ? .9 : .2}" stroke-width="1.2"/>`;
+    const sx = 62, sy = 54, sw = 76, sh = 92;
+    s += `<rect x="${sx - 1.5}" y="${sy - 1.5}" width="${sw + 3}" height="${sh + 3}" rx="3" fill="#000" opacity=".35"/><rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="2" fill="${x.lg([[0, "#ecebe4"], [1, "#d4d3cb"]], 0, 0, 1, 1)}"/>`;
+    const rh = sh / rows, active = 0;
+    for (let i = 0; i < n; i++) {
+      const col = i % 2, row = Math.floor(i / 2), cy = sy + rh * row + rh / 2, isA = x.on && i === active;
+      const zx = col ? sx + sw / 2 + 1 : sx + 2, zw = sw / 2 - 3;
+      const inkc = isA ? "#ecebe4" : "#24252a";
+      if (isA) s += `<rect x="${zx}" y="${f(sy + rh * row + 2)}" width="${zw}" height="${f(rh - 4)}" rx="2" fill="#1d1e22"/>`;
+      if (row > 0 && col === 0) s += `<path d="M${sx + 4} ${f(sy + rh * row)}H${sx + sw - 4}" stroke="#24252a" stroke-opacity=".35" stroke-width=".6"/>`;
+      s += ico(i, f(col ? zx + zw - 8 : zx + 8), f(cy - (rows > 2 ? 4 : 6)), inkc) +
+        `<text x="${f(col ? zx + zw - 3 : zx + 3)}" y="${f(cy + (rows > 2 ? 8 : 10))}" text-anchor="${col ? "end" : "start"}" ${FONT} font-size="${rows > 2 ? 6.6 : 7.6}" font-weight="600" fill="${inkc}">${lab[i]}</text>`;
+      const kx = col ? X0 + W - 15 : X0 + 4, lit = isA, pressed = lit;
+      s += `<rect x="${kx}" y="${f(cy - rh / 2 + 6)}" width="11" height="${f(rh - 12)}" rx="4" fill="#000" opacity=".22"/>` +
+        `<rect x="${kx + (pressed ? .4 : 0)}" y="${f(cy - rh / 2 + 5 + (pressed ? 1 : 0))}" width="11" height="${f(rh - 12)}" rx="4" fill="${x.lg([[0, p.l], [1, p.d]], 0, 0, 1, 0)}" stroke="#000" stroke-opacity=".12"/>`;
+      s += led(x, col ? X0 + W - 9.5 : X0 + 9.5, f(cy + rh / 2 - 4), 1, x.c1, lit, false);
+    }
+    s += `<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="2" fill="${x.lg([[0, "#fff", .25], [.4, "#fff", 0]], 0, 0, 1, 1)}"/>`;
+    if (x.on) s += `<rect class="${P}ink" x="${sx}" y="${sy}" width="${sw}" height="${sh}" rx="2" fill="#111" opacity="0"/>`;
+    return wrap(x, bg, s);
+  }
+
+  function touch(o) {
+    const x = X(o, "#5ad1ff", "#1b1c21"), p = pal(x.c2), cx = 100, cy = 100;
+    const bg = wall(x, "#6f7e7a", 13);
+    let s = drop(x, `<rect x="62" y="62" width="76" height="76" rx="14"/>`, 3, 6, .55, 3.5);
+    s += `<rect x="62" y="62" width="76" height="76" rx="14" fill="${x.lg([[0, p.l], [.45, p.m], [1, p.k]], 0, 0, 1, 1)}"/>` +
+      `<path d="M66 66H124L66 118Z" fill="#fff" opacity="${p.lt ? .35 : .08}"/><rect x="62.6" y="62.6" width="74.8" height="74.8" rx="13.4" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1"/>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="21" fill="none" stroke="${x.on ? x.c1 : (p.lt ? "#000" : "#fff")}" stroke-opacity="${x.on ? 1 : .22}" stroke-width="1.6"/>`;
+    let fp = ""; for (let i = 0; i < 5; i++) { const r = 3 + i * 2.6; fp += `<path d="M${f(cx - r)} ${cy + 2}A${r} ${f(r * 1.15)} 0 1 1 ${f(cx + r)} ${cy + 2}"/>`; }
+    if (x.on) {
+      s += `<g class="${P}breathe">${halo(x, cx, cy, 46, x.c1, .5)}</g>` +
+        `<g fill="none" stroke="${x.hot}" stroke-width="1.3" stroke-linecap="round" opacity=".95">${fp}</g>` +
+        [0, 1].map((i) => `<circle class="${P}rip" style="animation-delay:${(i * .5).toFixed(2)}s" cx="${cx}" cy="${cy}" r="${27 + i * 8}" fill="none" stroke="${x.c1}" stroke-width="2" opacity="${(.8 - i * .3).toFixed(2)}"/>`).join("");
+    } else s += `<g fill="none" stroke="${p.lt ? "#000" : "#fff"}" stroke-width="1" stroke-linecap="round" opacity=".1">${fp}</g>`;
+    s += led(x, cx, 128, 1.2, x.c1, x.on, false);
+    return wrap(x, bg, s);
+  }
+  function hand(x, cx, cy) {
+    const parts = [`<rect x="-14" y="-34" width="8.4" height="28" rx="4.2"/>`, `<rect x="-4.6" y="-39" width="8.8" height="33" rx="4.4"/>`, `<rect x="5" y="-35" width="8.4" height="29" rx="4.2"/>`,
+      `<rect x="14" y="-27" width="7.4" height="23" rx="3.7"/>`, `<rect x="-22" y="-12" width="8.6" height="24" rx="4.3" transform="rotate(-38 -18 6)"/>`,
+      `<rect x="-15" y="-12" width="37" height="34" rx="12"/>`, `<rect x="-9" y="16" width="26" height="22" rx="5"/>`].join("");
+    const skin = x.lg([[0, "#f6c9a4"], [.6, "#e7a982"], [1, "#c98a66"]], 0, 0, 1, 1);
+    return `<g transform="translate(${cx} ${cy})"><g fill="#6b3f2a" stroke="#6b3f2a" stroke-width="3" stroke-linejoin="round">${parts}</g><g fill="${skin}">${parts}</g>` +
+      `<g fill="none" stroke="#a8684a" stroke-opacity=".55" stroke-width=".9" stroke-linecap="round"><path d="M-12 -14h4.6M-2.6 -16h4.8M7 -14h4.6M15.6 -9h4"/><path d="M-11 4Q-3 6 -1 20"/></g>` +
+      `<path d="M-11 -30v14M-1 -35v16" stroke="#fff" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round"/></g>`;
+  }
+  function gesture(o) {
+    const x = X(o, "#b07cff", "#f2f1ee"), p = pal(x.c2), dir = x.opt("wave", "right");
+    const bg = wall(x, "#7d7590", 17) + `<rect y="150" width="200" height="50" fill="${x.lg([[0, "#d9d3c7"], [1, "#a39b8c"]])}"/><rect y="150" width="200" height="3" fill="#fff" opacity=".35"/>`;
+    let s = shadow(x, 100, 152, 70, 6, .6);
+    if (x.on) s += `<path d="M78 128L46 40H154L122 128Z" fill="${x.lg([[0, x.c1, 0], [1, x.c1, .28]])}"/>`;
+    s += `<rect x="36" y="124" width="128" height="26" rx="13" fill="${x.lg([[0, p.l], [.55, p.m], [1, p.d]])}"/>` +
+      `<rect x="36.6" y="124.6" width="126.8" height="24.8" rx="12.4" fill="none" stroke="#fff" stroke-opacity="${p.lt ? .9 : .2}" stroke-width="1.2"/>` +
+      `<rect x="68" y="130" width="64" height="14" rx="7" fill="${x.lg([[0, "#1a1b22"], [1, "#07080b"]])}"/>` +
+      `<circle cx="88" cy="137" r="3.4" fill="${x.rg([[0, "#6a5a8a"], [1, "#0b0b10"]], .35, .35)}"/><circle cx="112" cy="137" r="3.4" fill="${x.rg([[0, "#6a5a8a"], [1, "#0b0b10"]], .35, .35)}"/>` +
+      `<path d="M72 132H118" stroke="#fff" stroke-opacity=".15" stroke-width="1.2" stroke-linecap="round"/>` + led(x, 150, 137, 1.4, x.c1, x.on, true);
+    if (x.on) {
+      const mcls = { right: "swr", left: "swl", updown: "swu" }[dir] || "swr";
+      const lines = dir === "updown"
+        ? `<path d="M140 50V76M148 56V72M60 50V76M52 56V72"/>`
+        : `<path d="M${dir === "left" ? "136 54h22M140 64h26M136 74h22" : "64 54h-22M60 64h-26M64 74h-22"}"/>`;
+      s += `<g fill="none" stroke="${x.hot}" stroke-width="2.6" stroke-linecap="round" class="${P}blink">${lines}</g>`;
+      s += `<g class="${P}${mcls}">${hand(x, 100, 66)}</g>`;
+    }
+    return wrap(x, bg, s);
+  }
+
+  function keyShape(x, metal, tx, ty, rot) {
+    const m = metal === "brass" ? ["#fbe6a2", "#c9a04c", "#7a5a20"] : ["#f2f4f7", "#a9afb8", "#5c626b"];
+    const g = x.lg([[0, m[0]], [.5, m[1]], [1, m[2]]], 0, 0, 1, 1);
+    return `<g transform="translate(${tx} ${ty}) rotate(${rot})"><path d="M-9 -9A12 12 0 1 1 -9 9L-6 6A8 8 0 1 0 -6 -6Z" fill="${g}"/><circle r="12" fill="${g}"/><circle cx="-4" r="3.4" fill="#000" opacity=".55"/>` +
+      `<path d="M10 -4H48L52 0L48 4H44L42 7L39 4H35L33 8L30 4H10Z" fill="${g}" stroke="${m[2]}" stroke-width=".6"/><path d="M12 -1.2H46" stroke="${m[2]}" stroke-opacity=".6"/>` +
+      `<path d="M-6 -7A9 9 0 0 1 6 -8" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.2" stroke-linecap="round"/></g>`;
+  }
+  function keytag(o) {
+    const x = X(o, "#2b2d33"), p = pal(x.c1), home = x.on, gc = "#5ef08a";
+    const bg = desk(x, 70, "#6f7684", "#8a6040");
+    let s = shadow(x, 104, 150, 50, 10, .55) + shadow(x, 60, 128, 36, 8, .45);
+    s += keyShape(x, "brass", 64, 112, 150) + keyShape(x, "steel", 58, 92, 200);
+    s += `<circle cx="78" cy="86" r="15" fill="none" stroke="#5c626b" stroke-width="4.4"/><circle cx="78" cy="86" r="15" fill="none" stroke="${x.lg([[0, "#f4f6f9"], [1, "#8d939c"]], 0, 0, 1, 1)}" stroke-width="3"/>`;
+    const tag = "M92 80C104 72 122 74 134 86C150 102 148 128 130 140C114 150 94 146 86 130C78 116 80 92 92 80Z";
+    s += `<path d="${tag}" fill="${p.k}" transform="translate(1.5 3)"/><path d="${tag}" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 1)}"/>` +
+      `<path d="M96 84C106 78 120 79 130 88" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="${p.lt ? .9 : .35}"/>` +
+      `<circle cx="96" cy="88" r="5" fill="${p.k}"/><circle cx="96" cy="88" r="3.4" fill="#000" opacity=".6"/>` +
+      `<path d="M78 101A15 15 0 0 0 93 86" fill="none" stroke="#8d939c" stroke-width="3"/>` +
+      `<circle cx="116" cy="114" r="14" fill="${p.d}" opacity=".7"/><circle cx="116" cy="113" r="13" fill="${x.rg([[0, p.l], [1, p.m]], .4, .35, .7)}"/>`;
+    s += led(x, 116, 134, 1.6, gc, home, true);
+    if (home) s += waves(x, 136, 84, -45, 70, gc, 3, 8, 8);
+    s += `<g class="hda-bg"><rect x="18" y="18" width="${home ? 46 : 44}" height="16" rx="8" fill="#000" opacity=".5"/><circle cx="28" cy="26" r="3.4" fill="${home ? gc : "#9aa0a8"}"/>` +
+      `<text x="35" y="29.6" ${FONT} font-size="9.5" font-weight="600" fill="#fff">${home ? "Home" : "Away"}</text></g>`;
+    return wrap(x, bg, s);
+  }
+  function beacon(o) {
+    const x = X(o, "#f2f1ee"), p = pal(x.c1), cx = 92, cy = 98;
+    const bg = wall(x, "#88808f", 21) + `<rect x="150" y="0" width="22" height="200" fill="${x.lg([[0, "#f2efe8"], [.6, "#d8d3c8"], [1, "#a8a296"]], 0, 0, 1, 0)}"/><rect x="150" width="2" height="200" fill="#000" opacity=".2"/>` +
+      `<rect x="172" width="28" height="200" fill="${x.lg([[0, "#6a4a32"], [1, "#4a3020"]], 0, 0, 1, 0)}"/>`;
+    let s = drop(x, `<circle cx="${cx}" cy="${cy}" r="33"/>`, 3, 6, .55, 3.5);
+    s += `<circle cx="${cx + 1.5}" cy="${cy + 3}" r="32" fill="${p.k}"/><circle cx="${cx}" cy="${cy}" r="32" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 1)}"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="24" fill="none" stroke="#000" stroke-opacity=".15" stroke-width="1.4"/><circle cx="${cx}" cy="${cy + .8}" r="24" fill="none" stroke="#fff" stroke-opacity="${p.lt ? .7 : .15}" stroke-width=".8"/>` +
+      `<path d="M${cx - 22} ${cy - 14}A26 26 0 0 1 ${cx + 2} ${cy - 27}" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity="${p.lt ? .85 : .3}"/>` +
+      `<circle cx="${cx}" cy="${cy + 10}" r="4" fill="${p.d}" opacity=".6"/>`;
+    s += led(x, cx, cy - 6, 1.6, "#5ab8ff", x.on, true);
+    if (x.on) s += waves(x, cx - 36, cy, 180, 80, "#7cc4ff", 3, 6, 9) + waves(x, cx + 36, cy, 0, 80, "#7cc4ff", 3, 6, 9);
+    return wrap(x, bg, s);
+  }
+
+  const LEDS = ["#ffb347", "#ffffff", "#7cc4ff", "#7dff9a", "#ff6b9a", "#b07cff"];
+  const BODY = ["#f2f1ee", "#2c2e33", "#b8bdc3", "#d9c7a8"];
+  const icons = [
+    { id: "dial", name: "Dial switch", colors: LEDS, picker: true, colorLabel: "Ring light", colors2: BODY, picker2: true, colorLabel2: "Body", render: dialSwitch },
+    { id: "knob", name: "Puck knob", colors: ["#7cc4ff", "#ffb347", "#7dff9a", "#ff6b9a", "#ffffff"], picker: true, colorLabel: "Ring light", colors2: ["#2c2e33", "#f2f1ee", "#5a6a5a", "#8a4a3a"], picker2: true, colorLabel2: "Body", render: knob },
+    { id: "cube", name: "Gesture cube", colors: ["#f2f1ee", "#b8bdc3", "#2c2e33", "#a8c8e8", "#f2c4c4"], picker: true, colorLabel: "Body",
+      options: [{ id: "gest", name: "Gesture", values: [["flip", "Flip"], ["rotate", "Rotate"], ["shake", "Shake"], ["tap", "Tap"]] },
+        { id: "face", name: "Face up", values: [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]] }], render: cube },
+    { id: "puck", name: "Puck button", colors: ["#ffffff", "#ffb347", "#7cc4ff", "#7dff9a", "#ff6b9a"], picker: true, colorLabel: "Light ring", colors2: BODY, picker2: true, colorLabel2: "Body", options: [ACTION], render: puck },
+    { id: "ring", name: "Ring button", colors: ["#5ad1ff", "#ffffff", "#ffb347", "#7dff9a", "#ff6b9a"], picker: true, colorLabel: "Light ring", colors2: BODY, picker2: true, colorLabel2: "Plate", options: [firstIs(ACTION, "double")], render: ringBtn },
+    { id: "remote", name: "Handheld remote", colors: ["#7dff9a", "#ff5a5a", "#7cc4ff", "#ffb347"], picker: true, colorLabel: "LED", colors2: ["#f2f1ee", "#2a2b30", "#8d939a", "#d9c7a8"], picker2: true, colorLabel2: "Body",
+      options: [{ id: "style", name: "Style", values: [["light", "Light remote"], ["tv", "TV remote"], ["scene", "Multi-scene"]] }], render: remote },
+    { id: "ir", name: "IR blaster", colors: ["#ff5a7a", "#b07cff", "#ff8a3d", "#5ad1ff"], picker: true, colorLabel: "Beam", colors2: ["#1e1f24", "#f2f1ee", "#3a3d48"], picker2: true, colorLabel2: "Body", render: irBlaster },
+    { id: "rf", name: "RF bridge", colors: ["#ff8a3d", "#ff5a7a", "#7dff9a", "#5ad1ff"], picker: true, colorLabel: "Signal", colors2: ["#f2f1ee", "#2c2e33", "#b8bdc3"], picker2: true, colorLabel2: "Body", render: rfBridge },
+    { id: "eink", name: "E-paper scene panel", colors: ["#7dff9a", "#ffb347", "#7cc4ff", "#ffffff"], picker: true, colorLabel: "LED", colors2: ["#f2f1ee", "#2c2e33", "#b8bdc3", "#c8a878"], picker2: true, colorLabel2: "Frame",
+      options: [{ id: "layout", name: "Buttons", values: [["4", "4 buttons"], ["6", "6 buttons"]] }, { id: "labels", name: "Labels", values: [["scenes", "Scenes"], ["rooms", "Rooms"]] }], render: eink },
+    { id: "touch", name: "Touch sensor", colors: ["#5ad1ff", "#ffffff", "#ffb347", "#7dff9a", "#ff6b9a"], picker: true, colorLabel: "Glow", colors2: ["#1b1c21", "#f2f1ee", "#3a4a5a"], picker2: true, colorLabel2: "Glass", render: touch },
+    { id: "gesture", name: "Gesture sensor", colors: ["#b07cff", "#5ad1ff", "#7dff9a", "#ffb347"], picker: true, colorLabel: "Glow", colors2: ["#f2f1ee", "#2c2e33", "#b8bdc3"], picker2: true, colorLabel2: "Body",
+      options: [{ id: "wave", name: "Wave", values: [["right", "Left to right"], ["left", "Right to left"], ["updown", "Up and down"]] }], render: gesture },
+    { id: "keytag", name: "Key tag", colors: ["#2b2d33", "#f2f1ee", "#d8443c", "#3a6fd8", "#f0b429"], picker: true, colorLabel: "Tag", render: keytag },
+    { id: "beacon", name: "BLE beacon", colors: ["#f2f1ee", "#2c2e33", "#3a6fd8", "#d8443c"], picker: true, colorLabel: "Body", render: beacon },
+  ];
+
+  const css = `
+.hda-buttons-breathe,.hda-buttons-nudge,.hda-buttons-spin,.hda-buttons-rip,.hda-buttons-rip2,.hda-buttons-wave,.hda-buttons-shake,.hda-buttons-flip,.hda-buttons-flipsh,.hda-buttons-tapc,.hda-buttons-s-single,.hda-buttons-s-double,.hda-buttons-s-long,.hda-buttons-swr,.hda-buttons-swl,.hda-buttons-swu{transform-box:fill-box;transform-origin:center}
+@keyframes hda-buttons-breathe{0%,100%{opacity:1}50%{opacity:.55}}
+.hda-anim .hda-buttons-breathe{animation:hda-buttons-breathe 2.6s ease-in-out infinite}
+@keyframes hda-buttons-nudge{0%,100%{transform:rotate(0deg)}50%{transform:rotate(7deg)}}
+.hda-anim .hda-buttons-nudge{animation:hda-buttons-nudge 2.4s ease-in-out infinite}
+@keyframes hda-buttons-blink{0%,55%{opacity:1}65%,100%{opacity:.25}}
+.hda-anim .hda-buttons-blink{animation:hda-buttons-blink 1.1s steps(1) infinite}
+@keyframes hda-buttons-spin{to{transform:rotate(360deg)}}
+.hda-anim .hda-buttons-spin{animation:hda-buttons-spin 2.4s linear infinite}
+@keyframes hda-buttons-rip{0%{opacity:.9;transform:scale(.7)}45%,100%{opacity:0;transform:scale(1.35)}}
+.hda-anim .hda-buttons-rip{animation:hda-buttons-rip 1.6s ease-out infinite}
+@keyframes hda-buttons-rip2{0%{opacity:.9;transform:scale(.7)}30%,100%{opacity:0;transform:scale(1.3)}}
+.hda-anim .hda-buttons-rip2{animation:hda-buttons-rip2 1.6s ease-out infinite}
+@keyframes hda-buttons-wave{0%{opacity:0;transform:scale(.6)}30%{opacity:1}100%{opacity:0;transform:scale(1.25)}}
+.hda-anim .hda-buttons-wave{animation:hda-buttons-wave 1.4s ease-out infinite}
+@keyframes hda-buttons-p-single{0%,30%,100%{transform:translateY(0)}10%,18%{transform:translateY(3px)}}
+@keyframes hda-buttons-p-double{0%,40%,100%{transform:translateY(0)}7%{transform:translateY(3px)}14%{transform:translateY(0)}21%{transform:translateY(3px)}28%{transform:translateY(0)}}
+@keyframes hda-buttons-p-long{0%,85%,100%{transform:translateY(0)}8%,75%{transform:translateY(3px)}}
+.hda-anim .hda-buttons-p-single{animation:hda-buttons-p-single 1.6s ease-in-out infinite}
+.hda-anim .hda-buttons-p-double{animation:hda-buttons-p-double 1.6s ease-in-out infinite}
+.hda-anim .hda-buttons-p-long{animation:hda-buttons-p-long 2s ease-in-out infinite}
+@keyframes hda-buttons-s-single{0%,30%,100%{transform:scale(1)}10%,18%{transform:scale(.93)}}
+@keyframes hda-buttons-s-double{0%,40%,100%{transform:scale(1)}7%{transform:scale(.93)}14%{transform:scale(1)}21%{transform:scale(.93)}28%{transform:scale(1)}}
+@keyframes hda-buttons-s-long{0%,85%,100%{transform:scale(1)}8%,75%{transform:scale(.93)}}
+.hda-anim .hda-buttons-s-single{animation:hda-buttons-s-single 1.6s ease-in-out infinite}
+.hda-anim .hda-buttons-s-double{animation:hda-buttons-s-double 1.6s ease-in-out infinite}
+.hda-anim .hda-buttons-s-long{animation:hda-buttons-s-long 2s ease-in-out infinite}
+@keyframes hda-buttons-fill{0%,8%{stroke-dashoffset:100}75%,100%{stroke-dashoffset:0}}
+.hda-anim .hda-buttons-fill{animation:hda-buttons-fill 2s linear infinite}
+@keyframes hda-buttons-shake{0%,100%{transform:rotate(0deg)}20%{transform:rotate(-6deg)}40%{transform:rotate(6deg)}60%{transform:rotate(-4deg)}80%{transform:rotate(4deg)}}
+.hda-anim .hda-buttons-shake{animation:hda-buttons-shake .5s ease-in-out infinite}
+@keyframes hda-buttons-flip{0%,15%,100%{transform:translateY(0) rotate(0deg)}40%{transform:translateY(-20px) rotate(-16deg)}60%{transform:translateY(-14px) rotate(10deg)}80%{transform:translateY(0) rotate(0deg)}}
+.hda-anim .hda-buttons-flip{animation:hda-buttons-flip 1.8s ease-in-out infinite}
+@keyframes hda-buttons-flipsh{0%,15%,80%,100%{transform:scale(1);opacity:1}45%{transform:scale(.7);opacity:.5}}
+.hda-anim .hda-buttons-flipsh{animation:hda-buttons-flipsh 1.8s ease-in-out infinite}
+@keyframes hda-buttons-tapc{0%,20%,100%{transform:translateY(0)}8%{transform:translateY(2px)}}
+.hda-anim .hda-buttons-tapc{animation:hda-buttons-tapc 1.05s ease-out infinite}
+@keyframes hda-buttons-ink{0%,88%,100%{opacity:0}91%{opacity:.85}94%{opacity:0}96%{opacity:.6}}
+.hda-anim .hda-buttons-ink{animation:hda-buttons-ink 3.4s linear infinite}
+@keyframes hda-buttons-swr{0%,100%{transform:translateX(-30px) rotate(-8deg)}50%{transform:translateX(30px) rotate(8deg)}}
+@keyframes hda-buttons-swl{0%,100%{transform:translateX(30px) rotate(8deg)}50%{transform:translateX(-30px) rotate(-8deg)}}
+@keyframes hda-buttons-swu{0%,100%{transform:translateY(-12px)}50%{transform:translateY(14px)}}
+.hda-anim .hda-buttons-swr{animation:hda-buttons-swr 1.6s ease-in-out infinite}
+.hda-anim .hda-buttons-swl{animation:hda-buttons-swl 1.6s ease-in-out infinite}
+.hda-anim .hda-buttons-swu{animation:hda-buttons-swu 1.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-buttons-breathe,.hda-anim .hda-buttons-nudge,.hda-anim .hda-buttons-blink,.hda-anim .hda-buttons-spin,.hda-anim .hda-buttons-rip,.hda-anim .hda-buttons-rip2,.hda-anim .hda-buttons-wave,.hda-anim .hda-buttons-shake,.hda-anim .hda-buttons-flip,.hda-anim .hda-buttons-flipsh,.hda-anim .hda-buttons-tapc,.hda-anim .hda-buttons-ink,.hda-anim .hda-buttons-swr,.hda-anim .hda-buttons-swl,.hda-anim .hda-buttons-swu{animation:none}}`;
+
+  (window.HDA = window.HDA || []).push({
+    id: "buttons", tab: "Buttons & remotes", group: "Home", kind: "device", levelLabel: "Dial", onWord: "Active", offWord: "Idle",
+    intro: "Wireless buttons, dials, remotes, bridges and tags. On means pressed, sending or present. The slider turns the dial and fills its light ring. Menus pick the cube gesture and face, the button action (single, double or long press), the remote style, the panel buttons and labels, and the wave direction.",
+    css, icons,
+  });
+})();
+
+(function () {
+  const H = window.HDAH, P = "hda-camdoorbells-";
+  const f = (n) => (+n).toFixed(1), a2 = (n) => Math.max(0, Math.min(1, n)).toFixed(2);
+  const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+
+  function X(o, opt) {
+    opt = opt || {};
+    const on = !!o.on, lv = o.level == null ? 1 : Math.max(0, Math.min(1, o.level));
+    const x = { o, u: o.uid, on, lv, an: on && o.anim, L: on ? .35 + .65 * lv : 0, d: [], k: {}, n: 0 };
+    x.led = opt.led || o.color || "#4da3ff"; x.body = opt.body || "#eef0f2";
+    x.id = (s) => `${o.uid}-${s}`;
+    x.def = (key, mk) => { if (!x.k[key]) { const id = `${o.uid}-g${x.n++}`; x.k[key] = id; x.d.push(mk(id)); } return `url(#${x.k[key]})`; };
+    x.lg = (a, x1, y1, x2, y2) => { x1 = x1 || 0; y1 = y1 || 0; x2 = x2 == null ? 0 : x2; y2 = y2 == null ? 1 : y2;
+      return x.def("l" + JSON.stringify(a) + [x1, y1, x2, y2], (id) => `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops(a)}</linearGradient>`); };
+    x.rg = (a, cx, cy, r) => { cx = cx == null ? .5 : cx; cy = cy == null ? .5 : cy; r = r || .5;
+      return x.def("r" + JSON.stringify(a) + [cx, cy, r], (id) => `<radialGradient id="${id}" cx="${cx}" cy="${cy}" r="${r}">${stops(a)}</radialGradient>`); };
+    return x;
+  }
+  const pal = (c) => ({ l: H.shade(c, .5), m: c, d: H.shade(c, -.3), k: H.shade(c, -.56), e: H.shade(c, -.45) });
+
+  const M = {
+    v: (x, c) => { const p = pal(c); return x.lg([[0, p.l], [.45, p.m], [1, p.d]]); },
+    h: (x, c) => { const p = pal(c); return x.lg([[0, p.d], [.22, p.l], [.6, p.m], [1, p.k]], 0, 0, 1, 0); },
+    s: (x, c) => { const p = pal(c); return x.rg([[0, p.l], [.6, p.m], [1, p.d]], .38, .32, .78); },
+    side: (x, c) => { const p = pal(c); return x.lg([[0, p.d], [1, p.k]], 0, 0, 1, 1); },
+    gloss: (x) => x.lg([[0, "#fff", .55], [.5, "#fff", 0]], 0, 0, 1, 1),
+    shadow: (x) => x.rg([[0, "#000", .6], [.6, "#000", .24], [1, "#000", 0]]),
+    halo: (x, c) => x.rg([[0, c, .9], [.38, c, .32], [1, c, 0]]),
+    steel: (x) => x.lg([[0, "#4b5057"], [.3, "#e2e6ea"], [.55, "#9aa1a9"], [1, "#3f444a"]], 0, 0, 1, 0),
+    metal: (x, c) => x.lg([[0, H.shade(c, -.55)], [.25, H.shade(c, .35)], [.42, H.shade(c, .7)], [.62, H.shade(c, -.1)], [1, H.shade(c, -.6)]], 0, 0, 1, 0),
+    hole: (x) => x.lg([[0, "#030305"], [1, "#1c1d24"]]),
+  };
+
+  const WALLS = { sage: ["#4c5850", "#333c36"], blue: ["#3e485b", "#2a3141"], clay: ["#62493f", "#45332c"], cream: ["#5e5950", "#433f38"],
+    lav: ["#554f68", "#3a354b"], navy: ["#2f3852", "#1e2537"], gray: ["#4b4e56", "#33353c"], garage: ["#55585e", "#3c3e43"], olive: ["#4f5140", "#363829"] };
+  function dots(seed, n, x0, y0, w, h, big, op) {
+    const r = rnd(seed); let s = "";
+    for (let i = 0; i < n; i++) s += `<circle cx="${f(x0 + r() * w)}" cy="${f(y0 + r() * h)}" r="${f(.3 + r() * big)}" fill="${r() > .5 ? "#000" : "#fff"}" fill-opacity="${(op * (.4 + r() * .6)).toFixed(2)}"/>`;
+    return s;
+  }
+  function wallB(x, k, y0, y1) {
+    y0 = y0 || 8; y1 = y1 || 192; const w = WALLS[k] || WALLS.gray;
+    return `<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="${x.lg([[0, w[0]], [1, w[1]]])}"/>` + dots(k.length * 131 + 7, 40, 8, y0, 184, y1 - y0, .7, .1);
+  }
+  function woodB(x, y0, tone) {
+    tone = tone || "#8a6142"; const r = rnd(y0 * 17 + 3); let s = `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.lg([[0, H.shade(tone, -.35)], [1, H.shade(tone, .08)]])}"/>`;
+    let y = y0, g = 4.5;
+    while (y < 192) { const y2 = y + g;
+      s += `<rect x="8" y="${f(y)}" width="184" height="${f(g)}" fill="${r() > .5 ? "#fff" : "#000"}" fill-opacity="${(.02 + r() * .06).toFixed(2)}"/>`;
+      s += `<path d="M8 ${f(y2)}H192" stroke="#1b0f07" stroke-opacity=".5" stroke-width="${f(.5 + g * .06)}"/>`;
+      const sx = 8 + r() * 184; s += `<path d="M${f(sx)} ${f(y)}V${f(y2)}" stroke="#1b0f07" stroke-opacity=".45" stroke-width=".8"/>`;
+      s += `<path d="M${f(8 + r() * 60)} ${f(y + g * .45)}H${f(70 + r() * 120)}" stroke="#2a180b" stroke-opacity=".18" stroke-width=".6"/>`;
+      y = y2; g *= 1.32; }
+    return s;
+  }
+  function baseB(x, y, floor) {
+    return `<rect x="8" y="${y}" width="184" height="18" fill="${x.lg([[0, "#e6e3ea"], [.25, "#cfccd6"], [1, "#a29fac"]])}"/>
+<path d="M8 ${y + .5}H192" stroke="#000" stroke-opacity=".35" stroke-width="1.2"/><path d="M8 ${y + 3.5}H192" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/><path d="M8 ${y + 5}H192" stroke="#000" stroke-opacity=".12" stroke-width="1"/>` +
+      (floor === "carpet" ? carpetB(x, y + 18) : woodB(x, y + 18, floor)) + `<path d="M8 ${y + 18.5}H192" stroke="#000" stroke-opacity=".45" stroke-width="1.4"/>`;
+  }
+  function tileB(x, y0, y1, col) {
+    col = col || "#d9dde3"; let s = `<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="#6d7079"/>`; const g = x.lg([[0, H.shade(col, .4)], [.5, col], [1, H.shade(col, -.25)]]);
+    for (let row = 0, y = y0; y < y1; y += 13, row++) for (let bx = 8 - (row % 2) * 13; bx < 192; bx += 26)
+      s += `<rect x="${bx + .7}" y="${y + .7}" width="24.6" height="11.6" rx="1.6" fill="${g}"/><path d="M${bx + 2} ${y + 2.4}H${bx + 18}" stroke="#fff" stroke-opacity=".55" stroke-width=".8" stroke-linecap="round"/>`;
+    return s + `<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="${x.lg([[0, "#000", .2], [1, "#000", .45]])}"/>`;
+  }
+  function counterB(x, y, col) {
+    col = col || "#cfd0d6";
+    return `<rect x="8" y="${y}" width="184" height="${192 - y}" fill="${x.lg([[0, H.shade(col, -.25)], [1, H.shade(col, -.05)]])}"/>` + dots(y * 7 + 1, 70, 8, y, 184, 192 - y, .8, .2) +
+      `<path d="M8 ${y + .6}H192" stroke="#000" stroke-opacity=".5" stroke-width="1.6"/><path d="M8 ${y + 2.2}H192" stroke="#fff" stroke-opacity=".25" stroke-width=".8"/>`;
+  }
+  function carpetB(x, y0) {
+    return `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.lg([[0, "#3d3a46"], [1, "#575263"]])}"/>` + dots(y0 * 3 + 5, 260, 8, y0, 184, 192 - y0, .9, .16);
+  }
+  function concreteB(x, y0, col) {
+    col = col || "#6c6f75";
+    return `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.lg([[0, H.shade(col, -.35)], [1, col]])}"/>` + dots(y0 * 5 + 9, 120, 8, y0, 184, 192 - y0, .9, .14) +
+      `<path d="M8 ${y0 + .5}H192" stroke="#000" stroke-opacity=".5" stroke-width="1.4"/>`;
+  }
+  function sidingB(x, col) {
+    col = col || "#55606c"; let s = `<rect x="8" y="8" width="184" height="184" fill="${x.lg([[0, H.shade(col, .1)], [1, H.shade(col, -.3)]])}"/>`;
+    for (let y = 8; y < 192; y += 16) s += `<rect x="8" y="${y}" width="184" height="16" fill="${x.lg([[0, "#fff", .0], [1, "#fff", .08]])}"/><path d="M8 ${y + 15}H192" stroke="#000" stroke-opacity=".45" stroke-width="2.2"/><path d="M8 ${y + 16.6}H192" stroke="#fff" stroke-opacity=".1" stroke-width="1"/>`;
+    return s;
+  }
+  function blockB(x, y1) {
+    let s = `<rect x="8" y="8" width="184" height="${y1 - 8}" fill="${x.lg([[0, "#686a6f"], [1, "#4a4c51"]])}"/>`; const r = rnd(77);
+    for (let row = 0, y = 8; y < y1; y += 22, row++) for (let bx = 8 - (row % 2) * 22; bx < 192; bx += 44) {
+      s += `<rect x="${bx + 1}" y="${y + 1}" width="42" height="20" rx="1" fill="${r() > .5 ? "#fff" : "#000"}" fill-opacity="${(.03 + r() * .06).toFixed(2)}"/>`;
+      s += `<path d="M${bx} ${y}V${y + 22}M${bx} ${y}H${bx + 44}" stroke="#2e3034" stroke-opacity=".7" stroke-width="1.6"/><path d="M${bx + 1.4} ${y + 1.4}H${bx + 43}" stroke="#fff" stroke-opacity=".08"/>`; }
+    return s + dots(31, 120, 8, 8, 184, y1 - 8, .8, .14);
+  }
+  function fenceB(x) {
+    let s = `<rect x="8" y="8" width="184" height="184" fill="#3d2c22"/>`; const r = rnd(41);
+    for (let bx = 8; bx < 192; bx += 23) { const t = H.mix("#7a5a40", "#5d4330", r());
+      s += `<rect x="${bx + .8}" y="8" width="21.4" height="184" fill="${x.lg([[0, H.shade(t, -.2)], [.4, H.shade(t, .12)], [1, H.shade(t, -.25)]], 0, 0, 1, 0)}"/>`;
+      for (let g = 0; g < 3; g++) { const gx = bx + 3 + r() * 16; s += `<path d="M${f(gx)} 8C${f(gx + 2)} 70 ${f(gx - 2)} 130 ${f(gx + 1)} 192" fill="none" stroke="#2a1a10" stroke-opacity=".3" stroke-width=".7"/>`; }
+      s += `<circle cx="${bx + 11.5}" cy="40" r="1.1" fill="#1a1a1a"/><circle cx="${bx + 11.5}" cy="150" r="1.1" fill="#1a1a1a"/>`; }
+    return s + `<rect x="8" y="8" width="184" height="184" fill="${x.lg([[0, "#0b0d22", .45], [.6, "#000", .1], [1, "#000", .3]])}"/>`;
+  }
+
+  function scene(x, back, body) {
+    const vig = x.rg([[0, "#000", 0], [.65, "#000", .06], [1, "#000", .5]], .5, .46, .75), c = x.id("clip");
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="${c}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>${x.d.join("")}</defs>
+<g clip-path="url(#${c})"><g class="hda-bg">${back}<rect x="8" y="8" width="184" height="184" fill="${vig}"/></g>${body}</g>
+<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g></svg>`;
+  }
+
+  function holes(x, cx, cy, s) {
+    const hs = [
+      `M${f(cx - 5.6 * s)} ${f(cy - 7 * s)}h${f(2 * s)}v${f(7.8 * s)}h${f(-2 * s)}z`,
+      `M${f(cx + 3.6 * s)} ${f(cy - 6.4 * s)}h${f(2 * s)}v${f(6.4 * s)}h${f(-2 * s)}z`,
+      `M${f(cx - 2.4 * s)} ${f(cy + 3.2 * s)}h${f(4.8 * s)}v${f(1.4 * s)}a${f(2.4 * s)} ${f(2.4 * s)} 0 0 1 ${f(-4.8 * s)} 0z`];
+    return hs.map((d) => `<path d="${d}" fill="#fff" fill-opacity=".55" transform="translate(0 ${f(.7 * s)})"/><path d="${d}" fill="${M.hole(x)}"/>`).join("");
+  }
+  function face(x, cx, cy, s, col) {
+    const w = 22 * s, h = 20 * s;
+    return `<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2 + 1.2 * s)}" width="${f(w)}" height="${f(h)}" rx="${f(9.6 * s)}" fill="#000" fill-opacity=".22"/>
+<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(9.6 * s)}" fill="${x.lg([[0, H.shade(col, .7)], [.6, col], [1, H.shade(col, -.18)]])}" stroke="${H.shade(col, -.35)}" stroke-width=".5"/>
+<path d="M${f(cx - w * .34)} ${f(cy - h * .34)}Q${f(cx)} ${f(cy - h * .52)} ${f(cx + w * .34)} ${f(cy - h * .34)}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="${f(.8 * s)}" stroke-linecap="round"/>` + holes(x, cx, cy - .4 * s, s * 1.02);
+  }
+  const screw = (x, cx, cy, r, a) => `<circle cx="${f(cx)}" cy="${f(cy + .5)}" r="${f(r)}" fill="#000" fill-opacity=".3"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${M.steel(x)}"/>
+<path d="M${f(cx - r * .7)} ${f(cy + r * (a || 0))}L${f(cx + r * .7)} ${f(cy - r * (a || 0))}" stroke="#2a2d33" stroke-width="${f(r * .38)}" stroke-linecap="round"/>`;
+  function plateShadow(x0, y0, w, h, r) {
+    return `<rect x="${f(x0 + 2.5)}" y="${f(y0 + 4)}" width="${f(w)}" height="${f(h)}" rx="${f(r + 2)}" fill="#000" fill-opacity=".16"/><rect x="${f(x0 + 1.2)}" y="${f(y0 + 2)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="#000" fill-opacity=".26"/>`;
+  }
+  function plateBody(x, x0, y0, w, h, r, col) {
+    return plateShadow(x0, y0, w, h, r) + `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${x.lg([[0, H.shade(col, .65)], [.5, col], [1, H.shade(col, -.22)]])}"/>
+<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${x.lg([[0, "#fff", .25], [.2, "#fff", 0], [.85, "#000", 0], [1, "#000", .18]], 0, 0, 1, 0)}"/>
+<rect x="${f(x0 + 1.4)}" y="${f(y0 + 1.4)}" width="${f(w - 2.8)}" height="${f(h - 2.8)}" rx="${f(Math.max(1, r - 1))}" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/>
+<rect x="${f(x0 + .3)}" y="${f(y0 + .3)}" width="${f(w - .6)}" height="${f(h - .6)}" rx="${f(r)}" fill="none" stroke="${H.shade(col, -.45)}" stroke-opacity=".6" stroke-width=".6"/>`;
+  }
+  function plateT(x, cx, cy, s, col) {
+    col = col || "#eceef1"; const w = 50 * s, h = 80 * s;
+    return plateBody(x, cx - w / 2, cy - h / 2, w, h, 4 * s, col) + face(x, cx, cy - 17 * s, s, col) + face(x, cx, cy + 17 * s, s, col) + screw(x, cx, cy, 2.6 * s, .3);
+  }
+  function plateD(x, cx, cy, s, col, inner) {
+    col = col || "#eceef1"; const w = 48 * s, h = 78 * s, iw = 29 * s, ih = 58 * s;
+    return plateBody(x, cx - w / 2, cy - h / 2, w, h, 3.5 * s, col) +
+      `<rect x="${f(cx - iw / 2 - 1)}" y="${f(cy - ih / 2 - 1)}" width="${f(iw + 2)}" height="${f(ih + 2)}" rx="${f(2.6 * s)}" fill="#000" fill-opacity=".3"/>
+<rect x="${f(cx - iw / 2)}" y="${f(cy - ih / 2)}" width="${f(iw)}" height="${f(ih)}" rx="${f(2.4 * s)}" fill="${x.lg([[0, H.shade(col, .5)], [.5, H.shade(col, -.04)], [1, H.shade(col, -.2)]])}"/>
+<path d="M${f(cx - iw / 2 + 2)} ${f(cy - ih / 2 + 1)}H${f(cx + iw / 2 - 2)}" stroke="#fff" stroke-opacity=".7" stroke-width=".8"/>` +
+      (inner || "") + holes(x, cx, cy - 13 * s, s) + holes(x, cx, cy + 13 * s, s);
+  }
+
+  function plugHead(x, cx, cy, s, col, rot) {
+    const w = 15 * s, h = 17 * s, p = pal(col), r = 3.4 * s, t = rot ? ` transform="rotate(${rot} ${f(cx)} ${f(cy)})"` : "";
+    let g = `<rect x="${f(cx - w / 2 + 1.5)}" y="${f(cy - h / 2 + 2.5)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="#000" fill-opacity=".35"/>
+<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${M.h(x, col)}"/>
+<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${M.gloss(x)}" opacity=".35"/>`;
+    for (let i = 0; i < 4; i++) g += `<path d="M${f(cx - w * .32)} ${f(cy - h * .28 + i * 2.4 * s)}H${f(cx + w * .32)}" stroke="${p.k}" stroke-opacity=".55" stroke-width="${f(.7 * s)}"/>`;
+    g += `<rect x="${f(cx - 3.2 * s)}" y="${f(cy + h / 2 - 1.5 * s)}" width="${f(6.4 * s)}" height="${f(5.5 * s)}" rx="${f(2 * s)}" fill="${M.h(x, col)}"/>
+<path d="M${f(cx - w / 2 + 1.5)} ${f(cy - h / 2 + 1.2)}H${f(cx + w / 2 - 2)}" stroke="#fff" stroke-opacity=".45" stroke-width=".8" stroke-linecap="round"/>`;
+    return `<g${t}>${g}</g>`;
+  }
+
+  function bez(a, b, c, d, t) { const m = 1 - t; return m * m * m * a + 3 * m * m * t * b + 3 * m * t * t * c + t * t * t * d; }
+  function cordD(pts) { let d = `M${pts[0]} ${pts[1]}`; for (let i = 2; i + 5 < pts.length; i += 6) d += `C${pts.slice(i, i + 6).join(" ")}`; return d; }
+  function samples(pts, n) {
+    const segs = (pts.length - 2) / 6, out = [];
+    for (let i = 0; i < n; i++) { const T = (i + .5) / n * segs, k = Math.min(segs - 1, Math.floor(T)), t = T - k, b = k * 6;
+      const P0 = [pts[b], pts[b + 1]], P1 = [pts[b + 2], pts[b + 3]], P2 = [pts[b + 4], pts[b + 5]], P3 = [pts[b + 6], pts[b + 7]];
+      out.push([bez(P0[0], P1[0], P2[0], P3[0], t), bez(P0[1], P1[1], P2[1], P3[1], t)]); }
+    return out;
+  }
+  function cord(x, pts, w, col, flow, n) {
+    const d = cordD(pts), p = pal(col);
+    let s = `<path d="${d}" fill="none" stroke="#000" stroke-opacity=".28" stroke-width="${f(w + 1.6)}" stroke-linecap="round" transform="translate(2 3)"/>
+<path d="${d}" fill="none" stroke="${p.k}" stroke-width="${f(w)}" stroke-linecap="round"/>
+<path d="${d}" fill="none" stroke="${col}" stroke-width="${f(w * .6)}" stroke-linecap="round"/>
+<path d="${d}" fill="none" stroke="${p.l}" stroke-opacity=".7" stroke-width="${f(Math.max(.5, w * .2))}" stroke-linecap="round" transform="translate(${f(-w * .16)} ${f(-w * .16)})"/>`;
+    if (flow && x.on) s += chase(x, pts, n || 14, w, flow);
+    return s;
+  }
+  function chase(x, pts, n, w, col) {
+    const c = H.mix(col, "#ffffff", .45), dur = (2.2 - 1.3 * x.lv);
+    return samples(pts, n).map(([cx, cy], i) => `<circle class="${P}flow" cx="${f(cx)}" cy="${f(cy)}" r="${f(Math.max(.9, w * .34))}" fill="${c}" style="animation-duration:${dur.toFixed(2)}s;animation-delay:${(-dur * (1 - i / n)).toFixed(2)}s"/>`).join("");
+  }
+
+  function led(x, cx, cy, r, col, k) {
+    col = col || x.led; k = k == null ? 1 : k;
+    if (!x.on) return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${H.mix(col, "#15161b", .78)}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .35)}" r="${f(r * .38)}" fill="#fff" fill-opacity=".25"/>`;
+    return `<g class="${P}pulse"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * 5)}" fill="${M.halo(x, col)}" opacity="${a2(.85 * k * x.L)}"/></g>
+<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${H.mix(col, "#ffffff", .5)}"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * .5)}" fill="#fff"/>`;
+  }
+  function ringLed(x, cx, cy, rx, ry, w, col, k) {
+    col = col || x.led; k = k == null ? 1 : k;
+    if (!x.on) return `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="${H.mix(col, "#202128", .75)}" stroke-width="${f(w)}"/>
+<ellipse cx="${f(cx)}" cy="${f(cy - w * .3)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="${f(w * .3)}"/>`;
+    return `<g class="${P}pulse"><ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="${col}" stroke-opacity="${a2(.22 * k * x.L)}" stroke-width="${f(w * 5)}"/>
+<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="${col}" stroke-opacity="${a2(.4 * k * x.L)}" stroke-width="${f(w * 2.4)}"/></g>
+<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="${H.mix(col, "#ffffff", .35)}" stroke-width="${f(w)}"/>
+<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="${f(w * .3)}"/>`;
+  }
+  const spot = (x, cx, cy, rx, ry, col, k) => x.on ? `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${M.halo(x, col || x.led)}" opacity="${a2((k == null ? .6 : k) * x.L)}"/>` : "";
+
+  function box(x, x0, y0, w, h, r, dx, dy, col, fr) {
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 1.2)), sd = M.side(x, col);
+    let s = `<rect x="${f(x0 + dx + 3)}" y="${f(y0 + dy + 5)}" width="${f(w)}" height="${f(h)}" rx="${f(r + 3)}" fill="#000" fill-opacity=".16"/><rect x="${f(x0 + dx + 1)}" y="${f(y0 + dy + 2)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="#000" fill-opacity=".28"/>`;
+    for (let i = n; i >= 1; i--) s += `<rect x="${f(x0 + dx * i / n)}" y="${f(y0 + dy * i / n)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${sd}"/>`;
+    s += `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${fr || M.v(x, col)}"/>
+<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(r)}" fill="${M.gloss(x)}" opacity=".3"/>
+<rect x="${f(x0 + .7)}" y="${f(y0 + .7)}" width="${f(w - 1.4)}" height="${f(h - 1.4)}" rx="${f(Math.max(.5, r - .7))}" fill="none" stroke="#fff" stroke-opacity=".38" stroke-width=".8"/>`;
+    return s;
+  }
+  function button(x, cx, cy, r, col) {
+    return `<circle cx="${f(cx)}" cy="${f(cy + .6)}" r="${f(r + .6)}" fill="#000" fill-opacity=".25"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${M.s(x, col)}"/>
+<path d="M${f(cx - r * .6)} ${f(cy - r * .45)}A${f(r * .8)} ${f(r * .8)} 0 0 1 ${f(cx + r * .4)} ${f(cy - r * .7)}" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="${f(Math.max(.5, r * .18))}" stroke-linecap="round"/>`;
+  }
+
+  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+  function digits(x, xr, y, h, str, n, col) {
+    const w = h * .56, gap = h * .2, t = Math.max(.7, h * .14), hh = h / 2, ch = String(str).padStart(n, " ").slice(-n);
+    const lit = x.on ? H.mix(col, "#ffffff", .25) : col; let s = "";
+    for (let i = 0; i < n; i++) {
+      const x0 = xr - (n - i) * (w + gap) + gap, on = SEG[ch[i]] || "";
+      const R = { a: [x0 + t * .6, y, w - t * 1.2, t], g: [x0 + t * .6, y + hh - t / 2, w - t * 1.2, t], d: [x0 + t * .6, y + h - t, w - t * 1.2, t],
+        f: [x0, y + t * .6, t, hh - t * .9], b: [x0 + w - t, y + t * .6, t, hh - t * .9], e: [x0, y + hh + t * .3, t, hh - t * .9], c: [x0 + w - t, y + hh + t * .3, t, hh - t * .9] };
+      for (const k in R) { const r = R[k], lt = x.on && on.indexOf(k) >= 0;
+        s += `<rect x="${f(r[0])}" y="${f(r[1])}" width="${f(r[2])}" height="${f(r[3])}" rx="${f(t / 2)}" fill="${lt ? lit : "#fff"}" fill-opacity="${lt ? 1 : .05}"/>`; }
+    }
+    return `<g transform="translate(${f(y * .09)} 0) skewX(-5)">${s}</g>`;
+  }
+  function lcd(x, x0, y0, w, h, col) {
+    return `<rect x="${f(x0 - 1)}" y="${f(y0 - 1)}" width="${f(w + 2)}" height="${f(h + 2)}" rx="3" fill="#000" fill-opacity=".45"/><rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="2.4" fill="${x.lg([[0, "#07090d"], [1, "#151922"]])}"/>` +
+      (x.on ? `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="2.4" fill="${x.rg([[0, col, .35], [1, col, 0]], .5, .5, .7)}" opacity="${a2(.5 + .5 * x.L)}"/>` : "");
+  }
+  const glass = (x, x0, y0, w, h) => `<path d="M${f(x0 + 2)} ${f(y0 + 1.5)}H${f(x0 + w * .7)}L${f(x0 + w * .45)} ${f(y0 + h - 1.5)}H${f(x0 + 2)}Z" fill="#fff" fill-opacity=".07"/>`;
+  const watts = (x) => x.on ? Math.round(2 + 1498 * Math.pow(x.lv, 1.25)) : 0;
+
+  const clipU = (x, key, shape) => x.def("c" + key, (id) => `<clipPath id="${id}">${shape}</clipPath>`);
+  const rr = (x0, y0, w, h, r) => `M${f(x0 + r)} ${f(y0)}H${f(x0 + w - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w)} ${f(y0 + r)}V${f(y0 + h - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w - r)} ${f(y0 + h)}H${f(x0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0)} ${f(y0 + h - r)}V${f(y0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + r)} ${f(y0)}Z`;
+  const RING = ["#4da3ff", "#ffffff", "#3ee08f", "#ffb347", "#ff5a7a"];
+  const FACE = { nickel: "#b9bcc0", bronze: "#6e5a48", black: "#232428", white: "#eef0f2", pearl: "#e6e2da", silver: "#d5d8dc" };
+
+  function backdrop(x, kind) {
+    let wall = "";
+    if (kind === "brick") { const r = rnd(9); wall = `<rect x="8" y="8" width="184" height="184" fill="#5a3226"/>`;
+      for (let row = 0, y = 8; y < 192; y += 10, row++) for (let bx = 8 - (row % 2) * 12; bx < 150; bx += 24) wall += `<rect x="${bx + .8}" y="${y + .8}" width="22.4" height="8.4" rx=".8" fill="${H.mix("#a2533a", "#7a3a28", r())}"/>`; }
+    else { wall = `<rect x="8" y="8" width="184" height="184" fill="${x.lg([[0, "#8a96a2"], [1, "#6c7884"]])}"/>`;
+      for (let y = 8; y < 192; y += 14) wall += `<rect x="8" y="${y}" width="184" height="14" fill="${x.lg([[0, "#fff", .0], [1, "#fff", .1]])}"/><path d="M8 ${y + 13}H192" stroke="#000" stroke-opacity=".35" stroke-width="2"/>`; }
+    return wall + `<rect x="8" y="8" width="184" height="184" fill="${x.lg([[0, "#000", .12], [1, "#000", .3]], 0, 0, 1, 0)}"/>` +
+      `<rect x="134" y="8" width="58" height="184" fill="${x.lg([[0, "#3a2a22"], [.1, "#6a4a36"], [1, "#4a3426"]], 0, 0, 1, 0)}"/><rect x="146" y="20" width="46" height="70" rx="2" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="2"/><rect x="146" y="102" width="46" height="80" rx="2" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="2"/>` +
+      `<circle cx="152" cy="98" r="4" fill="${M.metal(x, "#c9a24a")}"/>` +
+      `<rect x="66" y="8" width="64" height="184" fill="${x.lg([[0, "#d9d5cc"], [.5, "#f4f1ea"], [1, "#c9c4ba"]], 0, 0, 1, 0)}"/><path d="M66 8V192M130 8V192" stroke="#000" stroke-opacity=".3"/><rect x="128" y="8" width="6" height="184" fill="#000" fill-opacity=".25"/>`;
+  }
+
+  function lens(x, cx, cy, r, st, ir) {
+    const live = st === "live";
+    let s = `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * 1.25)}" fill="#05060a"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${x.rg([[0, live ? "#3a5a8a" : "#1d2436"], [.6, "#0a0d16"], [1, "#000"]], .42, .4, .65)}"/>` +
+      `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * .45)}" fill="#020306"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * .75)}" fill="none" stroke="${live ? "#6aa8ff" : "#5a4a8a"}" stroke-opacity="${live ? .8 : .35}" stroke-width="${f(r * .12)}"/>` +
+      `<ellipse cx="${f(cx - r * .35)}" cy="${f(cy - r * .38)}" rx="${f(r * .28)}" ry="${f(r * .16)}" fill="#fff" fill-opacity=".7" transform="rotate(-35 ${f(cx - r * .35)} ${f(cy - r * .38)})"/>`;
+    if (live) s += `<g class="${P}glow"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * 1.9)}" fill="${M.halo(x, "#6aa8ff")}" opacity=".55"/></g>`;
+    if (ir) for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; s += `<circle cx="${f(cx + Math.cos(a) * r * 1.6)}" cy="${f(cy + Math.sin(a) * r * 1.6)}" r="${f(r * .16)}" fill="#ff3a4a" opacity=".9"/><circle cx="${f(cx + Math.cos(a) * r * 1.6)}" cy="${f(cy + Math.sin(a) * r * 1.6)}" r="${f(r * .5)}" fill="${M.halo(x, "#ff3a4a")}" opacity=".5"/>`; }
+    return s;
+  }
+  function btnR(x, cx, cy, r, c2, st, face, sq) {
+    const lit = st === "ring" ? 1 : st === "idle" ? .45 : .7, shape = (rad, w) => sq ? `<rect x="${f(cx - rad)}" y="${f(cy - rad)}" width="${f(rad * 2)}" height="${f(rad * 2)}" rx="${f(rad * .35)}" fill="none" stroke-width="${f(w)}"` : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(rad)}" fill="none" stroke-width="${f(w)}"`;
+    let s = (sq ? `<rect x="${f(cx - r)}" y="${f(cy - r)}" width="${f(r * 2)}" height="${f(r * 2)}" rx="${f(r * .35)}"` : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"`) + ` fill="${x.rg([[0, H.shade(face, .25)], [1, H.shade(face, -.25)]], .4, .35, .75)}"/>`;
+    s += `${shape(r * .82, r * .2)} stroke="${H.mix(c2, "#000", .55)}"/>`;
+    s += `<g class="${st === "ring" ? P + "pulse" : ""}">${shape(r * .82, r * .55)} stroke="${c2}" stroke-opacity="${(.25 * lit).toFixed(2)}"/>${shape(r * .82, r * .18)} stroke="${H.mix(c2, "#fff", .35)}" stroke-opacity="${lit.toFixed(2)}"/></g>`;
+    s += sq ? `<path d="M${f(cx - r * .3)} ${f(cy + r * .25)}h${f(r * .6)}M${f(cx)} ${f(cy - r * .4)}q${f(r * .3)} 0 ${f(r * .3)} ${f(r * .4)}v${f(r * .25)}h${f(-r * .6)}v${f(-r * .25)}q0 ${f(-r * .4)} ${f(r * .3)} ${f(-r * .4)}" fill="none" stroke="${H.mix(c2, "#fff", .4)}" stroke-width=".7"/>` : `<ellipse cx="${f(cx - r * .25)}" cy="${f(cy - r * .3)}" rx="${f(r * .35)}" ry="${f(r * .18)}" fill="#fff" fill-opacity=".35"/>`;
+    return s;
+  }
+  const speaker = (x, cx, cy, w, n, st, col) => { let s = ""; for (let i = 0; i < n; i++) { const xx = cx - w / 2 + i * w / (n - 1);
+    s += `<rect class="${st === "talk" ? P + "spk" : ""}" style="animation-delay:${(-i * .13).toFixed(2)}s" x="${f(xx - .6)}" y="${f(cy - 2.2)}" width="1.2" height="4.4" rx=".6" fill="${col || "#000"}" fill-opacity=".55"/>`; } return s; };
+  const statusLed = (x, cx, cy, st) => { const on = st === "motion" || st === "live"; const c = st === "motion" ? "#ff4a3a" : "#3ee08f";
+    return `<circle cx="${f(cx)}" cy="${f(cy)}" r="1.1" fill="${on ? c : "#2a2c33"}"/>` + (on ? `<circle class="${P}blink" cx="${f(cx)}" cy="${f(cy)}" r="3.4" fill="${M.halo(x, c)}"/>` : ""); };
+  const battery = (x, cx, cy, isBat) => { if (!isBat) return ""; const lv = x.lv, c = lv < .2 ? "#ff4a3a" : lv < .4 ? "#ffb347" : "#3ee08f";
+    return `<rect x="${f(cx - 6)}" y="${f(cy - 2)}" width="11" height="4" rx="1" fill="#0b0c0f" stroke="#c9ced5" stroke-width=".5"/><rect x="${f(cx + 5.2)}" y="${f(cy - .9)}" width="1" height="1.8" fill="#c9ced5"/><rect x="${f(cx - 5.2)}" y="${f(cy - 1.2)}" width="${f(9.4 * Math.max(.06, lv))}" height="2.4" fill="${c}"/>`; };
+  function overlay(x, st, cx, lensY, btnY, w) {
+    let s = "";
+    if (st === "ring") s += `<g>` + [0, 1, 2].map((i) => `<path class="${P}wave" style="animation-delay:${(-i * .45).toFixed(2)}s" d="M${f(cx - w / 2 - 6 - i * 7)} ${f(btnY - 10 - i * 4)}q${f(-6)} ${f(10 + i * 4)} 0 ${f(20 + i * 8)}M${f(cx + w / 2 + 6 + i * 7)} ${f(btnY - 10 - i * 4)}q6 ${f(10 + i * 4)} 0 ${f(20 + i * 8)}" fill="none" stroke="#fff" stroke-opacity="${(.7 - i * .18).toFixed(2)}" stroke-width="1.6" stroke-linecap="round"/>`).join("") + `</g>`;
+    if (st === "motion") s += `<g class="${P}sweep">` + [0, 1].map((i) => `<path d="M${f(cx - 12 - i * 8)} ${f(lensY - 14 - i * 6)}a${f(16 + i * 8)} ${f(16 + i * 8)} 0 0 1 ${f(24 + i * 16)} 0" fill="none" stroke="#ff8a6a" stroke-opacity="${(.7 - i * .25).toFixed(2)}" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="3 3"/>`).join("") + `</g>`;
+    if (st === "live") s += `<circle class="${P}blink" cx="${f(cx + w / 2 + 8)}" cy="${f(lensY - 12)}" r="3" fill="#ff3b3b"/>`;
+    if (st === "talk") s += `<g>` + [0, 1].map((i) => `<path class="${P}wave" style="animation-delay:${(-i * .5).toFixed(2)}s" d="M${f(cx + w / 2 + 5 + i * 6)} ${f(lensY - 4)}q5 6 0 12" fill="none" stroke="#7ee7ff" stroke-width="1.4" stroke-linecap="round"/>`).join("") + `</g>`;
+    return s;
+  }
+  function mount(x, kind, x0, y0, w, h, r, col) {
+    if (kind === "wedge") return `<path d="${rr(x0 - 5, y0 + 2, w + 2, h - 4, r)}" fill="${x.lg([[0, "#0e0f12"], [1, "#2a2c31"]], 0, 0, 1, 0)}"/>`;
+    if (kind === "corner") return `<path d="${rr(x0 - 2, y0 + 3, w + 4, h + 3, r)}" fill="${x.lg([[0, "#2a2c31"], [1, "#0e0f12"]])}"/><path d="${rr(x0 - 4, y0 + 4, w + 2, h - 2, r)}" fill="#16171a"/>`;
+    return "";
+  }
+  const shell = (x, x0, y0, w, h, r, col, soft) => `<path d="${rr(x0 + 1.5, y0 + 3, w, h, r)}" fill="#000" fill-opacity=".35"/><path d="${rr(x0, y0, w, h, r)}" fill="${x.lg([[0, H.shade(col, -.3)], [.18, H.shade(col, soft ? .15 : .35)], [.55, col], [1, H.shade(col, -.35)]], 0, 0, 1, 0)}"/>` +
+    `<path d="${rr(x0, y0, w, h, r)}" fill="${x.lg([[0, "#fff", .18], [.3, "#fff", 0], [1, "#000", .15]])}"/><path d="${rr(x0 + .6, y0 + .6, w - 1.2, h - 1.2, Math.max(.5, r - .6))}" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width=".7"/>`;
+  const glassW = (x, x0, y0, w, h, r) => `<path d="${rr(x0, y0, w, h, r)}" fill="${x.lg([[0, "#2a2d34"], [.5, "#0d0e12"], [1, "#16181d"]])}"/><path d="M${f(x0 + 2)} ${f(y0 + 2)}L${f(x0 + w * .55)} ${f(y0 + 2)}L${f(x0 + 2)} ${f(y0 + h * .6)}Z" fill="#fff" fill-opacity=".09"/>`;
+  function irDots(x, cx, cy, n, sp, on) { let s = ""; for (let i = 0; i < n; i++) { const xx = cx - (n - 1) * sp / 2 + i * sp; s += `<circle cx="${f(xx)}" cy="${f(cy)}" r="1.1" fill="${on ? "#ff3a4a" : "#1a1b20"}"/>` + (on ? `<circle cx="${f(xx)}" cy="${f(cy)}" r="3" fill="${M.halo(x, "#ff3a4a")}" opacity=".5"/>` : ""); } return s; }
+  function pkgLight(x, cx, cy, on) { return on ? `<path d="M${f(cx - 5)} ${f(cy + 2)}L${f(cx - 18)} ${f(cy + 40)}H${f(cx + 18)}L${f(cx + 5)} ${f(cy + 2)}Z" fill="${x.lg([[0, "#fff6d8", .55], [1, "#fff6d8", 0]])}"/><circle cx="${f(cx)}" cy="${f(cy)}" r="2.2" fill="#fffbe8"/><circle cx="${f(cx)}" cy="${f(cy)}" r="6" fill="${M.halo(x, "#fff6d8")}"/>` : `<circle cx="${f(cx)}" cy="${f(cy)}" r="1.6" fill="#3a3c42"/>`; }
+
+  function model(x, id, o, st, c, c2) {
+    const opt = o.opt || {}, ir = opt.ir === "on", pkg = opt.pkg === "on";
+    const MNT = opt.mount || "flat";
+    let s = "", geo = { cx: 98, lensY: 60, btnY: 120, w: 32 }, bat = false;
+    if (id === "classic") { const m = opt.model || "battery";
+      if (m === "slimwired") { const x0 = 84, y0 = 44, w = 28, h = 96; s += mount(x, MNT, x0, y0, w, h, 4) + shell(x, x0, y0, w, h, 4, c) + glassW(x, x0 + 3, y0 + 3, w - 6, h - 6, 2.5) + lens(x, 98, 58, 4.4, st, ir) + statusLed(x, 106, 52, st) + btnR(x, 98, 108, 7.4, c2, st, "#16181d") + speaker(x, 98, 133, 12, 6, st, "#fff"); geo = { cx: 98, lensY: 58, btnY: 108, w };
+      } else { const tall = m === "plus" ? 46 : m === "wired" ? 38 : 34, w = m === "wired" ? 30 : 36, h = m === "wired" ? 100 : 104, x0 = 98 - w / 2, y0 = 40;
+        bat = m !== "wired"; s += mount(x, MNT, x0, y0, w, h, 5) + shell(x, x0, y0, w, h, 5, c) + `<path d="M${f(x0)} ${f(y0 + 5)}A5 5 0 0 1 ${f(x0 + 5)} ${y0}H${f(x0 + w - 5)}A5 5 0 0 1 ${f(x0 + w)} ${f(y0 + 5)}V${f(y0 + tall)}H${f(x0)}Z" fill="${x.lg([[0, "#2a2d34"], [1, "#0b0c10"]])}"/>` +
+          lens(x, 98, y0 + tall * .5, m === "plus" ? 5.4 : 5, st, ir) + statusLed(x, 98 + w / 2 - 5, y0 + 5, st) + btnR(x, 98, y0 + tall + 30, w * .28, c2, st, c) + speaker(x, 98, y0 + h - 9, w * .4, 6, st) + battery(x, 98, y0 + h + 9, bat);
+        geo = { cx: 98, lensY: y0 + tall * .5, btnY: y0 + tall + 30, w }; } }
+    else if (id === "propoe") { const m = opt.model || "std", x0 = 84, w = 28, y0 = m === "std" ? 42 : 34, h = m === "std" ? 100 : 118, front = c;
+      s += mount(x, MNT, x0, y0, w, h, 6) + shell(x, x0, y0, w, h, 6, front);
+      if (m === "std") { s += glassW(x, x0 + 3, y0 + 3, w - 6, 36, 4) + lens(x, 98, y0 + 16, 5, st, ir) + irDots(x, 98, y0 + 29, 3, 5, ir) + btnR(x, 98, y0 + 54, 7.2, c2, st, front) +
+          `<rect x="${x0 + 7}" y="${y0 + 70}" width="${w - 14}" height="12" rx="1.6" fill="#05070c"/>` + (o.on ? `<path d="M${x0 + 10} ${y0 + 76}h${w - 20}" stroke="#4da3ff" stroke-width="1.4" stroke-dasharray="2 1"/>` : "") + speaker(x, 98, y0 + 92, 10, 5, st); geo = { cx: 98, lensY: y0 + 16, btnY: y0 + 54, w }; }
+      else { s += glassW(x, x0 + 3, y0 + 3, w - 6, 30, 4) + lens(x, 98, y0 + 13, 4.6, st, ir) + `<circle cx="92" cy="${y0 + 25}" r="2.1" fill="#05070c"/><circle cx="104" cy="${y0 + 25}" r="2.1" fill="#05070c"/>` + irDots(x, 98, y0 + 25, 2, 4, ir) +
+          btnR(x, 98, y0 + 48, 7.4, c2, st, front) + (m === "poe" ? `<g fill="none" stroke="${H.shade(front, -.35)}" stroke-width=".5">${[2, 3.5, 5].map((r) => `<path d="M${f(98 - r)} ${y0 + 48}a${r} ${r} 0 0 1 ${f(2 * r)} 0"/>`).join("")}</g>` : "") +
+          `<rect x="${x0 + 5}" y="${y0 + 63}" width="${w - 10}" height="22" rx="2" fill="#05070c"/>` + (o.on ? `<rect x="${x0 + 8}" y="${y0 + 72}" width="${w - 16}" height="3" rx="1" fill="#4da3ff"/><circle cx="98" cy="${y0 + 67}" r="1.4" fill="#4da3ff"/>` : "") +
+          `<path d="M${x0 + 10} ${y0 + 93}h8M${x0 + 10} ${y0 + 96}h8" stroke="${H.shade(front, -.3)}" stroke-width=".6"/>` +
+          `<rect x="${x0 + 7}" y="${y0 + 100}" width="${w - 14}" height="10" rx="2" fill="#05070c"/><circle cx="98" cy="${y0 + 105}" r="2.6" fill="${x.rg([[0, "#1d2436"], [1, "#000"]])}"/>` + pkgLight(x, 106, y0 + 105, pkg); geo = { cx: 98, lensY: y0 + 13, btnY: y0 + 48, w }; } }
+    else if (id === "pill") { const m = opt.power || "battery", w = m === "battery" ? 34 : m === "wired2" ? 30 : 26, h = m === "battery" ? 104 : 96, x0 = 98 - w / 2, y0 = 42, r = w / 2;
+      bat = m === "battery"; const face = m === "wired1" ? "#16181d" : c;
+      s += mount(x, MNT, x0, y0, w, h, r) + shell(x, x0, y0, w, h, r, face, true) + `<circle cx="98" cy="${y0 + r}" r="${f(r * .72)}" fill="${x.lg([[0, "#2a2d34"], [1, "#0b0c10"]])}"/>` + lens(x, 98, y0 + r, r * .32, st, ir) +
+        statusLed(x, 98, y0 + r * 1.65, st) + (m === "wired1" ? `<circle cx="98" cy="${y0 + h - r}" r="${f(r * .68)}" fill="none" stroke="${c2}" stroke-width="1.8" stroke-opacity="${st === "ring" ? 1 : .5}"/>` : "") +
+        `<g class="${st === "ring" ? P + "pulse" : ""}"><circle cx="98" cy="${f(y0 + h - r)}" r="${f(r * .72)}" fill="none" stroke="${c2}" stroke-opacity="${st === "ring" ? .9 : st === "idle" ? .25 : .5}" stroke-width="${st === "ring" ? 2.4 : 1.2}"/></g>` +
+        `<circle cx="98" cy="${f(y0 + h - r)}" r="${f(r * .62)}" fill="${x.rg([[0, H.shade(face, .2)], [1, H.shade(face, -.15)]], .4, .35, .75)}"/>` + battery(x, 98, y0 + h + 9, bat);
+      geo = { cx: 98, lensY: y0 + r, btnY: y0 + h - r, w }; }
+    else if (id === "dualcam") { const x0 = 82, y0 = 34, w = 32, h = 118; bat = (opt.power || "battery") === "battery";
+      s += mount(x, MNT, x0, y0, w, h, 6) + shell(x, x0, y0, w, h, 6, c) + glassW(x, x0 + 3, y0 + 3, w - 6, h - 6, 4) + lens(x, 98, y0 + 20, 7, st, ir) + statusLed(x, 98, y0 + 34, st) +
+        speaker(x, 98, y0 + 60, 12, 6, st, "#fff") + btnR(x, 98, y0 + 88, 9, c2, st, "#16181d") + `<circle cx="98" cy="${y0 + 106}" r="3.4" fill="${x.rg([[0, "#1d2436"], [1, "#000"]])}"/><circle cx="98" cy="${y0 + 106}" r="4.4" fill="none" stroke="#2a2d34"/>` + pkgLight(x, 108, y0 + 106, pkg) + battery(x, 98, y0 + h + 8, bat);
+      geo = { cx: 98, lensY: y0 + 20, btnY: y0 + 88, w }; }
+    else if (id === "squaretop") { const x0 = 83, y0 = 40, w = 30, h = 108; bat = (opt.power || "battery") === "battery";
+      s += mount(x, MNT, x0, y0, w, h, 14) + shell(x, x0, y0, w, h, 14, "#eef0f2") + `<path d="${rr(x0 + 2, y0 + 1, w - 4, h - 4, 13)}" fill="${x.lg([[0, H.shade(c, .15)], [1, H.shade(c, -.25)]])}"/>` + lens(x, 98, y0 + 16, 5, st, ir) + statusLed(x, 98, y0 + 28, st) +
+        `<path d="M${x0 + 2} ${y0 + 44}H${x0 + w - 2}" stroke="#000" stroke-opacity=".45"/>` + btnR(x, 98, y0 + h - 18, 8, c2, st, H.shade(c, -.1), true) + battery(x, 98, y0 + h + 8, bat);
+      geo = { cx: 98, lensY: y0 + 16, btnY: y0 + h - 18, w }; }
+    else if (id === "zigbee") { const x0 = 82, y0 = 40, w = 32, h = 104; bat = true;
+      s += mount(x, MNT, x0, y0, w, h, 4) + shell(x, x0, y0, w, h, 4, c) + `<circle cx="98" cy="${y0 + 20}" r="11" fill="${x.lg([[0, "#2a2d34"], [1, "#0b0c10"]])}"/>` + lens(x, 98, y0 + 20, 6, st, ir) + statusLed(x, 98, y0 + 37, st) +
+        btnR(x, 98, y0 + 66, 9, c2, st, H.shade(c, .1)) + speaker(x, 98, y0 + 92, 14, 7, st) + battery(x, 98, y0 + h + 8, bat);
+      geo = { cx: 98, lensY: y0 + 20, btnY: y0 + 66, w }; }
+    else if (id === "wedgetop") { const x0 = 84, y0 = 40, w = 28, h = 108; bat = (opt.power || "poe") === "wifi";
+      s += mount(x, MNT, x0, y0, w, h, 13) + shell(x, x0, y0, w, h, 13, c, true) + `<path d="${rr(x0 + 3, y0 + 3, w - 6, 40, 11)}" fill="${x.lg([[0, "#2a2d34"], [1, "#0b0c10"]])}"/>` + lens(x, 98, y0 + 18, 5.4, st, ir) + irDots(x, 98, y0 + 33, 2, 10, ir) + statusLed(x, 98, y0 + 49, st) +
+        btnR(x, 98, y0 + h - 20, 9, c2, st, H.shade(c, .15)) + (bat ? battery(x, 98, y0 + h + 8, true) : `<path d="M${x0 + w - 2} ${y0 + h - 6}Q${x0 + w + 14} ${y0 + h + 6} ${x0 + w + 8} 196" fill="none" stroke="#2f7fd8" stroke-width="2.4"/>`);
+      geo = { cx: 98, lensY: y0 + 18, btnY: y0 + h - 20, w }; }
+    else if (id === "wide2k") { const x0 = 83, y0 = 40, w = 30, h = 106;
+      s += mount(x, MNT, x0, y0, w, h, 7) + shell(x, x0, y0, w, h, 7, c) + `<path d="${rr(x0 + 3, y0 + 3, w - 6, 36, 5)}" fill="${x.lg([[0, "#2a2d34"], [1, "#0b0c10"]])}"/>` + lens(x, 98, y0 + 18, 6, st, ir) + statusLed(x, 106, y0 + 9, st) +
+        btnR(x, 98, y0 + 80, 8.4, c2, st, "#16181d", true) + speaker(x, 98, y0 + 56, 12, 6, st);
+      geo = { cx: 98, lensY: y0 + 18, btnY: y0 + 80, w }; }
+    else if (id === "budget") { const x0 = 84, y0 = 40, w = 28, h = 108;
+      s += mount(x, MNT, x0, y0, w, h, 12) + shell(x, x0, y0, w, h, 12, c, true) + `<circle cx="98" cy="${y0 + 18}" r="10" fill="${x.lg([[0, "#2a2d34"], [1, "#0b0c10"]])}"/>` + lens(x, 98, y0 + 18, 5.4, st, ir) + statusLed(x, 98, y0 + 34, st) +
+        `<path d="M${x0 + 8} ${y0 + 54}h${w - 16}" stroke="${H.shade(c, .3)}" stroke-width=".8"/>` + btnR(x, 98, y0 + h - 18, 8.6, c2, st, H.shade(c, .1));
+      geo = { cx: 98, lensY: y0 + 18, btnY: y0 + h - 18, w }; }
+    else if (id === "roundbtn") { if ((opt.shape || "round") === "round") { const cy = 96, R = 34;
+        s += (MNT !== "flat" ? `<circle cx="96" cy="${cy + 2}" r="${R + 2}" fill="#16171a"/>` : "") + `<circle cx="99.5" cy="${cy + 3}" r="${R}" fill="#000" fill-opacity=".35"/><circle cx="98" cy="${cy}" r="${R}" fill="${x.rg([[0, H.shade(c, .45)], [.6, c], [1, H.shade(c, -.35)]], .35, .3, .8)}"/>` +
+          (() => { let b = ""; for (let i = 0; i < 18; i++) b += `<path d="M${f(98 - R * .9)} ${f(cy - R + 6 + i * 3.4)}H${f(98 + R * .9)}" stroke="#fff" stroke-opacity=".06"/>`; return b; })() +
+          `<circle cx="98" cy="${cy - 15}" r="9" fill="#16181d"/>` + lens(x, 98, cy - 15, 5.4, st, ir) + statusLed(x, 98, cy - 2, st) + btnR(x, 98, cy + 15, 11, c2, st, "#16181d");
+        geo = { cx: 98, lensY: cy - 15, btnY: cy + 15, w: R * 2 }; }
+      else { const x0 = 85, y0 = 40, w = 26, h = 108;
+        s += mount(x, MNT, x0, y0, w, h, 5) + shell(x, x0, y0, w, h, 5, c) + glassW(x, x0 + 3, y0 + 3, w - 6, 40, 4) + lens(x, 98, y0 + 20, 5, st, ir) + btnR(x, 98, y0 + 68, 9, c2, st, "#16181d") + `<circle cx="98" cy="${y0 + 94}" r="3" fill="${H.shade(c, -.3)}"/>`;
+        geo = { cx: 98, lensY: y0 + 20, btnY: y0 + 68, w }; } }
+    return s + overlay(x, st, geo.cx, geo.lensY, geo.btnY, geo.w);
+  }
+
+  const STATE = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+  const MOUNT = { id: "mount", name: "Mount", values: [["flat", "Flat"], ["wedge", "Wedge"], ["corner", "Corner kit"]] };
+  const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] }, PKG = { id: "pkg", name: "Package light", values: [["off", "Off"], ["on", "On"]] };
+  const CARDS = [
+    { id: "classic", name: "Classic video doorbell", colors: [FACE.nickel, "#7a6650", "#232428", "#d9d5cc"], wall: "siding",
+      options: [{ id: "model", name: "Model", values: [["battery", "Battery"], ["plus", "Battery, wide view"], ["wired", "Wired"], ["slimwired", "Slim wired"]] }, STATE, MOUNT, IR] },
+    { id: "propoe", name: "Pro PoE doorbell", colors: [FACE.white, "#1a1b1f"], wall: "siding",
+      options: [{ id: "model", name: "Model", values: [["std", "Standard"], ["pro", "Pro, package camera"], ["poe", "Pro, PoE"]] }, STATE, MOUNT, IR, Object.assign({ when: { opt: "model", is: ["pro", "poe"] } }, PKG)] },
+    { id: "pill", name: "Rounded pill doorbell", colors: ["#eef0f2", "#e8dcc4", "#7d8288", "#5a6e5a"], wall: "brick",
+      options: [{ id: "power", name: "Power", values: [["battery", "Battery"], ["wired2", "Wired, newer"], ["wired1", "Wired, older (black)"]] }, STATE, MOUNT, IR] },
+    { id: "dualcam", name: "Dual-camera doorbell", colors: ["#16181d", "#2c2f36"], wall: "brick",
+      options: [{ id: "power", name: "Power", values: [["battery", "Battery"], ["wired", "Wired"]] }, STATE, MOUNT, IR, PKG] },
+    { id: "squaretop", name: "Square-top doorbell", colors: ["#1a1b1f", "#eef0f2"], wall: "siding",
+      options: [{ id: "power", name: "Power", values: [["battery", "Battery"], ["wired", "Wired"]] }, STATE, MOUNT, IR] },
+    { id: "zigbee", name: "Zigbee hub doorbell", colors: ["#3a3c42", "#d5d8dc"], wall: "siding", options: [STATE, MOUNT, IR] },
+    { id: "wedgetop", name: "Wedge-top PoE doorbell", colors: ["#1a1b1f", "#eef0f2"], wall: "brick",
+      options: [{ id: "power", name: "Power", values: [["poe", "PoE"], ["wifi", "Wi-Fi battery"]] }, STATE, MOUNT, IR] },
+    { id: "wide2k", name: "2K wide doorbell", colors: ["#1a1b1f", "#eef0f2"], wall: "siding", options: [STATE, MOUNT, IR] },
+    { id: "budget", name: "Budget video doorbell", colors: ["#2a2c31", "#d5d8dc"], wall: "brick", options: [STATE, MOUNT, IR] },
+    { id: "roundbtn", name: "Round-button doorbell", colors: [FACE.silver, "#c9a24a", "#6e5a48", "#232428"], wall: "brick",
+      options: [{ id: "shape", name: "Shape", values: [["round", "Round"], ["slim", "Slim"]] }, STATE, MOUNT, IR] },
+  ];
+  const OLD = { dbtall: ["tall", "Tall ring-button doorbell"], dbsquare: ["square", "Square-head doorbell"], dbwedge: ["wedge", "Slim battery doorbell"],
+    dbpackage: ["package", "Two-lens package doorbell"], dbintercom: ["intercom", "Apartment intercom"], dbgate: ["gatepost", "Gate keypad doorbell"], dbpeep: ["peephole", "Peephole camera"] };
+  const OLD_WALL = { dbtall: "siding", dbsquare: "brick", dbwedge: "siding", dbpackage: "brick", dbintercom: "brick", dbpeep: "siding" };
+  const BASE = ((typeof document !== "undefined" && document.currentScript && document.currentScript.src) || "").replace(/[^/]*$/, "");
+  const bellSet = () => (window.HDA || []).filter((st) => st && st.id === "doorbell")[0];
+  const oldIcon = (id) => { const st = bellSet(), L = st && (st.all || st.icons); return L ? L.filter((ic) => ic.id === id)[0] : null; };
+  let loading = false;
+  function ensureBells() {
+    if (loading || bellSet() || typeof document === "undefined" || !document.createElement) return;
+    loading = true; const sc = document.createElement("script"); sc.src = BASE + "doorbell.js";
+    sc.onload = sc.onerror = () => { const st = bellSet(); if (!st) { loading = false; return; }
+      if (st.css && !document.querySelector('style[data-set="doorbell"]')) { const el = document.createElement("style"); el.dataset.set = "doorbell"; el.textContent = st.css; document.head.appendChild(el); }
+      if (typeof window.renderStage === "function") window.renderStage(); };
+    document.head.appendChild(sc);
+  }
+  let oldN = 0;
+  function oldRender(o, k, op) {
+    const ic = oldIcon(OLD[k][0]);
+    const oo = Object.assign({}, o, { uid: `${o.uid}d${++oldN}`, opt: { state: op.state || "ring", ir: op.ir || "off" } });
+    if (!ic) { ensureBells(); const x = X(o); return scene(x, backdrop(x, OLD_WALL[k] || "siding"), ""); }
+    const sv = ic.render(oo);
+    if (k === "dbgate") return sv; 
+    const x = X(o), sc = k === "dbpeep" ? .9 : .74, w = 200 * sc, inner = sv.replace(/^<svg[^>]*>/, `<svg x="${f(98 - w / 2)}" y="${f(100 - w / 2)}" width="${f(w)}" height="${f(w)}" viewBox="0 0 200 200" overflow="visible">`);
+    return scene(x, backdrop(x, OLD_WALL[k] || "siding"), `<g class="hda-nobg">${inner}</g>`);
+  }
+
+  const BY = {}; CARDS.forEach((cd) => { BY[cd.id] = cd; });
+  const is = (list) => ({ opt: "style", is: list });
+  const options = [
+    { id: "style", name: "Style", values: CARDS.map((cd) => [cd.id, cd.name]).concat(Object.keys(OLD).map((k) => [k, OLD[k][1]])) },
+    { id: "mClassic", name: "Model", values: CARDS[0].options[0].values, when: is("classic") },
+    { id: "mProPoe", name: "Model", values: CARDS[1].options[0].values, when: is("propoe") },
+    { id: "pPill", name: "Power", values: BY.pill.options[0].values, when: is("pill") },
+    { id: "pBat", name: "Power", values: [["battery", "Battery"], ["wired", "Wired"]], when: is(["dualcam", "squaretop"]) },
+    { id: "pPoe", name: "Power", values: BY.wedgetop.options[0].values, when: is("wedgetop") },
+    { id: "shape", name: "Shape", values: BY.roundbtn.options[0].values, when: is("roundbtn") },
+    STATE, Object.assign({}, MOUNT, { when: is(CARDS.map((cd) => cd.id)) }), IR,
+    Object.assign({}, PKG, { id: "pkgPro", when: { opt: "mProPoe", is: ["pro", "poe"] } }),
+    Object.assign({}, PKG, { id: "pkgDual", when: is("dualcam") }),
+  ];
+  function oldOpt(op, k) {
+    const m = { state: op.state || "ring", mount: op.mount || "flat", ir: op.ir || "off" };
+    if (k === "classic") m.model = op.mClassic || "battery";
+    else if (k === "propoe") { m.model = op.mProPoe || "std"; m.pkg = m.model === "std" ? "off" : op.pkgPro || "off"; }
+    else if (k === "pill") m.power = op.pPill || "battery";
+    else if (k === "dualcam") { m.power = op.pBat || "battery"; m.pkg = op.pkgDual || "off"; }
+    else if (k === "squaretop") m.power = op.pBat || "battery";
+    else if (k === "wedgetop") m.power = op.pPoe || "poe";
+    else if (k === "roundbtn") m.shape = op.shape || "round";
+    return m;
+  }
+  const FACES = [FACE.nickel, FACE.white, "#1a1b1f", "#7a6650", "#d9d5cc", "#e8dcc4", "#7d8288", "#5a6e5a", "#c9a24a"];
+  const icons = [{ id: "bell", name: "Video doorbell", colors: FACES, picker: true, colorLabel: "Faceplate", colors2: RING, picker2: true, colorLabel2: "Ring light", options,
+    render(o) { const op0 = o.opt || {}; if (OLD[op0.style]) return oldRender(o, op0.style, op0);
+      const op = op0, k = BY[op.style] ? op.style : CARDS[0].id, cd = BY[k], opt = oldOpt(op, k), oo = Object.assign({}, o, { opt });
+      const x = X(oo), st = o.on ? opt.state : "idle", c = o.color || cd.colors[0], c2 = o.color2 || RING[0];
+      return scene(x, backdrop(x, cd.wall), model(x, k, oo, st, c, c2)); } }];
+
+  const css = `
+.hda-camdoorbells-pulse{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-camdoorbells-pulse{animation:hda-camdoorbells-pulse 1s ease-in-out infinite}
+@keyframes hda-camdoorbells-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.12)}}
+.hda-anim .hda-camdoorbells-wave{animation:hda-camdoorbells-wave 1.35s ease-out infinite}
+@keyframes hda-camdoorbells-wave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+.hda-anim .hda-camdoorbells-blink{animation:hda-camdoorbells-blink 1.1s steps(1) infinite}
+@keyframes hda-camdoorbells-blink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .hda-camdoorbells-glow{animation:hda-camdoorbells-glow 2.4s ease-in-out infinite}
+@keyframes hda-camdoorbells-glow{0%,100%{opacity:1}50%{opacity:.55}}
+.hda-anim .hda-camdoorbells-sweep{animation:hda-camdoorbells-sweep 1.6s ease-in-out infinite alternate}
+@keyframes hda-camdoorbells-sweep{0%{opacity:.3}100%{opacity:1}}
+.hda-camdoorbells-spk{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-camdoorbells-spk{animation:hda-camdoorbells-spk .32s ease-in-out infinite alternate}
+@keyframes hda-camdoorbells-spk{0%{transform:scale(1,.4)}100%{transform:scale(1,1.3)}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-camdoorbells-pulse,.hda-anim .hda-camdoorbells-wave,.hda-anim .hda-camdoorbells-blink,.hda-anim .hda-camdoorbells-glow,.hda-anim .hda-camdoorbells-sweep,.hda-anim .hda-camdoorbells-spk{animation:none!important}}
+`;
+  (window.HDA = window.HDA || []).push({
+    id: "camdoorbells", tab: "Video doorbells", group: "Security", kind: "device",
+    intro: "One video doorbell builder, drawn from real ones (no brands): pick the Style (classic, pro PoE, rounded pill, dual-camera, square-top, hub, wedge-top, 2K wide, budget, round-button, plus the older tall ring-button, square-head, slim battery, two-lens package, apartment intercom, gate keypad and peephole looks), then that style's own Model, Power or Shape menu. State shows ringing, motion, live view or talking; Mount is flat, wedge or corner kit (on the styles that use it); Night IR is Off/On, and Package light shows only on styles that have one. Battery models show a small battery bar.",
+    levelLabel: "Battery", onWord: "Ringing", offWord: "Idle",
+    css, icons,
+  });
+})();
+
+(function () {
   const H = window.HDAH, sh = H.shade, rgba = H.rgba;
   const P = "hda-ceilingfan-";
   const PK = 0.36, WARM = "#ffe0a6", HOT = "#fff8ea";
@@ -6498,9 +7509,6 @@ ${items}<rect x="20" y="${y}" width="160" height="9" rx="1.5" fill="${x.url("woo
 
   const pon = (o, id) => (o.parts && o.parts[id] != null ? !!o.parts[id] : !!o.on);
   const LC = (o) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor.light || "") ? o.pcolor.light : null);
-  // the parts: a light kit = a fan (the blades spin) and a light (the kit glows); the rest = the fan alone
-  // the "kit" option: "none" = the fan alone (a light kit hidden, a built-in light unlit), "light" = fan + light kit;
-  // the Light part only counts with the kit (Multi-Function Images sets kit = light)
   const LK = [{ id: "fan", name: "Fan" }, { id: "light", name: "Light", when: { opt: "kit", is: ["light"] } }];
   const KITOPT = [{ id: "kit", name: "Light kit", values: [["none", "Fan only"], ["light", "Fan + light"]] }];
 
@@ -6509,8 +7517,6 @@ ${items}<rect x="20" y="${y}" width="160" height="9" rx="1.5" fill="${x.url("woo
     const stops = (a) => a.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] == null ? "" : ` stop-opacity="${s[2]}"`}/>`).join("");
     const k = {
       u, o, on: !!o.on, lv: Math.max(0.05, Math.min(1, +o.level || 0)),
-      // (parts) "fan" and "light", each its own on (o.parts[id], else the drawing's one on) and level (o.plevel[id]);
-      // the light kit glows in the light's color (o.pcolor.light), else today's warm white
       fn: { on: pon(o, "fan"), lv: Math.max(0.05, Math.min(1, o.plevel && o.plevel.fan != null ? +o.plevel.fan || 0 : +o.level || 0)) },
       kit: !!(o.opt && o.opt.kit === "light"),
       lt: { on: pon(o, "light") && !!(o.opt && o.opt.kit === "light"), a: o.plevel && o.plevel.light != null ? f(0.35 + 0.65 * Math.max(0, Math.min(1, +o.plevel.light || 0))) : 1 },
@@ -6628,19 +7634,16 @@ ${items}<rect x="20" y="${y}" width="160" height="9" rx="1.5" fill="${x.url("woo
   const glowCast = (k, ...a) => (k.lt.on ? cast(k, ...a) : "");   // (a new kit: its light on the floor, the fan's own shadow stays)
   const finial = (k, cx, y, c, r = 2.8) => `<circle cx="${cx}" cy="${f(y)}" r="${r}" fill="${mg(k, c)}"/>`;
   const LEDOFF = [[0, "#e4e6ec"], [0.75, "#b1b4bd"], [1, "#767983"]];
-  // a flat LED disc in a trim ring (twin heads)
   function ledDisc(k, cx, y, r, c) {
     const disc = k.lt.on ? k.rad("lring", [[0, k.HOT], [0.6, k.lc("#fff1d6", 0.7)], [0.9, k.W], [1, sh(k.W, -0.2)]]) : k.rad("lringoff", LEDOFF, 0.45, 0.4, 0.6);
     return ell(cx, y, r + 1.8, mg(k, c)) + ell(cx, y + 0.4, r, disc) + (k.lt.on ? ell(cx, y + 0.4, r, "none", ` stroke="#fff" stroke-opacity=".75" stroke-width=".9"`) : band(cx, y + 0.4, r, "#fff", 0.3));
   }
-  // a thin ring light round a cap (minimal, propeller)
   function ringLight(k, cx, y, r, c, kind = "satin") {
     const lit = k.lt.on;
     return ell(cx, y, r + 2.4, mg(k, c, kind)) + ell(cx, y + 0.3, r, "none", ` stroke="${lit ? k.W : "#cfd3da"}" stroke-width="3.2"${lit ? "" : ` stroke-opacity=".9"`}`) +
       (lit ? ell(cx, y + 0.3, r, "none", ` stroke="${k.HOT}" stroke-width="1.4"`) + ell(cx, y + 0.3, r + 2.6, "none", ` stroke="${k.W}" stroke-opacity=".35" stroke-width="2"`) : band(cx, y + 0.3, r, "#000", 0.2, 0.8)) +
       ell(cx, y + 0.3, r - 2.2, mg(k, c, kind));
   }
-  // an Edison bulb in a wire cage (industrial)
   function cagedBulb(k, cx, y, s, cage) {
     const lit = k.lt.on, bulb = `M${f(cx - 3 * s)} ${f(y + 6 * s)}C${f(cx - 3 * s)} ${f(y + 10 * s)} ${f(cx - 9 * s)} ${f(y + 13 * s)} ${f(cx - 9 * s)} ${f(y + 20 * s)}C${f(cx - 9 * s)} ${f(y + 27 * s)} ${f(cx - 4.5 * s)} ${f(y + 30 * s)} ${cx} ${f(y + 30 * s)}C${f(cx + 4.5 * s)} ${f(y + 30 * s)} ${f(cx + 9 * s)} ${f(y + 27 * s)} ${f(cx + 9 * s)} ${f(y + 20 * s)}C${f(cx + 9 * s)} ${f(y + 13 * s)} ${f(cx + 3 * s)} ${f(y + 10 * s)} ${f(cx + 3 * s)} ${f(y + 6 * s)}Z`;
     const fil = `M${f(cx - 2.5 * s)} ${f(y + 11 * s)}L${f(cx - 4 * s)} ${f(y + 21 * s)}L${f(cx - 1.4 * s)} ${f(y + 17 * s)}L${cx} ${f(y + 22 * s)}L${f(cx + 1.4 * s)} ${f(y + 17 * s)}L${f(cx + 4 * s)} ${f(y + 21 * s)}L${f(cx + 2.5 * s)} ${f(y + 11 * s)}`;
@@ -6651,7 +7654,6 @@ ${items}<rect x="20" y="${y}" width="160" height="9" rx="1.5" fill="${x.url("woo
       `<path d="${wires}" fill="none" stroke="${cage}" stroke-width="1.3"/>` + ell(cx, y + 19 * s, 11.2 * s, "none", ` stroke="${cage}" stroke-width="1.3"`) +
       ell(cx, y + 33 * s, 3.2 * s, mg(k, cage, "matte"));
   }
-  // a galvanized barn shade with its bulb peeking out (windmill)
   function barn(k, cx, y, r, c) {
     const d = `M${cx - 4.5} ${y + 5}L${cx + 4.5} ${y + 5}C${cx + 8} ${y + 10} ${f(cx + r - 2)} ${y + 13} ${cx + r} ${y + 18}A${r} ${f(r * PK)} 0 0 1 ${cx - r} ${y + 18}C${f(cx - r + 2)} ${y + 13} ${cx - 8} ${y + 10} ${cx - 4.5} ${y + 5}Z`;
     const inside = k.lt.on ? k.rad("barnin", [[0, k.HOT], [0.5, k.W], [1, sh(k.W, -0.3)]]) : k.rad("barnin", [[0, "#3a3d42"], [1, "#1c1e22"]]);
@@ -6660,7 +7662,6 @@ ${items}<rect x="20" y="${y}" width="160" height="9" rx="1.5" fill="${x.url("woo
       ell(cx, y + 18, r - 1.3, inside) + ell(cx, y + 18, r, "none", ` stroke="${sh(c, -0.35)}" stroke-width="1.6"`) +
       ell(cx, y + 18.6, f(r * 0.36), k.lt.on ? k.HOT : "#d9d4c8", k.lt.on ? "" : ` fill-opacity=".85"`);
   }
-  // a seeded amber glass bell (palm leaf)
   function bell(k, cx, y, r, dep) {
     const d = `M${cx - 5} ${y}C${cx - 6} ${f(y + dep * 0.35)} ${cx - r} ${f(y + dep * 0.5)} ${cx - r} ${y + dep}A${r} ${f(r * PK)} 0 0 0 ${cx + r} ${y + dep}C${cx + r} ${f(y + dep * 0.5)} ${cx + 6} ${f(y + dep * 0.35)} ${cx + 5} ${y}Z`;
     const seeds = [[-8, 0.62, 0.9], [-3, 0.5, 0.7], [4, 0.58, 0.8], [9, 0.78, 0.7], [-11, 0.86, 0.6], [0, 0.74, 0.9], [6, 0.92, 0.6], [-5, 0.95, 0.7], [2, 0.36, 0.6], [12, 0.97, 0.5]]
@@ -6669,7 +7670,6 @@ ${items}<rect x="20" y="${y}" width="160" height="9" rx="1.5" fill="${x.url("woo
       `<path d="M${cx - 7} ${f(y + dep * 0.45)}C${f(cx - r + 3)} ${f(y + dep * 0.62)} ${f(cx - r + 2)} ${f(y + dep * 0.82)} ${f(cx - r + 3)} ${f(y + dep * 0.95)}" stroke="#fff" stroke-opacity=".45" stroke-width="1.6" fill="none" stroke-linecap="round"/>` +
       ell(cx, y + dep, r, "none", ` stroke="${sh("#c9a46a", -0.2)}" stroke-width="1.6"`);
   }
-  // a woven rattan dome, the bulb's glow through the weave (rattan)
   function wovenDome(k, cx, y, r, dep, weave, c) {
     const d = `M${cx - 5} ${y}C${f(cx - r * 0.75)} ${y + 2} ${cx - r} ${f(y + dep * 0.55)} ${cx - r} ${y + dep}A${r} ${f(r * PK)} 0 0 0 ${cx + r} ${y + dep}C${cx + r} ${f(y + dep * 0.55)} ${f(cx + r * 0.75)} ${y + 2} ${cx + 5} ${y}Z`;
     const back = k.lt.on ? k.rad("domein", [[0, k.HOT], [0.6, k.W], [1, sh(k.W, -0.25)]], 0.5, 0.7, 0.7) : sh(c, -0.6);
@@ -7051,7 +8051,7 @@ ${extra || ""}</defs>`;
   const C3 = [DAY, SOFT, WARM, "#9ef0c4", "#8fd0ff"];
   const RGB = ["#ff3d9a", "#7a5cff", "#18d8ff", "#3dffa0", WARM, DAY];
   const base = (o) => Object.assign({ picker: true, colorLabel: "Light", cast: "down" }, o);
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
@@ -9512,7 +10512,7 @@ ${extra || ""}</defs>`;
 `;
   const BG = (s) => `<g class="hda-bg">${s}</g>`;
   const RED_B = "#a8322c", WHT = "#ecebe6", GRY = "#8a9096", WOOD = "#b07a4a", GRN = "#5a7a4a";
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // (multi-function) o.parts holds only the parts the user ticked. A part left out follows the one device as a Device
   // Image (no o.mf, as today: the auto door, light and heaters follow o.on) and stays off / closed, never animated, as a
   // Multi-Function Image (o.mf). The readings come from o.pval when o.mf (temp = the coop temperature, water = the
   // waterer level in %), else from the Temperature menu and the slider (as today); a reading left out is blank.
@@ -10030,6 +11030,510 @@ ${extra || ""}</defs>`;
 })();
 
 (function () {
+  "use strict";
+  const P = "hda-covers2-";
+  const H = () => window.HDAH;
+  const f = (v) => (Math.round(v * 10) / 10).toString();
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  const FONT = `font-family="Segoe UI, Roboto, Arial, sans-serif"`;
+
+  function X(o) {
+    const d = []; let n = 0;
+    const st = (a) => a.map(([of, c, op]) => `<stop offset="${of}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+    const x = { o, d,
+      opt: (k, def) => (o.opt && o.opt[k]) || def,
+      c1: o.color || "#f2f2ee", c2: o.color2 || "#f0eee8",
+      lv: cl(o.level == null ? .6 : +o.level || 0, 0, 1),
+      lg(a, x1, y1, x2, y2) { const id = `${o.uid}-g${n++}`; d.push(`<linearGradient id="${id}" x1="${x1 == null ? 0 : x1}" y1="${y1 == null ? 0 : y1}" x2="${x2 == null ? 0 : x2}" y2="${y2 == null ? 1 : y2}">${st(a)}</linearGradient>`); return `url(#${id})`; },
+      rg(a, cx, cy, r) { const id = `${o.uid}-g${n++}`; d.push(`<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r == null ? .5 : r}">${st(a)}</radialGradient>`); return `url(#${id})`; },
+      clip(path) { const id = `${o.uid}-c${n++}`; d.push(`<clipPath id="${id}"><path d="${path}"/></clipPath>`); return `url(#${id})`; },
+      blur(sd) { const id = `${o.uid}-b${n++}`; d.push(`<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${sd}"/></filter>`); return `url(#${id})`; } };
+    x.on = !!o.on; x.anim = !!o.anim;
+    return x;
+  }
+  function pal(c) {
+    const h = H(), m = /^#?([0-9a-f]{6})$/i.exec(c || ""), n = m ? parseInt(m[1], 16) : 0xdddddd;
+    const lum = (((n >> 16) & 255) * .3 + ((n >> 8) & 255) * .59 + (n & 255) * .11) / 255, lt = lum > .7;
+    return { l: h.shade(c, lt ? .5 : .32), m: c, d: h.shade(c, lt ? -.14 : -.3), k: h.shade(c, lt ? -.34 : -.55), lt };
+  }
+  const shadow = (x, cx, cy, rx, ry, op) => `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${x.rg([[0, "#000", op == null ? .5 : op], [1, "#000", 0]])}"/>`;
+  function wrap(x, bg, item) {
+    const c = `${x.o.uid}-card`, vig = x.rg([[0, "#000", 0], [.65, "#000", .06], [1, "#000", .42]], .5, .46, .75);
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="${c}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>${x.d.join("")}</defs>` +
+      `<g clip-path="url(#${c})"><g class="hda-bg">${bg}<rect width="200" height="200" fill="${vig}"/></g>${item}</g>` +
+      `<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g></svg>`;
+  }
+  const firstIs = (op, v) => Object.assign({}, op, { values: [op.values.find((p) => p[0] === v)].concat(op.values.filter((p) => p[0] !== v)) });
+
+  function room(x, tone) {
+    const w = tone || "#8d8796";
+    return `<rect width="200" height="200" fill="${x.lg([[0, H().shade(w, .08)], [1, H().shade(w, -.22)]])}"/>` +
+      `<rect y="170" width="200" height="30" fill="${x.lg([[0, "#7a5638"], [1, "#4e3523"]])}"/><path d="M0 178H200M0 188H200" stroke="#000" stroke-opacity=".18"/>` +
+      `<rect y="165" width="200" height="6" fill="#ece8df"/><rect y="170.5" width="200" height="1.5" fill="#000" opacity=".25"/>`;
+  }
+  function sky(x, h) {
+    return `<rect width="200" height="200" fill="${x.lg([[0, "#2f74c4"], [.55, "#79b4e6"], [1, "#cfe6f5"]])}"/>` +
+      `<g fill="#fff" opacity=".85"><ellipse cx="146" cy="30" rx="20" ry="5"/><ellipse cx="156" cy="26" rx="11" ry="6"/><ellipse cx="44" cy="44" rx="14" ry="3.6"/></g>` +
+      `<path d="M0 ${h - 10}Q40 ${h - 22} 80 ${h - 12}T160 ${h - 14}T200 ${h - 12}V${h}H0Z" fill="#4d8a46" opacity=".8"/>`;
+  }
+  function siding(x, base) {
+    let s = `<rect width="200" height="200" fill="${base || "#c6ccd2"}"/>`;
+    for (let y = 0; y < 200; y += 10) s += `<rect y="${y}" width="200" height="4" fill="#fff" opacity=".14"/><path d="M0 ${y + 9.5}H200" stroke="#000" stroke-opacity=".26"/>`;
+    return s + `<rect width="200" height="200" fill="${x.lg([[0, "#fff", .05], [1, "#000", .22]])}"/>`;
+  }
+  function brick(x) {
+    let s = `<rect width="200" height="200" fill="#5e3328"/>`, k = 7;
+    for (let row = 0, y = 0; y < 200; y += 9, row++) for (let bx = -(row % 2) * 13; bx < 200; bx += 26) { k = (k * 16807) % 2147483647; s += `<rect x="${bx + .7}" y="${y + .7}" width="24.6" height="7.6" rx=".8" fill="${H().mix("#86452f", "#b0664a", (k % 1000) / 1000)}"/>`; }
+    return s + `<rect width="200" height="200" fill="${x.lg([[0, "#fff", .05], [1, "#000", .3]])}"/>`;
+  }
+  function stucco(x) {
+    let s = `<rect width="200" height="200" fill="#d9cbb0"/>`, k = 11;
+    for (let i = 0; i < 180; i++) { k = (k * 16807) % 2147483647; const a = k % 200; k = (k * 16807) % 2147483647; const b = k % 200; s += `<circle cx="${a}" cy="${b}" r="${f(.4 + (k % 9) / 10)}" fill="${k % 2 ? "#fff" : "#7a6a50"}" opacity=".13"/>`; }
+    return s + `<rect width="200" height="200" fill="${x.lg([[0, "#fff", .06], [1, "#000", .26]])}"/>`;
+  }
+  function chevrons(x, cx, cy, dir, col) {
+    const rot = { down: 0, up: 180, left: 90, right: -90 }[dir] || 0;
+    let s = ""; for (let i = 0; i < 3; i++) s += `<path class="${P}chev" style="animation-delay:${(i * .25).toFixed(2)}s" d="M-6 ${i * 6 - 6}L0 ${i * 6}L6 ${i * 6 - 6}" fill="none" stroke="${col || "#fff"}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="${(.5 + i * .2).toFixed(2)}"/>`;
+    return `<g transform="translate(${f(cx)} ${f(cy)}) rotate(${rot})"><circle r="13" fill="#000" opacity=".35"/>${s}</g>`;
+  }
+
+  function radiator(x, kind) {
+    const rc = x.c2, p = pal(rc), heat = x.vpct > 0 && x.mode !== "off";
+    let s = room(x, "#8a8494");
+    if (kind === "column") {
+      const x0 = 16, x1 = 138, y0 = 64, y1 = 160, n = 9, cw = (x1 - x0) / n;
+      s += `<rect x="${x0 + 4}" y="${y1}" width="6" height="8" fill="${p.d}"/><rect x="${x1 - 10}" y="${y1}" width="6" height="8" fill="${p.d}"/>`;
+      for (let i = 0; i < n; i++) { const cx = x0 + i * cw; s += `<rect x="${f(cx + 1)}" y="${y0}" width="${f(cw - 2)}" height="${y1 - y0}" rx="${f(cw / 2 - 1)}" fill="${x.lg([[0, p.k], [.3, p.l], [.55, p.m], [1, p.k]], 0, 0, 1, 0)}"/>`; }
+      s += `<rect x="${x0}" y="${y0 + 8}" width="${x1 - x0}" height="5" fill="${p.d}" opacity=".7"/><rect x="${x0}" y="${y1 - 13}" width="${x1 - x0}" height="5" fill="${p.d}" opacity=".7"/>`;
+    } else if (kind === "towel") {
+      const x0 = 34, x1 = 128, y0 = 30, y1 = 158;
+      const rail = (xx) => `<rect x="${xx - 4}" y="${y0}" width="8" height="${y1 - y0}" rx="4" fill="${x.lg([[0, p.k], [.35, p.l], [.6, p.m], [1, p.k]], 0, 0, 1, 0)}"/>`;
+      s += rail(x0) + rail(x1);
+      for (let y = y0 + 8; y < y1 - 4; y += 10) s += `<rect x="${x0}" y="${y}" width="${x1 - x0}" height="4.4" rx="2.2" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.k]])}"/>`;
+      s += `<path d="M52 40H96V112Q74 118 52 112Z" fill="${x.lg([[0, "#d8e6ee"], [1, "#9fb4c0"]], 0, 0, 1, 0)}"/><path d="M52 40H96" stroke="#000" stroke-opacity=".2" stroke-width="3"/><path d="M58 50V108M66 50V110M74 50V111M82 50V110M90 50V109" stroke="#fff" stroke-opacity=".18"/>`;
+      s += `<rect x="${x1 - 4}" y="${y1}" width="8" height="10" fill="${p.d}"/>`;
+    } else {
+      const x0 = 14, x1 = 140, y0 = 66, y1 = 158;
+      s += `<rect x="${x0 + 10}" y="${y1}" width="5" height="9" fill="${p.d}"/><rect x="${x1 - 16}" y="${y1}" width="5" height="9" fill="${p.d}"/>`;
+      s += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="3" fill="${x.lg([[0, p.l], [.15, p.m], [1, p.d]])}"/>`;
+      let g = ""; for (let xx = x0 + 6; xx < x1 - 3; xx += 6) g += `M${xx} ${y0 + 9}V${y1 - 5}`;
+      s += `<path d="${g}" stroke="${p.k}" stroke-opacity=".45" stroke-width="1.6"/><path d="${g}" stroke="#fff" stroke-opacity=".22" stroke-width=".6" transform="translate(1.4 0)"/>`;
+      s += `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="8" rx="3" fill="${x.lg([[0, p.l], [1, p.d]])}"/>`;
+      for (let xx = x0 + 6; xx < x1 - 3; xx += 4) s += `<rect x="${xx}" y="${y0 + 2}" width="2.2" height="4" rx=".6" fill="${p.k}" opacity=".55"/>`;
+    }
+    if (heat) {
+      const k = x.mode === "boost" ? 1 : x.vpct / 100;
+      s += `<rect x="12" y="40" width="130" height="126" fill="${x.lg([[0, "#ff8a3c", 0], [1, "#ff8a3c", (.06 + .1 * k).toFixed(2)]])}"/>`;
+      for (let i = 0; i < 4; i++) { const xx = 32 + i * 28; s += `<path class="${P}heat" style="animation-delay:${(i * .45).toFixed(2)}s" d="M${xx} ${kind === "towel" ? 30 : 60}q-5 -8 0 -16t0 -16" fill="none" stroke="#ffd2a8" stroke-width="2" stroke-linecap="round" opacity="${(.2 + .35 * k).toFixed(2)}"/>`; }
+    }
+    return s;
+  }
+  function valveBody(x) {
+    const ch = x.lg([[0, "#5c6168"], [.35, "#f1f3f5"], [.6, "#b4bac1"], [1, "#4b5057"]]), chH = x.lg([[0, "#5c6168"], [.35, "#f1f3f5"], [.6, "#b4bac1"], [1, "#4b5057"]], 0, 0, 1, 0);
+    return shadow(x, 168, 184, 22, 4, .45) +
+      `<rect x="161" y="160" width="12" height="24" fill="${chH}"/><rect x="158" y="172" width="18" height="5" rx="1.5" fill="${chH}"/>` +
+      `<rect x="132" y="146" width="30" height="11" rx="2" fill="${ch}"/><rect x="138" y="143" width="7" height="17" rx="1.5" fill="${ch}"/>` +
+      `<path d="M155 142H181L183 163H153Z" fill="${chH}"/><rect x="151" y="134" width="34" height="9" rx="2" fill="${chH}"/>` +
+      `<path d="M153 136H183" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/>`;
+  }
+  function trvReadout(x, cx, cy, sc, lit) {
+    const m = x.mode, col = m === "off" ? "#9aa3ad" : m === "eco" ? "#5fe08a" : m === "boost" ? "#ff6a5a" : "#ffb04a";
+    const icon = m === "eco" ? `<path d="M-4 3Q-5 -5 4 -5Q5 3 -4 3ZM-4 3L1 -2" fill="${col}" stroke="${col}" stroke-width=".6"/>`
+      : m === "off" ? `<circle r="3.6" fill="none" stroke="${col}" stroke-width="1.3"/><path d="M0 -5V-1" stroke="${col}" stroke-width="1.3" stroke-linecap="round"/>`
+      : m === "boost" ? `<path d="M1 -6L-3 1H0L-1 6L3 -1H0Z" fill="${col}"/>`
+      : `<path d="M0 -6C3 -2 4 0 4 2A4 4 0 0 1 -4 2C-4 0 -2 -1 -1 -3C-1 -1 0 0 1 0C1 -2 0 -4 0 -6Z" fill="${col}"/>`;
+    const big = m === "off" ? "OFF" : `${x.vpct}%`;
+    return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${sc})" opacity="${lit ? 1 : .55}">` +
+      `<g transform="translate(-13 -5)"${m === "boost" ? ` class="${P}blink"` : ""}>${icon}</g>` +
+      `<text x="5" y="3" ${FONT} font-size="9.5" font-weight="700" text-anchor="middle" fill="${lit ? "#fff" : "#9aa3ad"}">${big}</text>` +
+      `<text x="0" y="12" ${FONT} font-size="4.6" text-anchor="middle" fill="${col}" letter-spacing=".4">${m === "off" ? "VALVE SHUT" : "VALVE"}</text>` +
+      `<rect x="-13" y="14.5" width="26" height="1.6" rx=".8" fill="#fff" opacity=".18"/><rect x="-13" y="14.5" width="${f(26 * x.vpct / 100)}" height="1.6" rx=".8" fill="${col}"/></g>`;
+  }
+  const HEADS = {
+    round(x) {
+      const p = pal(x.c1), cx = 168, top = 66, bot = 134, w = 38;
+      let s = `<rect x="${cx - w / 2}" y="${top + 6}" width="${w}" height="${bot - top - 6}" rx="5" fill="${x.lg([[0, p.k], [.18, p.d], [.42, p.l], [.62, p.m], [1, p.k]], 0, 0, 1, 0)}"/>`;
+      s += `<ellipse cx="${cx}" cy="${top + 6}" rx="${w / 2}" ry="6" fill="${x.lg([[0, p.l], [1, p.m]])}"/><ellipse cx="${cx}" cy="${top + 6}" rx="${w / 2 - 4}" ry="4" fill="none" stroke="${p.d}" stroke-opacity=".5"/>`;
+      let rib = ""; for (let i = -16; i <= 16; i += 3.2) rib += `M${f(cx + i)} ${bot - 24}V${bot - 2}`;
+      s += `<g clip-path="${x.clip(`M${cx - w / 2} ${bot - 26}H${cx + w / 2}V${bot}H${cx - w / 2}Z`)}"><path d="${rib}" stroke="${p.k}" stroke-opacity=".45" stroke-width="1.2"/><path d="${rib}" stroke="#fff" stroke-opacity=".3" stroke-width=".5" transform="translate(1 0)"/></g>`;
+      s += `<path d="M${cx - w / 2} ${bot - 26}H${cx + w / 2}" stroke="${p.k}" stroke-opacity=".35"/>`;
+      s += `<circle cx="${cx}" cy="${top + 34}" r="13.5" fill="${p.k}" opacity=".35"/><circle cx="${cx}" cy="${top + 34}" r="12.5" fill="${x.lg([[0, "#0b1016"], [1, "#1b2530"]])}"/>` + trvReadout(x, cx, top + 32, .78, x.mode !== "off");
+      s += `<path d="M${cx - 12} ${top + 26}A12 12 0 0 1 ${cx + 4} ${top + 23}" stroke="#fff" stroke-opacity=".18" stroke-width="1.4" fill="none"/>`;
+      return s + `<rect x="${cx - w / 2 + 3}" y="${top + 10}" width="4" height="${bot - top - 40}" rx="2" fill="#fff" opacity=".22"/>`;
+    },
+    square(x) {
+      const p = pal(x.c1), x0 = 148, y0 = 72, w = 40, h = 62, lit = x.mode !== "off";
+      let s = `<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="7" fill="${x.lg([[0, p.l], [.2, p.m], [.8, p.d], [1, p.k]], 0, 0, 1, 0)}"/>`;
+      s += `<rect x="${x0}" y="${y0}" width="${w}" height="8" rx="7" fill="${x.lg([[0, p.l], [1, p.m]])}"/>`;
+      s += `<rect x="${x0 + 3}" y="${y0 + 3}" width="${w - 6}" height="${h - 6}" rx="5" fill="none" stroke="#fff" stroke-opacity=".12"/>`;
+      const col = x.mode === "off" ? "#7a828c" : x.mode === "eco" ? "#5fe08a" : x.mode === "boost" ? "#ff6a5a" : "#ffffff";
+      s += `<g opacity="${lit ? 1 : .45}"><text x="${x0 + w / 2}" y="${y0 + 30}" ${FONT} font-size="15" font-weight="800" text-anchor="middle" fill="${col}">${x.mode === "off" ? "OFF" : x.vpct}</text>`;
+      let mask = ""; for (let yy = y0 + 16; yy < y0 + 33; yy += 2.2) mask += `M${x0 + 2} ${f(yy)}H${x0 + w - 2}`;
+      s += `<path d="${mask}" stroke="${p.m}" stroke-width=".9"/>`;
+      let mk = ""; for (let xx = x0 + 3; xx < x0 + w - 2; xx += 2.2) mk += `M${f(xx)} ${y0 + 15}V${y0 + 34}`;
+      s += `<path d="${mk}" stroke="${p.m}" stroke-width=".9"/>`;
+      s += `<text x="${x0 + w / 2}" y="${y0 + 42}" ${FONT} font-size="5.5" text-anchor="middle" fill="${col}" opacity=".9">${x.mode === "off" ? "" : "% OPEN"}</text></g>`;
+      s += `<g transform="translate(${x0 + w / 2} ${y0 + 52})">` + (x.mode === "boost" ? `<g class="${P}blink"><path d="M1 -5L-3 1H0L-1 5L3 -1H0Z" fill="#ff6a5a"/></g>` : x.mode === "eco" ? `<path d="M-4 3Q-5 -5 4 -5Q5 3 -4 3Z" fill="#5fe08a"/>` : x.mode === "heat" ? `<path d="M0 -5C3 -2 4 0 4 2A4 4 0 0 1 -4 2C-4 0 -2 -1 -1 -3C-1 -1 0 0 1 0C1 -2 0 -4 0 -5Z" fill="#ffb04a"/>` : `<circle r="1.4" fill="#5a626b"/>`) + `</g>`;
+      return s + `<rect x="${x0 + 4}" y="${y0 + 6}" width="3" height="${h - 14}" rx="1.5" fill="#fff" opacity=".16"/>`;
+    },
+    display(x) {
+      const p = pal(x.c1), cx = 168, top = 62, bot = 134, w = 40;
+      let s = `<rect x="${cx - w / 2}" y="${top}" width="${w}" height="${bot - top}" rx="9" fill="${x.lg([[0, p.k], [.16, p.d], [.4, p.l], [.6, p.m], [1, p.k]], 0, 0, 1, 0)}"/>`;
+      s += `<rect x="${cx - w / 2}" y="${top}" width="${w}" height="14" rx="9" fill="${x.lg([[0, p.l], [1, p.m]])}"/>`;
+      s += `<ellipse cx="${cx}" cy="${top + 4}" rx="13" ry="2.4" fill="#fff" opacity=".25"/>`;
+      s += `<rect x="${cx - 15}" y="${top + 18}" width="30" height="40" rx="5" fill="${x.lg([[0, "#0a0e13"], [1, "#18212b"]])}" stroke="${p.k}" stroke-opacity=".5"/>`;
+      s += trvReadout(x, cx, top + 36, .95, x.mode !== "off");
+      s += `<path d="M${cx - 13} ${top + 21}L${cx + 4} ${top + 21}L${cx - 13} ${top + 40}Z" fill="#fff" opacity=".06"/>`;
+      s += `<circle cx="${cx}" cy="${top + 64}" r="2" fill="${x.on && x.mode !== "off" ? "#5fe08a" : p.d}"/>`;
+      let rib = ""; for (let i = -17; i <= 17; i += 3) rib += `M${f(cx + i)} ${bot - 12}V${bot - 1}`;
+      s += `<g clip-path="${x.clip(`M${cx - w / 2} ${bot - 13}H${cx + w / 2}V${bot}H${cx - w / 2}Z`)}"><path d="${rib}" stroke="${p.k}" stroke-opacity=".4" stroke-width="1.1"/></g>`;
+      return s + `<rect x="${cx - w / 2 + 3}" y="${top + 12}" width="3.4" height="${bot - top - 30}" rx="1.7" fill="#fff" opacity=".2"/>`;
+    },
+  };
+  const TRV_OPTS = [
+    { id: "mode", name: "Mode", values: [["heat", "Heat"], ["eco", "Eco"], ["off", "Off"], ["boost", "Boost"]] },
+    { id: "rad", name: "Radiator", values: [["panel", "Panel"], ["column", "Column"], ["towel", "Towel rail"]] },
+  ];
+  function trv(o, head, rad) {
+    const x = X(o); x.mode = x.opt("mode", "heat");
+    x.vpct = x.mode === "off" ? 0 : x.mode === "boost" ? 100 : x.on ? Math.round(x.lv * 100) : 0;
+    const bg = radiator(x, x.opt("rad", rad));
+    let item = valveBody(x) + HEADS[head](x);
+    if (x.mode === "boost") item += `<circle class="${P}ring" cx="168" cy="100" r="30" fill="none" stroke="#ff6a5a" stroke-width="1.6" opacity=".5"/>`;
+    return wrap(x, bg, item);
+  }
+  const trvCard = (id, name, head, rad) => ({ id, name, colors: ["#f2f2ee", "#d6d9dd", "#3a3d42", "#1c1d20", "#c9b48a"], picker: true, colorLabel: "Body",
+    colors2: ["#f0eee8", "#2e3135", "#8d939a", "#b84a3a", "#3e5f4a"], picker2: true, colorLabel2: "Radiator",
+    options: [TRV_OPTS[0], firstIs(TRV_OPTS[1], rad)], render: (o) => trv(o, head, rad) });
+
+  const PERG_OPTS = [
+    { id: "state", name: "State", values: [["open", "Open"], ["closing", "Closing"], ["closed", "Closed"], ["partial", "Partial"]] },
+    { id: "lights", name: "Lights", values: [["off", "Off"], ["on", "On"], ["dim", "Dim"]] },
+  ];
+  function pergAng(x) { const s = x.opt("state", "open"); if (!x.on || s === "closed") return 0; return s === "partial" ? x.lv * .5 : x.lv; }
+  function closeCls(x, r) { if (x.opt("state", "open") !== "closing" || !x.on) return ""; const k = 1 / Math.max(r, .15); return P + (k < 1.6 ? "cl1" : k < 2.5 ? "cl2" : k < 4 ? "cl3" : "cl4"); }
+  function pergola(o) {
+    const x = X(o), a = pergAng(x), p = pal(x.c1), lights = x.opt("lights", "off"), lc = x.c2;
+    const lk = lights === "on" ? 1 : lights === "dim" ? .45 : 0;
+    let bg = sky(x, 128) + `<path d="M0 118H200V200H0Z" fill="${x.lg([[0, "#9a7a5a"], [1, "#5e4530"]])}"/>`;
+    for (let i = 0; i < 14; i++) bg += `<path d="M${-60 + i * 24} 200L${f(40 + i * 9)} 118" stroke="#3a2a1c" stroke-opacity=".35"/>`;
+    bg += `<rect x="40" y="128" width="40" height="18" rx="3" fill="#cfc8bc"/><rect x="40" y="122" width="40" height="8" rx="3" fill="#e8e2d6"/><rect x="118" y="126" width="26" height="14" rx="2" fill="#6a5040"/>`;
+    const bk = { y: 46, l: 48, r: 152 }, fr = { y: 76, l: 22, r: 178 }, beam = 9;
+    const at = (t) => ({ y: bk.y + (fr.y - bk.y) * t, l: bk.l + (fr.l - bk.l) * t, r: bk.r + (fr.r - bk.r) * t });
+    const post = (x0, y0, y1, w) => `<rect x="${f(x0 - w / 2)}" y="${y0}" width="${w}" height="${y1 - y0}" fill="${x.lg([[0, p.k], [.3, p.l], [.6, p.m], [1, p.d]], 0, 0, 1, 0)}"/>`;
+    let s = shadow(x, 100, 176, 92, 10, .35);
+    if (lk) s += `<ellipse cx="100" cy="150" rx="80" ry="22" fill="${x.rg([[0, lc, .55 * lk], [1, lc, 0]])}"/>`;
+    s += post(bk.l + 4, bk.y + beam, 146, 7) + post(bk.r - 4, bk.y + beam, 146, 7);
+    s += `<path d="M${bk.l} ${bk.y}H${bk.r}V${bk.y + beam}H${bk.l}Z" fill="${p.d}"/>`;
+    s += `<path d="M${bk.l} ${bk.y}L${fr.l} ${fr.y}V${fr.y + beam}L${bk.l} ${bk.y + beam}Z" fill="${p.k}"/><path d="M${bk.r} ${bk.y}L${fr.r} ${fr.y}V${fr.y + beam}L${bk.r} ${bk.y + beam}Z" fill="${p.d}"/>`;
+    if (lk) s += `<path d="M${bk.l + 2} ${bk.y + beam - 1}H${bk.r - 2}M${bk.l + 1} ${bk.y + beam}L${fr.l + 3} ${fr.y + beam}M${bk.r - 1} ${bk.y + beam}L${fr.r - 3} ${fr.y + beam}" stroke="${H().mix(lc, "#ffffff", .5)}" stroke-width="2" opacity="${(.5 + .5 * lk).toFixed(2)}"/>`;
+    const n = 11, ang = a * Math.PI / 2;
+    for (let i = 0; i < n; i++) {
+      const t0 = (i + .5) / n, c = at(t0), pitch = (fr.y - bk.y) / n, hw = Math.max(.35, pitch / 2 * Math.cos(ang) * 1.05), th = 1.2 + Math.sin(ang) * 4.5 * (.6 + t0 * .5);
+      const top = c.y - hw, bot = c.y + hw, cls = closeCls(x, hw / (pitch / 2 * 1.05));
+      const blade = x.lg([[0, p.l], [1, p.m]]);
+      s += `<g class="${cls}"><path d="M${f(c.l + 1)} ${f(top - th * .5)}H${f(c.r - 1)}V${f(bot - th * .5)}H${f(c.l + 1)}Z" fill="${blade}"/>` +
+        `<path d="M${f(c.l + 1)} ${f(bot - th * .5)}H${f(c.r - 1)}V${f(bot + th * .5)}H${f(c.l + 1)}Z" fill="${p.k}"/>` +
+        `<path d="M${f(c.l + 1)} ${f(top - th * .5)}H${f(c.r - 1)}" stroke="#fff" stroke-opacity=".3" stroke-width=".5"/></g>`;
+    }
+    s += post(fr.l + 5, fr.y + beam, 176, 10) + post(fr.r - 5, fr.y + beam, 176, 10);
+    s += `<rect x="${fr.l - 2}" y="${fr.y - 1}" width="${fr.r - fr.l + 4}" height="${beam + 3}" fill="${x.lg([[0, p.l], [.3, p.m], [1, p.d]])}"/><path d="M${fr.l - 2} ${fr.y - 1}H${fr.r + 2}" stroke="#fff" stroke-opacity=".3"/>`;
+    s += `<rect x="${fr.l + .5}" y="174" width="9" height="3" fill="${p.k}"/><rect x="${fr.r - 9.5}" y="174" width="9" height="3" fill="${p.k}"/>`;
+    if (lk) s += `<path d="M${fr.l + 2} ${fr.y + beam + 2}H${fr.r - 2}" stroke="${H().mix(lc, "#ffffff", .5)}" stroke-width="1.6" opacity="${(.4 + .5 * lk).toFixed(2)}"/>`;
+    if (x.on && x.opt("state", "open") === "closing") s += chevrons(x, 100, 104, "down");
+    return wrap(x, bg, s);
+  }
+  function pergolaUp(o) {
+    const x = X(o), a = pergAng(x), p = pal(x.c1), lights = x.opt("lights", "off"), lc = x.c2;
+    const lk = lights === "on" ? 1 : lights === "dim" ? .45 : 0;
+    const bg = `<rect width="200" height="200" fill="${x.lg([[0, "#3d84d0"], [1, "#a8d2f2"]], 0, 0, 1, 1)}"/><g fill="#fff" opacity=".85"><ellipse cx="70" cy="80" rx="26" ry="8"/><ellipse cx="84" cy="74" rx="14" ry="8"/><ellipse cx="140" cy="140" rx="20" ry="6"/></g>`;
+    const x0 = 34, x1 = 166, y0 = 34, y1 = 166, n = 9, pitch = (y1 - y0) / n, ang = a * Math.PI / 2;
+    let s = "";
+    for (let i = 0; i < n; i++) {
+      const cy = y0 + (i + .5) * pitch, hw = Math.max(.4, pitch / 2 * Math.cos(ang) * 1.04), ed = Math.sin(ang) * 3.4, cls = closeCls(x, hw / (pitch / 2 * 1.04));
+      s += `<g class="${cls}"><rect x="${x0}" y="${f(cy - hw)}" width="${x1 - x0}" height="${f(hw * 2)}" fill="${x.lg([[0, p.m], [.5, p.d], [1, p.k]])}"/>` +
+        (ed > .3 ? `<rect x="${x0}" y="${f(cy + hw - .2)}" width="${x1 - x0}" height="${f(ed)}" fill="${p.k}"/>` : "") +
+        `<path d="M${x0} ${f(cy - hw + .4)}H${x1}" stroke="#fff" stroke-opacity=".18" stroke-width=".6"/></g>`;
+    }
+    const ring = `M14 14H186V186H14ZM${x0} ${y0}V${y1}H${x1}V${y0}Z`;
+    s += `<path d="${ring}" fill-rule="evenodd" fill="${p.d}"/>`;
+    s += `<path d="M14 14L${x0} ${y0}H${x1}L186 14Z" fill="${p.k}"/><path d="M14 186L${x0} ${y1}H${x1}L186 186Z" fill="${p.l}"/><path d="M14 14L${x0} ${y0}V${y1}L14 186Z" fill="${p.m}"/><path d="M186 14L${x1} ${y0}V${y1}L186 186Z" fill="${p.d}"/>`;
+    s += `<path d="M${x0} ${y0}H${x1}V${y1}H${x0}Z" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="1.5"/>`;
+    [[14, 14], [186, 14], [14, 186], [186, 186]].forEach(([cx, cy]) => { s += `<rect x="${cx - 10}" y="${cy - 10}" width="20" height="20" fill="${x.lg([[0, p.l], [1, p.k]], 0, 0, 1, 1)}"/>`; });
+    if (lk) {
+      const lw = H().mix(lc, "#ffffff", .55);
+      s += `<path d="M${x0 + 3} ${y0 + 3}H${x1 - 3}V${y1 - 3}H${x0 + 3}Z" fill="none" stroke="${lc}" stroke-width="6" opacity="${(.3 * lk).toFixed(2)}" filter="${x.blur(3)}"/>`;
+      s += `<path d="M${x0 + 2} ${y0 + 2}H${x1 - 2}V${y1 - 2}H${x0 + 2}Z" fill="none" stroke="${lw}" stroke-width="1.8" opacity="${(.55 + .45 * lk).toFixed(2)}"/>`;
+    }
+    s += `<rect x="${x1 + 2}" y="92" width="7" height="16" rx="2" fill="${p.k}"/><circle cx="${x1 + 5.5}" cy="96" r="1.2" fill="${x.on ? "#5fe08a" : "#555"}"/>`;
+    if (x.on && x.opt("state", "open") === "closing") s += chevrons(x, 100, 100, "down");
+    return wrap(x, bg, s);
+  }
+  const FRAME = ["#3a3d42", "#f2f2ee", "#6b5a48", "#cfc6b4", "#1e2024"], LIGHT = ["#ffd8a8", "#fff3e0", "#a5d8ff", "#ffc9de", "#b5f5c8"];
+  const pergCard = (id, name, fn) => ({ id, name, colors: FRAME, picker: true, colorLabel: "Frame", colors2: LIGHT, picker2: true, colorLabel2: "Lights",
+    options: PERG_OPTS, render: fn });
+
+  const MOTION = { id: "motion", name: "Motion", values: [["stopped", "Stopped"], ["opening", "Extending"], ["closing", "Retracting"]] };
+  function sail(o) {
+    const x = X(o), e = x.on ? cl(x.lv, .06, 1) : .06, p = pal(x.c1), mv = x.opt("motion", "stopped");
+    let bg = sky(x, 150) + `<path d="M0 140H200V200H0Z" fill="${x.lg([[0, "#4f8c44"], [1, "#2e5a2a"]])}"/>` + `<path d="M0 150L200 132V200H0Z" fill="#c9b9a0" opacity=".9"/>`;
+    bg += `<rect x="0" y="20" width="26" height="160" fill="${x.lg([[0, "#e2d8c6"], [1, "#b8ac98"]], 0, 0, 1, 0)}"/><path d="M26 20V180" stroke="#000" stroke-opacity=".25" stroke-width="2"/>`;
+    const A1 = [28, 66], A2 = [28, 40], B1 = [172, 98], B2 = [152, 62];
+    const L = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    const E1 = L(A1, B1, e), E2 = L(A2, B2, e);
+    let s = "";
+    s += `<path d="M${f(40)} 158L${f(40 + 120 * e)} ${f(158 - 8 * e)}L${f(30 + 112 * e)} ${f(146 - 6 * e)}L30 146Z" fill="#000" opacity="${(.12 + .18 * e).toFixed(2)}" filter="${x.blur(2)}"/>`;
+    const post = (pt, y1, w) => `<rect x="${f(pt[0] - w / 2)}" y="${f(pt[1])}" width="${w}" height="${f(y1 - pt[1])}" fill="${x.lg([[0, "#3a3d42"], [.4, "#c8ccd1"], [1, "#3a3d42"]], 0, 0, 1, 0)}"/>`;
+    s += shadow(x, B2[0], 150, 10, 2.5, .4) + post(B2, 150, 4) + shadow(x, B1[0], 180, 12, 3, .45) + post(B1, 180, 5);
+    s += `<path d="M${A1[0]} ${A1[1]}L${B1[0]} ${B1[1]}M${A2[0]} ${A2[1]}L${B2[0]} ${B2[1]}" stroke="#d8dde2" stroke-width=".9" opacity=".8"/>`;
+    const folds = 7;
+    for (let i = 0; i < folds; i++) {
+      const t0 = i / folds * e, t1 = (i + 1) / folds * e, a1 = L(A1, B1, t0), a2 = L(A2, B2, t0), b1 = L(A1, B1, t1), b2 = L(A2, B2, t1), sag = 2 + 5 * e;
+      const mid1 = L(a1, b1, .5), mid2 = L(a2, b2, .5);
+      s += `<path d="M${f(a2[0])} ${f(a2[1])}Q${f(mid2[0])} ${f(mid2[1] + sag)} ${f(b2[0])} ${f(b2[1])}L${f(b1[0])} ${f(b1[1])}Q${f(mid1[0])} ${f(mid1[1] + sag)} ${f(a1[0])} ${f(a1[1])}Z" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 1)}" stroke="${p.k}" stroke-opacity=".35" stroke-width=".6"/>`;
+      s += `<path d="M${f(b2[0])} ${f(b2[1])}L${f(b1[0])} ${f(b1[1])}" stroke="${p.k}" stroke-width="1.1" opacity=".55"/>`;
+    }
+    s += `<path d="M${A2[0]} ${A2[1]}L${f(E2[0])} ${f(E2[1])}L${f(E1[0])} ${f(E1[1])}L${A1[0]} ${A1[1]}Z" fill="${x.lg([[0, "#fff", .22], [.5, "#fff", 0]], 0, 0, 1, 1)}"/>`;
+    s += `<path d="M${f(E1[0])} ${f(E1[1])}L${f(E2[0])} ${f(E2[1])}" stroke="${H().shade(x.c1, -.5)}" stroke-width="2.6" stroke-linecap="round"/><circle cx="${f(E1[0])}" cy="${f(E1[1])}" r="2" fill="#9aa1a9"/><circle cx="${f(E2[0])}" cy="${f(E2[1])}" r="1.8" fill="#9aa1a9"/>`;
+    s += `<rect x="20" y="34" width="12" height="38" rx="3" fill="${x.lg([[0, "#f2f2ee"], [1, "#a8adb3"]], 0, 0, 1, 0)}"/><circle cx="26" cy="38" r="1.3" fill="${mv !== "stopped" && x.on ? "#5fe08a" : "#777"}"/>`;
+    if (x.on && mv !== "stopped") s += chevrons(x, 100, 124, mv === "opening" ? "right" : "left");
+    return wrap(x, bg, s);
+  }
+  function awning(o) {
+    const x = X(o), e = x.on ? x.lv : 0, mv = x.opt("motion", "stopped"), fab = x.c1, fab2 = x.c2;
+    let bg = siding(x, "#bfc5cc");
+    bg += `<rect x="62" y="82" width="76" height="98" fill="#2a3038"/><rect x="66" y="86" width="68" height="94" fill="${x.lg([[0, "#4a5a6a"], [1, "#1c232c"]])}"/><path d="M100 86V180" stroke="#e8e8e4" stroke-width="3"/><path d="M68 88L96 88L68 140Z" fill="#fff" opacity=".1"/>`;
+    bg += `<rect x="58" y="78" width="84" height="5" fill="#e8e8e4"/><rect x="0" y="180" width="200" height="20" fill="#8a8478"/><rect y="178" width="200" height="3" fill="#a8a294"/>`;
+    const y0 = 40, l0 = 22, r0 = 178, y1 = y0 + 6 + e * 74, l1 = l0 - e * 10, r1 = r0 + e * 10;
+    let s = "";
+    if (e > .05) s += `<path d="M${l0} ${y0 + 10}H${r0}L${f(r1)} ${f(y1 + 40 * e)}H${f(l1)}Z" fill="#000" opacity="${(.1 + .15 * e).toFixed(2)}" filter="${x.blur(3)}"/>`;
+    if (e > .05) {
+      [[l0 + 18, l1 + 18], [r0 - 18, r1 - 18]].forEach(([ax, bx]) => {
+        const ex = (ax + bx) / 2 + (ax < 100 ? 16 : -16) * (1 - e), ey = y0 + 18 + (y1 - y0) * .5 + 6;
+        s += `<path d="M${f(ax)} ${y0 + 16}L${f(ex)} ${f(ey)}L${f(bx)} ${f(y1)}" fill="none" stroke="#5a6068" stroke-width="2.6" stroke-linejoin="round"/><circle cx="${f(ex)}" cy="${f(ey)}" r="2.2" fill="#8a9098"/>`;
+      });
+    }
+    if (e > .02) {
+      const nS = 10; let stripes = "";
+      for (let i = 0; i < nS; i++) {
+        const u0 = i / nS, u1 = (i + 1) / nS, xa0 = l0 + (r0 - l0) * u0, xa1 = l0 + (r0 - l0) * u1, xb0 = l1 + (r1 - l1) * u0, xb1 = l1 + (r1 - l1) * u1;
+        stripes += `<path d="M${f(xa0)} ${y0 + 6}H${f(xa1)}L${f(xb1)} ${f(y1)}H${f(xb0)}Z" fill="${i % 2 ? fab2 : fab}"/>`;
+      }
+      s += stripes + `<path d="M${l0} ${y0 + 6}H${r0}L${f(r1)} ${f(y1)}H${f(l1)}Z" fill="${x.lg([[0, "#000", .3], [.4, "#000", .05], [1, "#fff", .12]])}"/>`;
+      const vh = 9; let v = `M${f(l1)} ${f(y1)}`;
+      const nV = 10; for (let i = 0; i < nV; i++) { const xa = l1 + (r1 - l1) * i / nV, xb = l1 + (r1 - l1) * (i + 1) / nV; v += `L${f(xa)} ${f(y1 + vh - 2)}Q${f((xa + xb) / 2)} ${f(y1 + vh + 3)} ${f(xb)} ${f(y1 + vh - 2)}`; }
+      v += `L${f(r1)} ${f(y1)}Z`;
+      s += `<g clip-path="${x.clip(v)}">` + Array.from({ length: nV }, (_, i) => `<rect x="${f(l1 + (r1 - l1) * i / nV)}" y="${f(y1)}" width="${f((r1 - l1) / nV + .3)}" height="${vh + 4}" fill="${i % 2 ? fab2 : fab}"/>`).join("") + `<rect x="${f(l1)}" y="${f(y1)}" width="${f(r1 - l1)}" height="${vh + 4}" fill="${x.lg([[0, "#000", .05], [1, "#000", .3]])}"/></g>`;
+      s += `<rect x="${f(l1 - 2)}" y="${f(y1 - 2.5)}" width="${f(r1 - l1 + 4)}" height="4" rx="1.5" fill="${x.lg([[0, "#f2f2ee"], [1, "#8d939a"]])}"/>`;
+    }
+    s += `<rect x="${l0 - 4}" y="${y0 - 4}" width="${r0 - l0 + 8}" height="12" rx="5" fill="${x.lg([[0, "#ffffff"], [.5, "#d8dce0"], [1, "#8d939a"]])}"/><path d="M${l0} ${y0 + 6}H${r0}" stroke="#000" stroke-opacity=".3"/>`;
+    s += `<circle cx="${r0 - 2}" cy="${y0 + 2}" r="1.3" fill="${mv !== "stopped" && x.on ? "#5fe08a" : "#888"}"/>`;
+    if (x.on && mv !== "stopped") s += chevrons(x, 100, Math.min(160, y1 + 30), mv === "opening" ? "down" : "up");
+    return wrap(x, bg, s);
+  }
+
+  const SCREEN_OPTS = [
+    { id: "mount", name: "Mount", values: [["case", "Ceiling case"], ["recessed", "In the ceiling"]] },
+    { id: "pic", name: "Picture", values: [["blank", "Blank"], ["movie", "Movie playing"]] },
+    { id: "motion", name: "Motion", values: [["stopped", "Stopped"], ["opening", "Lowering"], ["closing", "Raising"]] },
+  ];
+  function screen(o) {
+    const x = X(o), e = x.on ? x.lv : 0, p = pal(x.c1), rec = x.opt("mount", "case") === "recessed", mv = x.opt("motion", "stopped");
+    let bg = room(x, "#57525e") + `<rect width="200" height="30" fill="${x.lg([[0, "#d8d4cc"], [1, "#b8b2a8"]])}"/><rect y="29" width="200" height="3" fill="#e8e4dc"/>`;
+    bg += `<rect x="150" y="120" width="40" height="46" rx="3" fill="#3a2e26"/><rect x="152" y="116" width="36" height="6" rx="2" fill="#4a3c32"/>`;
+    bg += `<rect x="10" y="130" width="34" height="36" rx="4" fill="#26282c"/><circle cx="27" cy="144" r="8" fill="#16181b"/><circle cx="27" cy="144" r="3" fill="#3a3d42"/>`;
+    const top = rec ? 30 : 42, x0 = 30, x1 = 170, drop = 10 + e * 112, yb = top + drop;
+    let s = "";
+    if (!rec) s += `<rect x="${x0 - 8}" y="31" width="${x1 - x0 + 16}" height="12" rx="5" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]])}"/><rect x="${x0 - 8}" y="31" width="5" height="12" rx="2" fill="${p.d}"/><rect x="${x1 + 3}" y="31" width="5" height="12" rx="2" fill="${p.d}"/>`;
+    else s += `<rect x="${x0 - 6}" y="27" width="${x1 - x0 + 12}" height="4" fill="#1a1a1a"/><rect x="${x0 - 8}" y="26" width="${x1 - x0 + 16}" height="1.6" fill="${p.m}"/>`;
+    s += `<rect x="${x0}" y="${top}" width="${x1 - x0}" height="${f(drop)}" fill="#141518"/>`;
+    const fieldTop = top + Math.max(0, drop - 92), fh = Math.min(drop, 92) - 3;
+    if (fh > 2) {
+      s += `<rect x="${x0 + 3}" y="${f(fieldTop)}" width="${x1 - x0 - 6}" height="${f(fh)}" fill="${x.lg([[0, "#f6f6f2"], [1, "#d6d6d0"]])}"/>`;
+      if (x.opt("pic", "blank") === "movie" && e > .3) {
+        const fx0 = x0 + 3, fw = x1 - x0 - 6, fy = fieldTop, fhh = fh;
+        s += `<g clip-path="${x.clip(`M${fx0} ${f(fy)}H${fx0 + fw}V${f(fy + fhh)}H${fx0}Z`)}">` +
+          `<rect x="${fx0}" y="${f(fy)}" width="${fw}" height="${f(fhh)}" fill="${x.lg([[0, "#f2994a"], [.55, "#f7c873"], [1, "#2d5f6e"]])}"/>` +
+          `<circle cx="${fx0 + fw * .64}" cy="${f(fy + fhh * .52)}" r="${f(fhh * .16)}" fill="#fff4c8"/>` +
+          `<path d="M${fx0} ${f(fy + fhh * .7)}L${fx0 + fw * .2} ${f(fy + fhh * .5)}L${fx0 + fw * .38} ${f(fy + fhh * .66)}L${fx0 + fw * .56} ${f(fy + fhh * .46)}L${fx0 + fw} ${f(fy + fhh * .72)}V${f(fy + fhh)}H${fx0}Z" fill="#2a3a4a"/>` +
+          `<rect class="${P}flick" x="${fx0}" y="${f(fy)}" width="${fw}" height="${f(fhh)}" fill="#fff" opacity="0"/></g>`;
+      }
+    }
+    s += `<rect x="${x0}" y="${top}" width="${x1 - x0}" height="${f(drop)}" fill="${x.lg([[0, "#000", .12], [.2, "#fff", .06], [.6, "#000", 0], [1, "#000", .18]], 0, 0, 1, 0)}"/>`;
+    s += `<rect x="${x0 - 1}" y="${f(yb - 1)}" width="${x1 - x0 + 2}" height="5" rx="2" fill="${x.lg([[0, "#4a4e55"], [1, "#16181b"]])}"/>`;
+    s += `<path d="M98 ${f(yb + 4)}V${f(yb + 10)}" stroke="#888" stroke-width=".8"/><circle cx="98" cy="${f(yb + 11)}" r="1.4" fill="#2a2a2a"/>`;
+    s += shadow(x, 100, yb + 12, 70, 3, .25);
+    if (x.on && mv !== "stopped") s += chevrons(x, 184 - 6, Math.min(150, yb), mv === "opening" ? "down" : "up");
+    return wrap(x, bg, s);
+  }
+
+  function detect(x, cx, cy, col) {
+    if (!x.on) return "";
+    let s = `<path d="M${cx} ${cy}L${cx - 70} ${cy + 80}A106 106 0 0 0 ${cx + 70} ${cy + 80}Z" fill="${x.lg([[0, col, .32], [1, col, 0]])}"/>`;
+    for (let i = 0; i < 3; i++) s += `<path class="${P}wave" style="animation-delay:${(i * .5).toFixed(2)}s" d="M${cx - 20} ${cy + 22}A30 30 0 0 0 ${cx + 20} ${cy + 22}" transform="translate(0 0)" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" opacity="${(.8 - i * .2).toFixed(2)}"/>`;
+    return s;
+  }
+  function fresnel(x, cx, cy, r, dome) {
+    let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${x.rg([[0, "#f4f4f0"], [.6, "#d6d6d0"], [1, "#8d8d88"]], .38, .32, .8)}"/>`;
+    let g = ""; for (let i = -r + 4; i < r; i += 4.5) { const hh = Math.sqrt(Math.max(0, r * r - i * i)); g += `M${f(cx + i)} ${f(cy - hh)}V${f(cy + hh)}`; }
+    if (dome) for (let j = -r + 5; j < r; j += 6) { const ww = Math.sqrt(Math.max(0, r * r - j * j)); g += `M${f(cx - ww)} ${f(cy + j)}H${f(cx + ww)}`; }
+    s += `<path d="${g}" stroke="#7a7a74" stroke-opacity=".4" stroke-width=".6"/>`;
+    return s + `<ellipse cx="${f(cx - r * .3)}" cy="${f(cy - r * .4)}" rx="${f(r * .38)}" ry="${f(r * .2)}" fill="#fff" opacity=".55"/>`;
+  }
+  const PIR_STYLES = {
+    dome(x) {
+      const p = pal(x.c1), cx = 100, cy = 92;
+      let s = shadow(x, 104, 150, 40, 8, .35);
+      s += `<rect x="70" y="44" width="60" height="78" rx="12" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 0)}"/>`;
+      s += `<path d="M62 70Q62 40 100 40Q138 40 138 70V96Q138 88 100 86Q62 88 62 96Z" fill="${x.lg([[0, p.l], [.6, p.m], [1, p.k]])}"/>`;
+      s += `<path d="M66 70Q68 46 100 45Q132 46 134 70" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.2"/>`;
+      s += `<circle cx="${cx}" cy="${cy + 6}" r="24" fill="${p.k}"/>` + fresnel(x, cx, cy + 6, 21, true);
+      s += `<path d="M64 96Q100 84 136 96" stroke="${p.k}" stroke-width="2.4" fill="none"/>`;
+      return [s, cx, cy + 6, `<circle class="${x.on ? P + "blink" : ""}" cx="120" cy="118" r="2" fill="${x.on ? "#ff4d4d" : "#55302f"}"/>`];
+    },
+    box(x) {
+      const p = pal(x.c1), cx = 100, cy = 104;
+      let s = shadow(x, 104, 154, 40, 8, .35);
+      s += `<rect x="64" y="56" width="72" height="84" rx="6" fill="${x.lg([[0, p.l], [.55, p.m], [1, p.d]], 0, 0, 1, 0)}"/>`;
+      s += `<path d="M58 52H142L138 74H62Z" fill="${x.lg([[0, p.l], [1, p.k]])}"/><path d="M58 52H142" stroke="#fff" stroke-opacity=".35"/>`;
+      s += `<rect x="72" y="80" width="56" height="48" rx="5" fill="${p.k}"/>`;
+      s += `<rect x="75" y="83" width="50" height="42" rx="4" fill="${x.lg([[0, "#f2f2ee"], [.5, "#cfcfca"], [1, "#9a9a94"]])}"/>`;
+      let g = ""; for (let i = 79; i < 124; i += 5) g += `M${i} 84V124`; g += "M76 98H124M76 112H124";
+      s += `<path d="${g}" stroke="#6a6a64" stroke-opacity=".35" stroke-width=".7"/><rect x="77" y="85" width="20" height="8" rx="3" fill="#fff" opacity=".4"/>`;
+      return [s, cx, cy, `<circle class="${x.on ? P + "blink" : ""}" cx="100" cy="134" r="2" fill="${x.on ? "#ff4d4d" : "#55302f"}"/>`];
+    },
+    swivel(x) {
+      const p = pal(x.c1), cx = 104, cy = 108;
+      let s = shadow(x, 106, 154, 36, 7, .35);
+      s += `<rect x="64" y="50" width="34" height="58" rx="8" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 0)}"/>`;
+      s += `<path d="M80 92L96 104" stroke="${p.d}" stroke-width="12" stroke-linecap="round"/><path d="M80 92L96 104" stroke="${p.l}" stroke-width="4" stroke-linecap="round" opacity=".6"/>`;
+      s += `<circle cx="${cx}" cy="${cy}" r="30" fill="${x.rg([[0, p.l], [.7, p.m], [1, p.k]], .35, .3, .8)}"/>`;
+      s += `<path d="M${cx - 30} ${cy - 4}A30 30 0 0 1 ${cx + 30} ${cy - 4}Q${cx} ${cy - 16} ${cx - 30} ${cy - 4}Z" fill="${p.l}" opacity=".6"/>`;
+      s += fresnel(x, cx, cy + 4, 19, true);
+      return [s, cx, cy + 4, `<circle class="${x.on ? P + "blink" : ""}" cx="${cx + 22}" cy="${cy + 20}" r="1.8" fill="${x.on ? "#ff4d4d" : "#55302f"}"/>`];
+    },
+  };
+  const PIR_OPT = { id: "style", name: "Style", values: [["dome", "Hooded dome"], ["box", "Box with hood"], ["swivel", "Swivel ball"]] };
+  function pirOut(o, wall, def) {
+    const x = X(o), st = x.opt("style", def);
+    const bg = (wall === "brick" ? brick(x) : wall === "stucco" ? stucco(x) : siding(x, "#7d8a96")) + `<rect x="0" y="176" width="200" height="24" fill="#3e6a36"/>`;
+    const [body, lx, ly, led] = PIR_STYLES[st](x);
+    return wrap(x, bg, detect(x, lx, ly, "#ff6b5a") + body + led);
+  }
+  const pirCard = (id, name, wall, def) => ({ id, name, colors: ["#f2f2ee", "#26282c", "#8d939a", "#5a4a3a"], picker: true, colorLabel: "Body",
+    options: [firstIs(PIR_OPT, def)], render: (o) => pirOut(o, wall, def) });
+
+  function curtain(o) {
+    const x = X(o), p = pal(x.c1), side = x.opt("mount", "top") === "side";
+    let bg = room(x, "#a49cae");
+    const wx0 = 40, wx1 = 160, wy0 = 46, wy1 = 152;
+    bg += `<rect x="${wx0}" y="${wy0}" width="${wx1 - wx0}" height="${wy1 - wy0}" fill="${x.lg([[0, "#3a8ad8"], [.6, "#8ac4ee"], [1, "#d6edf8"]])}"/>`;
+    bg += `<path d="M${wx0} 126Q100 116 ${wx1} 124V${wy1}H${wx0}Z" fill="#5a9a48"/><circle cx="70" cy="110" r="14" fill="#3f7f38"/><rect x="69" y="112" width="3" height="20" fill="#5a3e2a"/>`;
+    bg += `<path d="M${wx0 - 10} ${wy0 - 10}H${wx1 + 10}V${wy1 + 10}H${wx0 - 10}Z M${wx0} ${wy0}V${wy1}H${wx1}V${wy0}Z" fill-rule="evenodd" fill="${x.lg([[0, "#f6f4ef"], [1, "#c8c4ba"]], 0, 0, 1, 1)}"/>`;
+    bg += `<path d="M100 ${wy0}V${wy1}M${wx0} 100H${wx1}" stroke="#eeeae2" stroke-width="5"/><rect x="${wx0 - 14}" y="${wy1 + 8}" width="${wx1 - wx0 + 28}" height="6" rx="1" fill="#e8e4dc"/>`;
+    bg += `<path d="M${wx0} ${wy0}L${wx0 + 40} ${wy0}L${wx0} ${wy0 + 50}Z" fill="#fff" opacity=".1"/>`;
+    let s = "";
+    if (!side) {
+      const sx = 100, sy = 34;
+      if (x.on) {
+        for (let i = 0; i < 5; i++) { const t = -1 + i * .5, bx = sx + t * 62; s += `<path class="${P}curt" style="animation-delay:${(i * .18).toFixed(2)}s" d="M${sx - 2} ${sy + 4}L${f(bx - 7)} ${wy1}H${f(bx + 7)}L${sx + 2} ${sy + 4}Z" fill="${x.lg([[0, "#ff4d4d", .5], [1, "#ff4d4d", .04]])}"/>`; }
+      }
+      s += shadow(x, sx, sy + 9, 34, 2.5, .4);
+      s += `<rect x="${sx - 32}" y="${sy - 5}" width="64" height="11" rx="5.5" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]])}"/>`;
+      s += `<rect x="${sx - 14}" y="${sy + 1}" width="28" height="5" rx="2.5" fill="${x.lg([[0, "#f2f2ee"], [1, "#9a9a94"]])}"/>`;
+      let g = ""; for (let i = sx - 12; i < sx + 13; i += 3) g += `M${i} ${sy + 1.4}V${sy + 5.6}`; s += `<path d="${g}" stroke="#6a6a64" stroke-opacity=".4" stroke-width=".5"/>`;
+      s += `<rect x="${sx - 30}" y="${sy - 4}" width="60" height="2.4" rx="1.2" fill="#fff" opacity=".35"/><circle class="${x.on ? P + "blink" : ""}" cx="${sx + 22}" cy="${sy + 1}" r="1.6" fill="${x.on ? "#ff4d4d" : "#7a4040"}"/>`;
+    } else {
+      const sx = 172, sy = 70;
+      if (x.on) {
+        for (let i = 0; i < 5; i++) { const t = -1 + i * .5, by = 100 + t * 50; s += `<path class="${P}curt" style="animation-delay:${(i * .18).toFixed(2)}s" d="M${sx - 4} ${sy + 18}L${wx0} ${f(by - 6)}V${f(by + 6)}L${sx - 4} ${sy + 22}Z" fill="${x.lg([[0, "#ff4d4d", .04], [1, "#ff4d4d", .45]], 0, 0, 1, 0)}"/>`; }
+      }
+      s += shadow(x, sx + 3, sy + 22, 3, 30, .35);
+      s += `<rect x="${sx - 6}" y="${sy - 10}" width="12" height="64" rx="6" fill="${x.lg([[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 0)}"/>`;
+      s += `<rect x="${sx - 5}" y="${sy + 8}" width="5" height="26" rx="2.5" fill="${x.lg([[0, "#9a9a94"], [1, "#f2f2ee"]], 0, 0, 1, 0)}"/>`;
+      s += `<rect x="${sx + 2}" y="${sy - 8}" width="2.2" height="58" rx="1.1" fill="#fff" opacity=".3"/><circle class="${x.on ? P + "blink" : ""}" cx="${sx}" cy="${sy - 2}" r="1.6" fill="${x.on ? "#ff4d4d" : "#7a4040"}"/>`;
+    }
+    return wrap(x, bg, s);
+  }
+
+  function handle(o) {
+    const x = X(o), pos = x.opt("pos", "closed"), hp = pal(x.c1), fc = x.c2, fp = pal(fc);
+    const open = pos === "open", tilt = pos === "tilt", sx = open ? 98 : 84;
+    let bg = room(x, "#9a92a4");
+    bg += `<rect x="72" y="0" width="128" height="200" fill="${x.lg([[0, "#3a8ad8"], [.6, "#8ac4ee"], [1, "#d6edf8"]])}"/><path d="M72 150Q130 136 200 146V200H72Z" fill="#5a9a48"/>`;
+    bg += `<rect x="24" y="0" width="${50}" height="200" fill="${x.lg([[0, fp.d], [.4, fp.l], [1, fp.m]], 0, 0, 1, 0)}"/><path d="M74 0V200" stroke="${fp.k}" stroke-width="2"/>`;
+    bg += `<rect x="12" y="0" width="12" height="200" fill="#e6e0d4"/>`;
+    let s = "";
+    const sash = (dx, top) => `<path d="M${sx + dx} ${top}H200V200H${sx}Z" fill="${x.lg([[0, fp.l], [.25, fp.m], [1, fp.d]], 0, 0, 1, 0)}"/>` +
+      `<path d="M${sx + dx + 28} ${top + 10}H200V200H${sx + 28}Z" fill="${x.lg([[0, "#fff", .2], [.3, "#fff", .03], [.6, "#fff", .1], [1, "#fff", 0]], 0, 0, 1, 1)}" stroke="#000" stroke-opacity=".25"/>` +
+      `<path d="M${sx + dx + 28} ${top + 10}V200" stroke="#000" stroke-opacity=".3" stroke-width="2"/>`;
+    if (tilt) s += `<path d="M74 0L${sx + 14} 0L${sx} 200H74Z" fill="#000" opacity=".25"/>` + sash(14, 0);
+    else if (open) s += `<rect x="74" y="0" width="${sx - 74}" height="200" fill="#000" opacity=".12"/>` + sash(0, 0);
+    else s += sash(0, 0);
+    const hx = sx + 14 + (tilt ? 7 : 0), hy = 100;
+    s += `<rect x="${hx - 9}" y="${hy - 30}" width="18" height="60" rx="9" fill="#000" opacity=".25" transform="translate(1.5 2)"/>`;
+    s += `<rect x="${hx - 9}" y="${hy - 30}" width="18" height="60" rx="9" fill="${x.lg([[0, hp.l], [.5, hp.m], [1, hp.d]], 0, 0, 1, 0)}"/>`;
+    s += `<rect x="${hx - 5}" y="${hy + 12}" width="10" height="14" rx="4" fill="${hp.lt ? "#e2e2de" : H().shade(x.c1, -.4)}"/>`;
+    s += `<circle class="${x.on ? P + "blink" : ""}" cx="${hx}" cy="${hy + 22}" r="1.6" fill="${x.on ? (pos === "closed" ? "#5fe08a" : "#ffb04a") : "#555"}"/>`;
+    if (x.on) s += `<path class="${P}wave" d="M${hx + 12} ${hy + 14}a8 8 0 0 1 0 12M${hx + 16} ${hy + 10}a13 13 0 0 1 0 20" fill="none" stroke="#7dd3fc" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>`;
+    const rot = pos === "open" ? 90 : pos === "tilt" ? 180 : 0;
+    s += `<g transform="rotate(${rot} ${hx} ${hy - 8})"><path d="M${hx - 7} ${hy - 8}A7 7 0 0 1 ${hx + 7} ${hy - 8}V${hy}H${hx - 7}Z" fill="${hp.d}"/>` +
+      `<circle cx="${hx}" cy="${hy - 8}" r="8" fill="${x.rg([[0, hp.l], [.7, hp.m], [1, hp.k]], .35, .3, .8)}"/>` +
+      `<path d="M${hx - 4.5} ${hy - 6}L${hx - 3.5} ${hy + 46}Q${hx} ${hy + 51} ${hx + 3.5} ${hy + 46}L${hx + 4.5} ${hy - 6}Z" fill="${x.lg([[0, hp.k], [.35, hp.l], [.6, hp.m], [1, hp.d]], 0, 0, 1, 0)}"/>` +
+      `<path d="M${hx - 1.6} ${hy}L${hx - 1.2} ${hy + 42}" stroke="#fff" stroke-opacity=".45" stroke-width="1"/></g>`;
+    const word = pos === "open" ? "OPEN" : pos === "tilt" ? "TILTED" : "CLOSED";
+    s += `<g transform="translate(${hx} 170)"><rect x="-22" y="-8" width="44" height="14" rx="7" fill="#000" opacity=".45"/><text y="2.5" ${FONT} font-size="7" font-weight="700" text-anchor="middle" fill="${pos === "closed" ? "#5fe08a" : "#ffb04a"}" letter-spacing=".5">${word}</text></g>`;
+    return wrap(x, bg, s);
+  }
+
+  const icons = [
+    trvCard("trvround", "Round valve head", "round", "panel"),
+    trvCard("trvsquare", "Square LED valve", "square", "column"),
+    trvCard("trvdisplay", "Display valve", "display", "towel"),
+    pergCard("pergola", "Louvered pergola", pergola),
+    pergCard("pergolaup", "Pergola from below", pergolaUp),
+    { id: "sail", name: "Retractable sail", colors: ["#efe6d2", "#3a3d42", "#c84a3a", "#2e6a8a", "#7a9a5a"], picker: true, colorLabel: "Fabric", options: [MOTION], render: sail },
+    { id: "awning", name: "Patio awning", colors: ["#2e6a8a", "#c84a3a", "#3e7a4a", "#3a3d42", "#d9a03a"], picker: true, colorLabel: "Stripe", colors2: ["#f2ede0", "#d8d2c4", "#3a3d42"], picker2: true, colorLabel2: "Fabric", options: [MOTION], render: awning },
+    { id: "projscreen", name: "Projector screen", colors: ["#f2f2ee", "#26282c", "#b8bdc3"], picker: true, colorLabel: "Case", options: SCREEN_OPTS, render: screen },
+    pirCard("pirdome", "Outdoor motion", "siding", "dome"),
+    pirCard("pirbox", "Hooded motion box", "brick", "box"),
+    { id: "curtainpir", name: "Curtain motion", colors: ["#f2f2ee", "#d6d9dd", "#26282c", "#8d939a"], picker: true, colorLabel: "Body", options: [{ id: "mount", name: "Mount", values: [["top", "Top of frame"], ["side", "Side of frame"]] }], render: curtain },
+    { id: "handle", name: "Window handle", colors: ["#c9ccd0", "#f2f2ee", "#26282c", "#b8955a"], picker: true, colorLabel: "Handle", colors2: ["#f4f3ef", "#3a3d42", "#6a4a32", "#8d939a"], picker2: true, colorLabel2: "Frame",
+      options: [{ id: "pos", name: "Position", values: [["closed", "Closed"], ["tilt", "Tilted"], ["open", "Open"]] }], render: handle },
+  ];
+
+  const css = `
+@keyframes hda-covers2-chev{0%{opacity:.1}50%{opacity:1}100%{opacity:.1}}
+.hda-anim .hda-covers2-chev{animation:hda-covers2-chev 1s ease-in-out infinite}
+@keyframes hda-covers2-heat{0%{opacity:0;transform:translateY(8px)}40%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
+.hda-anim .hda-covers2-heat{animation:hda-covers2-heat 2.6s ease-in infinite;transform-box:fill-box}
+@keyframes hda-covers2-blink{0%,55%{opacity:1}65%,100%{opacity:.25}}
+.hda-anim .hda-covers2-blink{animation:hda-covers2-blink 1.1s steps(1) infinite}
+@keyframes hda-covers2-ring{0%{opacity:.7;transform:scale(.8)}100%{opacity:0;transform:scale(1.25)}}
+.hda-anim .hda-covers2-ring{animation:hda-covers2-ring 1.6s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes hda-covers2-wave{0%{opacity:.9;transform:translateY(0) scale(.6)}100%{opacity:0;transform:translateY(34px) scale(1.8)}}
+.hda-anim .hda-covers2-wave{animation:hda-covers2-wave 1.5s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes hda-covers2-curt{0%,100%{opacity:.35}50%{opacity:1}}
+.hda-anim .hda-covers2-curt{animation:hda-covers2-curt .9s ease-in-out infinite}
+@keyframes hda-covers2-flick{0%,100%{opacity:0}30%{opacity:.08}60%{opacity:.02}80%{opacity:.1}}
+.hda-anim .hda-covers2-flick{animation:hda-covers2-flick 2.2s linear infinite}
+@keyframes hda-covers2-cl1{0%{transform:scaleY(1)}80%,100%{transform:scaleY(1.4)}}
+@keyframes hda-covers2-cl2{0%{transform:scaleY(1)}80%,100%{transform:scaleY(2)}}
+@keyframes hda-covers2-cl3{0%{transform:scaleY(1)}80%,100%{transform:scaleY(3)}}
+@keyframes hda-covers2-cl4{0%{transform:scaleY(1)}80%,100%{transform:scaleY(5)}}
+.hda-anim .hda-covers2-cl1,.hda-anim .hda-covers2-cl2,.hda-anim .hda-covers2-cl3,.hda-anim .hda-covers2-cl4{transform-box:fill-box;transform-origin:center;animation-duration:3s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+.hda-anim .hda-covers2-cl1{animation-name:hda-covers2-cl1}.hda-anim .hda-covers2-cl2{animation-name:hda-covers2-cl2}
+.hda-anim .hda-covers2-cl3{animation-name:hda-covers2-cl3}.hda-anim .hda-covers2-cl4{animation-name:hda-covers2-cl4}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-covers2-chev,.hda-anim .hda-covers2-heat,.hda-anim .hda-covers2-blink,.hda-anim .hda-covers2-ring,.hda-anim .hda-covers2-wave,.hda-anim .hda-covers2-curt,.hda-anim .hda-covers2-flick{animation:none}}`;
+
+  (window.HDA = window.HDA || []).push({
+    id: "covers2", tab: "Pergolas, valves & sensors", group: "Home", kind: "device", levelLabel: "Position", onWord: "On", offWord: "Off",
+    intro: "Radiator valves, outdoor covers and the missing sensors. The slider sets the valve opening (shown on its display), how far the pergola louvers turn, how far the sail and awning reach and how far the screen drops. Menus set the mode, cover state, motion and the handle position.",
+    css, icons,
+  });
+})();
+
+(function () {
   const P = "hda-deadbolts-";
   const H = () => window.HDAH;
   const f = (n) => (+n).toFixed(1);
@@ -10051,9 +11555,35 @@ ${extra || ""}</defs>`;
     if (m === "bronze") return { m, c, k: "#1a110b", d: s(c, -.38), l: s(c, .14), hi: "#c98d57", rim: "#b8794a", ink: "#120b07" };
     return { m, c, k: s(c, -.6), d: s(c, -.32), l: s(c, .42), hi: s(c, .72), rim: s(c, .6), ink: s(c, -.7) };
   }
+  const AMB = "#ffb020", JAM = "#ff3b30";
+  const LSTATE = [["auto", "From on/off"], ["locked", "Locked"], ["unlocked", "Unlocked"], ["locking", "Locking"], ["unlocking", "Unlocking"], ["jammed", "Jammed"]];
+  function lockState(o) {
+    const s = o.opt && o.opt.state, ls = s && s !== "auto" ? s : (o.on ? "locked" : "unlocked");
+    const mv = ls === "locking" ? 1 : ls === "unlocking" ? -1 : 0, jam = ls === "jammed", on = ls !== "unlocked";
+    return { ls, on, mv, jam, mid: !!mv || jam, fr: ls === "locked" ? 1 : ls === "unlocked" ? 0 : .5,
+      st: jam ? JAM : mv ? AMB : on ? GRN : RED, hk: jam ? "hj" : mv ? "ha" : on ? "hg" : "hr", cls: P + (jam ? "jblink" : mv ? "mblink" : on ? "breath" : "blink") };
+  }
+  const stDefs = (x) => x.mid ? rg(x.id("ha"), [[0, AMB, .85], [.45, AMB, .28], [1, AMB, 0]]) + rg(x.id("hj"), [[0, JAM, .9], [.45, JAM, .32], [1, JAM, 0]]) : "";
+  function arrows(x, cx, cy, dir) {
+    if (!x.mv) return "";
+    let s = ""; for (let i = 0; i < 3; i++) s += `<path class="${P}chev${i}" d="M${f(-4.6 + i * 3.4)} -2.8L${f(-1.8 + i * 3.4)} 0L${f(-4.6 + i * 3.4)} 2.8"/>`;
+    const t = `translate(${f(cx)} ${f(cy)}) rotate(${dir === "l" ? 180 : 0})`;
+    return `<g transform="${t}" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${s.replace(/ class="[^"]*"/g, "")}</g><g transform="${t}" fill="none" stroke="${AMB}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${s}</g>`;
+  }
+  function mark(x, cx, cy, s) {
+    if (x.jam) return `<g class="${P}jblink"><path d="M${f(cx)} ${f(cy - s * .48)}L${f(cx + s * .52)} ${f(cy + s * .42)}H${f(cx - s * .52)}Z" fill="${JAM}" stroke="${JAM}" stroke-width="${f(s * .1)}" stroke-linejoin="round"/></g>` +
+      `<path d="M${f(cx)} ${f(cy - s * .16)}V${f(cy + s * .1)}" stroke="#fff" stroke-width="${f(s * .11)}" stroke-linecap="round"/><circle cx="${f(cx)}" cy="${f(cy + s * .26)}" r="${f(s * .065)}" fill="#fff"/>`;
+    const r = s * .36, cw = x.mv > 0, a0 = -Math.PI / 2 + (cw ? .5 : -.5), a1 = a0 + (cw ? 1 : -1) * Math.PI * 1.45;
+    const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx2 = -Math.sin(a1) * (cw ? 1 : -1), ty2 = Math.cos(a1) * (cw ? 1 : -1), hs = s * .2;
+    const head = `M${f(ex + tx2 * hs)} ${f(ey + ty2 * hs)}L${f(ex - ty2 * hs * .9)} ${f(ey + tx2 * hs * .9)}L${f(ex + ty2 * hs * .9)} ${f(ey - tx2 * hs * .9)}Z`;
+    return `<g class="${P}${cw ? "spin" : "spinr"}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * .5)}" fill="none"/><path d="M${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))}A${f(r)} ${f(r)} 0 1 ${cw ? 1 : 0} ${f(ex)} ${f(ey)}" fill="none" stroke="${AMB}" stroke-width="${f(s * .11)}" stroke-linecap="round"/><path d="${head}" fill="${AMB}"/></g>`;
+  }
+  const markDisc = (x, cx, cy, r) => x.mid ? `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="#141418"/>${mark(x, cx, cy, r * 1.7)}` : "";
+  const badge = (x) => x.jam ? `<g class="${P}badge"><circle cx="26" cy="26" r="11" fill="#000" fill-opacity=".45" transform="translate(1 1.6)"/><circle cx="26" cy="26" r="11" fill="#1c1416"/><circle cx="26" cy="26" r="10.3" fill="none" stroke="${JAM}" stroke-width="1.3"/>` +
+    `<path d="M26 19.2L32.4 30.6H19.6Z" fill="${AMB}" stroke="${AMB}" stroke-width="1.2" stroke-linejoin="round"/><path d="M26 23.2V27" stroke="#1c1416" stroke-width="1.6" stroke-linecap="round"/><circle cx="26" cy="29" r=".95" fill="#1c1416"/></g>` : "";
   function ctx(o) {
-    const u = o.uid, on = !!o.on, lv = o.level == null ? 1 : o.level;
-    return { o, u, on, B: .4 + .6 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p: metal(o.color || SN), st: on ? GRN : RED, n: 0 };
+    const u = o.uid, S = lockState(o), on = S.on, lv = o.level == null ? 1 : o.level;
+    return Object.assign({ o, u, on, B: .4 + .6 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p: metal(o.color || SN), n: 0 }, S);
   }
 
   function defs(x, extra) {
@@ -10076,7 +11606,7 @@ ${lg(id("bolt"), [[0, "#f3f5f7"], [.42, "#aeb5bd"], [.56, "#cfd5db"], [1, "#565d
 ${lg(id("stv"), [[0, "#e2e6ea"], [.5, "#9aa1a9"], [1, "#5a6067"]], 0, 0, 0, 1)}
 ${lg(id("gap"), [[0, "#000", .9], [1, "#14121c", .9]])}
 ${rg(id("hg"), [[0, GRN, .9], [.45, GRN, .3], [1, GRN, 0]])}
-${rg(id("hr"), [[0, RED, .8], [.45, RED, .25], [1, RED, 0]])}
+${rg(id("hr"), [[0, RED, .8], [.45, RED, .25], [1, RED, 0]])}${stDefs(x)}
 ${rg(id("vig"), [[0, "#000", 0], [.62, "#000", .06], [1, "#000", .5]], .5, .48, .74)}
 ${brush ? `<pattern id="${id("br")}" width="2.6" height="40" patternUnits="userSpaceOnUse"><path d="M.6 0V40" stroke="#fff" stroke-opacity=".07" stroke-width=".5"/><path d="M1.9 0V40" stroke="#000" stroke-opacity=".07" stroke-width=".4"/></pattern>` : ""}
 <clipPath id="${id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>
@@ -10109,7 +11639,7 @@ ${extra || ""}</defs>`;
     const c = DOOR[kind];
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x, lg(x.id("dg"), [[0, c[0]], [1, c[1]]], 0, 0, .3, 1))}
 <g clip-path="${x.url("wc")}"><g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("dg")}"/>${tex || ""}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g>${hw}</g>
-<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g></svg>`;
+<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g>${badge(x)}</svg>`;
   }
   const E = 164;
   function jamb(x) {
@@ -10124,13 +11654,13 @@ ${extra || ""}</defs>`;
 <circle cx="${E + 11}" cy="${y - h / 2 + 3.5}" r="1.4" fill="#4b5158"/><circle cx="${E + 11}" cy="${y + h / 2 - 3.5}" r="1.4" fill="#4b5158"/><rect x="${E + 5}" y="${f(y - 6)}" width="9" height="12" rx="1" fill="#050508"/>`;
   }
   function bolt(x, y, latch) {
-    const k = x.id("bc" + (x.n++)), out = latch || x.on, L = latch ? 12 : 15, h = latch ? 9 : 10, y0 = y - h / 2;
+    const k = x.id("bc" + (x.n++)), fr = latch ? 1 : x.fr, out = fr >= 1, L = latch ? 12 : 15, h = latch ? 9 : 10, y0 = y - h / 2;
     const body = latch
       ? `<path d="M${E - 2} ${f(y0)}H${E + L - 5}L${E + L} ${f(y + h / 2)}H${E - 2}Z" fill="${x.url("bolt")}"/>`
       : `<path d="${rr(E - 2, y0, L + 2, h, 1.6)}" fill="${x.url("bolt")}"/><path d="M${E} ${f(y0 + .9)}H${E + L - 1.5}" stroke="#fff" stroke-opacity=".7" stroke-width=".9"/>`;
-    const cls = latch ? "" : ` class="${P}${out ? "bo" : "bi"}"`;
+    const cls = latch ? "" : ` class="${P}${x.mid ? (x.jam ? "jx" : x.mv > 0 ? "mxo" : "mxi") : out ? "bo" : "bi"}"`;
     return `<clipPath id="${k}"><rect x="${E}" y="0" width="${200 - E}" height="200"/></clipPath>
-<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${-L - 3} 0)"`}><g${cls}>${body}</g></g></g>`;
+<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${fr ? f(-(L + 3) * (1 - fr)) : -L - 3} 0)"`}><g${cls}>${body}</g></g></g>` + (latch ? "" : arrows(x, E + 11, y - h / 2 - 8, x.mv > 0 ? "r" : "l"));
   }
   const doorEdge = (x, y, latch) => `<g class="hda-bg">${jamb(x) + strike(x, y, latch ? 26 : 30)}</g>${bolt(x, y, latch)}`;
 
@@ -10221,7 +11751,10 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
     const [zx, zy] = cell(1, 3); s1 += dig(0, zx, zy, s, col, op, opt);
     if (style === "plus") { s1 +=`<path d="M${f(cx - s * .55)} ${f(y0 + gy - s * .55)}a${f(s * .9)} ${f(s * .9)} 0 0 0 0 ${f(s * 1.1)}M${f(cx + s * .55)} ${f(y0 + gy - s * .55)}a${f(s * .9)} ${f(s * .9)} 0 0 1 0 ${f(s * 1.1)}" fill="none" stroke="${col}" stroke-opacity="${op}" stroke-width=".7" stroke-linecap="round"/>`; }
     const [lx, ly] = cell(0, 3), [rx, ry] = cell(2, 3);
-    if (bottom === "connect") {
+    if (x.mid && bottom === "connect") s1 += ico.check(lx, ly + s * .1, s * .95, "#fff", .2) + mark(x, rx, ry, s * 1.15);
+    else if (x.mid && bottom === "encode") s1 += ico.house(lx, ly, s * .95, col, op) + mark(x, rx, ry, s * 1.15);
+    else if (x.mid) s1 += mark(x, rx, ry, s * 1.1);
+    else if (bottom === "connect") {
       s1 += (on ? halo(x, lx, ly, s * 1.05, 1) : "") + ico.check(lx, ly + s * .1, s * .95, on ? GRN : "#fff", on ? 1 : .2);
       s1 += (!on ? halo(x, rx, ry, s * .9, 0) : "") + ico.x(rx, ry, s * .75, on ? "#fff" : RED, on ? .2 : .85);
       s1 += `<circle cx="${f((zx + rx) / 2)}" cy="${f(ry + s * .25)}" r=".8" fill="#fff" fill-opacity="${on ? .7 : .25}"/>`;
@@ -10257,6 +11790,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
       if (n < 9) s += dig(n + 1, mx, my, bh * .52, digC, dOp, { w: .9 });
       else if (n === 10) s += dig(0, mx, my, bh * .52, digC, dOp, { w: .9 });
       else if (n === 9) s += ico.house(mx, my, bh * .55, digC, dOp);
+      else if (x.mid) s += markDisc(x, mx, my, bh * .42);
       else s += `<g class="${on ? P + "breath" : P + "blink"}">${halo(x, mx, my, bh * .75, on)}</g>` + ico.lock(mx, my, bh * .55, on ? GRN : RED, 1, !on);
     }
     return (on ? `<g opacity="${f(.5 * B)}"><g class="${P}pulse" filter="${x.url("gw")}">${glow}</g></g>` : "") + s;
@@ -10274,7 +11808,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
   }
   function logoBtn(x, cx, cy, w, h) {
     const c = x.st;
-    return `<g class="${x.on ? P + "breath" : P + "blink"}"><ellipse cx="${cx}" cy="${cy}" rx="${f(w / 2 + 4)}" ry="${f(h / 2 + 4)}" fill="${x.url(x.on ? "hg" : "hr")}"/></g>
+    return `<g class="${x.cls}"><ellipse cx="${cx}" cy="${cy}" rx="${f(w / 2 + 4)}" ry="${f(h / 2 + 4)}" fill="${x.url(x.hk)}"/></g>
 <ellipse cx="${cx}" cy="${f(cy + .7)}" rx="${f(w / 2 + .8)}" ry="${f(h / 2 + .8)}" fill="#000" fill-opacity=".45"/><ellipse cx="${cx}" cy="${cy}" rx="${f(w / 2 + .8)}" ry="${f(h / 2 + .8)}" fill="${c}"/>
 <ellipse cx="${cx}" cy="${cy}" rx="${f(w / 2)}" ry="${f(h / 2)}" fill="${x.url("ms")}"/><path d="M${f(cx - w * .3)} ${f(cy - h * .2)}H${f(cx + w * .3)}" stroke="#fff" stroke-opacity=".5" stroke-width=".5"/>`;
   }
@@ -10301,7 +11835,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
     const sx0 = x0 + 8 * k, sx1 = x1 - 8 * k, sy0 = y0 + (trim === "cam" ? 9 : 9) * k, sy1 = y0 + Hh * .66;
     const sd = trim === "cam" ? camScr(sx0, sy0, sx1, sy1, 12 * k, 6 * k) : rr(sx0, sy0, sx1 - sx0, sy1 - sy0, 2);
     s += screen(x, sd) + plate(x, cx, sy0 + 8 * k, 26 * k, 5.5 * k, true);
-    if (sense) s += `<path d="M${f(cx - 9 * k)} ${f(sy0 + 13 * k)}H${f(cx + 9 * k)}" stroke="${x.st}" stroke-width="${f(1.1 * k)}" stroke-linecap="round" stroke-opacity="${x.on ? 1 : .75}" class="${x.on ? P + "breath" : P + "blink"}"/>`;
+    if (sense) s += `<path d="M${f(cx - 9 * k)} ${f(sy0 + 13 * k)}H${f(cx + 9 * k)}" stroke="${x.st}" stroke-width="${f(1.1 * k)}" stroke-linecap="round" stroke-opacity="${x.on ? 1 : .75}" class="${x.cls}"/>`;
     const gy = (sy1 - sy0 - 22 * k) / 4, gTop = sy0 + 20 * k;
     if (sense) {
       s += grid(x, cx, gTop + gy * .1, 20 * k, gy, 9 * k, "sense", "none");
@@ -10350,7 +11884,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
   }
 
   const icons = [];
-  const add = (id, name, colors, fn) => icons.push({ id, name, colors, picker: true, colorLabel: "Finish", render: (o) => fn(ctx(o)) });
+  const add = (id, name, colors, fn) => icons.push({ id, name, colors, picker: true, colorLabel: "Finish", options: [{ id: "state", name: "State", values: LSTATE }], render: (o) => fn(ctx(o)) });
   const dead = (x, kind, tex, lock) => scene(x, kind, tex, doorEdge(x, lock.by) + lock.s);
 
   add("arched-push-button", "Arched push-button", [SN, AB, MB, BB, ANB, SC], (x) => dead(x, "red", PANELS(11), be365(x, "cam", 94, 30, 82, 140)));
@@ -10421,6 +11955,24 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
 @keyframes hda-deadbolts-blink{0%,60%{opacity:1}61%,100%{opacity:.15}}
 .hda-anim .hda-deadbolts-press{animation:hda-deadbolts-press 4s ease-out infinite}
 @keyframes hda-deadbolts-press{0%,70%{fill-opacity:0}74%{fill-opacity:.55}100%{fill-opacity:0}}
+.hda-deadbolts-mxo,.hda-deadbolts-mxi,.hda-deadbolts-jx,.hda-deadbolts-spin,.hda-deadbolts-spinr{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-deadbolts-mxo{animation:hda-deadbolts-mxo 1.8s ease-in-out infinite}
+@keyframes hda-deadbolts-mxo{0%{transform:translateX(-50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-deadbolts-mxi{animation:hda-deadbolts-mxi 1.8s ease-in-out infinite}
+@keyframes hda-deadbolts-mxi{0%{transform:translateX(50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-deadbolts-jx{animation:hda-deadbolts-jx 2.2s linear infinite}
+@keyframes hda-deadbolts-jx{0%,40%,100%{transform:translateX(0)}8%,24%{transform:translateX(1.2px)}16%,32%{transform:translateX(-1.2px)}}
+.hda-anim .hda-deadbolts-mblink{animation:hda-deadbolts-mblink .9s steps(1,end) infinite}
+@keyframes hda-deadbolts-mblink{0%,55%{opacity:1}56%,100%{opacity:.2}}
+.hda-anim .hda-deadbolts-jblink{animation:hda-deadbolts-jblink .5s steps(1,end) infinite}
+@keyframes hda-deadbolts-jblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
+.hda-anim .hda-deadbolts-chev0,.hda-anim .hda-deadbolts-chev1,.hda-anim .hda-deadbolts-chev2{animation:hda-deadbolts-chev 1.2s ease-in-out infinite}
+.hda-anim .hda-deadbolts-chev1{animation-delay:.2s}.hda-anim .hda-deadbolts-chev2{animation-delay:.4s}
+@keyframes hda-deadbolts-chev{0%,100%{opacity:.25}35%{opacity:1}}
+.hda-anim .hda-deadbolts-spin{animation:hda-deadbolts-spin 1.4s linear infinite}
+@keyframes hda-deadbolts-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.hda-anim .hda-deadbolts-spinr{animation:hda-deadbolts-spinr 1.4s linear infinite}
+@keyframes hda-deadbolts-spinr{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
 @media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-deadbolts-"]{animation:none!important}}`;
 
   (window.HDA = window.HDA || []).push({
@@ -10428,8 +11980,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
     tab: "Smart deadbolts: arched & slim",
     group: "More",
     kind: "device",
-    intro: "Electronic deadbolts and levers by model and trim (arched, slim, round and square), redrawn from product photos (outside face only, no logos). On means LOCKED: bolt out, check or padlock lit green, keypad backlit; off means UNLOCKED: bolt in, status dim red. The color is that model's real finishes.",
-    
+    intro: "Electronic deadbolts and levers by model and trim (arched, slim, round and square), redrawn from product photos (outside face only, no logos). On means LOCKED: bolt out, check or padlock lit green, keypad backlit; off means UNLOCKED: bolt in, status dim red. The color is that model's real finishes. The State menu also shows Locking and Unlocking (bolt part-way, amber light, arrows) and Jammed (red warning light and badge).",
     onWord: "Locked", offWord: "Unlocked",
     css,
     icons,
@@ -10615,7 +12166,7 @@ ${extra || ""}</defs>`;
 `;
 
   const ic = (id, name, first, render, swatches) => ({ id, name, colors: swatches || sw(first), picker: true, colorLabel: "Body", render });
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
@@ -11778,7 +13329,7 @@ ${extra || ""}</defs>`;
 `;
 
   const ic = (id, name, colors, label, render) => ({ id, name, colors, picker: true, colorLabel: label, render });
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
@@ -12807,11 +14358,11 @@ ${extra || ""}</defs>`;
   const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
 
   function ctx(o) {
-    const c = o.color || "#4da3ff", on = !!o.on, lv = o.level == null ? 1 : o.level;
-    const L = on ? .45 + .55 * lv : 0;
+    const c = o.color || "#4da3ff", on = !!o.on, lv = o.level == null ? 1 : o.level, act = o.act == null ? on : o.act; 
+    const L = act ? .45 + .55 * lv : 0;
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
     const body = o.body && o.bodyDef && String(o.body).toLowerCase() !== o.bodyDef ? o.body : null;
-    return { c, on, lv, L, id, url, hot: H.mix(c, "#ffffff", .62), op: (k) => (k * L).toFixed(2), sp: (1.7 - .9 * lv), wave: o.color2 || null, body, bodyMain: o.bodyMain };
+    return { c, on, act, bst: o.bst, cam: o.cam, ir: !!o.ir, lv, L, id, url, hot: H.mix(c, "#ffffff", .62), op: (k) => (k * L).toFixed(2), sp: (1.7 - .9 * lv), wave: o.color2 || null, body, bodyMain: o.bodyMain };
   }
   const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
   const lg = (id, a, x1, y1, x2, y2) => `<linearGradient id="${id}" x1="${x1 || 0}" y1="${y1 || 0}" x2="${x2 == null ? 1 : x2}" y2="${y2 || 0}">${stops(a)}</linearGradient>`;
@@ -12934,8 +14485,10 @@ ${extra || ""}</defs>`;
 <g clip-path="${x.url("wc")}">${texture(kind, x)}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g>
 <rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g>
 <g clip-path="${x.url("wc")}">${under || ""}</g>
-${body}</svg>`;
+${body}${camOv(x)}</svg>`;
   }
+  const camOv = (x) => { const q = x.cam; if (!q) return "";
+    return (x.ir ? CK.irDots(q[0], q[1], q[2] + 3.5, 6, 1) : "") + CK.bellOver(x.bst, q[0], q[1], q[2], q[3]); };
 
   const drop = (x, shape, dx, dy, a) => `<g transform="translate(${dx == null ? 3.5 : dx} ${dy == null ? 5 : dy})" fill="#000" stroke="none" opacity="${a || .5}" filter="${x.url("bl")}">${shape}</g>`;
   const hl = (d, a, w) => `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="${a}" stroke-width="${w}" stroke-linecap="round"/>`;
@@ -12988,7 +14541,7 @@ ${body}</svg>`;
     return `<g opacity="${(.55 + .45 * x.L).toFixed(2)}">${s}</g>`;
   }
   const gl = (x, d, a) => `<path d="${d}" fill="${x.url("gloss")}" opacity="${a || .35}"/>`;
-  const led = (x, cx, cy, r, col, blink) => x.on
+  const led = (x, cx, cy, r, col, blink) => x.act
     ? `<circle cx="${cx}" cy="${cy}" r="${f(r * 3)}" fill="${x.url("halo")}" opacity="${x.op(.7)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col || x.hot}" ${blink ? anim(x, "blink", x.sp * .8, 0) : ""}/>`
     : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#1b1e28"/><circle cx="${cx}" cy="${cy}" r="${f(r * .5)}" fill="${col || x.c}" opacity=".35"/>`;
 
@@ -13004,12 +14557,75 @@ ${body}</svg>`;
     const def = BODY[main], lit = d.colors[0], orig = d.render;
     const cols = [def].concat(["#22252e", "#eeecf1", "#b9bec7", "#c9a04e", "#6b4f3a", "#2f5e3c", "#8a2b2b"].filter((c) => c !== def));
     return Object.assign({}, d, { colors: cols, picker: true, colorLabel: "Body", colors2: [lit].concat(WAVES.filter((c) => c !== lit)), picker2: true, colorLabel2: "Waves",
-      render(o) { return orig.call(this, Object.assign({}, o, { color: o.color2 || lit, color2: o.color2 || null, body: o.color || def, bodyDef: def, bodyMain: main })); } });
+      options: d.cam ? [CK.BELL, CK.IR] : d.options,
+      render(o) { const st = d.cam ? CK.bell(o) : null, m3 = st ? { on: st === "ring", act: st !== "idle", bst: st, cam: d.cam, ir: (o.opt || {}).ir === "on" } : {};
+        return orig.call(this, Object.assign({}, o, { color: o.color2 || lit, color2: o.color2 || null, body: o.color || def, bodyDef: def, bodyMain: main }, m3)); } });
   };
   const fin = (d) => Object.assign({ picker: true, colorLabel: "Body", colors2: WAVES, picker2: true, colorLabel2: "Waves" }, d);
 
+  const CK = (() => {
+    const g = (n) => (+n).toFixed(1);
+    const STATE = { id: "state", name: "State", values: [["auto", "From on/off"], ["live", "Live"], ["rec", "Recording"], ["motion", "Motion"], ["privacy", "Privacy"], ["offline", "Offline"]] };
+    const BELL = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+    const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] };
+    const IRA = { id: "ir", name: "Night IR", values: [["auto", "Auto"], ["off", "Off"], ["on", "On"]] };
+    const PAN = { id: "pan", name: "Pan", values: [["center", "Center"], ["left", "Left"], ["right", "Right"]] };
+    const cam = (o) => { const s = (o.opt || {}).state || "auto"; return s === "auto" ? (o.on ? "on" : "off") : s; };
+    const bell = (o) => o.on ? ((o.opt || {}).state || "ring") : "idle";
+    const active = (s) => s === "on" || s === "live" || s === "rec" || s === "motion";
+    const COL = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940", privacy: "#c9ced6", offline: "#8a8f98" };
+    const LED = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940" };
+    function badge(s, bx, by) {
+      const c = COL[s]; if (!c) return "";
+      bx = bx == null ? 28 : bx; by = by == null ? 28 : by;
+      let gl = "";
+      if (s === "rec") gl = `<circle cx="${bx}" cy="${by}" r="7" fill="${c}" opacity=".22"/><g class="${P}ckblink"><circle cx="${bx}" cy="${by}" r="4.4" fill="${c}"/><circle cx="${g(bx - 1.4)}" cy="${g(by - 1.4)}" r="1.3" fill="#fff" fill-opacity=".6"/></g>`;
+      else if (s === "live") gl = `<circle cx="${bx}" cy="${by}" r="2.3" fill="${c}"/><path d="M${g(bx - 3.2)} ${g(by - 3.6)}A5 5 0 0 0 ${g(bx - 3.2)} ${g(by + 3.6)}M${g(bx + 3.2)} ${g(by - 3.6)}A5 5 0 0 1 ${g(bx + 3.2)} ${g(by + 3.6)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path class="${P}ckglow" d="M${g(bx - 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 0 ${g(bx - 5.6)} ${g(by + 5.4)}M${g(bx + 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 1 ${g(bx + 5.6)} ${g(by + 5.4)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "motion") gl = `<g class="${P}ckglow" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="${g(bx + 1.2)}" cy="${g(by - 5.6)}" r="1.9" fill="${c}" stroke="none"/>` +
+        `<path d="M${g(bx + .4)} ${g(by - 2.8)}L${g(bx - 1)} ${g(by + 2)}L${g(bx - 4.4)} ${g(by + 6.2)}M${g(bx - 1)} ${g(by + 2)}L${g(bx + 2.6)} ${g(by + 3.4)}L${g(bx + 3.4)} ${g(by + 6.6)}M${g(bx - 4.6)} ${g(by - .6)}L${g(bx + .4)} ${g(by - 2.8)}L${g(bx + 4)} ${g(by)}"/></g>`;
+      else if (s === "privacy") gl = `<path d="M${g(bx - 6.4)} ${by}Q${bx} ${g(by - 6)} ${g(bx + 6.4)} ${by}Q${bx} ${g(by + 6)} ${g(bx - 6.4)} ${by}Z" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="${bx}" cy="${by}" r="2" fill="${c}"/>` +
+        `<path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "offline") gl = `<circle cx="${bx}" cy="${g(by + 4)}" r="1.2" fill="${c}"/><path d="M${g(bx - 2.8)} ${g(by + 1.2)}A4 4 0 0 1 ${g(bx + 2.8)} ${g(by + 1.2)}M${g(bx - 5.3)} ${g(by - 1.3)}A7.5 7.5 0 0 1 ${g(bx + 5.3)} ${g(by - 1.3)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#ff5a5a" stroke-width="1.5" stroke-linecap="round"/>`;
+      return `<g><circle cx="${g(bx + 1)}" cy="${g(by + 1.6)}" r="11" fill="#000" fill-opacity=".45"/><circle cx="${bx}" cy="${by}" r="11" fill="#16181e"/><circle cx="${bx}" cy="${by}" r="10.2" fill="none" stroke="${c}" stroke-width="1.3"/>` +
+        `<path d="M${g(bx - 7)} ${g(by - 6)}A9 9 0 0 1 ${g(bx + 6)} ${g(by - 7)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>${gl}</g>`;
+    }
+    const motion = (cx, cy, r) => [0, 1].map((i) => `<circle class="${P}ckring" style="animation-delay:${(-i * .8).toFixed(1)}s" cx="${g(cx)}" cy="${g(cy)}" r="${g(r * (1.3 + i * .5))}" fill="none" stroke="#ffa940" stroke-opacity="${i ? .4 : .75}" stroke-width="${i ? 1.4 : 1.8}"${i ? ` stroke-dasharray="3 3"` : ""}/>`).join("");
+    function cap(u, k, cx, cy, r, col) {
+      const id = `${u}-ckc${k}`;
+      return `<defs><radialGradient id="${id}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${H.shade(col, .55)}"/><stop offset=".6" stop-color="${col}"/><stop offset="1" stop-color="${H.shade(col, -.45)}"/></radialGradient></defs>` +
+        `<circle cx="${g(cx)}" cy="${g(cy + r * .14)}" r="${g(r)}" fill="#000" fill-opacity=".4"/><circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="url(#${id})"/>` +
+        `<path d="M${g(cx - r * .97)} ${g(cy)}H${g(cx + r * .97)}" stroke="${H.shade(col, -.5)}" stroke-width="${g(Math.max(.8, r * .09))}"/><path d="M${g(cx - r * .9)} ${g(cy + r * .1)}H${g(cx + r * .9)}" stroke="#fff" stroke-opacity=".28" stroke-width="${g(Math.max(.5, r * .05))}"/>` +
+        `<circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="none" stroke="#000" stroke-opacity=".38" stroke-width=".8"/><ellipse cx="${g(cx - r * .32)}" cy="${g(cy - r * .5)}" rx="${g(r * .36)}" ry="${g(r * .15)}" fill="#fff" fill-opacity=".4" transform="rotate(-18 ${g(cx - r * .32)} ${g(cy - r * .5)})"/>`;
+    }
+    const irDots = (cx, cy, R, n, rr) => { let s = ""; rr = rr || 1.1;
+      for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, px = g(cx + Math.cos(a) * R), py = g(cy + Math.sin(a) * R);
+        s += `<circle cx="${px}" cy="${py}" r="${g(rr * 3)}" fill="#ff3a4a" opacity=".22"/><circle cx="${px}" cy="${py}" r="${g(rr)}" fill="#ff3a4a"/>`; }
+      return s; };
+    function bellOver(s, cx, ly, lr, w) {
+      if (s === "motion") return `<g class="${P}ckglow">` + [0, 1].map((i) => { const r = lr + 5 + i * 6; return `<path d="M${g(cx - r)} ${g(ly - 2)}A${g(r)} ${g(r)} 0 0 1 ${g(cx + r)} ${g(ly - 2)}" fill="none" stroke="#ff8a6a" stroke-opacity="${(.8 - i * .3).toFixed(2)}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>`; }).join("") + `</g>`;
+      if (s === "live") return `<g class="${P}ckglow"><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.9)}" fill="#6aa8ff" opacity=".22"/><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.05)}" fill="none" stroke="#6aa8ff" stroke-opacity=".8" stroke-width="1.4"/></g>` +
+        `<circle class="${P}ckblink" cx="${g(cx + w / 2 + 7)}" cy="${g(ly - lr)}" r="3" fill="#ff3b3b"/>`;
+      if (s === "talk") return [0, 1, 2].map((i) => `<path class="${P}ckwave" style="animation-delay:${(-i * .4).toFixed(1)}s" d="M${g(cx + w / 2 + 4 + i * 6)} ${g(ly - 6 - i * 2)}q${g(5 + i)} ${g(6 + i * 2)} 0 ${g(12 + i * 4)}" fill="none" stroke="#7ee7ff" stroke-opacity="${(.9 - i * .2).toFixed(2)}" stroke-width="1.5" stroke-linecap="round"/>`).join("");
+      return "";
+    }
+    const css = `
+.${P}ckring{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}ckblink{animation:${P}ckblink 1.1s steps(1,end) infinite}
+@keyframes ${P}ckblink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .${P}ckring{animation:${P}ckring 1.6s ease-out infinite}
+@keyframes ${P}ckring{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.hda-anim .${P}ckglow{animation:${P}ckglow 1.8s ease-in-out infinite}
+@keyframes ${P}ckglow{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-anim .${P}ckwave{animation:${P}ckwave 1.3s ease-out infinite}
+@keyframes ${P}ckwave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}ckblink,.hda-anim .${P}ckring,.hda-anim .${P}ckglow,.hda-anim .${P}ckwave{animation:none!important}}`;
+    return { STATE, BELL, IR, IRA, PAN, cam, bell, active, LED, badge, motion, cap, irDots, bellOver, css };
+  })();
+
   const icons = [
-     ring({ id: "tall", name: "Video doorbell", colors: rs("#4da3ff"), render(o) {
+     ring({ id: "tall", name: "Video doorbell", colors: rs("#4da3ff"), cam: [100, 56, 14, 48], render(o) {
       const x = ctx(o), B = rrp(76, 20, 48, 160, 24);
       const F = drop(x, `<path d="${B}"/>`, 4, 6, .55) +
         `<path d="${rrp(73, 17, 54, 166, 27)}" fill="${x.url("sil")}" opacity=".85"/>
@@ -13026,7 +14642,7 @@ ${gl(x, rrp(80, 24, 18, 140, 9), .28)}${hl("M81 46V156", .2, 1.6)}
       return scene(x, "siding", F + waves(x, 100, 144, 36, "lr"), "", glowE(x, 100, 144, 70, 70, .35));
     } }),
 
-     ring({ id: "square", name: "Square-head video", colors: rs("#f2f6ff"), render(o) {
+     ring({ id: "square", name: "Square-head video", colors: rs("#f2f6ff"), cam: [100, 64, 16, 76], render(o) {
       const x = ctx(o), B = rrp(62, 26, 76, 150, 14);
       const F = drop(x, `<path d="${B}"/>`, 4, 6, .55) +
         `<path d="${B}" fill="${x.url("sil")}"/><path d="${B}" fill="${x.url("silv")}" opacity=".35"/>
@@ -13043,7 +14659,7 @@ ${hl("M66 44V160", .45, 1.4)}<path d="${B}" fill="none" stroke="#000" stroke-opa
       return scene(x, "brick", F + waves(x, 100, 146, 48, "lr"), "", glowE(x, 100, 146, 74, 70, .35));
     } }),
 
-     ring({ id: "wedge", name: "Battery doorbell", colors: rs("#34d399"), render(o) {
+     ring({ id: "wedge", name: "Battery doorbell", colors: rs("#34d399"), cam: [95, 58, 12, 58], render(o) {
       const x = ctx(o), B = rrp(66, 22, 58, 156, 22);
       const F = drop(x, `<path d="${rrp(66, 22, 70, 156, 22)}"/>`, 5, 6, .55) +
         `<path d="${rrp(76, 26, 60, 150, 20)}" fill="#8f8b97"/><path d="${rrp(76, 26, 60, 150, 20)}" fill="${x.url("whtv")}" opacity=".35"/>
@@ -13061,7 +14677,7 @@ ${hl("M70 42V160", .7, 1.6)}<path d="${B}" fill="none" stroke="#000" stroke-opac
       return scene(x, "stucco", F + waves(x, 100, 134, 42, "lr"), "", glowE(x, 95, 134, 66, 66, .32));
     } }),
 
-     ring({ id: "package", name: "Package camera", colors: rs("#a78bfa"), render(o) {
+     ring({ id: "package", name: "Package camera", colors: rs("#a78bfa"), cam: [100, 47, 13, 60], render(o) {
       const x = ctx(o), B = rrp(70, 14, 60, 172, 14);
       const F = drop(x, `<path d="${B}"/>`, 4, 6, .55) +
         `<path d="${B}" fill="${x.url("sil")}"/><path d="${rrp(75, 19, 50, 162, 10)}" fill="${x.url("blkv")}"/>
@@ -13104,7 +14720,7 @@ ${hl("M85 58V142", .5, 1.2)}`;
       return scene(x, "trim", F + waves(x, 100, 100, 32, "lr"), "", glowE(x, 100, 100, 52, 52, .35));
     } }),
 
-     ring({ id: "intercom", name: "Apartment intercom", colors: rs("#4da3ff"), render(o) {
+     ring({ id: "intercom", name: "Apartment intercom", colors: rs("#4da3ff"), cam: [100, 32, 6.5, 92], render(o) {
       const x = ctx(o), B = rrp(54, 16, 92, 170, 6), rows = [96, 114, 132, 150, 168];
       let R = "";
       rows.forEach((ry, i) => { const lit = x.on && i === 1;
@@ -13124,7 +14740,7 @@ ${R}${hl("M58 30V176", .4, 1.2)}`;
       return scene(x, "stone", F + waves(x, 100, 62, 52, "lr", null, 7, 26), "", glowE(x, 132, 114, 44, 44, .3));
     } }),
 
-     ring({ id: "gatepost", name: "Gate keypad", colors: rs("#34d399"), render(o) {
+     ring({ id: "gatepost", name: "Gate keypad", colors: rs("#34d399"), cam: [100, 69, 5.6, 44], render(o) {
       const x = ctx(o);
       let gate = "";
       for (let gx = 146; gx < 194; gx += 10) gate += `<rect x="${gx}" y="58" width="3.4" height="112" fill="#15161b"/><path d="M${gx + .8} 58V170" stroke="#5b5f6b" stroke-opacity=".5" stroke-width=".8"/><path d="M${gx - 1} 60 L${gx + 1.7} 52 L${gx + 4.4} 60Z" fill="#15161b"/>`;
@@ -13148,7 +14764,7 @@ ${hl("M80 64V160", .45, 1.2)}`;
       return scene(x, "yard", F + waves(x, 100, 104, 32, "lr", null, 8, 30), post, `<g class="hda-bg">${gate}</g>` + glowE(x, 100, 118, 60, 60, .3));
     } }),
 
-     ring({ id: "peephole", name: "Peephole camera", colors: rs("#f2f6ff"), render(o) {
+     ring({ id: "peephole", name: "Peephole camera", colors: rs("#f2f6ff"), cam: [100, 64, 8.5, 32], render(o) {
       const x = ctx(o), B = rrp(84, 40, 32, 112, 16);
       const F = drop(x, `<path d="${B}"/>`, 3, 5, .6) +
         `<path d="${B}" fill="${x.url("blk")}"/><path d="${B}" fill="none" stroke="#fff" stroke-opacity=".12"/>
@@ -13349,8 +14965,7 @@ ${ringLight(xr, 100, 148, 7.5, 2.4, .18)}<circle cx="100" cy="148" r="5" fill="$
     tab: "Doorbells",
     group: "More",
     kind: "device",
-    intro: "Eighteen doorbells and chimes, each on its own door, frame or wall. On means it is ringing (someone is at the door): rings chase, sound ripples, tubes and bells swing, screens light up. Off is idle with a soft standby glow.",
-    
+    intro: "Doorbells and chimes, each on its own door, frame or wall. On means it is ringing (someone is at the door): rings chase, sound ripples, tubes and bells swing, screens light up. Off is idle with a soft standby glow. The video doorbells now live as styles in the Video doorbell builder.",
     css: `.hda-doorbell-chase,.hda-doorbell-wave,.hda-doorbell-pulse,.hda-doorbell-blink{animation-timing-function:linear;animation-iteration-count:infinite}
 .hda-anim .hda-doorbell-chase{animation-name:hda-doorbell-chase}
 .hda-anim .hda-doorbell-wave{animation-name:hda-doorbell-wave;animation-timing-function:ease-out}
@@ -13369,7 +14984,312 @@ ${ringLight(xr, 100, 148, 7.5, 2.4, .18)}<circle cx="100" cy="148" r="5" fill="$
 @keyframes hda-doorbell-buzz{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-9deg)}}
 @keyframes hda-doorbell-twist{0%,100%{transform:rotate(0deg)}35%,65%{transform:rotate(85deg)}}
 @keyframes hda-doorbell-knock{0%,30%,100%{transform:scale(1,1)}45%{transform:scale(1,.8)}60%{transform:scale(1,1)}70%{transform:scale(1,.9)}80%{transform:scale(1,1)}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-doorbell-chase,.hda-anim .hda-doorbell-wave,.hda-anim .hda-doorbell-pulse,.hda-anim .hda-doorbell-blink,.hda-anim .hda-doorbell-swing,.hda-anim .hda-doorbell-buzz,.hda-anim .hda-doorbell-twist,.hda-anim .hda-doorbell-knock{animation:none}}`,
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-doorbell-chase,.hda-anim .hda-doorbell-wave,.hda-anim .hda-doorbell-pulse,.hda-anim .hda-doorbell-blink,.hda-anim .hda-doorbell-swing,.hda-anim .hda-doorbell-buzz,.hda-anim .hda-doorbell-twist,.hda-anim .hda-doorbell-knock{animation:none}}` + CK.css,
+    icons,
+    all: icons, 
+  });
+})();
+
+(function () {
+  const P = "hda-doorcfg-";
+  const N = () => window.HDAH;
+  const f = (n) => (+n).toFixed(1);
+  const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+  const lg = (id, a, x1, y1, x2, y2) => `<linearGradient id="${id}" x1="${x1 || 0}" y1="${y1 || 0}" x2="${x2 == null ? 1 : x2}" y2="${y2 || 0}">${stops(a)}</linearGradient>`;
+  const rg = (id, a, cx, cy, r) => `<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r || .5}">${stops(a)}</radialGradient>`;
+  const rr = (x, y, w, h, r) => `M${f(x + r)} ${f(y)}H${f(x + w - r)}A${r} ${r} 0 0 1 ${f(x + w)} ${f(y + r)}V${f(y + h - r)}A${r} ${r} 0 0 1 ${f(x + w - r)} ${f(y + h)}H${f(x + r)}A${r} ${r} 0 0 1 ${f(x)} ${f(y + h - r)}V${f(y + r)}A${r} ${r} 0 0 1 ${f(x + r)} ${f(y)}Z`;
+  const BGW = (t) => `<g class="hda-bg">${t}</g>`;
+  const WARM = "#ffd89c";
+
+  const EXT_C = ["#8a2f37", "#2d3c5e", "#25262a", "#ecebe6", "#7f8f78", "#2f6266", "#a9784a", "#5e3e28"];
+  const INT_C = ["#ecebe6", "#9aa0a6", "#2a2b2f", "#c79a6a", "#5e3e28", "#3e4a5a"];
+  const PAT_C = ["#ecebe6", "#25262a", "#5e4432", "#8a8f94", "#a9784a"];
+  const TRIM_C = ["#f2f1ec", "#e8dfcc", "#2a2b2f", "#5a4636", "#a9784a"];
+  const HW = { nickel: "#b9bec4", black: "#2a2b2f", brass: "#c9a14a", bronze: "#5e4432" };
+  const HWV = [["nickel", "Brushed nickel"], ["black", "Matte black"], ["brass", "Brass"], ["bronze", "Oil-rubbed bronze"]];
+  const STATE = [["auto", "From on/off"], ["closed", "Closed"], ["open", "Open"], ["ajar", "Ajar"]];
+  const EXT_S = [["sixpanel", "6-panel"], ["craftsman", "Craftsman, top lites"], ["fullglass", "Full glass"], ["halfglass", "Half glass"], ["halfgrille", "Half glass, grille"], ["flush", "Modern flush + lite strip"], ["lites4", "Modern 4 horizontal lites"], ["lites5", "Modern 5 horizontal lites"], ["plank", "Plank / rustic"], ["arched", "Arched top"], ["dutch", "Dutch door"], ["double", "Double French entry"]];
+  const INT_S = [["shaker2", "2-panel shaker"], ["shaker5", "5-panel shaker"], ["colonial", "6-panel colonial"], ["flush", "Flush"], ["lites4", "Modern 4 horizontal lites"], ["lites5", "Modern 5 horizontal lites"], ["louver", "Louvered"], ["french", "French glass"], ["barn", "Barn door on track"], ["pocket", "Pocket door"], ["bifold", "Bifold"]];
+  const PAT_S = [["slider2", "2-panel slider"], ["slider3", "3-panel slider"], ["french", "French swing"], ["folding", "Folding glass wall"]];
+  const BOLTS = [["none", "None"], ["lock:keypad", "Keypad deadbolt"], ["lock:touch", "Touchscreen lock"], ["lock:retrofit", "Retrofit lock"], ["lock:fingerprint", "Fingerprint lever"], ["lock:handleset", "Handle set"], ["lock:mortise", "Mortise lock"], ["lock:video", "Video doorbell lock"], ["lock:sliding", "Sliding door lock"], ["lock:office", "Office lever"], ["lock:cylinder", "Key deadbolt"], ["lock:euro", "Euro cylinder"], ["lock:card", "Card key lock"],
+    ["deadbolts:arched-push-button", "Keypad deadbolt, curved"], ["deadbolts:round-push-button", "Keypad deadbolt, oval"], ["deadbolts:arched-wi-fi-touch", "Touchscreen deadbolt, curved"], ["deadbolts:slim-wi-fi-touch", "Touchscreen deadbolt, square"], ["deadbolts:arched-keypad-lever", "Keypad lever, curved"], ["deadbolts:arched-touch-lever", "Touchscreen lever, curved"], ["deadbolts:slim-touch-lever", "Touchscreen lever, square"],
+    ["lock2:glass-touchscreen", "Slim touchscreen lock"], ["lock2:push-button-keypad", "Slim push-button lock"], ["lock2:a2kftouch", "Key-free Touch"], ["lock2:slim-touchscreen", "Keyless slim lock"], ["lock2:levertouch", "Lever Touch"], ["lock2:leverkeypad", "Lever Keypad"], ["lock2:smart-lock-black", "Matter Black"], ["lock2:entrance-handle-lock", "Unity Entrance"]];
+  const WITH_HANDLE = ["lock:fingerprint", "lock:handleset", "lock:mortise", "lock:office", "lock:card", "lock:sliding", "deadbolts:arched-keypad-lever", "deadbolts:arched-touch-lever", "deadbolts:slim-touch-lever", "lock2:levertouch", "lock2:leverkeypad", "lock2:entrance-handle-lock"];
+  const BASE = ((typeof document !== "undefined" && document.currentScript && document.currentScript.src) || "").replace(/[^/]*$/, "");
+  const setOf = (id) => (window.HDA || []).filter((st) => st && st.id === id && st.icons)[0];
+  let loading = false;
+  function ensureLocks() {
+    if (loading || typeof document === "undefined" || !document.createElement) return;
+    const miss = ["lock", "deadbolts", "lock2"].filter((id) => !setOf(id)); if (!miss.length) return;
+    loading = true; let left = miss.length;
+    miss.forEach((id) => { const sc = document.createElement("script"); sc.src = BASE + id + ".js"; sc.onload = sc.onerror = () => { if (--left) return; ["lock", "deadbolts", "lock2"].forEach((sid) => { const st = setOf(sid); if (st && st.css && !document.querySelector(`style[data-set="${sid}"]`)) { const el = document.createElement("style"); el.dataset.set = sid; el.textContent = st.css; document.head.appendChild(el); } }); if (typeof window.renderStage === "function") window.renderStage(); }; document.head.appendChild(sc); });
+  }
+  const dist = (a, b) => { const A = N().hx(a), B = N().hx(b); return Math.abs(A[0] - B[0]) + Math.abs(A[1] - B[1]) + Math.abs(A[2] - B[2]); };
+  let lockN = 0;
+  function lockArt(x, cx, cy, S) {
+    const parts = x.bolt.split(":"), st = setOf(parts[0]), ic = st && st.icons.filter((i) => i.id === parts[1])[0];
+    if (!ic) { ensureLocks(); return `<rect x="${f(cx - S * .14)}" y="${f(cy - S * .22)}" width="${f(S * .28)}" height="${f(S * .44)}" rx="${f(S * .06)}" fill="${x.url("hw")}"/><circle cx="${f(cx)}" cy="${f(cy + S * .08)}" r="${f(S * .06)}" fill="#222"/><circle cx="${f(cx)}" cy="${f(cy - S * .12)}" r="${f(S * .035)}" fill="${(LOCKC[x.lock] || LOCKC.unlocked)}"/>`; }
+    const cols = ic.colors || []; let col = cols[0] || "#b6babe", best = 1e9; cols.forEach((c) => { const d = dist(c, x.hw); if (d < best) { best = d; col = c; } });
+    let sv = ic.render({ on: x.locked, anim: x.o.anim, color: col, level: 1, opt: { state: x.lock }, uid: `${x.u}k${++lockN}` });
+    const w = S * 150 / 184;
+    sv = sv.replace(/^<svg[^>]*>/, `<svg x="${f(cx - w / 2)}" y="${f(cy - S / 2)}" width="${f(w)}" height="${f(S)}" viewBox="20 8 150 184" overflow="hidden">`);
+    return `<g class="hda-nobg">${sv}</g>`;
+  }
+  const LOCKV = [["unlocked", "Unlocked"], ["locked", "Locked"], ["locking", "Locking"], ["unlocking", "Unlocking"], ["jammed", "Jammed"]];
+  const LOCKC = { unlocked: "#ff5a5f", locked: "#34d399", locking: "#ffb020", unlocking: "#ffb020", jammed: "#ff3b30" };
+  const first = (all, d) => { const i = Math.max(0, all.findIndex((a) => a[0] === d)); return [all[i]].concat(all.filter((_, k) => k !== i)); };
+  const firstC = (all, d) => [d].concat(all.filter((c) => c !== d));
+
+  function ctx(o) {
+    const h = N(), c = o.color || "#8a2f37", t = o.color2 || TRIM_C[0], opt = o.opt || {};
+    const state = opt.state && opt.state !== "auto" ? opt.state : (o.on ? "open" : "closed");
+    return { o, u: o.uid, c, t, opt, state, ang: { closed: 0, ajar: 25, open: 75 }[state] * Math.PI / 180, slide: { closed: 0, ajar: .32, open: .92 }[state],
+      hw: HW[opt.hw] || HW.nickel, locked: opt.lock === "locked", lock: LOCKC[opt.lock] ? opt.lock : "unlocked", bolt: opt.bolt || "none",
+      p: { l: h.shade(c, .3), m: c, d: h.shade(c, -.28), k: h.shade(c, -.55) }, tp: { l: h.shade(t, .25), m: t, d: h.shade(t, -.3) },
+      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, n: 0 };
+  }
+  function defs(x) {
+    const id = x.id, p = x.p, t = x.tp;
+    return `<defs>
+${lg(id("dr"), [[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 1, 1)}
+${lg(id("fr"), [[0, t.d], [.3, t.l], [.7, t.m], [1, t.d]])}
+${lg(id("frv"), [[0, t.l], [1, t.d]], 0, 0, 0, 1)}
+${lg(id("gls"), [[0, "#9fb6c6"], [.5, "#5c7486"], [1, "#2c3a46"]], 0, 0, 1, 1)}
+${lg(id("frost"), [[0, "#eef3f6"], [1, "#b9c6ce"]], 0, 0, 0, 1)}
+${lg(id("sh"), [[0, "#fff", .16], [.3, "#fff", 0], [.7, "#000", 0], [1, "#000", .22]])}
+${lg(id("dn"), [[0, "#000", .5], [1, "#000", 0]], 0, 0, 0, 1)}
+${lg(id("hw"), [[0, N().shade(x.hw, .45)], [.5, x.hw], [1, N().shade(x.hw, -.4)]], 0, 0, 1, 1)}
+${lg(id("in"), [[0, "#5a4636"], [1, "#2a2018"]], 0, 0, 0, 1)}
+${rg(id("lp"), [[0, WARM, .9], [.5, WARM, .35], [1, WARM, 0]])}
+${rg(id("cs"), [[0, "#000", .5], [1, "#000", 0]])}
+${rg(id("vig"), [[0, "#000", 0], [.66, "#000", .06], [1, "#000", .45]], .5, .45, .75)}
+<clipPath id="${id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath></defs>`;
+  }
+  const svg = (x, body) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x)}<g clip-path="${x.url("wc")}">${body}<g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g></g><rect class="hda-bg" x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></svg>`;
+
+  function scene(x, kind, fy) {
+    const h = N(); let s = "", d = "";
+    if (kind === "front" || kind === "back") {
+      const c = kind === "front" ? "#8a97a3" : "#9b6a52";
+      s += `${lg(x.id("wl"), [[0, h.shade(c, -.15)], [1, h.shade(c, .05)]], 0, 0, 0, 1)}<rect x="8" y="8" width="184" height="${fy - 8}" fill="${x.url("wl")}"/>`;
+      if (kind === "front") { for (let y = 14; y < fy; y += 7) d += `M8 ${y}H192`; s += `<path d="${d}" stroke="#000" stroke-opacity=".22"/>`; }
+      else { for (let y = 10, i = 0; y < fy; y += 6, i++) { d += `M8 ${y}H192`; for (let xx = 8 + (i % 2) * 7; xx < 192; xx += 14) d += `M${xx} ${y}v6`; } s += `<path d="${d}" stroke="#d8cdbd" stroke-opacity=".35" stroke-width=".7"/>`; }
+      s += `<rect x="8" y="${fy}" width="184" height="${192 - fy}" fill="#8d8478"/><path d="M8 ${fy}H192" stroke="#fff" stroke-opacity=".3"/><rect x="8" y="${fy}" width="184" height="4" fill="${x.url("dn")}" opacity=".6"/>`;
+    } else if (kind === "patio") {
+      s += `${lg(x.id("wl"), [[0, "#c9bba3"], [1, "#e0d4c0"]], 0, 0, 0, 1)}<rect x="8" y="8" width="184" height="${fy - 8}" fill="${x.url("wl")}"/>`;
+      for (let xx = 8; xx < 192; xx += 9) d += `M${xx} ${fy}L${f(100 + (xx - 100) * 1.4)} 192`;
+      s += `<rect x="8" y="${fy}" width="184" height="${192 - fy}" fill="#8a6440"/><path d="${d}" stroke="#000" stroke-opacity=".22"/>`;
+    } else {
+      s += `${lg(x.id("wl"), [[0, "#b9b2a6"], [1, "#d6cfc2"]], 0, 0, 0, 1)}<rect x="8" y="8" width="184" height="${fy - 8}" fill="${x.url("wl")}"/><rect x="8" y="${fy - 8}" width="184" height="8" fill="#f2f0ea"/><path d="M8 ${fy - 8}H192" stroke="#000" stroke-opacity=".12"/>`;
+      for (let y = fy + 5; y < 192; y += 6) d += `M8 ${y}H192`;
+      s += `<rect x="8" y="${fy}" width="184" height="${192 - fy}" fill="#9a7650"/><path d="${d}" stroke="#000" stroke-opacity=".2"/>`;
+    }
+    return BGW(s);
+  }
+  function beyond(x, X, Y, W, H, ext) {
+    return `<rect x="${f(X)}" y="${f(Y)}" width="${f(W)}" height="${f(H)}" fill="${ext ? x.url("in") : "#8f8579"}"/><rect x="${f(X + W * .15)}" y="${f(Y + H * .1)}" width="${f(W * .7)}" height="${f(H * .62)}" fill="${ext ? "#7a6450" : "#b3a896"}"/><path d="M${f(X)} ${f(Y + H)}L${f(X + W * .15)} ${f(Y + H * .72)}H${f(X + W * .85)}L${f(X + W)} ${f(Y + H)}Z" fill="${ext ? "#4a3a2c" : "#a07c56"}"/>` +
+      (ext ? `<ellipse cx="${f(X + W / 2)}" cy="${f(Y + H * .25)}" rx="${f(W * .7)}" ry="${f(H * .6)}" fill="${x.url("lp")}" opacity=".8"/>` : `<rect x="${f(X + W * .38)}" y="${f(Y + H * .3)}" width="${f(W * .24)}" height="${f(H * .2)}" fill="#e9e2d2" stroke="#6a5a44" stroke-width=".6"/>`);
+  }
+
+  function rpan(px, py, pw, ph, flat) {
+    const d = Math.max(.8, Math.min(pw, ph) * .12);
+    return `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="#000" fill-opacity="${flat ? .08 : .05}"/><path d="M${f(px)} ${f(py + ph)}V${f(py)}H${f(px + pw)}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".7"/><path d="M${f(px + pw)} ${f(py)}V${f(py + ph)}H${f(px)}" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width=".7"/>` +
+      (flat ? "" : `<rect x="${f(px + d)}" y="${f(py + d)}" width="${f(pw - 2 * d)}" height="${f(ph - 2 * d)}" fill="#fff" fill-opacity=".06"/><path d="M${f(px + d)} ${f(py + ph - d)}V${f(py + d)}H${f(px + pw - d)}" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width=".6"/>`);
+  }
+  function glass(x, px, py, pw, ph, rows, cols, frost) {
+    let s = `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${x.url(frost ? "frost" : "gls")}"/><path d="M${f(px)} ${f(py + ph * .85)}L${f(px + pw * .6)} ${f(py)}H${f(px + pw * .85)}L${f(px)} ${f(py + ph)}Z" fill="#fff" opacity=".16"/>`;
+    let d = ""; for (let r = 1; r < rows; r++) d += `M${f(px)} ${f(py + r * ph / rows)}h${f(pw)}`; for (let c = 1; c < cols; c++) d += `M${f(px + c * pw / cols)} ${f(py)}v${f(ph)}`;
+    if (d) s += `<path d="${d}" stroke="${x.p.m}" stroke-width="${f(Math.max(1, pw * .05))}"/>`;
+    return s + `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="none" stroke="#000" stroke-opacity=".4" stroke-width=".6"/>`;
+  }
+  function leafFace(x, W, H, style, hand, ext) {
+    const h = N(), m = W * .14;
+    let s = `<rect width="${f(W)}" height="${f(H)}" fill="${x.url("dr")}"/>`;
+    const st = style;
+    if (st === "sixpanel" || st === "colonial") { const pw = (W - 3 * m) / 2; [[.05, .17], [.27, .36], [.68, .26]].forEach(([y, hh]) => { s += rpan(m, H * y, pw, H * hh) + rpan(2 * m + pw, H * y, pw, H * hh); }); }
+    else if (st === "craftsman") { s += glass(x, m, H * .07, W - 2 * m, H * .26, 1, 3) + `<rect x="${f(m * .6)}" y="${f(H * .35)}" width="${f(W - 1.2 * m)}" height="${f(H * .03)}" fill="${x.p.l}"/>`; const pw = (W - 4 * m) / 3; for (let i = 0; i < 3; i++) s += rpan(m + i * (pw + m), H * .42, pw, H * .5, true); }
+    else if (st === "fullglass") s += glass(x, m, H * .06, W - 2 * m, H * .86, 1, 1);
+    else if (st === "halfglass" || st === "halfgrille") { s += glass(x, m, H * .06, W - 2 * m, H * .42, st === "halfgrille" ? 3 : 1, st === "halfgrille" ? 3 : 1); const pw = (W - 3 * m) / 2; s += rpan(m, H * .56, pw, H * .36) + rpan(2 * m + pw, H * .56, pw, H * .36); }
+    else if (st === "flush") s += glass(x, W * (hand > 0 ? .2 : .66), H * .08, W * .14, H * .84, 1, 1, true) + (x.c === "#a9784a" || x.c === "#5e3e28" || x.c === "#c79a6a" ? grain(W, H, 3) : "");
+    else if (st === "lites4" || st === "lites5") { const n = st === "lites4" ? 4 : 5, y0 = n === 4 ? .1 : .075, sp = n === 4 ? .24 : .19, gh = n === 4 ? .08 : .07, gx = W * .15, fr = (x.opt.glass || "clear") === "frost"; let d = ""; for (let i = 0; i < n; i++) { const gy = H * (y0 + i * sp); s += `<rect x="${f(gx - .8)}" y="${f(gy - .8)}" width="${f(W - 2 * gx + 1.6)}" height="${f(H * gh + 1.6)}" fill="#000" fill-opacity=".18"/>` + glass(x, gx, gy, W - 2 * gx, H * gh, 1, 1, fr); if (i < n - 1) for (let k = 1; k < 3; k++) d += `M${f(gx)} ${f(gy + H * gh + k * H * (sp - gh) / 3)}H${f(W - gx)}`; } s += `<path d="${d}" stroke="#000" stroke-opacity=".12" stroke-width=".5"/><path d="M${f(gx * .55)} ${f(H * .03)}V${f(H * .97)}M${f(W - gx * .55)} ${f(H * .03)}V${f(H * .97)}" stroke="#000" stroke-opacity=".1" stroke-width=".5"/>`; }
+    else if (st === "plank") { let d = ""; for (let xx = W / 6; xx < W - .5; xx += W / 6) d += `M${f(xx)} 0V${f(H)}`; s += grain(W, H, 5) + `<path d="${d}" stroke="#000" stroke-opacity=".4" stroke-width=".8"/>`; const sw = Math.max(1.2, H * .025); [.18, .82].forEach((y) => { s += `<path d="M${f(hand > 0 ? 1 : W - 1)} ${f(H * y - sw)}H${f(hand > 0 ? W * .55 : W * .45)}L${f(hand > 0 ? W * .6 : W * .4)} ${f(H * y)}L${f(hand > 0 ? W * .55 : W * .45)} ${f(H * y + sw)}H${f(hand > 0 ? 1 : W - 1)}Z" fill="#1c1c1e"/>`; }); s += glass(x, W * .32, H * .12, W * .36, H * .14, 1, 2); }
+    else if (st === "arched") { s += glass(x, m, H * .04, W - 2 * m, H * .46, 3, 2) + rpan(m, H * .58, W - 2 * m, H * .34); }
+    else if (st === "dutch") { s += glass(x, m, H * .07, W - 2 * m, H * .3, 2, 2) + `<rect x="0" y="${f(H * .48)}" width="${f(W)}" height="${f(H * .035)}" fill="${x.p.l}"/><path d="M0 ${f(H * .5)}H${f(W)}" stroke="#000" stroke-opacity=".5" stroke-width=".8"/>`; const pw = (W - 3 * m) / 2; s += rpan(m, H * .58, pw, H * .34) + rpan(2 * m + pw, H * .58, pw, H * .34); }
+    else if (st === "frenchleaf") s += glass(x, m * .8, H * .05, W - 1.6 * m, H * .88, 5, 2);
+    else if (st === "shaker2") { s += rpan(m, H * .06, W - 2 * m, H * .42, true) + rpan(m, H * .54, W - 2 * m, H * .4, true); }
+    else if (st === "shaker5") { for (let i = 0; i < 5; i++) s += rpan(m, H * (.05 + i * .182), W - 2 * m, H * .15, true); }
+    else if (st === "louver") { let d = ""; for (let y = H * .07; y < H * .93; y += H * .035) d += `<rect x="${f(m)}" y="${f(y)}" width="${f(W - 2 * m)}" height="${f(H * .022)}" fill="${x.p.d}"/><path d="M${f(m)} ${f(y)}h${f(W - 2 * m)}" stroke="#fff" stroke-opacity=".3" stroke-width=".5"/>`; s += `<rect x="${f(m)}" y="${f(H * .06)}" width="${f(W - 2 * m)}" height="${f(H * .88)}" fill="#000" fill-opacity=".3"/>` + d; }
+    else if (st === "french") s += glass(x, m * .8, H * .05, W - 1.6 * m, H * .88, 5, 3);
+    else if (st === "barn") { s += grain(W, H, 9); let d = ""; for (let xx = W / 5; xx < W - .5; xx += W / 5) d += `M${f(xx)} 0V${f(H)}`; s += `<path d="${d}" stroke="#000" stroke-opacity=".35" stroke-width=".7"/><path d="M${f(W * .06)} ${f(H * .06)}H${f(W * .94)}V${f(H * .94)}H${f(W * .06)}Z" fill="none" stroke="${x.p.d}" stroke-width="${f(W * .08)}"/><path d="M${f(W * .1)} ${f(H * .1)}L${f(W * .9)} ${f(H * .9)}M${f(W * .9)} ${f(H * .1)}L${f(W * .1)} ${f(H * .9)}" stroke="${x.p.d}" stroke-width="${f(W * .07)}"/>`; }
+    else if (st === "glasspanel") s += glass(x, W * .07, H * .04, W * .86, H * .92, 1, 1);
+    s += `<rect width="${f(W)}" height="${f(H)}" fill="${x.url("sh")}"/>`;
+    return s;
+  }
+  function grain(W, H, seed) { const r = rnd(seed); let d = ""; for (let xx = 1; xx < W; xx += 1.4 + r() * 2) { const a = r() * 1.2 - .6; d += `M${f(xx)} 0C${f(xx + a)} ${f(H * .3)} ${f(xx - a)} ${f(H * .6)} ${f(xx)} ${f(H)}`; } return `<path d="${d}" fill="none" stroke="#2a1606" stroke-opacity=".18" stroke-width=".5"/>`; }
+  function hardware(x, W, H, hand, opt) {
+    opt = opt || {};
+    const hx = hand > 0 ? W - W * .12 : W * .12, hy = H * .52, k = Math.max(1.6, W * .045);
+    const wh = WITH_HANDLE.indexOf(x.bolt) >= 0;
+    let s = opt.pull ? `<rect x="${f(hx - k * .35)}" y="${f(hy - H * .12)}" width="${f(k * .7)}" height="${f(H * .24)}" rx="${f(k * .3)}" fill="${x.url("hw")}"/>`
+      : (x.bolt !== "none" && wh ? "" : `<circle cx="${f(hx)}" cy="${f(hy)}" r="${f(k * .9)}" fill="${x.url("hw")}"/><path d="M${f(hx)} ${f(hy)}h${f(-hand * k * 3)}" stroke="${x.url("hw")}" stroke-width="${f(k * .9)}" stroke-linecap="round"/>`);
+    if (x.bolt !== "none") {
+      const S = Math.min(W * .5, H * (wh ? .3 : .2)), cy = wh ? hy - H * .05 : hy - H * .14, lx = opt.pull ? hx - hand * W * .12 : hx;
+      s += opt.full ? lockArt(x, lx, cy, S) : `<rect x="${f(lx - k * .7)}" y="${f(cy - k * 1.6)}" width="${f(k * 1.4)}" height="${f(k * 3.2)}" rx="${f(k * .4)}" fill="#26272a"/><circle cx="${f(lx)}" cy="${f(cy - k * .8)}" r="${f(k * .3)}" fill="${(LOCKC[x.lock] || LOCKC.unlocked)}"/>`;
+    }
+    return s;
+  }
+  function hinged(x, X, Y, W, H, style, hs, ext, bolt) {
+    const a = x.ang, face = leafFace(x, W, H, style, -hs, ext) + hardware(x, W, H, -hs, { full: a === 0 });
+    if (a === 0) return `<g transform="translate(${f(X)} ${f(Y)})">${face}</g>`;
+    const F = 230, c = Math.cos(a), sn = Math.sin(a), y0 = Y + H * .45, hx = hs < 0 ? X : X + W;
+    const k = (u) => F / (F + u * sn), uOf = (xl) => (hs < 0 ? xl : W - xl);
+    const M = (xl) => { const u = uOf(xl); return hx - hs * u * c * k(u); };
+    const n = 8; let strips = "";
+    for (let i = 0; i < n; i++) {
+      const x0 = i * W / n, x1 = (i + 1) * W / n, A = (M(x1) - M(x0)) / (x1 - x0), sk = k(uOf((x0 + x1) / 2)), cid = x.id("st" + (x.n++));
+      strips += `<g transform="matrix(${A.toFixed(4)} 0 0 ${sk.toFixed(4)} ${f(M(x0) - A * x0)} ${f(y0 + (Y - y0) * sk)})"><clipPath id="${cid}"><rect x="${f(x0 - .05)}" y="-1" width="${f(x1 - x0 + .1)}" height="${f(H + 2)}"/></clipPath><g clip-path="url(#${cid})">${face}</g></g>`;
+    }
+    const kf = k(W), fx = M(hs < 0 ? W : 0), top = (kk) => y0 + (Y - y0) * kk, bot = (kk) => y0 + (Y + H - y0) * kk;
+    const poly = `M${f(hx)} ${f(Y)}L${f(fx)} ${f(top(kf))}L${f(fx)} ${f(bot(kf))}L${f(hx)} ${f(Y + H)}Z`;
+    const th = Math.max(1.6, W * .055) * sn * kf, ed = `M${f(fx)} ${f(top(kf))}L${f(fx - hs * th)} ${f(top(kf) + th * .15)}V${f(bot(kf) - th * .15)}L${f(fx)} ${f(bot(kf))}Z`;
+    return `<g class="${P}swing" style="transform-origin:${f(hx)}px ${f(y0)}px">${strips}<path d="${poly}" fill="#000" opacity="${f(.28 * sn)}"/><path d="${poly}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".6"/><path d="${ed}" fill="${x.p.d}"/><path d="${ed}" fill="#fff" opacity=".15"/></g>`;
+  }
+  function frame(x, X, Y, W, H, t, arch) {
+    const top = arch ? `<path d="M${f(X - t)} ${f(Y + W * .28)}A${f(W / 2 + t)} ${f(W * .32 + t)} 0 0 1 ${f(X + W + t)} ${f(Y + W * .28)}V${f(Y + H)}H${f(X + W)}V${f(Y + W * .28)}A${f(W / 2)} ${f(W * .32)} 0 0 0 ${f(X)} ${f(Y + W * .28)}V${f(Y + H)}H${f(X - t)}Z" fill="${x.url("fr")}"/>`
+      : `<path d="M${f(X - t)} ${f(Y + H)}V${f(Y - t)}H${f(X + W + t)}V${f(Y + H)}H${f(X + W)}V${f(Y)}H${f(X)}V${f(Y + H)}Z" fill="${x.url("fr")}"/><path d="M${f(X - t)} ${f(Y - t)}H${f(X + W + t)}" stroke="#fff" stroke-opacity=".35" stroke-width=".7"/>`;
+    return top;
+  }
+
+  function exterior(x, kind) {
+    const o = x.opt, style = o.style || "sixpanel", dbl = style === "double", arch = style === "arched";
+    const side = o.side || "none", tr = o.transom || "none", fy = 170;
+    const lw = dbl ? 46 : 58, LW = dbl ? lw * 2 : lw, H = 112, sw = 16, t = 5;
+    const nS = side === "both" ? 2 : side === "one" ? 1 : 0, total = LW + nS * (sw + t);
+    let X = 100 - total / 2 + (side === "both" || side === "one" ? sw + t : 0), Y = fy - H - (tr !== "none" && !arch ? 18 : 0) + (tr !== "none" && !arch ? 18 : 0);
+    Y = fy - H;
+    let s = scene(x, kind, fy);
+    s += BGW(`<rect x="${f(Math.max(16, X - (nS ? sw + t : 0) - 22))}" y="${f(Y + 20)}" width="8" height="14" rx="2" fill="#1b1c1e"/><rect x="${f(Math.max(16, X - (nS ? sw + t : 0) - 21))}" y="${f(Y + 22)}" width="6" height="9" fill="#ffe2a4" opacity=".85"/>`);
+    s += `<rect x="${f(X - (nS ? sw + t : 0) - 14)}" y="${fy}" width="${f(total + 28)}" height="8" fill="#a8a196"/><path d="M${f(X - (nS ? sw + t : 0) - 14)} ${fy}h${f(total + 28)}" stroke="#fff" stroke-opacity=".4"/><rect x="${f(X - (nS ? sw + t : 0) - 14)}" y="${fy + 8}" width="${f(total + 28)}" height="3" fill="#000" opacity=".25"/>`;
+    let tY = Y;
+    if (tr !== "none" && !arch) {
+      tY = Y - 22;
+      if (tr === "rect") s += `<rect x="${f(X - t)}" y="${f(tY - t)}" width="${f(LW + 2 * t)}" height="${f(22 + t)}" fill="${x.url("fr")}"/>` + glass(x, X, tY, LW, 18, 1, dbl ? 4 : 3);
+      else { const r = LW / 2; s += `<path d="M${f(X - t)} ${f(Y)}V${f(Y - 4)}A${f(r + t)} ${f(r * .45 + t)} 0 0 1 ${f(X + LW + t)} ${f(Y - 4)}V${f(Y)}Z" fill="${x.url("fr")}"/><path d="M${f(X)} ${f(Y - 4)}A${f(r)} ${f(r * .45)} 0 0 1 ${f(X + LW)} ${f(Y - 4)}Z" fill="${x.url("gls")}"/>`; let d = ""; for (let i = 1; i < 6; i++) { const a = Math.PI * (1 - i / 6); d += `M${f(X + r)} ${f(Y - 4)}L${f(X + r + r * Math.cos(a))} ${f(Y - 4 - r * .45 * Math.sin(a))}`; } s += `<path d="${d}" stroke="${x.tp.m}" stroke-width="1"/>`; }
+    }
+    const sl = (sx) => `<rect x="${f(sx - t)}" y="${f(Y - t)}" width="${f(sw + 2 * t)}" height="${f(H + t)}" fill="${x.url("fr")}"/>` + glass(x, sx, Y + 3, sw, H * .62, 4, 1, true) + rpan(sx + 1, Y + H * .7, sw - 2, H * .26) + `<rect x="${f(sx)}" y="${f(Y + H * .66)}" width="${f(sw)}" height="${f(H * .34)}" fill="${x.url("dr")}" opacity=".9"/>` + rpan(sx + 2, Y + H * .7, sw - 4, H * .26);
+    if (nS >= 1) s += sl(X - sw - t);
+    if (nS === 2) s += sl(X + LW + t);
+    const clipD = arch ? `M${f(X)} ${f(Y + H)}V${f(Y + LW * .28)}A${f(LW / 2)} ${f(LW * .32)} 0 0 1 ${f(X + LW)} ${f(Y + LW * .28)}V${f(Y + H)}Z` : `M${f(X)} ${f(Y)}H${f(X + LW)}V${f(Y + H)}H${f(X)}Z`;
+    const k = x.id("oc");
+    s += `<clipPath id="${k}"><path d="${clipD}"/></clipPath>`;
+    if (x.ang > 0) s += `<g clip-path="url(#${k})">${beyond(x, X, Y, LW, H, true)}</g>`;
+    s += frame(x, X, Y, LW, H, t, arch);
+    const leaves = dbl ? hinged(Object.assign({}, x, { bolt: "none" }), X, Y, lw, H, "frenchleaf", -1, true, false) + hinged(x, X + lw, Y, lw, H, "frenchleaf", 1, true, true)
+      : hinged(x, X, Y, LW, H, style, -1, true, true);
+    s += arch && x.ang === 0 ? `<g clip-path="url(#${k})">${leaves}</g>` : leaves;
+    if (x.ang > 0) s += `<path d="M${f(X)} ${fy}H${f(X + LW)}L${f(X + LW + 20)} 192H${f(X - 20)}Z" fill="${x.url("lp")}" opacity=".35"/>`;
+    s += BGW(`<rect x="${f(X + LW + t + (nS === 2 ? sw + t : 0) + 6)}" y="${f(Y + H * .45)}" width="5" height="9" rx="1.5" fill="#26272a"/><circle cx="${f(X + LW + t + (nS === 2 ? sw + t : 0) + 8.5)}" cy="${f(Y + H * .45 + 5.5)}" r="1.4" fill="#9fd8ff"/>`);
+    return s;
+  }
+
+  function patio(x) {
+    const o = x.opt, st = o.style || "slider2", fy = 172, Y = 46, H = fy - Y, X = 26, W = 148, t = 6;
+    let s = scene(x, "patio", fy), k = x.id("pc");
+    s += `<clipPath id="${k}"><rect x="${X}" y="${Y}" width="${W}" height="${H}"/></clipPath>`;
+    s += `<g clip-path="url(#${k})">${lg(x.id("sky"), [[0, "#8ab7dc"], [1, "#d8e8f0"]], 0, 0, 0, 1)}<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="${x.url("sky")}"/><path d="M${X} ${f(Y + H * .55)}Q${X + 40} ${f(Y + H * .42)} ${X + 80} ${f(Y + H * .52)}T${X + W} ${f(Y + H * .48)}V${Y + H}H${X}Z" fill="#5f8a4a"/><rect x="${X}" y="${f(Y + H * .78)}" width="${W}" height="${f(H * .22)}" fill="#9a7a56"/></g>`;
+    s += `<rect x="${X - t}" y="${Y - t}" width="${W + 2 * t}" height="${H + t}" fill="none" stroke="${x.t}" stroke-width="${2 * t}"/>`;
+    const panel = (px, pw, handleSide) => `<rect x="${f(px)}" y="${Y}" width="${f(pw)}" height="${H}" fill="none" stroke="${x.c}" stroke-width="5"/>` + `<rect x="${f(px + 2.5)}" y="${Y + 2.5}" width="${f(pw - 5)}" height="${H - 5}" fill="#9fc3dc" opacity=".18"/><path d="M${f(px + 4)} ${f(Y + H * .9)}L${f(px + pw * .6)} ${Y + 4}H${f(px + pw * .8)}L${f(px + 4)} ${Y + H - 4}Z" fill="#fff" opacity=".14"/>` +
+      (handleSide ? `<rect x="${f(handleSide > 0 ? px + pw - 6 : px + 4)}" y="${f(Y + H * .45)}" width="2.4" height="16" rx="1.2" fill="${x.url("hw")}"/>` : "");
+    if (st === "slider2" || st === "slider3") {
+      const n = st === "slider2" ? 2 : 3, pw = W / n;
+      for (let i = 0; i < n; i++) if (i !== n - 1) s += panel(X + i * pw, pw, 0);
+      const off = x.slide * pw * (n - 1) * (n === 2 ? 1 : .5);
+      s += `<g class="${P}slide">${panel(X + (n - 1) * pw - off, pw, -1)}${x.bolt !== "none" ? lockArt(x, X + (n - 1) * pw - off + 9, Y + H * .5, H * .22) : ""}</g>`;
+      s += `<path d="M${X} ${fy - 1}H${X + W}" stroke="#555" stroke-width="2"/>`;
+    } else if (st === "folding") {
+      const n = 4, pw = W / n, fold = x.slide;
+      if (fold === 0) { for (let i = 0; i < n; i++) s += panel(X + i * pw, pw, i === n - 1 ? -1 : 0); if (x.bolt !== "none") s += lockArt(x, X + W - 9, Y + H * .5, H * .22); }
+      else {
+        const cw = pw * (1 - fold * .82);
+        for (let i = 0; i < n; i++) { const px = X + i * cw, sk = (i % 2 ? -1 : 1) * fold * 6; s += `<g transform="translate(${f(px)} ${Y}) skewY(${f(sk)}) translate(${f(-px)} ${-Y})">${panel(px, cw, 0)}</g>`; }
+      }
+    } else {
+      s += `<g clip-path="url(#${k})">${x.ang > 0 ? "" : ""}</g>` + hinged(Object.assign({}, x, { bolt: "none" }), X, Y, W / 2, H, "glasspanel", -1, true, false) + hinged(x, X + W / 2, Y, W / 2, H, "glasspanel", 1, true, true);
+    }
+    return s;
+  }
+  const lockDot = (x, cx, cy) => `<circle cx="${f(cx)}" cy="${f(cy)}" r="2" fill="${(LOCKC[x.lock] || LOCKC.unlocked)}"/>`;
+
+  function interior(x) {
+    const o = x.opt, st = o.style || "shaker2", fy = 174, W = 60, H = 116, X = 100 - W / 2, Y = fy - H, t = 6;
+    let s = scene(x, "interior", fy), k = x.id("ic");
+    s += `<clipPath id="${k}"><rect x="${X}" y="${Y}" width="${W}" height="${H}"/></clipPath>`;
+    if (st === "bifold") {
+      const BW = 96, BX = 100 - BW / 2;
+      s += `<rect x="${BX}" y="${Y}" width="${BW}" height="${H}" fill="#3a3028"/><path d="M${BX + 4} ${Y + 14}H${BX + BW - 4}" stroke="#7a6a58" stroke-width="2"/>${[0, 1, 2, 3, 4, 5].map((i) => `<rect x="${BX + 8 + i * 13}" y="${Y + 16}" width="9" height="${30 + (i % 3) * 8}" fill="${["#5a7aa8", "#a85a5a", "#7aa85a", "#d0c0a0", "#3a3d44", "#a88a5a"][i]}"/>`).join("")}`;
+      s += frame(x, BX, Y, BW, H, t, false);
+      const pw = BW / 4, fold = x.slide;
+      for (let side = -1; side <= 1; side += 2) for (let j = 0; j < 2; j++) {
+        const cw = pw * (1 - fold * .7), base = side < 0 ? BX + j * cw : BX + BW - (j + 1) * cw, sk = (j % 2 ? 1 : -1) * side * fold * 8;
+        s += `<g transform="translate(${f(base)} ${Y}) skewY(${f(sk)})"><g transform="scale(${(cw / pw).toFixed(3)} 1)">${leafFace(x, pw, H, "louver", side, false)}</g></g>`;
+      }
+      s += `<circle cx="${f(BX + BW / 2 - 4 - (x.slide ? BW * .25 : 0))}" cy="${f(Y + H * .5)}" r="1.6" fill="${x.url("hw")}"/>` + (x.bolt !== "none" && x.slide === 0 ? lockArt(x, BX + BW / 2 + 6, Y + H * .4, H * .18) : "");
+      return s;
+    }
+    if (x.ang > 0 || x.slide > 0) s += `<g clip-path="url(#${k})">${beyond(x, X, Y, W, H, false)}</g>`;
+    if (st === "barn") {
+      const bw = W + 12, bx = X - 6 + x.slide * (W + 4);
+      s += frame(x, X, Y, W, H, t, false) + `<rect x="${f(X - 16)}" y="${Y - 12}" width="${f(W * 2 + 30)}" height="4" rx="2" fill="#26272a"/>`;
+      s += `<g class="${P}slide"><rect x="${f(bx)}" y="${Y - 6}" width="${bw}" height="${H + 4}" fill="none"/>` + `<g transform="translate(${f(bx)} ${Y - 6})">${leafFace(x, bw, H + 4, "barn", 1, false)}${hardware(x, bw, H + 4, -1, { pull: true })}</g>` +
+        `<circle cx="${f(bx + 10)}" cy="${Y - 10}" r="4" fill="#26272a"/><circle cx="${f(bx + bw - 10)}" cy="${Y - 10}" r="4" fill="#26272a"/><path d="M${f(bx + 10)} ${Y - 10}v8M${f(bx + bw - 10)} ${Y - 10}v8" stroke="#26272a" stroke-width="2.4"/></g>`;
+      return s;
+    }
+    if (st === "pocket") {
+      const off = x.slide * W * .95;
+      s += `<g clip-path="url(#${k})"><g class="${P}slide"><g transform="translate(${f(X - off)} ${Y})">${leafFace(x, W, H, "flush", 1, false)}<rect x="${f(W - 6)}" y="${f(H * .5 - 6)}" width="3" height="12" rx="1.5" fill="${x.url("hw")}"/>${x.bolt !== "none" && x.slide === 0 ? lockArt(x, W - 8, H * .38, H * .2) : ""}</g></g></g>` + frame(x, X, Y, W, H, t, false);
+      return s;
+    }
+    s += frame(x, X, Y, W, H, t, false) + hinged(x, X, Y, W, H, st === "flush" ? "slab" : st, -1, false, false);
+    return s;
+  }
+
+  const icons = [];
+  function card(id, name, d) {
+    const options = [{ id: "style", name: "Style", values: first(d.styles, d.style) }];
+    if (d.ext) options.push({ id: "side", name: "Sidelites", values: first([["none", "None"], ["one", "One"], ["both", "Both"]], d.side || "none"), when: { opt: "style", is: d.styles.map((s) => s[0]).filter((s) => s !== "double" || true) } },
+      { id: "transom", name: "Transom", values: first([["none", "None"], ["rect", "Rectangle"], ["arched", "Arched"]], d.transom || "none"), when: { opt: "style", is: d.styles.map((s) => s[0]).filter((s) => s !== "arched") } });
+    if (d.styles.some((s) => s[0] === "lites4")) options.push({ id: "glass", name: "Glass", values: first([["clear", "Clear"], ["frost", "Frosted"]], d.glass || "clear"), when: { opt: "style", is: ["lites4", "lites5"] } });
+    options.push({ id: "bolt", name: "Deadbolt", values: first(BOLTS, d.bolt || "none") }, { id: "lock", name: "Lock", values: LOCKV, when: { opt: "bolt", is: BOLTS.slice(1).map((v) => v[0]) } });
+    options.push({ id: "hw", name: "Hardware", values: first(HWV, d.hw || "nickel") }, { id: "state", name: "State", values: STATE });
+    const ic = { id, name, colors: firstC(d.colors, d.c), picker: true, colorLabel: "Door", colors2: firstC(TRIM_C, d.t || TRIM_C[0]), picker2: true, colorLabel2: "Frame", options,
+      render(o) { const x = ctx(o); return svg(x, d.draw(x)); } };
+    icons.push(ic);
+  }
+  card("front", "Front door", { styles: EXT_S, style: "craftsman", colors: EXT_C, c: "#8a2f37", ext: true, bolt: "deadbolts:arched-wi-fi-touch", side: "both", transom: "none", hw: "black", draw: (x) => exterior(x, "front") });
+  card("back", "Back / side door", { styles: EXT_S, style: "halfgrille", colors: EXT_C, c: "#ecebe6", ext: true, bolt: "lock:cylinder", hw: "nickel", draw: (x) => exterior(x, "back") });
+  card("patio", "Patio door", { styles: PAT_S, style: "slider2", colors: PAT_C, c: "#ecebe6", bolt: "lock:sliding", hw: "nickel", draw: patio });
+  card("interior", "Interior door", { styles: INT_S, style: "shaker2", glass: "frost", colors: INT_C, c: "#ecebe6", hw: "nickel", draw: interior });
+
+  const css = `
+.hda-doorcfg-slide{transform-box:fill-box}
+.hda-anim .hda-doorcfg-swing{animation:hda-doorcfg-ease 1.2s cubic-bezier(.3,.7,.3,1) both}
+.hda-anim .hda-doorcfg-slide{animation:hda-doorcfg-slide 1.2s cubic-bezier(.3,.7,.3,1) both}
+@keyframes hda-doorcfg-ease{from{opacity:.4;transform:scaleX(1.25)}to{opacity:1;transform:scaleX(1)}}
+@keyframes hda-doorcfg-slide{from{transform:translateX(-8%)}to{transform:translateX(0)}}
+.hda-anim .hda-doorcfg-blink{animation:hda-doorcfg-blink 1.2s ease-in-out infinite}
+@keyframes hda-doorcfg-blink{0%,100%{opacity:.25}50%{opacity:.6}}
+@media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-doorcfg-"]{animation:none!important}}`;
+
+  (window.HDA = window.HDA || []).push({
+    id: "doorcfg",
+    tab: "Door builder",
+    group: "Security",
+    kind: "device",
+    onWord: "Open",
+    offWord: "Closed",
+    intro: "Build any door: front, back or side, patio and interior. Pick the real style (6-panel, craftsman, full or half glass, modern flush, plank, arched, Dutch, French entry; sliders, French and folding patio doors; shaker, colonial, flush, louvered, French, barn, pocket and bifold inside), sidelites and transom, hardware finish, door color and frame color. On swings the door open (or slides or folds it); Ajar and Closed are in the State menu, and any door can take a Deadbolt from our lock sets, drawn on the door, with a Lock menu: unlocked, locked, locking, unlocking or jammed.",
+    css,
     icons,
   });
 })();
@@ -14458,7 +16378,7 @@ ${extra || ""}</defs>`;
   }
   const trapLed = (x, cx, cy) => led(cx, cy, 1.8, x.on ? "#ff4a4f" : "#7dff9a", true, 0, x.on);
   const base = (o) => Object.assign({ picker: true, colorLabel: "Finish" }, o);
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // (multi-function) o.parts holds only the parts the user ticked. A part left out follows the one device as a Device
   // Image (no o.mf, exactly as today) and stays off / dark, never blinking, as a Multi-Function Image (o.mf). Status
   // parts (a box online, the internet up, activity, on battery) are contacts; a reading is o.pval[id].
   const MF = {
@@ -15909,7 +17829,7 @@ ${x.on ? `<g class="${P}swirl" style="animation-duration:${(1.6 - x.lv).toFixed(
   const led = (x, cx, cy, col) => `<circle cx="${cx}" cy="${cy}" r="${x.on ? 1.6 : 1.2}" fill="${x.on ? col : "#2c3038"}"/>${x.on ? `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}" opacity=".3"/>` : ""}`;
   const mount = (x, X, Y) => `<rect x="${X - 10}" y="${Y - 6}" width="20" height="26" rx="3" fill="#d9d6e0"/><rect x="${X - 10}" y="${Y - 6}" width="20" height="26" rx="3" fill="none" stroke="#8a86a0"/><path d="M${X} ${Y + 20} V176" stroke="#16141c" stroke-width="1.6"/>`;
 
-  function dysonStick(x, o2) {
+  function laserStick(x, o2) {
     o2 = o2 || {};
     const bodyG = o2.body || "nk";
     let head = "";
@@ -15938,7 +17858,7 @@ ${lcdS}${hl("M106 25 H128", .5, 1)}`];
   const icons = [
     base({ id: "laser-stick-vacuum", name: "Laser stick vacuum", colorLabel: "Accents", colors: ["#e8b923", "#6b3fa0", "#2f5aa8", "#c9a24a", "#c87a3a"], render(o) {
       const x = ctx(o);
-      return svg(x, room(x, "wood") + pose(x, dysonStick(x, { head: "laser", lcd: true }), laser(x, 68, 179, 60)));
+      return svg(x, room(x, "wood") + pose(x, laserStick(x, { head: "laser", lcd: true }), laser(x, 68, 179, 60)));
     } }),
     base({ id: "ball-upright-vacuum", name: "Ball upright vacuum", colors: ["#b8774f", "#7a4fd0", "#b8343a"], render(o) {
       const x = ctx(o);
@@ -18480,6 +20400,277 @@ ${extra || ""}</defs>`;
 })();
 
 (function () {
+  const P = "hda-garagecfg-";
+  const N = () => window.HDAH;
+  const f = (n) => (+n).toFixed(1);
+  const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+  const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+  const lg = (id, a, x1, y1, x2, y2) => `<linearGradient id="${id}" x1="${x1 || 0}" y1="${y1 || 0}" x2="${x2 == null ? 1 : x2}" y2="${y2 || 0}">${stops(a)}</linearGradient>`;
+  const rg = (id, a, cx, cy, r) => `<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r || .5}">${stops(a)}</radialGradient>`;
+  const rr = (x, y, w, h, r) => `M${f(x + r)} ${f(y)}H${f(x + w - r)}A${r} ${r} 0 0 1 ${f(x + w)} ${f(y + r)}V${f(y + h - r)}A${r} ${r} 0 0 1 ${f(x + w - r)} ${f(y + h)}H${f(x + r)}A${r} ${r} 0 0 1 ${f(x)} ${f(y + h - r)}V${f(y + r)}A${r} ${r} 0 0 1 ${f(x + r)} ${f(y)}Z`;
+  const BGW = (t) => `<g class="hda-bg">${t}</g>`;
+  const WARM = "#ffd89c", AMB = "#ffb02e";
+
+  const WHT = "#eceeec", ALM = "#e0d4ba", SND = "#c3a983", BRZ = "#4d3c2f", BLK = "#27292d", CDR = "#a86f3e", WAL = "#6b4529", GRY = "#7c8187";
+  const DOORC = [WHT, ALM, SND, BRZ, BLK, CDR, WAL, GRY];
+  const TRIMC = ["#f2f1ec", "#e8dfcc", "#2a2b2f", "#5a4636", "#9aa0a6"];
+  const STYLES = [["raised", "Raised short panel"], ["long", "Raised long panel"], ["flush", "Flush"], ["carriage", "Carriage house"], ["glass", "Full-view glass"], ["plank", "Wood plank"], ["ribbed", "Ribbed steel"], ["rollup", "Roll-up"], ["tilt", "One-piece tilt-up"], ["louver", "Louvered"]];
+  const WINS = [["none", "None"], ["top", "Top row"], ["arched", "Arched"], ["square", "Square"], ["frosted", "Frosted full-view"]];
+  const WINSTYLES = ["raised", "long", "flush", "carriage", "plank", "louver", "tilt"];
+  const STATES = [["closed", "Closed"], ["opening", "Opening"], ["open", "Open"], ["closing", "Closing"], ["partly", "Partly open"], ["notclosed", "Not closed"]];
+  const WIDTH = [["single", "Single"], ["double", "Double"]];
+  const first = (all, d) => { const i = Math.max(0, all.findIndex((a) => a[0] === d)); return [all[i]].concat(all.filter((_, k) => k !== i)); };
+
+  function ctx(o) {
+    const h = N(), c = o.color || WHT, t = o.color2 || TRIMC[0];
+    return { o, u: o.uid, c, t, p: { l: h.shade(c, .38), m: c, d: h.shade(c, -.28), k: h.shade(c, -.55) }, opt: o.opt || {}, anim: o.anim,
+      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, n: 0 };
+  }
+  function defs(x) {
+    const p = x.p, id = x.id;
+    return `<defs>
+${lg(id("fin"), [[0, p.l], [.5, p.m], [1, p.d]], 0, 0, 0, 1)}
+${lg(id("sec"), [[0, p.l], [.2, p.m], [.82, p.d], [1, p.k]], 0, 0, 0, 1)}
+${lg(id("sh"), [[0, "#fff", .18], [.3, "#fff", 0], [.68, "#000", 0], [1, "#000", .26]])}
+${lg(id("dn"), [[0, "#000", .55], [1, "#000", 0]], 0, 0, 0, 1)}
+${lg(id("in"), [[0, "#1b1815"], [1, "#0a0908"]], 0, 0, 0, 1)}
+${lg(id("bw"), [[0, "#5a5046"], [1, "#2e2822"]], 0, 0, 0, 1)}
+${lg(id("gls"), [[0, "#41566a"], [.5, "#1a232d"], [1, "#0c1117"]], 0, 0, 0, 1)}
+${lg(id("fr"), [[0, "#e6ecef", .94], [1, "#a9b6bf", .94]], 0, 0, 0, 1)}
+${lg(id("drv"), [[0, "#56585a"], [1, "#8b8c8a"]], 0, 0, 0, 1)}
+${lg(id("chr"), [[0, "#5f666d"], [.45, "#eef1f3"], [.6, "#b6bcc2"], [1, "#4e545b"]])}
+${lg(id("spill"), [[0, WARM, .55], [1, WARM, 0]], 0, 0, 0, 1)}
+${rg(id("lp"), [[0, WARM, .95], [.35, WARM, .42], [1, WARM, 0]])}
+${rg(id("vig"), [[0, "#000", 0], [.66, "#000", .06], [1, "#000", .48]], .5, .45, .75)}
+<clipPath id="${id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath></defs>`;
+  }
+  const svg = (x, body) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x)}<g clip-path="${x.url("wc")}">${body}<g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g></g><rect class="hda-bg" x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></svg>`;
+
+  function wall_(x, kind, c, y0, y1, seed) {
+    y0 = y0 || 8; y1 = y1 || 192; const h = N(), g = x.id("wl" + x.n++), r = rnd(seed || 11);
+    let s = `${lg(g, [[0, h.shade(c, .1)], [1, h.shade(c, -.2)]], 0, 0, 0, 1)}<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="url(#${g})"/>`;
+    let d = "", e = "", t = "";
+    if (kind === "siding") {
+      for (let y = y0 + 7; y < y1; y += 7.5) { d += `M8 ${f(y)}H192`; e += `M8 ${f(y + 1.3)}H192`; }
+      s += `<path d="${d}" stroke="#000" stroke-opacity=".3" stroke-width="1.4"/><path d="${e}" stroke="#fff" stroke-opacity=".12"/>`;
+    } else if (kind === "brick") {
+      for (let y = y0, i = 0; y < y1; y += 6, i++) {
+        d += `M8 ${f(y)}H192`;
+        for (let xx = 8 - (i % 2 ? 0 : 7); xx < 192; xx += 14) {
+          e += `M${f(xx)} ${f(y)}v6`;
+          if (r() > .55) t += `<rect x="${f(xx + .7)}" y="${f(y + .7)}" width="12.6" height="4.6" fill="${r() > .5 ? "#000" : "#fff"}" fill-opacity="${(.04 + r() * .12).toFixed(2)}"/>`;
+        }
+      }
+      s += t + `<path d="${d}${e}" stroke="#d9d2c6" stroke-opacity=".38"/>`;
+    } else if (kind === "stone") {
+      for (let y = y0; y < y1; y += 9) {
+        for (let xx = 8 - r() * 10; xx < 192;) {
+          const w = 10 + r() * 14, hh = 7 + r() * 3;
+          t += `<path d="${rr(xx + .8, y + .8, w - 1.6, hh - 1, 2.5)}" fill="${h.shade(c, r() * .36 - .2)}" stroke="#000" stroke-opacity=".38"/>`;
+          t += `<path d="M${f(xx + 2.5)} ${f(y + 1.6)}H${f(xx + w - 3)}" stroke="#fff" stroke-opacity=".16"/>`;
+          xx += w;
+        }
+      }
+      s += `<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="#2b2824"/>` + t;
+    } else if (kind === "stucco") {
+      for (let i = 0; i < 160; i++) t += `<circle cx="${f(8 + r() * 184)}" cy="${f(y0 + r() * (y1 - y0))}" r="${f(.3 + r() * .7)}" fill="${r() > .5 ? "#000" : "#fff"}" fill-opacity="${(.05 + r() * .08).toFixed(2)}"/>`;
+      s += t;
+    } else if (kind === "batten") {
+      for (let xx = 12; xx < 192; xx += 15) { d += `M${xx} ${y0}V${y1}`; e += `M${xx + 2.6} ${y0}V${y1}`; }
+      s += `<path d="${d}" stroke="#fff" stroke-opacity=".22" stroke-width="2.2"/><path d="${e}" stroke="#000" stroke-opacity=".28" stroke-width="1.2"/>`;
+    } else if (kind === "metal") {
+      for (let xx = 9; xx < 192; xx += 7) { d += `M${xx} ${y0}V${y1}`; e += `M${xx + 2.2} ${y0}V${y1}`; }
+      s += `<path d="${d}" stroke="#fff" stroke-opacity=".2" stroke-width="1.6"/><path d="${e}" stroke="#000" stroke-opacity=".3" stroke-width="1.6"/>`;
+    } else if (kind === "panel") {
+      for (let xx = 8 + 46; xx < 192; xx += 46) d += `M${xx} ${y0}V${y1}`;
+      for (let y = y0 + 44; y < y1; y += 44) d += `M8 ${y}H192`;
+      s += `<path d="${d}" stroke="#000" stroke-opacity=".45" stroke-width="1.2"/>`;
+      for (let i = 0; i < 70; i++) t += `<circle cx="${f(8 + r() * 184)}" cy="${f(y0 + r() * (y1 - y0))}" r=".5" fill="#fff" fill-opacity=".06"/>`;
+      s += t;
+    }
+    return s;
+  }
+
+  function secBase(x, W, H, n) {
+    let s = ""; const h = H / n;
+    for (let i = 0; i < n; i++) s += `<rect x="0" y="${f(i * h)}" width="${f(W)}" height="${f(h)}" fill="${x.url("sec")}"/>`;
+    for (let i = 1; i < n; i++) s += `<path d="M0 ${f(i * h)}H${f(W)}" stroke="#000" stroke-opacity=".45" stroke-width="${f(Math.max(.5, H * .012))}"/><path d="M0 ${f(i * h + Math.max(.6, H * .012))}H${f(W)}" stroke="#fff" stroke-opacity=".28" stroke-width=".6"/>`;
+    return s;
+  }
+  function rp(px, py, pw, ph) {
+    const d = Math.max(.8, Math.min(pw, ph) * .14);
+    return `<path d="M${f(px)} ${f(py + ph)}V${f(py)}H${f(px + pw)}" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".7"/><path d="M${f(px + pw)} ${f(py)}V${f(py + ph)}H${f(px)}" fill="none" stroke="#000" stroke-opacity=".4" stroke-width=".7"/><rect x="${f(px + d)}" y="${f(py + d)}" width="${f(pw - 2 * d)}" height="${f(ph - 2 * d)}" fill="#fff" fill-opacity=".07"/>`;
+  }
+  const pane = (x, px, py, pw, ph, frost) => `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${x.url(frost ? "fr" : "gls")}"/><path d="M${f(px)} ${f(py + ph * .9)}L${f(px + pw * .55)} ${f(py)}H${f(px + pw * .8)}L${f(px)} ${f(py + ph)}Z" fill="#fff" opacity=".14"/><rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".5"/>`;
+  function grainV(seed, W, H) { const r = rnd(seed); let d = ""; for (let xx = 1; xx < W; xx += 1.5 + r() * 2) { const a = r() * 1.2 - .6; d += `M${f(xx)} 0C${f(xx + a)} ${f(H * .3)} ${f(xx - a)} ${f(H * .6)} ${f(xx)} ${f(H)}`; } return `<path d="${d}" fill="none" stroke="#2a1606" stroke-opacity=".2" stroke-width=".5"/>`; }
+  function grainH(seed, W, H) { const r = rnd(seed); let d = ""; for (let y = 1; y < H; y += 1.2 + r() * 1.6) { const a = r() * 1.2 - .6; d += `M0 ${f(y)}C${f(W * .3)} ${f(y + a)} ${f(W * .6)} ${f(y - a)} ${f(W)} ${f(y)}`; } return `<path d="${d}" fill="none" stroke="#2a1606" stroke-opacity=".2" stroke-width=".5"/>`; }
+  function doorFace(x, W, H, style, win) {
+    const dbl = W / H > 1.6, cols = dbl ? 8 : 4, sh = H / 4;
+    let s = "";
+    if (style === "glass") {
+      s = `<rect width="${f(W)}" height="${f(H)}" fill="${x.url("fin")}"/>`; const fw = Math.max(1.2, W * .026), c2 = dbl ? 6 : 3;
+      const pw = (W - fw * (c2 + 1)) / c2, ph = sh - fw * 2;
+      for (let r = 0; r < 4; r++) for (let c = 0; c < c2; c++) s += pane(x, fw + c * (pw + fw), r * sh + fw, pw, ph, false) + `<rect x="${f(fw + c * (pw + fw))}" y="${f(r * sh + fw)}" width="${f(pw)}" height="${f(ph)}" fill="#8fa4b4" opacity=".18"/>`;
+      for (let r = 1; r < 4; r++) s += `<path d="M0 ${f(r * sh)}H${f(W)}" stroke="#000" stroke-opacity=".5" stroke-width=".6"/>`;
+    } else if (style === "rollup") {
+      s = `<rect width="${f(W)}" height="${f(H)}" fill="${x.url("fin")}"/>`; let d = "", e = "";
+      for (let y = 1.5; y < H - 3; y += Math.max(2, H / 22)) { d += `M0 ${f(y)}H${f(W)}`; e += `M0 ${f(y + .8)}H${f(W)}`; }
+      s += `<path d="${e}" stroke="#fff" stroke-opacity=".3" stroke-width=".8"/><path d="${d}" stroke="#000" stroke-opacity=".35" stroke-width=".7"/><rect y="${f(H - H * .07)}" width="${f(W)}" height="${f(H * .07)}" fill="${x.p.d}"/><rect x="${f(W / 2 - W * .08)}" y="${f(H - H * .055)}" width="${f(W * .16)}" height="${f(H * .03)}" rx="1" fill="${x.url("chr")}"/>`;
+    } else if (style === "tilt") {
+      s = `<rect width="${f(W)}" height="${f(H)}" fill="${x.url("fin")}"/>`; let d = "";
+      for (let xx = W / (dbl ? 26 : 14); xx < W - .5; xx += W / (dbl ? 26 : 14)) d += `M${f(xx)} 0V${f(H)}`;
+      s += `<path d="${d}" stroke="#000" stroke-opacity=".3" stroke-width=".7"/><path d="${d}" stroke="#fff" stroke-opacity=".18" stroke-width=".5" transform="translate(.8 0)"/>`;
+    } else if (style === "plank") {
+      const h = N(), n = 14, ph = H / n, r = rnd(23);
+      for (let i = 0; i < n; i++) s += `<rect x="0" y="${f(i * ph)}" width="${f(W)}" height="${f(ph)}" fill="${h.shade(x.c, r() * .22 - .11)}"/><path d="M0 ${f(i * ph + ph - .3)}H${f(W)}" stroke="#000" stroke-opacity=".5" stroke-width=".6"/>`;
+      s += grainH(5, W, H);
+    } else if (style === "louver") {
+      s = `<rect width="${f(W)}" height="${f(H)}" fill="#141516"/>`; const n = 12, ph = H / n;
+      for (let i = 0; i < n; i++) s += `<rect x="${f(W * .02)}" y="${f(i * ph + ph * .12)}" width="${f(W * .96)}" height="${f(ph * .72)}" fill="${x.url("fin")}"/><path d="M${f(W * .02)} ${f(i * ph + ph * .14)}H${f(W * .98)}" stroke="#fff" stroke-opacity=".35" stroke-width=".5"/>`;
+      s += `<rect width="${f(W * .02)}" height="${f(H)}" fill="${x.p.k}"/><rect x="${f(W * .98)}" width="${f(W * .02)}" height="${f(H)}" fill="${x.p.k}"/>`;
+    } else if (style === "ribbed") {
+      s = secBase(x, W, H, 4); let d = "", e = "";
+      for (let r = 0; r < 4; r++) for (let k = 1; k < 4; k++) { const y = r * sh + k * sh / 4; d += `M0 ${f(y)}H${f(W)}`; e += `M0 ${f(y + .7)}H${f(W)}`; }
+      s += `<path d="${d}" stroke="#000" stroke-opacity=".28" stroke-width=".6"/><path d="${e}" stroke="#fff" stroke-opacity=".22" stroke-width=".5"/>`;
+    } else {
+      s = secBase(x, W, H, 4);
+      if (style === "raised") { const m = W * .05, gx = W * .022, pw = (W - 2 * m - (cols - 1) * gx) / cols; for (let r = 0; r < 4; r++) for (let c = 0; c < cols; c++) s += rp(m + c * (pw + gx), r * sh + sh * .2, pw, sh * .6); }
+      else if (style === "long") { const c2 = dbl ? 4 : 2, m = W * .05, gx = W * .03, pw = (W - 2 * m - (c2 - 1) * gx) / c2; for (let r = 0; r < 4; r++) for (let c = 0; c < c2; c++) s += rp(m + c * (pw + gx), r * sh + sh * .2, pw, sh * .6); }
+      else if (style === "flush") { let d = ""; for (let r = 0; r < 4; r++) for (let k = 1; k < 5; k++) d += `M0 ${f(r * sh + k * sh / 5)}H${f(W)}`; s += `<path d="${d}" stroke="#000" stroke-opacity=".08" stroke-width=".5"/>`; }
+      else if (style === "carriage") {
+        const leaves = dbl ? 4 : 2, lw = W / leaves; let g = "";
+        for (let xx = W / (dbl ? 28 : 14); xx < W - .5; xx += W / (dbl ? 28 : 14)) g += `M${f(xx)} ${f(sh)}V${f(H)}`;
+        s += `<path d="${g}" stroke="#000" stroke-opacity=".28" stroke-width=".6"/>`;
+        if (x.c === CDR || x.c === WAL || x.c === SND) s += grainV(7, W, H);
+        for (let i = 1; i < leaves; i++) s += `<path d="M${f(i * lw)} 0V${f(H)}" stroke="#000" stroke-opacity=".55" stroke-width="${f(Math.max(.7, W * .008))}"/>`;
+        for (let i = 0; i < leaves; i++) s += `<rect x="${f(i * lw + lw * .04)}" y="${f(H * .03)}" width="${f(lw * .92)}" height="${f(H * .92)}" fill="none" stroke="#000" stroke-opacity=".28" stroke-width="${f(Math.max(.8, W * .012))}"/>`;
+        const sw = Math.max(.9, H * .03), strap = (y) => `<path d="M${f(W * .02)} ${f(y - sw)}H${f(W * .14)}L${f(W * .16)} ${f(y)}L${f(W * .14)} ${f(y + sw)}H${f(W * .02)}Z" fill="#1c1c1e"/><path d="M${f(W * .98)} ${f(y - sw)}H${f(W * .86)}L${f(W * .84)} ${f(y)}L${f(W * .86)} ${f(y + sw)}H${f(W * .98)}Z" fill="#1c1c1e"/>`;
+        s += strap(sh * 1.5) + strap(sh * 3.4);
+        for (let i = 1; i < leaves; i += 2) s += `<rect x="${f(i * lw - W * .04)}" y="${f(sh * 2.2)}" width="${f(Math.max(.8, W * .012))}" height="${f(sh * .8)}" fill="#1c1c1e"/><rect x="${f(i * lw + W * .028)}" y="${f(sh * 2.2)}" width="${f(Math.max(.8, W * .012))}" height="${f(sh * .8)}" fill="#1c1c1e"/>`;
+      }
+    }
+    if (WINSTYLES.indexOf(style) >= 0 && win !== "none") {
+      if (win === "frosted") {
+        const c2 = dbl ? 8 : 4, fw = Math.max(1, W * .02), pw = (W - fw * (c2 + 1)) / c2;
+        for (let r = 0; r < 4; r++) for (let c = 0; c < c2; c++) s += pane(x, fw + c * (pw + fw), r * sh + fw, pw, sh - 2 * fw, true);
+      } else {
+        const c2 = style === "long" ? (dbl ? 8 : 4) : cols, m = W * .06, gx = W * .025, pw = (W - 2 * m - (c2 - 1) * gx) / c2, py = sh * .18, ph = sh * .62;
+        for (let c = 0; c < c2; c++) {
+          const px = m + c * (pw + gx);
+          if (win === "arched") { const d = `M${f(px)} ${f(py + ph)}V${f(py + ph * .45)}Q${f(px + pw / 2)} ${f(py - ph * .2)} ${f(px + pw)} ${f(py + ph * .45)}V${f(py + ph)}Z`; s += `<path d="${d}" fill="${x.url("gls")}"/><path d="M${f(px + pw / 2)} ${f(py + ph * .1)}V${f(py + ph)}" stroke="${x.p.l}" stroke-width=".6"/><path d="${d}" fill="none" stroke="${x.p.l}" stroke-width=".7"/>`; }
+          else if (win === "square") { const q = Math.min(pw, ph); s += pane(x, px + (pw - q) / 2, py + (ph - q) / 2, q, q) + `<path d="M${f(px + pw / 2)} ${f(py + (ph - q) / 2)}v${f(q)}M${f(px + (pw - q) / 2)} ${f(py + ph / 2)}h${f(q)}" stroke="${x.p.l}" stroke-width=".5"/>`; }
+          else s += pane(x, px, py, pw, ph);
+        }
+      }
+    }
+    return s + `<rect width="${f(W)}" height="${f(H)}" fill="${x.url("sh")}"/><rect y="${f(H - Math.max(1, H * .025))}" width="${f(W)}" height="${f(Math.max(1, H * .025))}" fill="#131313"/>`;
+  }
+
+  function bay(x, X, Y, W, H, style, win, state, i) {
+    const k = x.id("bc" + i), trim = x.t, lift = { closed: 0, open: 1, partly: .32, notclosed: .12, opening: .5, closing: .5 }[state] || 0, cas = Math.max(2, W * .045);
+    let s = `<rect x="${f(X - cas)}" y="${f(Y - cas)}" width="${f(W + 2 * cas)}" height="${f(H + cas)}" fill="${trim}"/><path d="M${f(X - cas)} ${f(Y + H)}V${f(Y - cas)}H${f(X + W + cas)}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".6"/><rect x="${f(X - .8)}" y="${f(Y - .8)}" width="${f(W + 1.6)}" height="${f(H + .8)}" fill="#000" fill-opacity=".5"/>`;
+    s += `<clipPath id="${k}"><rect x="${f(X)}" y="${f(Y)}" width="${f(W)}" height="${f(H)}"/></clipPath><g clip-path="url(#${k})">`;
+    if (lift > 0) {
+      const cx = X + W / 2;
+      s += `<rect x="${f(X)}" y="${f(Y)}" width="${f(W)}" height="${f(H)}" fill="${x.url("in")}"/><rect x="${f(X + W * .12)}" y="${f(Y + H * .1)}" width="${f(W * .76)}" height="${f(H * .5)}" fill="${x.url("bw")}"/><path d="M${f(X)} ${f(Y + H)}L${f(X + W * .12)} ${f(Y + H * .6)}H${f(X + W * .88)}L${f(X + W)} ${f(Y + H)}Z" fill="#2e2924"/>` +
+        `<ellipse cx="${f(cx)}" cy="${f(Y + H * .2)}" rx="${f(W * .6)}" ry="${f(H * .6)}" fill="${x.url("lp")}" opacity=".7"/>`;
+      const nc = W / H > 1.6 ? 2 : 1;
+      for (let c = 0; c < nc; c++) { const ccx = X + W * (nc === 1 ? .5 : .27 + c * .46), cw = W * (nc === 1 ? .6 : .36), cy = Y + H; s += `<g transform="translate(${f(ccx)} ${f(cy)}) scale(${(cw / 100).toFixed(3)})"><ellipse cy="-1" rx="54" ry="5" fill="#000" opacity=".55"/><path d="M-49 -9Q-51 -28 -44 -32L-36 -34H36L44 -32Q51 -28 49 -9Z" fill="${["#6a7c8e", "#8a2a2a"][c]}"/><path d="M-35 -34L-27 -52Q-25 -55 -19 -55H19Q25 -55 27 -52L35 -34Z" fill="#3a3f46"/><path d="M-30 -35.5L-23.5 -50H23.5L30 -35.5Z" fill="#0d1318"/><rect x="-46" y="-28" width="17" height="5" rx="2" fill="#b3262a"/><rect x="29" y="-28" width="17" height="5" rx="2" fill="#b3262a"/><rect x="-50" y="-13" width="100" height="5" rx="2" fill="#151719"/><rect x="-46" y="-13" width="15" height="13" rx="3" fill="#0b0b0c"/><rect x="31" y="-13" width="15" height="13" rx="3" fill="#0b0b0c"/></g>`; }
+    }
+    const face = doorFace(x, W, H, style, win), cls = state === "opening" ? `${P}up` : state === "closing" ? `${P}dn` : "";
+    if (style === "tilt") {
+      const sy = 1 - lift * .86;
+      s += `<g transform="translate(${f(X)} ${f(Y)}) scale(1 ${sy.toFixed(3)})"><g class="${cls ? cls + "t" : ""}">${face}<rect width="${f(W)}" height="${f(H)}" fill="#000" opacity="${f(lift * .5)}"/></g></g>`;
+    } else s += `<g transform="translate(${f(X)} ${f(Y - lift * H)})"><g class="${cls}">${face}</g></g>`;
+    if (lift > 0) s += `<rect x="${f(X)}" y="${f(Y + H - lift * H)}" width="${f(W)}" height="${f(Math.min(6, H * .08))}" fill="${x.url("dn")}" opacity=".7"/>`;
+    s += `</g>`;
+    if (style === "rollup") s += `<rect x="${f(X - cas * 1.4)}" y="${f(Y - cas - H * .14)}" width="${f(W + cas * 2.8)}" height="${f(H * .14)}" rx="${f(H * .06)}" fill="${x.url("fin")}"/><rect x="${f(X - cas * 1.4)}" y="${f(Y - cas - H * .14)}" width="${f(W + cas * 2.8)}" height="${f(H * .14)}" rx="${f(H * .06)}" fill="${x.url("sh")}"/>`;
+    if (lift > 0) s += `<path d="M${f(X)} ${f(Y + H)}H${f(X + W)}L${f(X + W + W * .18)} 192H${f(X - W * .18)}Z" fill="${x.url("spill")}" opacity="${f(.25 + .5 * lift)}"/>`;
+    const m = Math.max(5, Math.min(10, W * .12)), mx = X + W - m * .9, my = Y + m * .9;
+    if (state === "notclosed") s += `<g class="${P}blink"><path d="M${f(mx)} ${f(my - m)}L${f(mx + m)} ${f(my + m * .75)}H${f(mx - m)}Z" fill="${AMB}" stroke="#3a2a00" stroke-width=".6"/><path d="M${f(mx)} ${f(my - m * .35)}v${f(m * .55)}" stroke="#2a1a00" stroke-width="${f(m * .18)}" stroke-linecap="round"/><circle cx="${f(mx)}" cy="${f(my + m * .45)}" r="${f(m * .1)}" fill="#2a1a00"/></g>`;
+    if (state === "opening" || state === "closing") { const up = state === "opening"; s += `<g class="${P}blink"><circle cx="${f(mx)}" cy="${f(my)}" r="${f(m * .9)}" fill="#000" opacity=".55"/><path d="M${f(mx - m * .5)} ${f(my + (up ? m * .25 : -m * .25))}L${f(mx)} ${f(my + (up ? -m * .35 : m * .35))}L${f(mx + m * .5)} ${f(my + (up ? m * .25 : -m * .25))}" fill="none" stroke="#fff" stroke-width="${f(m * .2)}" stroke-linecap="round" stroke-linejoin="round"/></g>`; }
+    s += `<rect x="${f(X - cas * .7)}" y="${f(Y + H - Math.max(3, H * .06))}" width="${f(cas * .5)}" height="${f(Math.max(1.6, H * .04))}" fill="#26272a"/><rect x="${f(X + W + cas * .2)}" y="${f(Y + H - Math.max(3, H * .06))}" width="${f(cas * .5)}" height="${f(Math.max(1.6, H * .04))}" fill="#26272a"/>`;
+    return s;
+  }
+
+  const HOUSES = {
+    siding: { wall: "siding", c: "#7c8a96", eave: "#e9e7e1", roof: "#3a3532" },
+    brick: { wall: "brick", c: "#83483a", eave: "#efece4", roof: "#2f2b2a" },
+    stucco: { wall: "stucco", c: "#c8b79a", eave: "#5a3b26", roof: "#3d3330" },
+    stone: { wall: "stone", c: "#8b8070", eave: "#f0eee8", roof: "#3d3a36" },
+    batten: { wall: "batten", c: "#e3e2dd", eave: "#1f2023", roof: "#26272a" },
+    modern: { wall: "panel", c: "#3b3f45", eave: "#2c2e33", roof: false },
+  };
+  function building(x, house) {
+    const o = x.opt, n = Math.max(1, Math.min(4, +o.doors || 1)), hs = HOUSES[house], h = N();
+    const ws = []; for (let i = 1; i <= n; i++) ws.push(o["w" + i] === "double" ? 1.8 : 1);
+    const pier = .26, total = ws.reduce((a, b) => a + b, 0) + pier * (n + 1);
+    const unit = Math.min(178 / total, 98), dH = unit * .8, base = Math.min(164, 112 + dH * .62), top = base - dH;
+    const eaveY = Math.max(40, Math.min(top - Math.max(8, dH * .38), 150));
+    let s = BGW(wall_(x, hs.wall, hs.c, 8, base, 11 + n) + eaveBand(x, eaveY, hs) +
+      `<rect x="8" y="${f(base)}" width="184" height="${f(192 - base)}" fill="${x.url("drv")}"/><rect x="8" y="${f(base)}" width="184" height="4" fill="${x.url("dn")}" opacity=".7"/>` + (() => { let d = ""; for (let y = base + 9, k = 1; y < 192; y += 6 + k * 4, k++) d += `M8 ${f(y)}H192`; for (let i = -4; i <= 4; i++) d += `M${f(100 + i * 22)} ${f(base)}L${f(100 + i * 22 * (1 + (192 - base) / 40))} 192`; return `<path d="${d}" stroke="#000" stroke-opacity=".18"/>`; })());
+    let cx = 100 - (total * unit) / 2 + pier * unit;
+    const style = o.style || "raised", win = o.win || "none";
+    for (let i = 0; i < n; i++) { const W = ws[i] * unit; s += bay(x, cx, top, W, dH, style, win, o["s" + (i + 1)] || "closed", i); cx += W + pier * unit; }
+    if (unit > 30) s += BGW(`<circle cx="${f(100 - (total * unit) / 2 + pier * unit * .5)}" cy="${f(top + dH * .3)}" r="2" fill="#ffd89c" opacity=".7"/>`);
+    return s;
+  }
+  function eaveBand(x, y, hs) {
+    if (y < 18) return "";
+    const h = N(), c = hs.eave, roofH = hs.roof ? Math.min(26, y - 22) : 0, skyB = y - 14 - roofH;
+    let s = skyB > 8 ? `${lg(x.id("sky"), [[0, "#7fa7c9"], [1, "#d3e2ec"]], 0, 0, 0, 1)}<rect x="8" y="8" width="184" height="${f(skyB - 8)}" fill="${x.url("sky")}"/><path d="M8 ${f(skyB)}Q60 ${f(skyB - 8)} 110 ${f(skyB - 3)}T192 ${f(skyB - 6)}V${f(skyB)}Z" fill="#5f7d5a" opacity=".6"/>` : "";
+    if (hs.roof) { let d = ""; for (let yy = skyB + 4; yy < y - 14; yy += 4.5) d += `M8 ${f(yy)}H192`; s += `<path d="M2 ${f(y - 14)}L14 ${f(skyB)}H186L198 ${f(y - 14)}Z" fill="${hs.roof}"/><path d="${d}" stroke="#000" stroke-opacity=".45"/>`; }
+    return s + `<rect x="8" y="${f(y - 14)}" width="184" height="8" fill="${h.shade(c, -.05)}"/><path d="M8 ${f(y - 13.5)}H192" stroke="#fff" stroke-opacity=".45"/><rect x="8" y="${f(y - 6)}" width="184" height="6" fill="${h.shade(c, -.35)}"/><rect x="8" y="${f(y)}" width="184" height="12" fill="${x.url("dn")}" opacity=".55"/>`;
+  }
+
+  const icons = [];
+  const sizes = (n) => ({ is: ["1", "2", "3", "4"].slice(n - 1) });
+  function card(id, name, house, d) {
+    const options = [{ id: "doors", name: "Doors", values: first([["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"]], d.doors) }];
+    for (let i = 1; i <= 4; i++) options.push(Object.assign({ id: "w" + i, name: `Door ${i} width`, values: first(WIDTH, (d.w || [])[i - 1] || "single") }, i > 1 ? { when: { opt: "doors", is: sizes(i).is } } : {}));
+    options.push({ id: "style", name: "Door style", values: first(STYLES, d.style) });
+    options.push({ id: "win", name: "Windows", values: first(WINS, d.win || "none"), when: { opt: "style", is: WINSTYLES } });
+    for (let i = 1; i <= 4; i++) options.push(Object.assign({ id: "s" + i, name: `Door ${i} state`, values: STATES }, i > 1 ? { when: { opt: "doors", is: sizes(i).is } } : {}));
+    icons.push({ id, name, colors: first(DOORC.map((c) => [c]), d.c).map((a) => a[0]), picker: true, colorLabel: "Door", colors2: first(TRIMC.map((c) => [c]), d.t || TRIMC[0]).map((a) => a[0]), picker2: true, colorLabel2: "Trim", options,
+      render(o) { const x = ctx(o); return svg(x, building(x, house)); } });
+  }
+  card("siding", "Siding house", "siding", { doors: "1", style: "raised", c: WHT });
+  card("brick", "Brick house", "brick", { doors: "2", w: ["double", "single"], style: "carriage", win: "arched", c: CDR });
+  card("stucco", "Stucco house", "stucco", { doors: "2", style: "long", win: "top", c: ALM });
+  card("stone", "Stone house", "stone", { doors: "3", w: ["single", "double", "single"], style: "plank", c: WAL, t: "#e8dfcc" });
+  card("batten", "Board-and-batten", "batten", { doors: "1", w: ["double"], style: "carriage", win: "square", c: BLK, t: "#2a2b2f" });
+  card("modern", "Modern", "modern", { doors: "2", w: ["double", "single"], style: "glass", c: BLK, t: "#2a2b2f" });
+
+  const css = `
+.hda-garagecfg-up,.hda-garagecfg-dn,.hda-garagecfg-upt,.hda-garagecfg-dnt{transform-box:fill-box}
+.hda-garagecfg-upt,.hda-garagecfg-dnt{transform-origin:50% 0}
+.hda-anim .hda-garagecfg-up{animation:hda-garagecfg-up 3.2s ease-in-out infinite}
+@keyframes hda-garagecfg-up{0%{transform:translateY(50%)}85%,100%{transform:translateY(-40%)}}
+.hda-anim .hda-garagecfg-dn{animation:hda-garagecfg-dn 3.2s ease-in-out infinite}
+@keyframes hda-garagecfg-dn{0%{transform:translateY(-40%)}85%,100%{transform:translateY(50%)}}
+.hda-anim .hda-garagecfg-upt{animation:hda-garagecfg-upt 3.2s ease-in-out infinite}
+@keyframes hda-garagecfg-upt{0%{transform:scaleY(1.7)}85%,100%{transform:scaleY(.4)}}
+.hda-anim .hda-garagecfg-dnt{animation:hda-garagecfg-dnt 3.2s ease-in-out infinite}
+@keyframes hda-garagecfg-dnt{0%{transform:scaleY(.4)}85%,100%{transform:scaleY(1.7)}}
+.hda-anim .hda-garagecfg-blink{animation:hda-garagecfg-blink 1.1s ease-in-out infinite}
+@keyframes hda-garagecfg-blink{0%,100%{opacity:1}50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-garagecfg-"]{animation:none!important}}`;
+
+  (window.HDA = window.HDA || []).push({
+    id: "garagecfg",
+    tab: "Garage door builder",
+    group: "Outdoor",
+    kind: "device",
+    onWord: "Open",
+    offWord: "Closed",
+    intro: "Build any garage front: 1 to 4 doors, each Single or Double, in any mix, on six house looks. Pick the door style (raised short or long panel, flush, carriage house, full-view glass, wood plank, ribbed steel, roll-up, one-piece tilt-up, louvered), the windows, and each door's state: Closed, Opening, Open, Closing, Partly open or Not closed. Door color and trim color are separate.",
+    css,
+    icons,
+    building: (o, house) => { const x = ctx(o); return svg(x, building(x, house || "siding")); },
+  });
+})();
+
+(function () {
   const P = "hda-grill-";
   const G = (s) => s ? `<g class="hda-bg">${s}</g>` : "";
   const H = () => window.HDAH;
@@ -19454,7 +21645,7 @@ ${extra || ""}</defs>`;
 @keyframes hda-habitats-sway{0%{transform:rotate(-6deg)}100%{transform:rotate(6deg)}}
 `;
   const BG = (s) => `<g class="hda-bg">${s}</g>`;
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // (multi-function) o.parts holds only the parts the user ticked. A part left out follows the one device as a Device
   // Image (no o.mf: a switch follows o.on, a door or drawer o.open, as today) and stays off / closed / blank, never
   // animated, as a Multi-Function Image (o.mf). The readings (temp, hum) come from o.pval when o.mf, else from the
   // slider and the Humidity menu (as today). Every door and drawer is its own contact part.
@@ -19832,7 +22023,22 @@ ${extra || ""}</defs>`;
   const fsw = (first) => [first].concat(FL.filter((c) => c !== first));
   const HOT = "#ff9a4a";
   const n1 = (v) => (+v).toFixed(1);
-  const G = (o) => (o.on ? .3 + .7 * o.level : 0);
+  const G = (o) => (o.on && o.hvm !== "fan" ? (.3 + .7 * o.level) * (o.hvm === "eco" ? .6 : 1) : 0);
+  const mcol = (o) => (o.hvm === "eco" ? "#8bd450" : o.hvm === "fan" ? "#c9d2dc" : HOT);
+  const n2 = (v) => (+v).toFixed(2);
+  const G1 = (cx, cy, s, b, col, fill) => `<g transform="translate(${n2(cx)} ${n2(cy)}) scale(${s})" fill="${fill ? col : "none"}" stroke="${fill ? "none" : col}" stroke-width=".22" stroke-linecap="round" stroke-linejoin="round">${b}</g>`;
+  function hvGlyph(o, cx, cy, s) {
+    if (!o.on) return ""; let out = "", x = cx; const col = mcol(o);
+    if (o.hvm === "eco") { out += G1(x, cy, s, `<path d="M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z"/>`, col, 1); x += s * 2.6; }
+    if (o.hvm === "fan") { let b = ""; for (let i = 0; i < 3; i++) b += `<path transform="rotate(${i * 120})" d="M0 0 C-.5 -.3 -.38 -.95 0 -.95 C.32 -.95 .3 -.38 0 0 Z"/>`; out += G1(x, cy, s, b, col, 1); x += s * 2.6; }
+    const p = o.hvp, pc = o.hvm === "heat" || !o.hvm ? "#ffd2a6" : col;
+    if (p === "boost") out += G1(x, cy, s, `<path d="M.2 -1 L-.6 .12 H-.02 L-.22 1 L.6 -.15 H.02 Z"/>`, pc, 1);
+    if (p === "comfort") out += G1(x, cy, s, `<path d="M-.5 .1 V-.55 H.5 V.1 M-.85 .55 V-.05 H-.5 V.15 H.5 V-.05 H.85 V.55 Z M-.7 .55 V.8 M.7 .55 V.8"/>`, pc);
+    if (p === "sleep") out += G1(x, cy, s, `<path d="M.3 -.9 A.92 .92 0 1 0 .9 .35 A.7 .7 0 0 1 .3 -.9 Z"/>`, pc, 1);
+    if (p === "away") out += G1(x, cy, s, `<path d="M-.85 -.02 L0 -.82 L.85 -.02 M-.6 -.25 V.82 H.6 V-.25 M-.18 .82 V.32 H.18 V.82"/>`, pc);
+    if (p === "frost") out += G1(x, cy, s, `<path d="M0 -.95 V.95 M-.82 -.47 L.82 .47 M-.82 .47 L.82 -.47 M-.25 -.75 L0 -.52 L.25 -.75 M-.25 .75 L0 .52 L.25 .75"/>`, "#9fdcff");
+    return out;
+  }
   const g2 = (o, k) => (G(o) * (k == null ? 1 : k)).toFixed(2);
   const tmp = (o) => Math.round(62 + 16 * o.level);
   const dur = (o, a, b) => (a - b * o.level).toFixed(2);
@@ -19897,8 +22103,8 @@ ${extra || ""}</defs>`;
   const knob = (o, x, y, r, a) => { const t = (a == null ? -40 + 80 * o.level : a) * Math.PI / 180;
     return `<circle cx="${x}" cy="${y + .8}" r="${r + .8}" fill="#000" fill-opacity=".35"/><circle cx="${x}" cy="${y}" r="${r}" fill="url(#${o.uid}-kn)"/><circle cx="${x}" cy="${y}" r="${n1(r * .62)}" fill="none" stroke="#000" stroke-opacity=".18" stroke-width=".7"/>` +
       `<path d="M${x} ${y}L${n1(x + Math.sin(t) * r * .8)} ${n1(y - Math.cos(t) * r * .8)}" stroke="#2a2e35" stroke-width="1.2" stroke-linecap="round"/>`; };
-  const led = (o, x, y, c) => o.on ? `<circle class="${P}pulse" cx="${x}" cy="${y}" r="6" fill="url(#${o.uid}-hh)"/><circle cx="${x}" cy="${y}" r="1.7" fill="${c || "#ffb347"}"/><circle cx="${x - .5}" cy="${y - .5}" r=".6" fill="#fff"/>` : `<circle cx="${x}" cy="${y}" r="1.7" fill="#4a3a36"/>`;
-  const digits = (o, x, y, s) => o.on ? `<text x="${x}" y="${y}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${s}" fill="${HOT}">${tmp(o)}°</text>` : "";
+  const led = (o, x, y, c) => o.on ? `<circle class="${P}pulse" cx="${x}" cy="${y}" r="6" fill="url(#${o.uid}-hh)"/><circle cx="${x}" cy="${y}" r="1.7" fill="${o.hvm === "eco" || o.hvm === "fan" ? mcol(o) : c || "#ffb347"}"/><circle cx="${x - .5}" cy="${y - .5}" r=".6" fill="#fff"/>` + hvGlyph(o, x + 6.5, y, 2.1) : `<circle cx="${x}" cy="${y}" r="1.7" fill="#4a3a36"/>`;
+  const digits = (o, x, y, s) => o.on ? `<text x="${x}" y="${y}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${s}" fill="${mcol(o)}">${tmp(o)}°</text>` + hvGlyph(o, x + s * 1.35, y - s * .36, s * .3) : "";
   const wall = (y) => `<g class="hda-bg"><rect x="4" y="4" width="192" height="${y - 4}" rx="6" fill="#fff" fill-opacity=".035"/><path d="M4 ${y}H196" stroke="#fff" stroke-opacity=".12"/></g>`;
   const floorGlow = (o, cx, cy, rx, ry, fire) => o.on ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry || 10}" fill="url(#${o.uid}-${fire ? "fg" : "fl"})" opacity="${g2(o)}"/>` : "";
   const wallGlow = (o, x, y, w, h, fire) => o.on ? `<ellipse class="hda-bg" cx="${x + w / 2}" cy="${y + h}" rx="${w / 2 + 10}" ry="${h}" fill="url(#${o.uid}-${fire ? "fg" : "fl"})" opacity="${g2(o, .8)}"/>` : "";
@@ -19915,11 +22121,11 @@ ${extra || ""}</defs>`;
   }
   function shimmer(o, x, y, w, h, n) {
     if (!o.on) return ""; n = n || 4; const d = +dur(o, 3.6, 1.6), q = h / 4;
-    let s = `<g opacity="${(.45 + .55 * o.level).toFixed(2)}">`;
+    let s = `<g opacity="${(.45 + .55 * o.level).toFixed(2)}">`; const fan = o.hvm === "fan";
     for (let i = 0; i < n; i++) {
       const xi = x - w / 2 + w * (i + .5) / n, sg = i % 2 ? 1 : -1, del = ((i * .37 * d) % d).toFixed(2);
       const pd = `d="M${n1(xi)} ${y}c${2.4 * sg} ${n1(-q * .5)} ${-2.4 * sg} ${n1(-q * .5)} 0 ${n1(-q)}s${-2.4 * sg} ${n1(-q * .5)} 0 ${n1(-q)}s${2.4 * sg} ${n1(-q * .5)} 0 ${n1(-q)}s${-2.4 * sg} ${n1(-q * .5)} 0 ${n1(-q)}" fill="none" stroke-linecap="round"`;
-      s += `<g class="${P}shim" style="animation-duration:${d}s;animation-delay:-${del}s"><path ${pd} stroke="#ffb878" stroke-opacity=".12" stroke-width="4"/><path ${pd} stroke="#ffe2c2" stroke-opacity=".55" stroke-width="1.1" stroke-dasharray="${n1(h * .45)} ${n1(h * .3)}"/></g>`;
+      s += `<g class="${P}shim" style="animation-duration:${d}s;animation-delay:-${del}s"><path ${pd} stroke="${fan ? "#c9d2dc" : "#ffb878"}" stroke-opacity=".12" stroke-width="4"/><path ${pd} stroke="${fan ? "#eef2f6" : "#ffe2c2"}" stroke-opacity=".55" stroke-width="1.1" stroke-dasharray="${n1(h * .45)} ${n1(h * .3)}"/></g>`;
     }
     return s + `</g>`;
   }
@@ -19984,21 +22190,14 @@ ${extra || ""}</defs>`;
 
   const ic = (id, name, first, render, list) => ({ id, name, colors: sw(first, list), picker: true, colorLabel: "Body", render });
   const fi = (id, name, first, render) => ({ id, name, colors: fsw(first), picker: true, colorLabel: "Flame", render });
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
-  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
-  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
     has: (o, k) => !!(o.parts && o.parts[k] != null),
     on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
     lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
     col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
     st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
-    // the drawing as one part: on = that part, level = its level
     as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
   };
-  // (parts) an electric fireplace: Flame (the flame effect: on, level = brightness, color = o.pcolor.flame, else the
-  // drawing's flame color) and Heat (the fan heater: its vent glows, heat shimmer rises). A Device Image (no o.mf, no
-  // parts) is drawn exactly as before; as a Multi-Function Image the vent is drawn and each part follows its own state.
   const FH = [{ id: "flame", name: "Flame" }, { id: "heat", name: "Heat" }];
   const vent = (o, x, y, w, h, n) => { const on = o.on, u = o.uid; let sl = "";
     for (let i = 1; i < n; i++) sl += `M${n1(x + w * i / n)} ${n1(y + .8)}V${n1(y + h - .8)}`;
@@ -20096,7 +22295,7 @@ ${extra || ""}</defs>`;
       bx(o, 22, 128, 156, 36, 3) + `<rect x="28" y="131" width="144" height="7" fill="url(#${u}-dk)"/>` +
       (o.on ? `<g opacity="${g2(o, .8)}"><rect class="${P}pulse" x="28" y="131" width="144" height="7" fill="url(#${u}-hr)"/></g>` : "") +
       `<rect x="28" y="131" width="144" height="7" fill="url(#${u}-sl)"/><rect x="28" y="156" width="144" height="4" fill="url(#${u}-sl)"/>` +
-      hl(26, 142, 172, 142, 1.2, .3) + knob(o, 181, 140, 3.6) + `<path d="M174 150H188" stroke="#000" stroke-opacity=".2"/>` +
+      hl(26, 142, 172, 142, 1.2, .3) + knob(o, 181, 140, 3.6) + hvGlyph(o, 141, 108, 2.2) + `<path d="M174 150H188" stroke="#000" stroke-opacity=".2"/>` +
       shimmer(o, 100, 126, 148, 48, 7)); }),
 
     ic("panel", "Wall panel", WH, (o) => { const u = o.uid, d = rr(34, 44, 132, 94, 8); return svg(o, wall(176) + wallGlow(o, 34, 6, 132, 40) +
@@ -20210,7 +22409,7 @@ ${extra || ""}</defs>`;
     ic("smart", "Smart display", WH, (o) => { const u = o.uid, gd = rr(70, 122, 60, 34, 10), C = 2 * Math.PI * 21; return svg(o, sh(o, 100, 178, 46, 5) + floorGlow(o, 100, 180, 72, 12) +
       `<path d="${rr(64, 168, 72, 8, 4)}" fill="#15171b"/>` + bx(o, 56, 38, 88, 132, 24) + `<path d="${rr(56, 38, 88, 48, 24)}" fill="url(#${u}-g)" opacity=".3"/>` +
       `<circle cx="100" cy="82" r="28" fill="#000" fill-opacity=".3"/><circle cx="100" cy="81" r="27" fill="#0d0f12"/><circle cx="100" cy="81" r="21" fill="none" stroke="#252a31" stroke-width="3"/>` +
-      (o.on ? `<g opacity="${(.6 + .4 * o.level).toFixed(2)}"><circle class="${P}pulse" cx="100" cy="81" r="30" fill="url(#${u}-hh)"/><circle cx="100" cy="81" r="21" fill="none" stroke="${HOT}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${n1(C * (.15 + .8 * o.level))} ${n1(C)}" transform="rotate(-90 100 81)"/></g>` : "") +
+      (o.on ? `<g opacity="${(.6 + .4 * o.level).toFixed(2)}">${o.hvm === "fan" ? "" : `<circle class="${P}pulse" cx="100" cy="81" r="30" fill="url(#${u}-hh)"/>`}<circle cx="100" cy="81" r="21" fill="none" stroke="${mcol(o)}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${n1(C * (.15 + .8 * o.level))} ${n1(C)}" transform="rotate(-90 100 81)"/></g>` : "") +
       digits(o, 100, 86, 14) + (o.on ? `<path d="M96 96Q100 92 104 96M97.6 98.4Q100 96.4 102.4 98.4" fill="none" stroke="#7dd3fc" stroke-width=".9" stroke-linecap="round"/>` : "") +
       `<path d="M78 66A27 27 0 0 1 104 54" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="2" stroke-linecap="round"/>` +
       `<circle cx="86" cy="114" r="1.8" fill="#000" fill-opacity=".3"/><circle cx="100" cy="114" r="1.8" fill="#000" fill-opacity=".3"/><circle cx="114" cy="114" r="1.8" fill="#000" fill-opacity=".3"/>` +
@@ -20218,10 +22417,21 @@ ${extra || ""}</defs>`;
       hl(60, 64, 60, 150, 2, .25) + shimmer(o, 100, 36, 60, 26, 4)); }),
   ];
 
+  const ML = { heat: "Heat", off: "Off", fan: "Fan", eco: "Eco" }, PL = { none: "None", boost: "Boost", comfort: "Comfort", sleep: "Sleep", away: "Away", frost: "Frost" };
+  const HV = { oil: ["heat off eco", "comfort frost"], cube: ["heat off fan eco", "boost frost"], tower: ["heat off fan eco"], utility: ["heat off fan"],
+    baseboard: ["heat off eco", "comfort away frost"], panel: ["heat off eco", "boost comfort sleep away frost"], mica: ["heat off eco", "frost"],
+    loop: ["heat off fan"], smart: ["heat off fan eco", "boost comfort sleep away frost"] };
+  icons.forEach((ic) => { const h = HV[ic.id]; if (!h) return;
+    const modes = h[0].split(" ");
+    ic.options = [{ id: "mode", name: "Mode", values: modes.map((m) => [m, ML[m]]) }];
+    if (h[1]) ic.options.push({ id: "preset", name: "Preset", values: ("none " + h[1]).split(" ").map((p) => [p, PL[p]]), when: { opt: "mode", is: modes.filter((m) => m !== "off") } });
+    const r0 = ic.render;
+    ic.render = (o) => { const op = o.opt || {}, md = op.mode || "heat"; return r0(Object.assign({}, o, { on: !!o.on && md !== "off", hvm: md, hvp: op.preset || "none" })); };
+  });
+
   (window.HDA = window.HDA || []).push({
     id: "heater", tab: "Space heaters", group: "Air", kind: "device",
-    intro: "Eighteen space heaters and electric fireplaces. When on, coils, tubes and ceramic grilles glow orange and pulse, heat shimmer rises, the floor picks up a warm glow, and fireplaces dance with layered flames in the picked flame color; the slider sets the heat output.",
-    
+    intro: "Eighteen space heaters and electric fireplaces. When on, coils, tubes and ceramic grilles glow orange and pulse, heat shimmer rises, the floor picks up a warm glow, and fireplaces dance with layered flames in the picked flame color; the slider sets the heat output. Electric heaters add Mode (Fan blows unheated air, Eco glows softer) and Preset menus where they have them.",
     css, icons,
   });
 })();
@@ -20550,7 +22760,7 @@ ${extra || ""}</defs>`;
   }
 
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {});
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
@@ -21094,16 +23304,31 @@ ${extra || ""}</defs>`;
 .hda-home2-haze{opacity:.4}
 .hda-anim .hda-home2-haze{animation:hda-home2-haze 2.2s ease-in-out infinite}
 @keyframes hda-home2-haze{0%{transform:translateY(4px);opacity:0}40%{opacity:.6}100%{transform:translateY(-10px);opacity:0}}
+.hda-anim .hda-home2-mvu{animation:hda-home2-mvu 1.8s ease-in-out infinite}
+.hda-anim .hda-home2-mvd{animation:hda-home2-mvd 1.8s ease-in-out infinite}
+@keyframes hda-home2-mvu{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.4px)}}
+@keyframes hda-home2-mvd{0%,100%{transform:translateY(0)}50%{transform:translateY(2.4px)}}
+.hda-anim .hda-home2-chev{animation:hda-home2-chev 1.1s ease-in-out infinite}
+@keyframes hda-home2-chev{0%,100%{opacity:1}50%{opacity:.3}}
 .hda-home2-puff{opacity:.45;transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-home2-puff{opacity:0;animation:hda-home2-puff 3.4s ease-out infinite}
 @keyframes hda-home2-puff{0%{transform:translateY(6px) scale(.5);opacity:0}30%{opacity:.8}100%{transform:translateY(-22px) scale(1.6);opacity:0}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-home2-pulse,.hda-anim .hda-home2-flick,.hda-anim .hda-home2-haze,.hda-anim .hda-home2-puff{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-home2-pulse,.hda-anim .hda-home2-flick,.hda-anim .hda-home2-haze,.hda-anim .hda-home2-puff,.hda-anim .hda-home2-mvu,.hda-anim .hda-home2-mvd,.hda-anim .hda-home2-chev{animation:none!important}}
 `;
   const steam = (o, x, pts) => o.on ? pts.map((p, i) => `<circle class="${P}puff" cx="${p[0]}" cy="${p[1]}" r="${p[2] || 7}" fill="${x.rg([[0, "#fff", .6], [.6, "#fff", .18], [1, "#fff", 0]])}" style="animation-delay:-${(i * .9).toFixed(1)}s"/>`).join("") : "";
   const tempF = (o, lo, hi) => Math.round((lo + (hi - lo) * lvl(o)) / 5) * 5;
-  // (parts) Multi-Function: Tilt (slats open, %) and Lift (raised, %) as readings, like the shades set's blinds
   const TILT = { options: [{ id: "tilt", name: "Slats", values: [["open", "Tilted open"], ["half", "Half open"], ["closed", "Tilted shut"]] }],
     parts: [{ id: "tilt", name: "Tilt (open)", type: "value", unit: "%", min: 0, max: 100, def: 50 }, { id: "lift", name: "Lift (raised)", type: "value", unit: "%", min: 0, max: 100, def: 40 }] };
+  const STATE = { id: "state", name: "State", values: [["stopped", "Stopped"], ["opening", "Opening"], ["closing", "Closing"], ["partial", "Partial"]] };
+  const TILT_STATE = { options: TILT.options.concat([STATE]), parts: TILT.parts };
+  const stOf = (o) => (o.opt && o.opt.state) || "stopped";
+  function stateBadge(o, cx, cy) {
+    const st = stOf(o); if (st === "stopped") return "";
+    let s = `<rect x="${cx - 9}" y="${cy - 5.5}" width="18" height="11" rx="5.5" fill="#101418" opacity=".72"/><rect x="${cx - 9}" y="${cy - 5.5}" width="18" height="11" rx="5.5" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width=".6"/>`;
+    if (st === "partial") return s + `<rect x="${cx - 3.2}" y="${cy - 3}" width="2.2" height="6" rx=".8" fill="#ffc46b"/><rect x="${cx + 1}" y="${cy - 3}" width="2.2" height="6" rx=".8" fill="#ffc46b"/>`;
+    const d = st === "opening" ? -1 : 1, ch = (y) => `<path d="M${cx - 3.2} ${f(y - d * 1.4)}L${cx} ${f(y + d * 1.4)}L${cx + 3.2} ${f(y - d * 1.4)}" fill="none" stroke="#5ef0b4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    return s + `<g class="${P}chev">${ch(cy - 1.8)}${ch(cy + 1.8)}</g>`;
+  }
   const tiltOf = (o) => ({ open: 0, half: .5, closed: 1 })[(o.opt && o.opt.tilt) || "open"];
   const icons = [];
   const add = (id, name, colors, label, render, extra) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {}));
@@ -21200,7 +23425,6 @@ ${extra || ""}</defs>`;
     return scene(x, back, ROLL(o, x, wx, wy, ww, wh, c, { box: 22, pitch: 7, bar: 6 }) + `<rect x="${wx + ww / 2 - 6}" y="${f(wy + (wh - 2) * (1 - amt(o)) + 2)}" width="12" height="3" rx="1.5" fill="#6a6f76"/>`); });
 
   function venetian(o, x, c, alu) {
-    // (multi-function) Tilt (slats open %) and Lift (raised %) readings in o.pval; a reading left out: slats shut, blind down
     const rd = (k) => { const v = o.pval && o.pval[k]; return v != null && v !== "" && isFinite(+v) ? Math.max(0, Math.min(1, +v / 100)) : 0; };
     const wx = 50, wy = 40, ww = 100, wh = 100, a = o.mf ? rd("lift") : amt(o), t = o.mf ? 1 - rd("tilt") : o.on ? tiltOf(o) : 1;
     const back = room(x, 180, "#5f6a72") + `<rect x="${wx - 7}" y="${wy - 7}" width="${ww + 14}" height="${wh + 14}" fill="#f1efe9"/>` + view(x, wx, wy, ww, wh) + `<path d="M${wx + ww / 2} ${wy}V${wy + wh}" stroke="#f1efe9" stroke-width="3"/><rect x="${wx - 11}" y="${wy + wh + 6}" width="${ww + 22}" height="6" fill="#ece9e2"/>`;
@@ -21209,16 +23433,19 @@ ${extra || ""}</defs>`;
     let s = `<rect x="${wx - 3}" y="${wy - 2}" width="${ww + 6}" height="${alu ? 6 : 9}" rx="1.2" fill="${vmetal(x, c)}"/>`;
     const liftTop = wy + (alu ? 4 : 7), stackEnd = liftTop + (a > 0 ? stackH - 3 : 0);
     if (a > 0) s += vSlats(x, c, wx - 2, liftTop, ww + 4, stackEnd, alu ? 1.6 : 2.6, 1, alu);
-    s += vSlats(x, c, wx - 2, stackEnd, ww + 4, bot, pitch, t, alu);
-    s += `<rect x="${wx - 3}" y="${f(bot)}" width="${ww + 6}" height="${alu ? 3.4 : 5}" rx="1" fill="${vmetal(x, H().shade(c, -.08))}"/>`;
+    const st = stOf(o), mvc = st === "opening" ? "mvu" : st === "closing" ? "mvd" : "";
+    s += (mvc ? `<g class="${P}${mvc}">` : "") + vSlats(x, c, wx - 2, stackEnd, ww + 4, bot, pitch, t, alu);
+    s += `<rect x="${wx - 3}" y="${f(bot)}" width="${ww + 6}" height="${alu ? 3.4 : 5}" rx="1" fill="${vmetal(x, H().shade(c, -.08))}"/>` + (mvc ? "</g>" : "");
     if (!alu) [wx + 18, wx + ww - 18].forEach((tx) => { s += `<rect x="${tx - 3}" y="${wy + 6}" width="6" height="${f(bot - wy - 6)}" fill="${H().shade(c, -.06)}" opacity=".92"/>`; });
     else [wx + 22, wx + ww - 22].forEach((tx) => { s += `<path d="M${tx} ${wy + 4}V${f(bot)}" stroke="#eee" stroke-opacity=".55" stroke-width=".5"/>`; });
     if (alu) s += `<rect x="${wx + ww - 10}" y="${wy - 1}" width="10" height="4" rx="1" fill="#1d2025"/>` + led(o, wx + ww - 6, wy + 1);
     else s += `<path d="M${wx + 4} ${wy + 6}V${wy + 62}" stroke="#f4f4f2" stroke-opacity=".8" stroke-width="1.6" stroke-linecap="round"/>`;
-    return scene(x, back, s);
+    s += stateBadge(o, wx + ww / 2, wy - 14);
+    const dim = o.on ? (1 - a) * t * .3 : 0;
+    return scene(x, back + (dim > .005 ? `<rect x="8" y="8" width="184" height="184" fill="#07060c" opacity="${f(dim * 100) / 100}"/>` : ""), s);
   }
   add("fauxwood", "Faux wood 2-inch", ["#f6f4ef", "#ece4d4", "#a7a9a8", "#4a3326", "#c39563"], "Slats", (o) => venetian(o, X(o), o.color, false), TILT);
-  add("smart-faux-wood-blinds", "Smart faux-wood blinds", ["#c9ced3", "#2c2f33", "#f4f4f1", "#b8a27a"], "Slats", (o) => venetian(o, X(o), o.color, true), TILT);
+  add("smart-faux-wood-blinds", "Smart faux-wood blinds", ["#c9ced3", "#2c2f33", "#f4f4f1", "#b8a27a"], "Slats", (o) => venetian(o, X(o), o.color, true), TILT_STATE);
 
   function swing(o, x, c, style, wall) {
     const wx = 62, wy = 46, ww = 76, wh = 104, a = amt(o), ang = Math.PI * a * .97;
@@ -21234,8 +23461,7 @@ ${extra || ""}</defs>`;
 
   (window.HDA = window.HDA || []).push({
     id: "home2", tab: "Stoves, saunas & shutters", group: "Home", kind: "device", levelLabel: "Open / heat",
-    intro: "Real pellet and wood stoves, saunas, exterior roller shutters, venetian blinds and swing shutters. Stoves and saunas: on = burning or heating, the slider sets the heat. Shutters and blinds: off = closed, on = open as far as the slider (venetian blinds also tilt with the Slats menu).",
-    
+    intro: "Real pellet and wood stoves, saunas, exterior roller shutters, venetian blinds and swing shutters. Stoves and saunas: on = burning or heating, the slider sets the heat. Shutters and blinds: off = closed, on = open as far as the slider (venetian blinds also tilt with the Slats menu; the motorized one shows its State).",
     css, icons,
   });
 })();
@@ -21443,7 +23669,7 @@ ${extra || ""}</defs>`;
     if (x.on) s += seg(weight(x), cx - 9, cy - 25, 3, 6, light ? "#111" : "#f2f2f2") + `<g class="${P}breath">${glow(x, cx, cy - 22, 20, "#ffffff", .22)}</g>`;
     return scene(x, scaleBack(x), s);
   }
-  function eufy(x) {
+  function slimScale(x) {
     const cx = 100, cy = 138, light = H().hx(x.c).reduce((a, b) => a + b, 0) > 380, ln = light ? "#a9b0b6" : "#4c535b";
     let s = slab(x, cx, cy, 116, 64, x.lg([[0, sh(x.c, .1)], [1, sh(x.c, -.08)]], 0, 0, 0, 1), sh(x.c, -.4));
     s += `<path d="M${cx} ${cy - 18}V${cy + 32}M${cx - 60} ${cy + 4}H${cx + 60}" stroke="${ln}" stroke-opacity=".7" stroke-width=".6"/><path d="${rr(cx - 6, cy, 12, 8, 3)}" fill="${sh(x.c, -.2)}"/>`;
@@ -21659,7 +23885,7 @@ ${extra || ""}</defs>`;
   add("hot-air-brush", "Hot-air brush", ["#7b4bb3", "#2aa7a0", "#c99582", "#d23c5a"], "Accent", revlon);
   add("hotel_dryer", "Wall hotel dryer", ["#f2f2ef", "#2a2a2d", "#b9bdc2"], "Body", hotel);
   add("smart-glass-scale", "Smart glass scale", ["#1d1e21", "#f4f4f2"], "Glass", withings);
-  add("slim-smart-scale", "Slim smart scale", ["#f4f4f2", "#1d1e21"], "Glass", eufy);
+  add("slim-smart-scale", "Slim smart scale", ["#f4f4f2", "#1d1e21"], "Glass", slimScale);
   add("dial_scale", "Analog dial scale", ["#f1ece0", "#b8d8c8", "#9a9ea4", "#c9a0a8"], "Body", dialScale);
   add("tall-pet-feeder", "Tall pet feeder", ["#f2f2ef", "#2a2a2d"], "Body", granary);
   add("wide-pet-feeder", "Wide pet feeder", ["#2f3a4d", "#4a4d52", "#f2f2ef"], "Body", smartfeed);
@@ -22283,7 +24509,7 @@ ${extra || ""}</defs>`;
 `;
 
   const ic = (id, name, first, render, label, colors) => ({ id, name, colors: colors || sw(first), picker: true, colorLabel: label || "Body", render });
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
@@ -23666,6 +25892,324 @@ ${extra || ""}</defs>`;
 })();
 
 (function () {
+  const P = "hda-leaks-";
+  const H = () => window.HDAH;
+  const n1 = (v) => (+v).toFixed(1);
+  const GREEN = "#34d399", RED = "#ff5257", ORNG = "#ff9a4a", CYAN = "#7dd3fc", AMB = "#ffb547";
+  const CU = ["#4f2410", "#b8693a", "#ffd2ae"], PVC = ["#7f868e", "#e4e7ea", "#ffffff"], IRON = ["#08090b", "#34373d", "#8d939b"],
+    GALV = ["#4b5158", "#a9b0b7", "#eef1f3"], HOSE = ["#123d1a", "#2f8a3e", "#9be3a6"], BLKP = ["#050608", "#24272c", "#6f757d"];
+  const dur = (o, a, b) => n1(Math.max(.25, a - b * o.level));
+
+  function pal(c) {
+    const h = H(), x = h.hx(c), lt = (x[0] * .3 + x[1] * .59 + x[2] * .11) / 255 > .7;
+    return { l: h.shade(c, lt ? .6 : .38), m: c, d: h.shade(c, lt ? -.16 : -.32), k: h.shade(c, lt ? -.36 : -.58), lt };
+  }
+  const st = (a) => a.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] != null ? ` stop-opacity="${s[2]}"` : ""}/>`).join("");
+  const lg = (id, v, a) => `<linearGradient id="${id}" ${v ? 'x1="0" y1="0" x2="0" y2="1"' : 'x1="0" x2="1"'}>${st(a)}</linearGradient>`;
+  const rg = (id, a, at) => `<radialGradient id="${id}" ${at || ""}>${st(a)}</radialGradient>`;
+  const halo = (id, c) => rg(id, [[0, c, .85], [.45, c, .28], [1, c, 0]]);
+
+  function defs(o, extra) {
+    const u = o.uid, p = pal(o.color);
+    return `<defs>
+${lg(u + "-v", 1, [[0, p.l], [.5, p.m], [1, p.d]])}${lg(u + "-c", 0, [[0, p.k], [.2, p.m], [.4, p.l], [.62, p.m], [1, p.k]])}
+${lg(u + "-tp", 0, [[0, p.d], [.4, p.l], [1, p.d]])}${lg(u + "-sd", 0, [[0, p.d], [1, p.k]])}
+${lg(u + "-fx", 0, [[0, "#fff", .2], [.14, "#fff", 0], [.84, "#000", 0], [1, "#000", .3]])}
+<linearGradient id="${u}-g" x1="0" y1="0" x2="1" y2="1">${st([[0, "#fff", .5], [.42, "#fff", 0]])}</linearGradient>
+${lg(u + "-wall", 1, [[0, "#fff", .085], [1, "#fff", .035]])}${lg(u + "-flr", 1, [[0, "#a3a8ae", .34], [1, "#5d6369", .2]])}
+${lg(u + "-mt", 0, [[0, "#525960"], [.35, "#eef0f2"], [.6, "#b9bfc6"], [1, "#454b52"]])}${lg(u + "-mtv", 1, [[0, "#f2f4f6"], [.5, "#a2a9b1"], [1, "#545a61"]])}
+${lg(u + "-bs", 0, [[0, "#5e3f10"], [.35, "#f6d886"], [.6, "#c9973a"], [1, "#4e340c"]])}${lg(u + "-bsv", 1, [[0, "#f9e09a"], [.5, "#c18f34"], [1, "#5e3f10"]])}
+${lg(u + "-bk", 1, [[0, "#41464e"], [.5, "#1b1e23"], [1, "#08090c"]])}${lg(u + "-bkh", 0, [[0, "#08090c"], [.38, "#454a52"], [1, "#0b0d10"]])}
+${lg(u + "-lcd", 1, [[0, "#081014"], [1, "#16242b"]])}${lg(u + "-lcdg", 1, [[0, "#b9d7a3"], [1, "#8fb37c"]])}
+${lg(u + "-wt", 1, [[0, "#86d4f6", .8], [.3, "#3d8fd0", .85], [1, "#123f7a", .95]])}
+${lg(u + "-soil", 1, [[0, "#5b4431"], [1, "#2a1e14"]])}${lg(u + "-grass", 1, [[0, "#2f6a2a"], [1, "#48923c"]])}
+${lg(u + "-sky", 1, [[0, "#0d1a2e", 0], [1, "#3a5a7a", .35]])}${lg(u + "-hedge", 1, [[0, "#2e5a2a"], [1, "#16301a"]])}
+${lg(u + "-pvc", 0, [[0, "#80878f"], [.35, "#ffffff"], [.7, "#d9dde1"], [1, "#7a8189"]])}
+${rg(u + "-sh", [[0, "#000", .6], [1, "#000", 0]])}
+${halo(u + "-hg", GREEN)}${halo(u + "-hr", RED)}${halo(u + "-ho", ORNG)}${halo(u + "-hb", CYAN)}
+${rg(u + "-fl", [[0, "#f2fbff"], [.3, "#7ab8ff"], [.75, "#2a5cff", .85], [1, "#1b3fd6", 0]], 'cx=".5" cy=".85" r=".8"')}
+${rg(u + "-warm", [[0, "#ffb35c", .8], [.5, "#ff8a3c", .3], [1, "#ff7a2a", 0]])}
+${rg(u + "-dial", [[0, "#ffffff"], [.8, "#e9ecef"], [1, "#9aa1a9"]], 'cx=".4" cy=".35" r=".75"')}
+${rg(u + "-mist", [[0, "#dff4ff", .5], [1, "#dff4ff", 0]])}
+<pattern id="${u}-blk" width="40" height="20" patternUnits="userSpaceOnUse"><path d="M0 .5H40M0 10.5H40M.5 0V10.5M20.5 10.5V20" stroke="#000" stroke-opacity=".32" fill="none"/><path d="M0 1.5H40M0 11.5H40" stroke="#fff" stroke-opacity=".06" fill="none"/></pattern>
+<pattern id="${u}-brk" width="24" height="10" patternUnits="userSpaceOnUse"><rect width="24" height="10" fill="#9a4a32" fill-opacity=".55"/><rect x="1" y="1" width="22" height="3.6" fill="#b85d40" fill-opacity=".45"/><path d="M0 .5H24M0 5.5H24M.5 0V5.5M12.5 5.5V10" stroke="#d8cfc4" stroke-opacity=".45" fill="none"/></pattern>
+<pattern id="${u}-sid" width="40" height="11" patternUnits="userSpaceOnUse"><rect width="40" height="11" fill="#c9cfd4" fill-opacity=".16"/><path d="M0 10.5H40" stroke="#000" stroke-opacity=".35"/><path d="M0 9H40" stroke="#fff" stroke-opacity=".1" stroke-width="2"/></pattern>
+<pattern id="${u}-bld" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M1 9L2 3M4 9L5.5 1.5M7 9L6.5 4" stroke="#7fc56e" stroke-opacity=".5" stroke-width=".8" fill="none"/><path d="M2.5 9L3.5 5" stroke="#16361a" stroke-opacity=".6" stroke-width=".8"/></pattern>
+<pattern id="${u}-plt" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M2.5 0V5" stroke="#000" stroke-opacity=".18"/></pattern>
+${extra || ""}</defs>`;
+  }
+  const svg = (o, body, extra) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(o, `<clipPath id="${o.uid}-all"><rect width="200" height="200" rx="6"/></clipPath>` + (extra || ""))}<g clip-path="url(#${o.uid}-all)">${body}</g></svg>`;
+  const sh = (o, cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry || 5}" fill="url(#${o.uid}-sh)"/>`;
+  const rr = (x, y, w, h, r) => `M${n1(x + r)} ${n1(y)}H${n1(x + w - r)}A${r} ${r} 0 0 1 ${n1(x + w)} ${n1(y + r)}V${n1(y + h - r)}A${r} ${r} 0 0 1 ${n1(x + w - r)} ${n1(y + h)}H${n1(x + r)}A${r} ${r} 0 0 1 ${n1(x)} ${n1(y + h - r)}V${n1(y + r)}A${r} ${r} 0 0 1 ${n1(x + r)} ${n1(y)}Z`;
+  const hl = (x1, y1, x2, y2, w, op) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#fff" stroke-opacity="${op || .4}" stroke-width="${w || 2}" stroke-linecap="round"/>`;
+
+  const tube = (d, w, c, cap) => `<path d="${d}" fill="none" stroke="${c[0]}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="${cap || "butt"}"/>` +
+    `<path d="${d}" fill="none" stroke="${c[1]}" stroke-width="${n1(w * .66)}" stroke-linejoin="round" stroke-linecap="${cap || "butt"}"/>` +
+    `<path d="${d}" fill="none" stroke="${c[2]}" stroke-opacity=".7" stroke-width="${n1(w * .2)}" stroke-linejoin="round" transform="translate(${n1(-w * .17)} ${n1(-w * .17)})"/>`;
+  const band = (x, y, w, h, c) => `<rect x="${n1(x - w / 2)}" y="${n1(y - h / 2)}" width="${w}" height="${h}" rx="1.2" fill="${c[1]}" stroke="${c[0]}" stroke-width=".8"/><rect x="${n1(x - w / 2 + 1)}" y="${n1(y - h / 2 + 1)}" width="${n1(w * .3)}" height="${n1(h - 2)}" rx=".8" fill="${c[2]}" opacity=".5"/>`;
+  const flow = (o, d, w, col, a, b) => o.on ? `<path class="${P}flow" d="${d}" fill="none" stroke="${col || "#bfeaff"}" stroke-opacity=".75" stroke-width="${w || 2.4}" stroke-linecap="round" stroke-dasharray="2.5 7" style="animation-duration:${dur(o, a || 1.2, b || .85)}s"/>` : "";
+  const led = (o, x, y, r, on, col, hid) => (on ? `<circle cx="${x}" cy="${y}" r="${r * 4.5}" fill="url(#${o.uid}-${hid})"/>` : "") +
+    `<circle cx="${x}" cy="${y}" r="${r}" fill="${on ? col : "#353a41"}"/><circle cx="${n1(x - r * .3)}" cy="${n1(y - r * .35)}" r="${n1(r * .4)}" fill="#fff" opacity="${on ? .8 : .3}"/>`;
+  const state = (o, x, y, r) => led(o, x, y, r, true, o.on ? GREEN : RED, o.on ? "hg" : "hr");
+  const screw = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r || 1.6}" fill="#8b929a"/><path d="M${n1(x - (r || 1.6) * .7)} ${y}H${n1(x + (r || 1.6) * .7)}" stroke="#3a3f46" stroke-width=".6"/>`;
+
+  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgecd", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+  function digits(str, x, y, s, col, dim) {
+    const w = s * .52, t = Math.max(.7, s * .14); let out = "", X = x;
+    String(str).split("").forEach((ch) => {
+      if (ch === ".") { out += `<circle cx="${n1(X - t * .4)}" cy="${n1(y + s)}" r="${n1(t * .55)}" fill="${col}"/>`; X += t * .9; return; }
+      const sg = { a: [X + t * .6, y, X + w - t * .6, y], b: [X + w, y + t * .6, X + w, y + s / 2 - t * .5], c: [X + w, y + s / 2 + t * .5, X + w, y + s - t * .6],
+        d: [X + t * .6, y + s, X + w - t * .6, y + s], e: [X, y + s / 2 + t * .5, X, y + s - t * .6], f: [X, y + t * .6, X, y + s / 2 - t * .5], g: [X + t * .6, y + s / 2, X + w - t * .6, y + s / 2] };
+      const on = SEG[ch] || "";
+      for (const k in sg) { const q = sg[k], lit = on.indexOf(k) >= 0; if (!lit && !dim) continue;
+        out += `<path d="M${n1(q[0])} ${n1(q[1])}L${n1(q[2])} ${n1(q[3])}" stroke="${lit ? col : dim}" stroke-width="${n1(t)}" stroke-linecap="round"/>`; }
+      X += w + t * 2.2;
+    });
+    return out;
+  }
+  const lcd = (o, x, y, w, h, str, s, col) => `<path d="${rr(x, y, w, h, 2)}" fill="url(#${o.uid}-lcd)" stroke="#000" stroke-opacity=".5"/>` +
+    (o.on ? `<path d="${rr(x, y, w, h, 2)}" fill="${col}" fill-opacity=".08"/>` : "") +
+    digits(str, x + (w - str.replace(".", "").length * s * .82) / 2 + s * .1, y + (h - s) / 2, s, o.on ? col : "#2b3a40", o.on ? H().rgba(col, .1) : null) +
+    `<path d="M${x + 1.5} ${y + 1.5}H${x + w * .6}" stroke="#fff" stroke-opacity=".12"/>`;
+
+  const room = (o, fy, wall) => `<g class="hda-bg">${room0(o, fy, wall)}</g>`;
+  function room0(o, fy, wall) {
+    const u = o.uid;
+    let s = `<rect width="200" height="${fy}" fill="url(#${u}-wall)"/>`;
+    if (wall === "block") s += `<rect width="200" height="${fy}" fill="url(#${u}-blk)"/>`;
+    if (wall === "brick") s += `<rect width="200" height="${fy}" fill="url(#${u}-brk)"/>`;
+    if (wall === "siding") s += `<rect width="200" height="${fy}" fill="url(#${u}-sid)"/>`;
+    if (wall === "board") s += `<rect x="18" y="8" width="164" height="${fy - 28}" fill="#c9a77a" fill-opacity=".16" stroke="#000" stroke-opacity=".3"/>` + [20, 34, 52, 75, 96, 118, 136].map((y, i) => `<path d="M18 ${y}C60 ${y + (i % 2 ? 3 : -3)} 120 ${y + (i % 2 ? -2 : 3)} 182 ${y}" fill="none" stroke="#6a4a2a" stroke-opacity=".22" stroke-width=".8"/>`).join("") + [40, 80, 120, 160].map((x) => `<circle cx="${x}" cy="${fy / 2}" r=".9" fill="#000" fill-opacity=".4"/>`).join("");
+    if (wall === "grass") return s + `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-grass)"/><path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-bld)"/>`;
+    s += `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-flr)"/><path d="M0 ${fy}H200" stroke="#000" stroke-opacity=".35"/><path d="M0 ${fy + 1}H200" stroke="#fff" stroke-opacity=".08"/>`;
+    [[30, .3], [72, .62], [128, .4], [164, .78], [100, .88], [14, .72]].forEach((p) => { s += `<circle cx="${p[0]}" cy="${n1(fy + (200 - fy) * p[1])}" r=".8" fill="#fff" fill-opacity=".14"/>`; });
+    return s;
+  }
+  const face = (o, d, g) => `<path d="${d}" fill="url(#${o.uid}-${g || "v"})"/><path d="${d}" fill="url(#${o.uid}-fx)"/><path d="${d}" fill="url(#${o.uid}-g)" opacity=".28"/>`;
+  function tank(o, x, y, w, b, g) {
+    const u = o.uid, r = w / 2, d = `M${x} ${y + 8}Q${x} ${y - 4} ${x + r} ${y - 5}Q${x + w} ${y - 4} ${x + w} ${y + 8}V${b - 4}Q${x + w} ${b} ${x + w - 4} ${b}H${x + 4}Q${x} ${b} ${x} ${b - 4}Z`;
+    return `<path d="${d}" fill="url(#${u}-${g || "c"})"/><path d="${d}" fill="url(#${u}-g)" opacity=".2"/>` +
+      `<path d="M${x} ${y + 8}Q${x + r} ${y + 13} ${x + w} ${y + 8}" fill="none" stroke="#000" stroke-opacity=".25"/>` +
+      `<path d="M${x + w * .3} ${y + 14}V${b - 8}" stroke="#fff" stroke-opacity=".22" stroke-width="${n1(w * .05)}" stroke-linecap="round"/>`;
+  }
+  function flames(o, cx, by, w, n) {
+    if (!o.on) return "";
+    const u = o.uid, s = .6 + .55 * o.level; let f = `<ellipse cx="${cx}" cy="${by - 3}" rx="${n1(w * .8)}" ry="${n1(9 * s)}" fill="url(#${u}-warm)" opacity=".55"/>`;
+    for (let i = 0; i < n; i++) {
+      const x = cx - w / 2 + (i + .5) * w / n, h = (i % 2 ? 7 : 10) * s;
+      f += `<path class="${P}flk" style="animation-delay:-${n1(i * .17)}s" d="M${n1(x - 2.6)} ${by}Q${n1(x - 2.4)} ${n1(by - h * .55)} ${n1(x)} ${n1(by - h)}Q${n1(x + 2.4)} ${n1(by - h * .55)} ${n1(x + 2.6)} ${by}Z" fill="url(#${u}-fl)"/>`;
+    }
+    return f;
+  }
+  function gauge(o, x, y, r, v) {
+    const a = (-130 + 260 * v) * Math.PI / 180, nx = x + Math.sin(a) * r * .72, ny = y - Math.cos(a) * r * .72;
+    let t = "";
+    for (let i = 0; i <= 8; i++) { const b = (-130 + 32.5 * i) * Math.PI / 180; t += `<path d="M${n1(x + Math.sin(b) * r * .62)} ${n1(y - Math.cos(b) * r * .62)}L${n1(x + Math.sin(b) * r * .8)} ${n1(y - Math.cos(b) * r * .8)}" stroke="#2a2f36" stroke-width=".6"/>`; }
+    return `<circle cx="${x}" cy="${y}" r="${r + 1.6}" fill="url(#${o.uid}-mtv)"/><circle cx="${x}" cy="${y}" r="${r}" fill="url(#${o.uid}-dial)"/>${t}` +
+      `<path d="M${x} ${y}L${n1(nx)} ${n1(ny)}" stroke="#d12f2f" stroke-width="1.1" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="1.3" fill="#222"/>` +
+      `<path d="M${n1(x - r * .7)} ${n1(y - r * .45)}A${r} ${r} 0 0 1 ${n1(x + r * .2)} ${n1(y - r * .85)}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1"/>`;
+  }
+  const ballValve = (o, cx, cy, s) => { const u = o.uid; s = s || 1;
+    const hx = (x) => `<path d="M${n1(x - 5 * s)} ${n1(cy - 9 * s)}H${n1(x + 5 * s)}L${n1(x + 6 * s)} ${cy}L${n1(x + 5 * s)} ${n1(cy + 9 * s)}H${n1(x - 5 * s)}L${n1(x - 6 * s)} ${cy}Z" fill="url(#${u}-bsv)" stroke="#5e3f10" stroke-width=".7"/><path d="M${n1(x - 6 * s)} ${cy}H${n1(x + 6 * s)}" stroke="#5e3f10" stroke-opacity=".5" stroke-width=".6"/>`;
+    return hx(cx - 16 * s) + hx(cx + 16 * s) + `<path d="${rr(cx - 11 * s, cy - 11 * s, 22 * s, 22 * s, 7 * s)}" fill="url(#${u}-bsv)" stroke="#5e3f10" stroke-width=".7"/>` +
+      `<ellipse cx="${n1(cx - 3 * s)}" cy="${n1(cy - 5 * s)}" rx="${n1(5 * s)}" ry="${n1(2.5 * s)}" fill="#fff" opacity=".45"/>`; };
+
+  const css = `
+.hda-leaks-flow{stroke-dashoffset:0}
+.hda-anim .hda-leaks-flow{animation:hda-leaks-flow 1s linear infinite}
+@keyframes hda-leaks-flow{to{stroke-dashoffset:-18}}
+.hda-leaks-flk{transform-box:fill-box;transform-origin:50% 100%}
+.hda-anim .hda-leaks-flk{animation:hda-leaks-flk .5s ease-in-out infinite alternate}
+@keyframes hda-leaks-flk{0%{transform:scale(1,1)}50%{transform:scale(.9,.78)}100%{transform:scale(1.06,1.08)}}
+.hda-leaks-spin{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-leaks-spin{animation:hda-leaks-spin 1s linear infinite}
+@keyframes hda-leaks-spin{to{transform:rotate(360deg)}}
+.hda-anim .hda-leaks-blink{animation:hda-leaks-blink 1.2s steps(1,end) infinite}
+@keyframes hda-leaks-blink{0%,59%{opacity:1}60%,100%{opacity:.2}}
+.hda-leaks-chase{opacity:.18}
+.hda-anim .hda-leaks-chase{animation:hda-leaks-chase 4s linear infinite}
+@keyframes hda-leaks-chase{0%,100%{opacity:.18}6%{opacity:1}24%{opacity:1}30%{opacity:.18}}
+.hda-leaks-bub{opacity:0;transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-leaks-bub{animation:hda-leaks-bub 2s ease-in infinite}
+@keyframes hda-leaks-bub{0%{transform:translate(0,0);opacity:0}15%{opacity:.9}100%{transform:translate(0,-26px);opacity:0}}
+.hda-leaks-rip{transform-box:fill-box;transform-origin:center;opacity:0}
+.hda-anim .hda-leaks-rip{animation:hda-leaks-rip 2.2s ease-out infinite}
+@keyframes hda-leaks-rip{0%{transform:scale(.3);opacity:.8}100%{transform:scale(1.4);opacity:0}}
+.hda-leaks-mist{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-leaks-mist{animation:hda-leaks-mist 1.6s ease-in-out infinite}
+@keyframes hda-leaks-mist{50%{opacity:.45;transform:scale(1.08)}}
+.hda-leaks-heat{opacity:0}
+.hda-anim .hda-leaks-heat{animation:hda-leaks-heat 2.6s ease-out infinite}
+.hda-anim .hda-leaks-hum{animation:hda-leaks-hum .16s linear infinite}
+@keyframes hda-leaks-hum{0%,100%{transform:translate(0,0)}50%{transform:translate(.5px,-.3px)}}
+.hda-anim .hda-leaks-bob{animation:hda-leaks-bob 1.6s ease-in-out infinite}
+@keyframes hda-leaks-bob{50%{transform:translate(0,-2px)}}
+@keyframes hda-leaks-heat{0%{transform:translate(0,4px);opacity:0}35%{opacity:.6}100%{transform:translate(0,-16px);opacity:0}}
+.hda-leaks-heat.hda-leaks-still{opacity:.4}
+.hda-anim .hda-leaks-heat.hda-leaks-still{opacity:0}
+`;
+  const heat = (o, xs, y, col) => o.on ? xs.map((x, i) => `<path class="${P}heat${o.anim ? "" : " " + P + "still"}" style="animation-delay:-${n1(i * .8)}s" d="M${x} ${y}q-3 -5 0 -10t0 -10" fill="none" stroke="${col || "#ffc58a"}" stroke-width="1.3" stroke-linecap="round"/>`).join("") : "";
+  const bubbles = (o, pts, col) => o.on ? pts.map((p, i) => `<circle class="${P}bub" style="animation-delay:-${n1(i * .45)}s;animation-duration:${dur(o, 2.6, 1.4)}s" cx="${p[0]}" cy="${p[1]}" r="${p[2] || 1.3}" fill="none" stroke="${col || "#e6f7ff"}" stroke-width=".7"/>`).join("") : "";
+
+  const css2 = css + `
+.hda-leaks-ring{transform-box:fill-box;transform-origin:center;opacity:0}
+.hda-anim .hda-leaks-ring{animation:hda-leaks-ring 1.6s ease-out infinite}
+@keyframes hda-leaks-ring{0%{transform:scale(.4);opacity:.9}100%{transform:scale(1.3);opacity:0}}
+.hda-leaks-ring.hda-leaks-still{opacity:.6}
+.hda-anim .hda-leaks-ring.hda-leaks-still{opacity:0}
+.hda-leaks-drop{opacity:.8}
+.hda-anim .hda-leaks-drop{animation:hda-leaks-drop 1.5s ease-in infinite}
+@keyframes hda-leaks-drop{0%{transform:translate(0,0);opacity:0}15%{opacity:.9}100%{transform:translate(0,22px);opacity:0}}
+`;
+  const BG = (s) => `<g class="hda-bg">${s}</g>`;
+  const WH = "#eef0f1", BK = "#2a2d32", GY = "#9aa1a9";
+  const TEMPS = [["68", "68°F"], ["50", "50°F"], ["38", "38°F"], ["30", "30°F"], ["20", "20°F"]];
+  const TOPT = [{ id: "temp", name: "Temperature", values: TEMPS }];
+
+  function lextra(o) {
+    const u = o.uid;
+    return lg(u + "-pud", 1, [[0, "#8fd0f2", .75], [1, "#3a8ac8", .6]]) + lg(u + "-wd", 1, [[0, "#b98a5a"], [1, "#7a5232"]]) +
+      lg(u + "-tile2", 1, [[0, "#d9d6cf"], [1, "#a9a49a"]]) + lg(u + "-cab", 1, [[0, "#6a7480"], [1, "#4a525c"]]) + lg(u + "-rope", 0, [[0, "#c9a210"], [.5, "#ffe25a"], [1, "#a8840a"]]) +
+      lg(u + "-hw", 0, [[0, "#9aa1a9"], [.4, "#f2f4f6"], [1, "#7a8189"]]) +
+      `<pattern id="${u}-tl" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M0 .5H30M.5 0V30" stroke="#000" stroke-opacity=".22"/></pattern>` +
+      `<pattern id="${u}-plank" width="200" height="12" patternUnits="userSpaceOnUse"><path d="M0 11.5H200" stroke="#3a2414" stroke-opacity=".45"/><path d="M60 0V12M150 0V12" stroke="#3a2414" stroke-opacity=".3"/></pattern>` +
+      `<pattern id="${u}-braid" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6L6 0M-1 1L1 -1M5 7L7 5" stroke="#8a6a00" stroke-opacity=".6"/></pattern>`;
+  }
+  const svgL = (o, body) => svg(o, body, lextra(o));
+  function floor(o, kind, fy) {
+    const u = o.uid; fy = fy || 120;
+    let s = `<rect width="200" height="${fy}" fill="url(#${u}-wall)"/><rect y="${fy - 8}" width="200" height="8" fill="#e9e6df" opacity=".6"/>`;
+    if (kind === "wood") s += `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-wd)" opacity=".75"/><path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-plank)"/>`;
+    else if (kind === "conc") s += `<path d="M0 ${fy}H200V200H0Z" fill="#8f949a" opacity=".45"/>` + [[30, 150], [90, 180], [150, 140], [176, 186]].map((p) => `<circle cx="${p[0]}" cy="${p[1]}" r="1" fill="#fff" fill-opacity=".2"/>`).join("");
+    else s += `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-tile2)" opacity=".75"/><path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-tl)"/>`;
+    return BG(s + `<path d="M0 ${fy}H200" stroke="#000" stroke-opacity=".3"/>`);
+  }
+  function puddle(o, cx, cy, rx) {
+    if (!o.on) return "";
+    const ry = rx * .3;
+    return `<path d="M${n1(cx - rx)} ${cy}Q${n1(cx - rx * 1.05)} ${n1(cy - ry * 1.1)} ${n1(cx - rx * .3)} ${n1(cy - ry)}Q${n1(cx + rx * .2)} ${n1(cy - ry * 1.3)} ${n1(cx + rx * .8)} ${n1(cy - ry * .9)}Q${n1(cx + rx * 1.15)} ${n1(cy - ry * .2)} ${n1(cx + rx * .9)} ${n1(cy + ry * .7)}Q${n1(cx + rx * .2)} ${n1(cy + ry * 1.2)} ${n1(cx - rx * .5)} ${n1(cy + ry)}Q${n1(cx - rx * 1.1)} ${n1(cy + ry * .8)} ${n1(cx - rx)} ${cy}Z" fill="url(#${o.uid}-pud)"/>` +
+      `<ellipse cx="${n1(cx - rx * .35)}" cy="${n1(cy - ry * .3)}" rx="${n1(rx * .3)}" ry="${n1(ry * .2)}" fill="#fff" opacity=".45"/>` +
+      [0, 1].map((i) => `<ellipse class="${P}rip" style="animation-delay:-${i * 1.1}s" cx="${n1(cx + rx * .4)}" cy="${n1(cy + ry * .2)}" rx="${n1(rx * .25)}" ry="${n1(ry * .25)}" fill="none" stroke="#e8f8ff" stroke-width=".8"/>`).join("");
+  }
+  const alarm = (o, x, y, r) => o.on ? [0, 1, 2].map((i) => `<circle class="${P}ring${o.anim ? "" : " " + P + "still"}" style="animation-delay:-${n1(i * .5)}s" cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${RED}" stroke-width="1.6"/>`).join("") : "";
+  const sled = (o, x, y, r) => o.on ? `<g class="${P}blink">${led(o, x, y, r || 1.6, true, RED, "hr")}</g>` : led(o, x, y, r || 1.6, true, GREEN, "hg");
+  const drops = (o, pts) => o.on ? pts.map((p, i) => `<path class="${P}drop" style="animation-delay:-${n1(i * .5)}s" d="M${p[0]} ${p[1]}q-2 3 0 4.4q2 -1.4 0 -4.4Z" fill="#9fdcff"/>`).join("") : "";
+  function battery(o, x, y) {
+    const lv = o.level, col = lv < .2 ? RED : lv < .4 ? AMB : "#7ee08a";
+    return `<path d="${rr(x, y, 18, 9, 2)}" fill="#0a0d10" stroke="#e9ecef" stroke-width="1"/><rect x="${x + 18}" y="${y + 3}" width="2" height="3" fill="#e9ecef"/><rect x="${x + 2}" y="${y + 2}" width="${n1(Math.max(.6, 14 * lv))}" height="5" rx="1" fill="${col}"/>`;
+  }
+  function temp(o, x, y) {
+    const t = +((o.opt && o.opt.temp) || 68), col = t < 40 ? "#6fb8ff" : "#7ee08a";
+    return `<path d="${rr(x, y, 28, 14, 2)}" fill="#0a0d10" stroke="#e9ecef"/>` + digits(String(t), x + 5, y + 4, 6, col, "rgba(255,255,255,.05)") +
+      `<circle cx="${x + 18}" cy="${y + 4.6}" r=".9" fill="none" stroke="${col}" stroke-width=".6"/>` + (t < 40 ? `<path d="M${x + 22} ${y + 3}v8M${x + 19} ${y + 5}l6 4M${x + 25} ${y + 5}l-6 4" stroke="${col}" stroke-width=".8"/>` : "");
+  }
+  const body = (o, d) => `<path d="${d}" fill="url(#${o.uid}-v)"/><path d="${d}" fill="url(#${o.uid}-fx)"/><path d="${d}" fill="url(#${o.uid}-g)" opacity=".35"/>`;
+  const cord = (d) => `<path d="${d}" fill="none" stroke="#1a1c20" stroke-width="2.6" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#5a6068" stroke-width=".8"/>`;
+  const probe = (o, x, y) => `<path d="${rr(x - 8, y - 4, 16, 6, 2)}" fill="url(#${o.uid}-v)"/><path d="${rr(x - 8, y - 4, 16, 6, 2)}" fill="url(#${o.uid}-fx)"/><rect x="${x - 5}" y="${y + 1.6}" width="2" height="1.6" fill="url(#${o.uid}-mt)"/><rect x="${x + 3}" y="${y + 1.6}" width="2" height="1.6" fill="url(#${o.uid}-mt)"/>`;
+
+  const ic = (id, name, colors, temp, render) => Object.assign({ id, name, colors, picker: true, colorLabel: "Body", render }, temp ? { options: TOPT } : {});
+
+  const SHAPE = {
+    square: (o, x, y, s) => `<path d="M${x - 34 * s} ${y - 10 * s}L${x - 24 * s} ${y - 26 * s}H${x + 44 * s}L${x + 34 * s} ${y - 10 * s}Z" fill="url(#${o.uid}-tp)"/>` + body(o, rr(x - 34 * s, y - 20 * s, 68 * s, 20 * s, 6 * s)) +
+      `<path d="M${x + 34 * s} ${y - 10 * s}L${x + 44 * s} ${y - 26 * s}V${y - 14 * s}L${x + 34 * s} ${y}Z" fill="url(#${o.uid}-sd)"/><circle cx="${x + 12 * s}" cy="${y - 12 * s}" r="${2.4 * s}" fill="#d9dde2" stroke="#9aa1a9" stroke-width=".6"/>`,
+    teardrop: (o, x, y, s) => { const d = `M${x} ${y - 64 * s}C${x + 10 * s} ${y - 50 * s} ${x + 36 * s} ${y - 36 * s} ${x + 36 * s} ${y - 18 * s}C${x + 36 * s} ${y - 2 * s} ${x + 20 * s} ${y + 4 * s} ${x} ${y + 4 * s}C${x - 20 * s} ${y + 4 * s} ${x - 36 * s} ${y - 2 * s} ${x - 36 * s} ${y - 18 * s}C${x - 36 * s} ${y - 36 * s} ${x - 10 * s} ${y - 50 * s} ${x} ${y - 64 * s}Z`;
+      return `<path d="${d}" fill="url(#${o.uid}-v)"/><path d="${d}" fill="url(#${o.uid}-fx)"/><path d="${d}" fill="none" stroke="#8a9096" stroke-width="1.6" transform="translate(${n1(x * .12)} ${n1((y - 18 * s) * .12)}) scale(.88)"/>` +
+        `<path d="M${x - 16 * s} ${y - 36 * s}Q${x - 8 * s} ${y - 46 * s} ${x - 2 * s} ${y - 50 * s}" stroke="#fff" stroke-opacity=".7" stroke-width="2" fill="none" stroke-linecap="round"/>`; },
+    slim: (o, x, y, s) => `<path d="M${x - 46 * s} ${y - 8 * s}L${x - 38 * s} ${y - 18 * s}H${x + 54 * s}L${x + 46 * s} ${y - 8 * s}Z" fill="url(#${o.uid}-tp)"/>` + body(o, rr(x - 46 * s, y - 12 * s, 92 * s, 12 * s, 5 * s)) + `<path d="M${x + 20 * s} ${y - 6 * s}h${14 * s}" stroke="#9aa1a9" stroke-width="1.4" stroke-linecap="round"/>`,
+    round: (o, x, y, s) => `<ellipse cx="${x}" cy="${y - 2 * s}" rx="${28 * s}" ry="${9 * s}" fill="url(#${o.uid}-sd)"/><path d="M${x - 28 * s} ${y - 8 * s}V${y - 4 * s}A${28 * s} ${9 * s} 0 0 0 ${x + 28 * s} ${y - 4 * s}V${y - 8 * s}Z" fill="url(#${o.uid}-c)"/>` +
+      `<path d="M${x - 28 * s} ${y - 8 * s}Q${x - 26 * s} ${y - 22 * s} ${x} ${y - 22 * s}Q${x + 26 * s} ${y - 22 * s} ${x + 28 * s} ${y - 8 * s}A${28 * s} ${9 * s} 0 0 1 ${x - 28 * s} ${y - 8 * s}Z" fill="url(#${o.uid}-tp)"/><ellipse cx="${x - 8 * s}" cy="${y - 17 * s}" rx="${10 * s}" ry="${2.6 * s}" fill="#fff" opacity=".55"/>` +
+      `<path d="M${x} ${y - 18 * s}q${-3 * s} ${4 * s} 0 ${6 * s}q${3 * s} ${-2 * s} 0 ${-6 * s}Z" fill="#c9ced4"/>`,
+    standing: (o, x, y, s) => { const d = `M${x} ${y - 70 * s}C${x + 10 * s} ${y - 54 * s} ${x + 22 * s} ${y - 42 * s} ${x + 22 * s} ${y - 24 * s}C${x + 22 * s} ${y - 8 * s} ${x + 12 * s} ${y} ${x} ${y}C${x - 12 * s} ${y} ${x - 22 * s} ${y - 8 * s} ${x - 22 * s} ${y - 24 * s}C${x - 22 * s} ${y - 42 * s} ${x - 10 * s} ${y - 54 * s} ${x} ${y - 70 * s}Z`;
+      return `<path d="${d}" fill="url(#${o.uid}-v)"/><path d="${d}" fill="url(#${o.uid}-fx)"/><circle cx="${x}" cy="${y - 26 * s}" r="${5 * s}" fill="#d9dde2"/><path d="M${x - 12 * s} ${y - 40 * s}Q${x - 6 * s} ${y - 54 * s} ${x - 2 * s} ${y - 58 * s}" stroke="#fff" stroke-opacity=".7" stroke-width="2" fill="none" stroke-linecap="round"/>`; },
+    floodsq: (o, x, y, s) => `<ellipse cx="${x}" cy="${y - 2 * s}" rx="${32 * s}" ry="${10 * s}" fill="url(#${o.uid}-sd)"/><path d="M${x - 32 * s} ${y - 6 * s}Q${x - 30 * s} ${y - 30 * s} ${x} ${y - 30 * s}Q${x + 30 * s} ${y - 30 * s} ${x + 32 * s} ${y - 6 * s}A${32 * s} ${10 * s} 0 0 1 ${x - 32 * s} ${y - 6 * s}Z" fill="url(#${o.uid}-v)"/>` +
+      `<path d="M${x - 32 * s} ${y - 6 * s}Q${x - 30 * s} ${y - 30 * s} ${x} ${y - 30 * s}Q${x + 30 * s} ${y - 30 * s} ${x + 32 * s} ${y - 6 * s}A${32 * s} ${10 * s} 0 0 1 ${x - 32 * s} ${y - 6 * s}Z" fill="url(#${o.uid}-fx)"/><ellipse cx="${x - 10 * s}" cy="${y - 24 * s}" rx="${10 * s}" ry="${2.6 * s}" fill="#fff" opacity=".55"/>` +
+      `<ellipse cx="${x}" cy="${y - 22 * s}" rx="${7 * s}" ry="${2.6 * s}" fill="none" stroke="${o.on ? RED : "#4aa8ff"}" stroke-width="${1.6 * s}"/>`,
+    zround: (o, x, y, s) => body(o, rr(x - 13 * s, y - 40 * s, 26 * s, 36 * s, 4 * s)) + `<path d="M${x - 9 * s} ${y - 36 * s}H${x + 9 * s}" stroke="#fff" stroke-opacity=".6"/>`,
+  };
+  const LEDPOS = { square: [-4, -12], teardrop: [0, -18], slim: [-30, -6], round: [16, -12], standing: [0, -26], floodsq: [18, -12], zround: [0, -14] };
+  const PLACE = {
+    floor: { spot: [100, 162], mount: [54, 66], bg: (o) => floor(o, "tile", 112) },
+    sink: { spot: [104, 166], mount: [160, 70], bg: (o) => { const u = o.uid; return BG(`<rect width="200" height="200" fill="url(#${u}-cab)"/><path d="M16 16H184V176H16Z" fill="#2a2e34"/><path d="M16 150H184V176H16Z" fill="#4a525c"/>` +
+      `<path d="M70 16V70Q70 96 100 96Q124 96 124 76V60" fill="none" stroke="#e6e9ec" stroke-width="7"/><path d="M60 16V40M144 16V40" stroke="#c9ced4" stroke-width="4"/><circle cx="60" cy="44" r="5" fill="#c33"/><circle cx="144" cy="44" r="5" fill="#2a6dd9"/><path d="M0 0H16V200H0ZM184 0H200V200H184Z" fill="url(#${u}-cab)"/>`); }, drip: [[100, 102], [104, 116]] },
+    pan: { spot: [136, 166], mount: [168, 92], bg: (o) => { const u = o.uid; return floor(o, "conc", 150) + BG(`<path d="M30 30H150V156H30Z" fill="url(#${u}-hw)"/><path d="M30 30Q90 18 150 30" fill="url(#${u}-hw)"/><path d="M76 30V0M104 30V0" stroke="#b8693a" stroke-width="6"/>` +
+      `<path d="${rr(70, 120, 40, 24, 3)}" fill="#14161a"/><path d="M14 156L20 172H170L176 156Z" fill="#8a949e"/><path d="M14 156H176" stroke="#c9ced4" stroke-width="2"/>`); }, drip: [[50, 140], [130, 146]] },
+    sump: { spot: [140, 150], mount: [50, 60], bg: (o) => { const u = o.uid; return BG(`<rect width="200" height="110" fill="url(#${u}-wall)"/><rect width="200" height="110" fill="url(#${u}-blk)"/><path d="M0 110H200V200H0Z" fill="url(#${u}-soil)"/><path d="M0 110H200V118H0Z" fill="#9aa0a6" fill-opacity=".55"/>`) +
+      `<path d="M110 110H170V198H110Z" fill="#14161a"/><path d="M114 ${o.on ? 140 : 176}H166V198H114Z" fill="url(#${u}-wt)"/>`; } },
+    toilet: { spot: [146, 168], mount: [170, 66], drip: [[124, 126], [126, 138]], bg: (o) => { const u = o.uid; return floor(o, "tile", 124) + BG(`<rect width="200" height="124" fill="url(#${u}-tl)" opacity=".5"/>` +
+      `<path d="${rr(34, 46, 78, 50, 6)}" fill="#f4f5f6"/><path d="${rr(30, 40, 86, 10, 4)}" fill="#e9ecef"/><path d="M40 96H106Q110 126 92 136V170H54V136Q36 126 40 96Z" fill="#f2f3f4"/><ellipse cx="73" cy="100" rx="36" ry="9" fill="#e6e9ec"/><path d="M50 170H96" stroke="#c9ced4" stroke-width="3"/>` +
+      `<path d="M124 118h8v8h-8z" fill="url(#${u}-mt)"/><path d="M128 126V140" stroke="#9aa1a9" stroke-width="3"/><path d="M128 140Q128 150 112 152H100" fill="none" stroke="#c9ced4" stroke-width="2.4"/><circle cx="136" cy="122" r="3.4" fill="#c9ced4"/>`); } },
+    dishwasher: { spot: [100, 174], mount: [176, 100], drip: [[80, 160], [118, 160]], bg: (o) => { const u = o.uid; return BG(`<rect width="200" height="200" fill="url(#${u}-wall)"/><rect y="30" width="200" height="8" fill="url(#${u}-ct)"/><rect y="38" width="200" height="138" fill="url(#${u}-cab)"/>` +
+      `<path d="M50 40H150V160H50Z" fill="url(#${u}-hw)"/><path d="M54 46H146V56H54Z" fill="#14161a"/><rect x="70" y="62" width="60" height="4" rx="2" fill="#c9ced4"/><path d="M50 160H150V176H50Z" fill="#0c0d10"/><path d="M0 176H200V200H0Z" fill="url(#${u}-tile2)" opacity=".7"/>`); } },
+    washer: { spot: [130, 172], mount: [178, 104], drip: [[150, 70], [156, 84]], bg: (o) => { const u = o.uid; return floor(o, "tile", 124) + BG(`<path d="${rr(132, 40, 44, 34, 3)}" fill="#f2f2ee"/><circle cx="144" cy="54" r="5" fill="#c33"/><circle cx="164" cy="54" r="5" fill="#2a6dd9"/><path d="M150 62v10" stroke="#555" stroke-width="5"/>` +
+      `<path d="M10 70H96V176H10Z" fill="#eceef0"/><path d="M96 70L108 62V168L96 176Z" fill="#c9ced4"/><path d="M10 70L22 62H108L96 70Z" fill="#f4f5f6"/>` +
+      `<path d="M144 60C130 80 120 90 108 96M164 60C150 86 128 100 108 106" fill="none" stroke="#1a1c20" stroke-width="3"/>`); } },
+    fridge: { spot: [128, 172], mount: [178, 96], drip: [[134, 132], [136, 144]], bg: (o) => { const u = o.uid; return floor(o, "wood", 124) + BG(`<path d="M8 20H84V176H8Z" fill="url(#${u}-hw)"/><path d="M84 20L96 14V170L84 176Z" fill="#8a9096"/><path d="M8 96H84" stroke="#000" stroke-opacity=".25"/>` +
+      `<path d="${rr(126, 120, 18, 14, 2)}" fill="#f2f2ee"/><circle cx="135" cy="127" r="3" fill="#c9973a"/><path d="M135 134C135 160 120 150 110 160S96 170 96 166" fill="none" stroke="#c9733a" stroke-width="1.6"/><path d="M112 170c8 -6 16 -6 22 0s-16 6 -22 0" fill="none" stroke="#c9733a" stroke-width="1.4"/>`); } },
+    hvac: { spot: [100, 154], mount: [178, 70], drip: [[90, 132], [110, 136]], bg: (o) => { const u = o.uid; return floor(o, "conc", 166) + BG(`<path d="M52 12H148V136H52Z" fill="#9aa1a9"/><path d="M52 12H148V136H52Z" fill="url(#${u}-fx)"/><path d="M60 24H140V60H60Z" fill="#8a9096" stroke="#000" stroke-opacity=".2"/><path d="M60 70H140V128H60Z" fill="#8a9096" stroke="#000" stroke-opacity=".2"/>` +
+      `<path d="M30 136L36 160H164L170 136Z" fill="url(#${u}-hw)"/><path d="M30 136H170" stroke="#c9ced4" stroke-width="2"/><path d="M148 110H170V176" fill="none" stroke="#e6e9ec" stroke-width="5"/>`); } },
+    tub: { spot: [104, 168], mount: [176, 70], drip: [[96, 112], [100, 126]], bg: (o) => { const u = o.uid; return BG(`<rect width="200" height="200" fill="url(#${u}-wall)"/><rect width="200" height="200" fill="url(#${u}-tl)" opacity=".4"/>` +
+      `<path d="M30 56H170V178H30Z" fill="#1a1c20"/><path d="M30 56H170V178H30Z" fill="none" stroke="#f2f0ea" stroke-width="4"/><path d="M36 150H164V176H36Z" fill="#3a3530"/>` +
+      `<path d="M60 56V96Q60 104 70 104H120V118" fill="none" stroke="#e6e9ec" stroke-width="5"/><path d="M120 118V150" stroke="#e6e9ec" stroke-width="6"/><path d="M110 64h20" stroke="#9aa1a9" stroke-width="5"/><path d="M0 178H200V200H0Z" fill="url(#${u}-tile2)" opacity=".7"/>`); } },
+    softener: { spot: [146, 172], mount: [180, 84], drip: [[60, 50], [70, 58]], bg: (o) => { const u = o.uid; return floor(o, "conc", 130) + BG(`<path d="M24 60Q24 48 40 48Q56 48 56 60V176H24Z" fill="#26282c"/><path d="M28 34H52V50H28Z" fill="#14161a"/><path d="M64 96H116V176H64Z" fill="#e9e6df"/><path d="M62 92H118V98H62Z" fill="#c9ced4"/>` +
+      `<path d="M34 34V10M46 34V10" stroke="#b8693a" stroke-width="5"/>`); } },
+    floordrain: { spot: [100, 166], mount: [40, 70], bg: (o) => { const u = o.uid; return floor(o, "conc", 110) + BG(`<rect width="200" height="110" fill="url(#${u}-blk)"/><ellipse cx="120" cy="170" rx="22" ry="7" fill="#5a6068"/><ellipse cx="120" cy="170" rx="18" ry="5.4" fill="#2a2e34"/>` +
+      [-12, -6, 0, 6, 12].map((d) => `<path d="M${120 + d} 165.4V174.6" stroke="#8a9096" stroke-width="1.2"/>`).join("") + `<path d="M60 150Q100 156 140 168" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="10"/>`); } },
+    crawl: { spot: [100, 172], mount: [56, 44], drip: [[120, 52], [124, 64]], bg: (o) => { const u = o.uid; return BG(`<rect width="200" height="200" fill="#1a1612"/>` + [0, 1, 2, 3, 4].map((i) => `<path d="M${-10 + i * 50} 0V30" stroke="url(#${u}-wd)" stroke-width="14"/>`).join("") + `<rect y="0" width="200" height="8" fill="#7a5232"/>` +
+      `<path d="M0 40H200" stroke="#e6e9ec" stroke-width="5"/><path d="M0 130L200 120V200H0Z" fill="#e9ecef" opacity=".85"/><path d="M0 130L200 120" stroke="#fff" stroke-opacity=".5"/><path d="M30 150Q70 140 110 156M120 170Q160 160 196 176" stroke="#c9ced4" fill="none"/>` +
+      `<path d="M160 60H176V128H160Z" fill="#7a7a72"/>`); } },
+    vanity: { spot: [100, 168], mount: [158, 76], drip: [[96, 104], [98, 118]], bg: (o) => { const u = o.uid; return BG(`<rect width="200" height="200" fill="#f2f0ea"/><path d="M24 24H176V180H24Z" fill="#2a2e34"/><path d="M24 150H176V180H24Z" fill="#4a525c"/>` +
+      `<path d="M96 24V60Q96 82 112 82Q124 82 124 70V60" fill="none" stroke="#e6e9ec" stroke-width="6"/><path d="M124 60H176" stroke="#e6e9ec" stroke-width="6"/><path d="M60 24V50M140 24V40" stroke="#c9ced4" stroke-width="3"/><circle cx="60" cy="52" r="4" fill="#c9ced4"/>` +
+      `<path d="M0 0H24V200H0ZM176 0H200V200H176Z" fill="#e9e6df"/>`); } },
+  };
+  const PROBE = [["none", "None"], ["short", "Short cord"], ["long", "Long cord"], ["rope", "Rope cable"]];
+  const PLACEV = [["floor", "Floor"], ["toilet", "Behind toilet"], ["sink", "Under kitchen sink"], ["vanity", "Under bathroom vanity"], ["dishwasher", "Under dishwasher"], ["washer", "Behind washer"], ["fridge", "Behind fridge (ice maker)"], ["pan", "Water heater pan"], ["hvac", "AC / furnace drain pan"], ["tub", "Tub / shower access"], ["softener", "Water softener"], ["floordrain", "Basement floor drain"], ["sump", "Sump"], ["crawl", "Crawlspace"]];
+  const TEMPV = [["off", "Off"]].concat(TEMPS);
+  const lead = (v, list) => list.filter((x) => x[0] === v).concat(list.filter((x) => x[0] !== v));
+  function leakCard(o, shape) {
+    const op = o.opt || {}, pr = op.probe || "none", pl = PLACE[op.place || "floor"] || PLACE.floor, sp = pl.spot, wallMount = pr !== "none";
+    let s = pl.bg(o);
+    if (pr === "rope") { const rd = `M${sp[0] - 80} ${sp[1] + 6}C${sp[0] - 40} ${sp[1] - 2} ${sp[0]} ${sp[1] + 10} ${sp[0] + 40} ${sp[1] + 2}S${sp[0] + 80} ${sp[1] - 4} ${sp[0] + 96} ${sp[1] + 6}`;
+      s += puddle(o, sp[0], sp[1] + 2, 52) + `<path d="${rd}" fill="none" stroke="#7a6200" stroke-width="6" stroke-linecap="round"/><path d="${rd}" fill="none" stroke="url(#${o.uid}-rope)" stroke-width="4.6" stroke-linecap="round"/><path d="${rd}" fill="none" stroke="url(#${o.uid}-braid)" stroke-width="4.6"/>`; }
+    else s += puddle(o, sp[0], sp[1], wallMount ? 50 : 66);
+    s += drops(o, pl.drip || [[sp[0] - 40, 100], [sp[0] + 20, 92]]);
+    let bx = sp[0], by = sp[1], sc = 1;
+    if (wallMount) { bx = pl.mount[0]; by = pl.mount[1] + 20; sc = .62;
+      const px = pr === "short" ? (bx + sp[0]) / 2 + (sp[0] > bx ? -6 : 6) : sp[0], py = pr === "short" ? Math.min(sp[1], by + 50) : sp[1];
+      if (pr !== "rope") s += cord(`M${bx} ${by}C${bx} ${by + 40} ${n1((bx + px) / 2)} ${py} ${px} ${py}`) + probe(o, px, py + 2);
+      else s += cord(`M${bx} ${by}C${bx} ${by + 40} ${sp[0] - 90} ${sp[1] - 10} ${sp[0] - 80} ${sp[1] + 6}`); }
+    else s += sh(o, bx, by + 2, 40, 5);
+    s += SHAPE[shape](o, bx, by, sc);
+    const lp = LEDPOS[shape]; s += sled(o, n1(bx + lp[0] * sc), n1(by + lp[1] * sc), 1.6) + alarm(o, bx, by - 30 * sc, 14);
+    if (op.temp && op.temp !== "off") s += temp(o, 20, 16);
+    return svgL(o, s + battery(o, 160, 16));
+  }
+  const leakOpts = (probe, temp) => [{ id: "probe", name: "Probe", values: lead(probe, PROBE) }, { id: "place", name: "Placement", values: PLACEV }].concat(temp ? [{ id: "temp", name: "Temperature", values: lead(temp, TEMPV) }] : []);
+  const lc = (id, name, shape, probe, temp) => ({ id, name, colors: [WH, BK, GY], picker: true, colorLabel: "Body", options: leakOpts(probe, temp), render: (o) => leakCard(o, shape) });
+
+  const icons = [
+    lc("squarepuck", "Square leak puck", "square", "none", "off"),
+    lc("teardrop", "Teardrop leak sensor", "teardrop", "none", null),
+    lc("slim", "Slim leak sensor", "slim", "none", null),
+    lc("roundmini", "Round leak sensor", "round", "none", null),
+    lc("dropdetector", "Smart leak detector", "standing", "rope", "68"),
+    lc("floodfreeze", "Flood & freeze", "floodsq", "none", "68"),
+    lc("zprobe", "Z-Wave probe sensor", "zround", "short", "off"),
+    { id: "gateway", name: "Sensor & gateway", colors: [WH, BK, GY], picker: true, colorLabel: "Body", render: (o) => { const u = o.uid;
+      return svgL(o, floor(o, "tile", 120) + BG(`<path d="M120 92H186V98H120Z" fill="url(#${u}-wd)"/>`) + puddle(o, 70, 166, 50) +
+        `<ellipse cx="153" cy="90" rx="22" ry="5" fill="#000" opacity=".25"/><path d="M131 90Q131 70 153 70Q175 70 175 90Z" fill="url(#${u}-v)"/><path d="M131 90Q131 70 153 70Q175 70 175 90Z" fill="url(#${u}-fx)"/><path d="M131 90H175" stroke="#000" stroke-opacity=".2"/>` +
+        sled(o, 153, 80, 1.8) + (o.on ? `<path class="${P}blink" d="M180 70q6 6 0 12M184 66q10 10 0 20" fill="none" stroke="${RED}" stroke-width="1.4"/>` : "") +
+        sh(o, 72, 166, 18, 4) + body(o, rr(60, 122, 24, 44, 6)) + `<circle cx="72" cy="134" r="6" fill="#d9dde2" stroke="#9aa1a9" stroke-width=".6"/>` + sled(o, 72, 148, 1.3) + alarm(o, 72, 120, 12) + drops(o, [[50, 96], [100, 104]]) + battery(o, 160, 16)); } },
+  ];
+
+
+  (window.HDA = window.HDA || []).push({
+    id: "leaks", tab: "Water leak sensors", group: "Utility", kind: "device", onWord: "Wet", offWord: "Dry", levelLabel: "Battery",
+    intro: "Eight water leak sensors, each built from menus: Probe (none, short cord, long cord, rope cable), Placement (14 spots: floor, behind the toilet, under the kitchen sink or vanity, dishwasher, washer, fridge, AC/furnace pan, tub, water softener, water heater pan, floor drain, crawlspace, sump) and a Temperature readout where the real one has it. Wet = a puddle spreads, the LED blinks red and alarm rings pulse; dry = a green LED on a dry floor. The slider is the battery; temperatures below 40°F turn blue.",
+    css: css2, icons,
+  });
+})();
+
+(function () {
   const H = window.HDAH;
   const f = (n) => (+n).toFixed(1);
 
@@ -24216,6 +26760,414 @@ ${fil(x, `M${gx - 2} ${gy - 8} L${gx - 3} ${gy + 2} M${gx + 2} ${gy - 8} L${gx +
 })();
 
 (function () {
+  const H = window.HDAH, P = "hda-lights9-";
+  const f = (n) => (+n).toFixed(1);
+  const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
+
+  function ctx(o, lit) {
+    const c = o.color || "#d77bff", on = lit == null ? !!o.on : !!lit, lv = o.level == null ? 1 : o.level;
+    const L = on ? .3 + .7 * lv : 0;
+    const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
+    return { c, on, L, lv, anim: !!o.anim, opt: o.opt || {}, id, url, hot: H.mix(c, "#ffffff", .6), op: (k) => Math.min(1, k * L).toFixed(2) };
+  }
+  const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+  const lg = (id, a, x1, y1, x2, y2) => `<linearGradient id="${id}" x1="${x1 || 0}" y1="${y1 || 0}" x2="${x2 == null ? 1 : x2}" y2="${y2 || 0}">${stops(a)}</linearGradient>`;
+  const rg = (id, a, cx, cy, r) => `<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r || .5}">${stops(a)}</radialGradient>`;
+
+  function defs(x, extra) {
+    const { c, id, hot } = x;
+    return `<defs>
+<clipPath id="${id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>
+${rg(id("vig"), [[0, "#000", 0], [.62, "#000", .05], [1, "#000", .5]], .5, .48, .74)}
+${rg(id("halo"), [[0, c, .85], [.45, c, .3], [1, c, 0]])}
+${rg(id("pool"), [[0, hot, .7], [.35, c, .4], [1, c, 0]])}
+${rg(id("sh"), [[0, "#000", .6], [.6, "#000", .22], [1, "#000", 0]])}
+${lg(id("beam"), [[0, hot, .7], [.3, c, .4], [1, c, 0]], 0, 0, 0, 1)}
+${lg(id("wall"), [[0, "#4a4750"], [1, "#2e2c34"]], 0, 0, 0, 1)}
+${lg(id("ceil"), [[0, "#24222a"], [1, "#3a3840"]], 0, 0, 0, 1)}
+${lg(id("wood"), [[0, "#8a6440"], [.12, "#6e4e30"], [1, "#3a2818"]], 0, 0, 0, 1)}
+${lg(id("alu"), [[0, "#f2f4f6"], [.35, "#c4c9cf"], [.6, "#8d949c"], [1, "#5d636b"]], 0, 0, 0, 1)}
+${lg(id("aluh"), [[0, "#6a7078"], [.25, "#c9ced4"], [.5, "#f4f6f8"], [.75, "#aab0b7"], [1, "#5d636b"]])}
+${lg(id("blk"), [[0, "#3a3b44"], [.35, "#24252c"], [1, "#0b0b0f"]], 0, 0, 0, 1)}
+${lg(id("blkh"), [[0, "#0d0d12"], [.3, "#3a3b46"], [.45, "#52545f"], [.75, "#1f2029"], [1, "#09090d"]])}
+${lg(id("wp"), [[0, "#ffffff"], [.5, "#e9ebee"], [1, "#b9bec5"]], 0, 0, 0, 1)}
+${lg(id("wph"), [[0, "#aeb3ba"], [.25, "#eef0f2"], [.55, "#ffffff"], [1, "#b4b9c0"]])}
+${lg(id("leaf"), [[0, "#86c46a"], [.55, "#4f9440"], [1, "#2c5e28"]], 0, 0, 1, 1)}
+${lg(id("pot"), [[0, "#7a3e22"], [.3, "#c46a3e"], [.55, "#d98458"], [1, "#6e361c"]])}
+${lg(id("soil"), [[0, "#3a2a1e"], [1, "#22180f"]], 0, 0, 0, 1)}
+${extra || ""}</defs>`;
+  }
+  function svg(x, s, extra) {
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x, extra)}
+<g clip-path="${x.url("wc")}"><g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="#1c1b24"/>${s.bg || ""}</g>${x.on ? s.light || "" : ""}<g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g>${s.fx || ""}${x.on ? s.over || "" : ""}</g>
+<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g></svg>`;
+  }
+  const E = (cx, cy, rx, ry, fill, more) => `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${fill}" ${more || ""}/>`;
+  const glo = (x, cx, cy, rx, ry, k) => x.on ? E(cx, cy, rx, ry, x.url("halo"), `opacity="${x.op(k)}"`) : "";
+  const shadow = (x, cx, cy, rx, ry, k) => E(cx, cy, rx, ry, x.url("sh"), `opacity="${k == null ? .8 : k}"`);
+  const hl = (d, o, w) => `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="${o == null ? .35 : o}" stroke-width="${w || 1.2}" stroke-linecap="round"/>`;
+  const poly = (pts) => pts.map((p) => f(p[0]) + " " + f(p[1])).join(" ");
+  const wallBg = (x, y0, y1, seed) => `<rect x="8" y="${y0}" width="184" height="${y1 - y0}" fill="${x.url("wall")}"/>` + (() => { const r = rnd(seed || 7); let s = ""; for (let i = 0; i < 36; i++) s += `<circle cx="${f(10 + r() * 180)}" cy="${f(y0 + 2 + r() * (y1 - y0 - 4))}" r="${f(.3 + r() * .6)}" fill="${r() > .5 ? "#000" : "#fff"}" fill-opacity="${(.04 + r() * .07).toFixed(2)}"/>`; return s; })();
+  const ceil = (x, y1) => `<rect x="8" y="8" width="184" height="${y1 - 8}" fill="${x.url("ceil")}"/><rect x="8" y="${y1}" width="184" height="2.4" fill="#000" fill-opacity=".35"/>`;
+  function floorBoards(x, y0) {
+    let s = `<rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.url("wood")}"/><rect x="8" y="${y0 - 3}" width="184" height="3.4" fill="#d8d4cc" fill-opacity=".5"/>`;
+    for (let i = -6; i <= 26; i++) { const bx = 8 + i * 9; s += `<path d="M${f(100 + (bx - 100) * .6)} ${y0} L${f(bx + (bx - 100) * .35)} 192" stroke="#000" stroke-opacity=".28" stroke-width=".8"/>`; }
+    return s;
+  }
+  const bench = (x, y0) => `<rect x="8" y="${y0 - 8}" width="184" height="8" fill="#8f6a46"/><rect x="8" y="${y0 - 8}" width="184" height="1.4" fill="#fff" fill-opacity=".2"/><rect x="8" y="${y0}" width="184" height="${192 - y0}" fill="${x.url("wood")}"/><path d="M8 ${y0 + 6} H192 M8 ${y0 + 15} H192" stroke="#000" stroke-opacity=".18" stroke-width=".8"/>`;
+
+  function plant(x, cx, by, s, seed, n) {
+    const r = rnd(seed); let t = ""; n = n || 7;
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (n > 1 ? (i / (n - 1) - .5) * 2.3 : 0) + (r() - .5) * .3;
+      const len = s * (.7 + r() * .4), w = s * .26;
+      const tx = cx + Math.cos(a) * len, ty = by + Math.sin(a) * len * .9;
+      const nx = -Math.sin(a), ny = Math.cos(a), mx = (cx + tx) / 2, my = (by + ty) / 2;
+      t += `<path d="M${f(cx)} ${f(by)} Q${f(mx + nx * w)} ${f(my + ny * w)} ${f(tx)} ${f(ty)} Q${f(mx - nx * w)} ${f(my - ny * w)} ${f(cx)} ${f(by)} Z" fill="${x.url("leaf")}" stroke="#1e4a1c" stroke-width=".5"/>` +
+        `<path d="M${f(cx)} ${f(by)} Q${f(mx + nx * w * .15)} ${f(my + ny * w * .15)} ${f(tx)} ${f(ty)}" fill="none" stroke="#c8f0a8" stroke-opacity=".45" stroke-width=".6"/>`;
+    }
+    return t;
+  }
+  const sprout = (x, cx, by, s) => `<path d="M${cx} ${by} V${f(by - s)}" stroke="#7cb85a" stroke-width="1.1"/>` +
+    `<path d="M${cx} ${f(by - s)} q-${f(s * .7)} -${f(s * .1)} -${f(s * .8)} -${f(s * .55)} q${f(s * .55)} -${f(s * .05)} ${f(s * .8)} ${f(s * .55)} Z" fill="${x.url("leaf")}"/>` +
+    `<path d="M${cx} ${f(by - s)} q${f(s * .7)} -${f(s * .1)} ${f(s * .8)} -${f(s * .55)} q-${f(s * .55)} -${f(s * .05)} -${f(s * .8)} ${f(s * .55)} Z" fill="${x.url("leaf")}"/>`;
+  const pot = (x, cx, by, w, h) => shadow(x, cx, by + 1, w * .75, 3.5) +
+    `<path d="M${f(cx - w / 2)} ${f(by - h)} H${f(cx + w / 2)} L${f(cx + w * .38)} ${by} H${f(cx - w * .38)} Z" fill="${x.url("pot")}"/>` +
+    `<rect x="${f(cx - w / 2 - 2)}" y="${f(by - h - 4)}" width="${f(w + 4)}" height="5" rx="1.2" fill="${x.url("pot")}"/><rect x="${f(cx - w / 2 - 2)}" y="${f(by - h - 4)}" width="${f(w + 4)}" height="1.2" fill="#fff" fill-opacity=".25"/>` +
+    E(cx, by - h - 3.6, w / 2, 1.6, "#2a1c12");
+
+  const SPEC = { full: ["#fff4e4", "#fff4e4", "#ff4b5c", "#fff4e4", "#ffcf9a"], rb: ["#ff3550", "#ff3550", "#5a6cff", "#ff3550"], bloom: ["#ff3550", "#ff6a3a", "#fff0e0", "#ff3550"] };
+  function chips(x, pts, spec) {
+    const pal = SPEC[spec] || SPEC.full;
+    return pts.map(([cx, cy, r], i) => {
+      const col = pal[i % pal.length];
+      return x.on ? `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * 2.2)}" fill="${col}" opacity="${x.op(.3)}"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${H.mix(col, "#ffffff", .45)}"/>`
+        : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="#e9dfc4" fill-opacity=".7"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * .45)}" fill="#c9a860" fill-opacity=".8"/>`;
+    }).join("");
+  }
+  const GROW = ["#d77bff", "#ff6fb8", "#f4f0ff", "#ffd2a6", "#9d7bff"];
+  const SPECOPT = { id: "spec", name: "Spectrum", values: [["full", "Full spectrum"], ["rb", "Red + blue"], ["bloom", "Bloom"]] };
+  const MODEOPT = { id: "mode", name: "Mode", values: [["normal", "Normal"], ["battery", "On battery"], ["test", "Test"]] };
+  const COUNTOPT = { id: "count", name: "Count", values: [["2", "2"], ["3", "3"], ["4", "4"]] };
+  const base = (o) => Object.assign({ picker: true, colorLabel: "Light", cast: "down" }, o);
+
+  function statusLed(x, cx, cy, mode) {
+    const col = mode === "battery" ? "#ffb02e" : mode === "test" ? "#ff4040" : "#3ddc6a";
+    return `<g${mode === "test" ? ` class="${P}blink"` : ""}><circle cx="${cx}" cy="${cy}" r="4.2" fill="${col}" opacity=".35"/><circle cx="${cx}" cy="${cy}" r="1.9" fill="${H.mix(col, "#fff", .4)}"/></g>`;
+  }
+
+  const icons = [
+    base({ id: "growbar", name: "Grow bar panel", colors: GROW, glow: { x: .5, y: .3, r: 1.2 }, options: [SPECOPT], render(o) {
+      const x = ctx(o), sp = x.opt.spec || "full";
+      const bg = ceil(x, 20) + wallBg(x, 22, 152, 3) + bench(x, 160) +
+        `<rect x="66" y="20" width="8" height="3" fill="#8a8f96"/><rect x="126" y="20" width="8" height="3" fill="#8a8f96"/>`;
+      const BY = 40, FY = 68, bx0 = 54, bw = 92, fx0 = 34, fw = 132;
+      let fx = "";
+      [[bx0, BY, 70], [bx0 + bw, BY, 130], [fx0, FY, 70], [fx0 + fw, FY, 130]].forEach(([cx, cy, hx]) => {
+        fx += `<path d="M${cx} ${cy} L${hx} 23" stroke="#141418" stroke-width="1"/>`;
+      });
+      fx += `<rect x="66" y="27" width="8" height="5" rx="1" fill="#2a2b31"/><rect x="126" y="27" width="8" height="5" rx="1" fill="#2a2b31"/>`;
+      fx += `<rect x="86" y="31" width="28" height="9" rx="1.6" fill="${x.url("blk")}"/><path d="M89 34 H111 M89 36.5 H111" stroke="#fff" stroke-opacity=".1"/>`;
+      for (let i = 0; i < 4; i++) {
+        const t0 = (i + .12) / 4, t1 = (i + .88) / 4, tm = (i + .5) / 4;
+        const a = bx0 + bw * t0, b = bx0 + bw * t1, c = fx0 + fw * t0, d = fx0 + fw * t1;
+        fx += `<path d="M${f(a)} ${BY} L${f(b)} ${BY} L${f(d)} ${FY} L${f(c)} ${FY} Z" fill="${x.url("aluh")}"/>`;
+        const ia = bx0 + bw * (tm - .07), ib = bx0 + bw * (tm + .07), ic = fx0 + fw * (tm - .07), id2 = fx0 + fw * (tm + .07);
+        fx += `<path d="M${f(ia)} ${BY + 1} L${f(ib)} ${BY + 1} L${f(id2)} ${FY - 1} L${f(ic)} ${FY - 1} Z" fill="#17171c"/>`;
+        const pts = []; for (let k = 0; k < 7; k++) { const u = (k + .5) / 7; pts.push([bx0 + bw * tm + (fx0 + fw * tm - bx0 - bw * tm) * u, BY + 1 + (FY - BY - 2) * u, .9 + .7 * u]); }
+        fx += chips(x, pts, sp);
+        fx += `<path d="M${f(c)} ${FY} L${f(d)} ${FY} L${f(d)} ${FY + 2.6} L${f(c)} ${FY + 2.6} Z" fill="#5d636b"/>`;
+      }
+      fx += `<rect x="${bx0 - 3}" y="${BY - 2}" width="${bw + 6}" height="3" rx="1.4" fill="${x.url("blkh")}"/><rect x="${fx0 - 4}" y="${FY + 1}" width="${fw + 8}" height="4" rx="2" fill="${x.url("blkh")}"/>`;
+      fx += pot(x, 58, 160, 22, 16) + plant(x, 58, 140, 22, 5) + pot(x, 100, 160, 24, 18) + plant(x, 100, 138, 26, 9, 8) + pot(x, 142, 160, 22, 16) + plant(x, 142, 140, 21, 13);
+      const cone = poly([[fx0, FY + 4], [fx0 + fw, FY + 4], [188, 156], [12, 156]]);
+      const light = `<polygon points="${cone}" fill="${x.url("beam")}" opacity="${x.op(.7)}"/>` + E(100, 154, 88, 8, x.url("pool"), `opacity="${x.op(.8)}"`);
+      const over = `<polygon points="${cone}" fill="${x.url("beam")}" opacity="${x.op(.16)}"/>` + glo(x, 100, FY, 70, 10, .5);
+      return svg(x, { bg, light, fx, over });
+    } }),
+
+    base({ id: "clipgrow", name: "Clip-on grow lamp", colors: GROW, glow: { x: .62, y: .3, r: 1 }, options: [SPECOPT], render(o) {
+      const x = ctx(o), sp = x.opt.spec || "full";
+      const bg = wallBg(x, 8, 142, 11) + `<rect x="150" y="34" width="34" height="46" fill="#2a3448"/><path d="M167 34 V80 M150 57 H184" stroke="#cfc8bc" stroke-width="2.2"/><rect x="148" y="32" width="38" height="50" fill="none" stroke="#d8d2c6" stroke-width="2"/>` +
+        `<rect x="8" y="142" width="184" height="10" fill="#9a7450"/><rect x="8" y="142" width="184" height="1.4" fill="#fff" fill-opacity=".22"/><rect x="8" y="152" width="184" height="40" fill="${x.url("wood")}"/>`;
+      const heads = [[92, 56, 16], [124, 40, -4], [152, 62, -26]];
+      let fx = "", light = "";
+      fx += `<path d="M22 136 H44 V160 H38 V146 H22 Z" fill="${x.url("blkh")}"/><rect x="30" y="160" width="4" height="12" fill="#7d838b"/><rect x="24" y="170" width="16" height="4" rx="2" fill="${x.url("blkh")}"/>`;
+      fx += `<rect x="30" y="100" width="6" height="38" rx="2" fill="${x.url("blkh")}"/><circle cx="33" cy="100" r="5" fill="${x.url("blk")}"/>`;
+      fx += `<path d="M40 150 C56 156 60 166 70 168" stroke="#141418" stroke-width="1.6" fill="none"/><rect x="68" y="162" width="24" height="12" rx="2.4" fill="${x.url("blk")}"/><circle cx="74" cy="168" r="1.6" fill="#888"/><circle cx="80" cy="168" r="1.6" fill="#888"/><circle cx="86" cy="168" r="1.6" fill="${x.on ? "#69db7c" : "#555"}"/>`;
+      heads.forEach(([hx, hy, ang]) => {
+        const rad = ang * Math.PI / 180, ex = hx - Math.cos(rad) * 18, ey = hy - Math.sin(rad) * 18;
+        const d = `M33 100 C33 ${f(hy + 10)} ${f(ex - 30)} ${f(ey - 26)} ${f(ex)} ${f(ey)}`;
+        fx += `<path d="${d}" stroke="#18181d" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="${d}" stroke="#6a6e76" stroke-width="3.4" fill="none" stroke-dasharray=".7 1.6"/>`;
+      });
+      heads.forEach(([hx, hy, ang], j) => {
+        const pts = []; for (let k = 0; k < 8; k++) pts.push([-14 + k * 4, 3.4, .95]);
+        light += `<g transform="translate(${hx} ${hy}) rotate(${ang})"><polygon points="-16,4 16,4 34,96 -34,96" fill="${x.url("beam")}" opacity="${x.op(.45)}"/></g>`;
+        fx += `<g transform="translate(${hx} ${hy}) rotate(${ang})"><rect x="-18" y="-4" width="36" height="8" rx="3.6" fill="${x.url("blkh")}"/><rect x="-16" y="1.6" width="32" height="3.6" rx="1.6" fill="#101014"/>${chips(x, pts, sp)}${hl("M-15 -2.6 H15", .25, .8)}</g>`;
+        light += glo(x, hx, hy + 6, 22, 10, .55);
+      });
+      fx += pot(x, 124, 146, 34, 24) + plant(x, 124, 118, 40, 21, 9);
+      light += E(124, 144, 54, 7, x.url("pool"), `opacity="${x.op(.75)}"`);
+      const over = `<polygon points="70,70 180,70 180,142 70,142" fill="${x.url("beam")}" opacity="${x.op(.12)}"/>`;
+      return svg(x, { bg, light, fx, over });
+    } }),
+
+    base({ id: "growstrip", name: "Shelf grow strip", colors: ["#f4f0ff", "#d77bff", "#ff6fb8", "#ffd2a6", "#9d7bff"], glow: { x: .5, y: .3, r: 1.1 }, options: [SPECOPT], render(o) {
+      const x = ctx(o), sp = x.opt.spec || "full";
+      const bg = wallBg(x, 8, 192, 17);
+      let fx = "";
+      [24, 176].forEach((px) => { fx += `<rect x="${px - 3}" y="8" width="6" height="184" fill="${x.url("aluh")}"/>`; for (let y = 12; y < 192; y += 5) fx += `<path d="M${px - 3} ${y} H${px + 3}" stroke="#000" stroke-opacity=".22" stroke-width=".6"/>`; });
+      for (let i = 0; i < 18; i++) fx += `<path d="M${f(28 + i * 8.3)} 44 L${f(30 + i * 8)} 52" stroke="#aeb4bb" stroke-width=".8"/>`;
+      fx += `<rect x="20" y="40" width="160" height="4" fill="${x.url("alu")}"/><rect x="20" y="52" width="160" height="4" fill="${x.url("alu")}"/>`;
+      const strip = (y, x0, x1, h) => {
+        const pts = []; const n = Math.round((x1 - x0 - 8) / 5); for (let k = 0; k < n; k++) pts.push([x0 + 6 + k * ((x1 - x0 - 12) / (n - 1)), y + h * .6, h * .26]);
+        return `<rect x="${x0}" y="${y}" width="${x1 - x0}" height="${h}" rx="${h / 2.4}" fill="${x.url("alu")}"/><rect x="${x0 + 3}" y="${f(y + h * .35)}" width="${x1 - x0 - 6}" height="${f(h * .55)}" rx="1.4" fill="#18181c"/>${chips(x, pts, sp)}` +
+          `<rect x="${f(x0 + 3)}" y="${f(y + h * .35)}" width="${x1 - x0 - 6}" height="${f(h * .55)}" rx="1.4" fill="#fff" fill-opacity="${x.on ? .12 : .06}"/><rect x="${x0 - 1}" y="${y - .5}" width="4" height="${h + 1}" rx="1" fill="#2a2b31"/><rect x="${x1 - 3}" y="${y - .5}" width="4" height="${h + 1}" rx="1" fill="#2a2b31"/>`;
+      };
+      fx += strip(57, 40, 160, 6) + strip(64, 34, 166, 8);
+      fx += `<path d="M166 68 C172 70 174 74 174 82" stroke="#141418" stroke-width="1.4" fill="none"/>`;
+      for (let i = 0; i < 18; i++) fx += `<path d="M${f(30 + i * 8)} 150 L${f(28 + i * 8.3)} 160" stroke="#aeb4bb" stroke-width=".8"/>`;
+      fx += `<rect x="20" y="148" width="160" height="3" fill="${x.url("alu")}"/><rect x="20" y="160" width="160" height="5" fill="${x.url("alu")}"/>`;
+      fx += shadow(x, 100, 154, 66, 5) + `<path d="M40 128 H160 L166 154 H34 Z" fill="#1d1e22"/><path d="M40 128 H160 L162 134 H38 Z" fill="#3a3c42"/>`;
+      for (let col = 0; col < 8; col++) for (let row = 0; row < 2; row++) {
+        const cx = 50 + col * 14.3 + (row ? -1.5 : 0), by = 138 + row * 9;
+        fx += E(cx, by, 5.2, 1.6, x.url("soil")) + sprout(x, cx, by, 6 + ((col * 7 + row * 3) % 5));
+      }
+      const cone = poly([[34, 72], [166, 72], [178, 150], [22, 150]]);
+      const light = `<polygon points="${cone}" fill="${x.url("beam")}" opacity="${x.op(.75)}"/>` + E(100, 140, 72, 8, x.url("pool"), `opacity="${x.op(.8)}"`);
+      const over = `<polygon points="${cone}" fill="${x.url("beam")}" opacity="${x.op(.14)}"/>` + glo(x, 100, 68, 76, 7, .55);
+      return svg(x, { bg, light, fx, over });
+    } }),
+
+    base({ id: "blacklight", name: "Blacklight tube", colors: ["#8a4dff", "#6a3dff", "#b06aff", "#5a6cff"], cast: "down", glow: { x: .5, y: .24, r: 1.2 }, render(o) {
+      const x = ctx(o), L = x.L;
+      const neon = (col) => x.on ? H.mix(col, "#ffffff", .25 * L) : H.mix(col, "#55525e", .7);
+      const poster = `<rect x="56" y="78" width="88" height="96" fill="#0c0b12"/><rect x="56" y="78" width="88" height="96" fill="none" stroke="#2a2833" stroke-width="2"/>` +
+        `<circle cx="100" cy="114" r="20" fill="none" stroke="${neon("#ff3cc8")}" stroke-width="2.4"/><ellipse cx="100" cy="114" rx="32" ry="7" fill="none" stroke="${neon("#5aff7a")}" stroke-width="2" transform="rotate(-14 100 114)"/>` +
+        `<path d="M64 158 Q76 148 88 158 T112 158 T136 158" fill="none" stroke="${neon("#ffe14a")}" stroke-width="2.2"/><path d="M64 166 Q76 156 88 166 T112 166 T136 166" fill="none" stroke="${neon("#4ad8ff")}" stroke-width="1.6"/>` +
+        [[70, 90], [128, 92], [134, 136], [66, 130], [118, 140]].map(([sx, sy]) => `<path d="M${sx} ${sy - 3} L${sx + 1} ${sy} L${sx} ${sy + 3} L${sx - 1} ${sy} Z M${sx - 3} ${sy} L${sx} ${sy + 1} L${sx + 3} ${sy} L${sx} ${sy - 1} Z" fill="${neon("#ffffff")}"/>`).join("") +
+        (x.on ? `<rect x="56" y="78" width="88" height="96" fill="${x.c}" opacity="${(.12 * L).toFixed(2)}"/>` : "");
+      const bg = `<rect x="8" y="8" width="184" height="184" fill="#24212c"/>` + wallBg(x, 8, 180, 23).replace(x.url("wall"), "#26232e") +
+        (x.on ? E(100, 70, 110, 70, x.url("halo"), `opacity="${x.op(.32)}"`) : "") + poster + `<rect x="8" y="180" width="184" height="12" fill="#121016"/>`;
+      let fx = shadow(x, 100, 54, 70, 4, .6);
+      fx += `<rect x="28" y="40" width="144" height="12" rx="3" fill="${x.url("blkh")}"/><rect x="30" y="49" width="140" height="1" fill="#fff" fill-opacity=".1"/>`;
+      const tubeFill = x.on ? x.url("tube") : x.url("tubeoff");
+      fx += `<rect x="36" y="31" width="128" height="10" rx="5" fill="${tubeFill}"/>`;
+      if (x.on) fx += `<g class="${P}hum"><rect x="36" y="29" width="128" height="14" rx="7" fill="${x.c}" opacity="${x.op(.35)}"/><rect x="38" y="34" width="124" height="2.6" rx="1.3" fill="#ffffff" opacity="${x.op(.75)}"/></g>`;
+      fx += hl("M40 33.2 H160", x.on ? .3 : .45, .9);
+      fx += `<rect x="30" y="30" width="8" height="12" rx="1.6" fill="${x.url("alu")}"/><rect x="162" y="30" width="8" height="12" rx="1.6" fill="${x.url("alu")}"/>`;
+      fx += `<path d="M70 41 V44 M130 41 V44" stroke="#9aa0a8" stroke-width="2.6"/><path d="M172 46 C182 48 184 60 184 80" stroke="#141418" stroke-width="1.4" fill="none"/><rect x="152" y="46" width="12" height="4" rx="1" fill="#1a1a1f"/><circle cx="160" cy="48" r=".9" fill="${x.on ? "#b06aff" : "#444"}"/>`;
+      const light = `<polygon points="36,42 164,42 192,180 8,180" fill="${x.url("beam")}" opacity="${x.op(.3)}"/>` + glo(x, 100, 36, 90, 16, .7);
+      const extra = lg(x.id("tube"), [[0, H.mix(x.c, "#fff", .4)], [.45, "#ffffff"], [1, x.c]], 0, 0, 0, 1) +
+        lg(x.id("tubeoff"), [[0, "#5a4f78"], [.4, "#c9c2dc"], [.6, "#7a6e9a"], [1, "#2e2840"]], 0, 0, 0, 1);
+      return svg(x, { bg, light, fx }, extra);
+    } }),
+
+    base({ id: "uvsanitizer", name: "UV sanitizer lamp", colors: ["#8fa8ff", "#b07cff", "#6fd0ff", "#e0d8ff"], cast: "around", glow: { x: .5, y: .5, r: 1.1 }, render(o) {
+      const x = ctx(o);
+      const bg = wallBg(x, 8, 158, 29) + bench(x, 166);
+      let fx = shadow(x, 100, 170, 48, 6);
+      fx += `<path d="M58 152 V164 A42 9 0 0 0 142 164 V152 Z" fill="${x.url("wph")}"/>` + E(100, 152, 42, 9, x.url("wp")) + E(100, 152, 30, 6, "#d6dadf");
+      fx += `<rect x="84" y="158" width="32" height="10" rx="2" fill="#15161b"/>`;
+      fx += x.on ? `<text x="100" y="165.6" font-family="Arial, Helvetica, sans-serif" font-size="7" font-weight="700" fill="${H.mix(x.c, "#fff", .5)}" text-anchor="middle">14<tspan class="${P}blink">:</tspan>59</text>`
+        : `<text x="100" y="165.6" font-family="Arial, Helvetica, sans-serif" font-size="7" font-weight="700" fill="#2c2e36" text-anchor="middle">00:00</text>`;
+      fx += `<circle cx="72" cy="163" r="2.4" fill="#cfd3d8" stroke="#9aa0a8" stroke-width=".6"/><circle cx="128" cy="163" r="2.4" fill="${x.on ? "#ff5a5a" : "#cfd3d8"}" stroke="#9aa0a8" stroke-width=".6"/>`;
+      fx += `<rect x="80" y="140" width="40" height="12" rx="3" fill="${x.url("wph")}"/>`;
+      const tube = (cx) => `M${cx - 7} 141 V70 A7 7 0 0 1 ${cx + 7} 70 V141`;
+      let tubes = "";
+      [88, 112].forEach((cx) => {
+        tubes += x.on ? `<path d="${tube(cx)}" stroke="${x.c}" stroke-width="9" fill="none" opacity="${x.op(.45)}"/><path d="${tube(cx)}" stroke="${H.mix(x.hot, "#fff", .4)}" stroke-width="4.4" fill="none"/><path d="${tube(cx)}" stroke="#ffffff" stroke-width="1.6" fill="none" opacity="${x.op(.9)}"/>`
+          : `<path d="${tube(cx)}" stroke="#d9dcef" stroke-opacity=".55" stroke-width="5" fill="none"/><path d="${tube(cx)}" stroke="#ffffff" stroke-opacity=".7" stroke-width="1" fill="none" transform="translate(-1.4 0)"/>`;
+      });
+      fx += tubes;
+      fx += `<rect x="98.5" y="66" width="3" height="76" fill="${x.url("aluh")}"/>` + E(100, 62, 24, 5, x.url("wph")) + `<rect x="76" y="56" width="48" height="6" rx="3" fill="${x.url("wph")}"/>` + E(100, 56, 24, 4.4, x.url("wp"));
+      fx += hl("M62 154 Q64 162 70 165", .5, 1.2);
+      const light = `<g class="${P}pulse">${E(100, 104, 80, 74, x.url("halo"), `opacity="${x.op(.75)}"`)}</g>` + E(100, 166, 74, 7, x.url("pool"), `opacity="${x.op(.7)}"`);
+      return svg(x, { bg, light, fx });
+    } }),
+
+    base({ id: "twinhead", name: "Twin-head emergency", colors: ["#fff8e8", "#ffffff", "#ffe2a8", "#e8f0ff"], glow: { x: .5, y: .44, r: 1.1 }, options: [MODEOPT], render(o) {
+      const mode = (o.opt && o.opt.mode) || "normal";
+      const x = ctx(o, o.on || mode !== "normal");
+      let bg = wallBg(x, 8, 172, 31).replace(x.url("wall"), x.url("block"));
+      for (let r = 0; r < 9; r++) { const y = 8 + r * 18.5; bg += `<path d="M8 ${f(y)} H192" stroke="#000" stroke-opacity=".22" stroke-width="1"/>`; for (let c = 0; c < 5; c++) bg += `<path d="M${f(8 + c * 46 + (r % 2) * 23)} ${f(y)} V${f(y + 18.5)}" stroke="#000" stroke-opacity=".2" stroke-width="1"/>`; }
+      bg += floorBoards(x, 172).replace(x.url("wood"), "#3a3a40");
+      const blinkCls = mode === "test" ? ` class="${P}blink"` : "";
+      let fx = shadow(x, 100, 128, 40, 3.5, .5);
+      fx += `<rect x="64" y="90" width="72" height="36" rx="5" fill="${x.url("wp")}"/><rect x="64" y="90" width="72" height="36" rx="5" fill="none" stroke="#9aa0a8" stroke-width=".6"/>`;
+      fx += `<rect x="68" y="94" width="64" height="2" rx="1" fill="#fff" fill-opacity=".8"/>`;
+      for (let i = 0; i < 6; i++) fx += `<rect x="${74 + i * 5}" y="104" width="2.2" height="12" rx="1.1" fill="#b4b9c0"/>`;
+      fx += `<circle cx="116" cy="110" r="4" fill="#d83a3a" stroke="#8a1f1f" stroke-width=".6"/>${hl("M114 108.4 A2.4 2.4 0 0 1 117 107.6", .6, .8)}` + statusLed(x, 127, 110, mode);
+      let light = "";
+      [[64, 84, -1], [136, 84, 1]].forEach(([hx, hy, s]) => {
+        fx += `<path d="M${hx + s * -6} 92 L${hx} ${hy + 4}" stroke="#c4c9cf" stroke-width="4" stroke-linecap="round"/>`;
+        fx += `<g transform="translate(${hx} ${hy}) rotate(${s * 28})">` +
+          `<rect x="-11" y="-10" width="22" height="16" rx="6" fill="${x.url("wph")}"/>` +
+          E(0, 6, 10, 4.6, "#cfd3d8") + E(0, 6.4, 8, 3.6, x.on ? x.url("lens") : "#e6e8ea") +
+          (x.on ? "" : `<path d="M-6 6.4 H6 M-4 4.4 H4 M-4 8.4 H4" stroke="#b4b9c0" stroke-width=".5"/>`) + `</g>`;
+        light += `<g${blinkCls}><polygon points="${poly([[hx - 8, hy + 8], [hx + 8, hy + 8], [hx + s * 70, 182], [hx + s * 6, 186]])}" fill="${x.url("beam")}" opacity="${x.op(.55)}"/>` +
+          E(hx + s * 38, 178, 34, 6, x.url("pool"), `opacity="${x.op(.8)}"`) + E(hx + s * 2, hy + 8, 16, 12, x.url("halo"), `opacity="${x.op(.8)}"`) + `</g>`;
+      });
+      const extra = lg(x.id("block"), [[0, "#6c6a66"], [1, "#4a4844"]], 0, 0, 0, 1) + rg(x.id("lens"), [[0, "#ffffff"], [.5, x.hot], [1, x.c]]);
+      return svg(x, { bg, light, fx }, extra);
+    } }),
+
+    base({ id: "exitsign", name: "Lit EXIT sign", colors: ["#ff3b30", "#33d16a", "#ff5a4a", "#4ae08a"], colorLabel: "Letters", glow: { x: .5, y: .4, r: 1 }, options: [MODEOPT, { id: "arrow", name: "Arrows", values: [["none", "None"], ["left", "Left"], ["right", "Right"], ["both", "Both"]] }], render(o) {
+      const mode = (o.opt && o.opt.mode) || "normal", arrow = (o.opt && o.opt.arrow) || "none";
+      const x = ctx(o, o.on || mode !== "normal");
+      const bg = ceil(x, 24) + wallBg(x, 26, 176, 37) +
+        `<rect x="58" y="120" width="84" height="64" fill="#5a4a3a"/><rect x="62" y="124" width="76" height="60" fill="#7a6248"/><rect x="62" y="124" width="76" height="60" fill="none" stroke="#000" stroke-opacity=".3"/>` +
+        `<rect x="70" y="152" width="60" height="5" rx="2" fill="${x.url("alu")}"/><path d="M8 176 H192" stroke="#888" stroke-opacity=".4"/><rect x="8" y="176" width="184" height="16" fill="#2e2c30"/>`;
+      let fx = `<rect x="96" y="24" width="8" height="12" fill="${x.url("aluh")}"/><rect x="88" y="22" width="24" height="4" rx="1" fill="${x.url("wp")}"/>`;
+      fx += shadow(x, 100, 104, 62, 4, .4) + `<rect x="36" y="36" width="128" height="66" rx="4" fill="${x.url("wp")}"/><rect x="36" y="36" width="128" height="66" rx="4" fill="none" stroke="#9aa0a8" stroke-width=".7"/>`;
+      fx += `<rect x="42" y="42" width="116" height="52" rx="2" fill="${x.on ? H.mix(x.c, "#ffffff", .9) : "#eceae6"}"/><rect x="42" y="42" width="116" height="52" rx="2" fill="none" stroke="#c4c9cf" stroke-width=".6"/>`;
+      const letter = x.on ? H.mix(x.c, "#ffffff", .1 * x.L) : H.mix(x.c, "#3a3a3a", .55);
+      const lcls = mode === "test" ? ` class="${P}blink"` : "";
+      const fs2 = arrow === "both" ? 24 : arrow === "none" ? 30 : 27, tx = arrow === "left" ? 106 : arrow === "right" ? 94 : 100;
+      let face = `<text x="${tx}" y="${arrow === "none" ? 80 : 78}" font-family="Arial, Helvetica, sans-serif" font-size="${fs2}" font-weight="700" letter-spacing="2" text-anchor="middle" fill="${letter}">EXIT</text>`;
+      const chev = (cx, dir) => `<path d="M${cx + dir * 6} 56 L${cx - dir * 4} 68 L${cx + dir * 6} 80" fill="none" stroke="${letter}" stroke-width="4.4" stroke-linejoin="miter"/>`;
+      if (arrow === "left" || arrow === "both") face += chev(50, 1);
+      if (arrow === "right" || arrow === "both") face += chev(150, -1);
+      fx += `<g${lcls}>${x.on ? `<g opacity="${x.op(.75)}" filter="url(#${x.id("bl")})">${face}</g>` : ""}${face}</g>`;
+      fx += statusLed(x, 152, 98, mode) + `<circle cx="48" cy="98" r="2" fill="#d8dce0" stroke="#9aa0a8" stroke-width=".5"/>`;
+      fx += hl("M40 39 H160", .6, .8);
+      const light = `<g${lcls}>` + `<polygon points="40,102 160,102 184,176 16,176" fill="${x.url("beam")}" opacity="${x.op(.28)}"/>` + E(100, 70, 86, 46, x.url("halo"), `opacity="${x.op(.55)}"`) + `</g>`;
+      const extra = `<filter id="${x.id("bl")}" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.4"/></filter>`;
+      return svg(x, { bg, light, fx }, extra);
+    } }),
+
+    base({ id: "pendantgroup", name: "Pendant group", colors: ["#ffc477", "#ffe2ad", "#fff6ea", "#ffb36b", "#a5d8ff"], colors2: ["#1d1e24", "#e9e6df", "#3e5a4a", "#7a2e2e"], picker2: true, colorLabel2: "Shade", glow: { x: .5, y: .5, r: 1.3 }, options: [COUNTOPT], render(o) {
+      const x = ctx(o), n = +((o.opt && o.opt.count) || 2), sc = o.color2 || "#1d1e24";
+      const gap = n === 4 ? 40 : n === 3 ? 50 : 62, w = n === 4 ? 30 : 34;
+      const bg = ceil(x, 20) + wallBg(x, 22, 150, 41) + `<rect x="18" y="150" width="164" height="7" rx="1" fill="#d9d6d0"/><rect x="18" y="150" width="164" height="1.6" fill="#fff" fill-opacity=".6"/><rect x="22" y="157" width="156" height="35" fill="#34404a"/>` +
+        [0, 1, 2, 3].map((i) => `<rect x="${26 + i * 38.5}" y="161" width="34" height="31" fill="none" stroke="#000" stroke-opacity=".25"/><rect x="${39 + i * 38.5}" y="165" width="8" height="1.8" rx=".9" fill="#c9a24a"/>`).join("");
+      let fx = "", light = "";
+      for (let i = 0; i < n; i++) {
+        const cx = 100 + (i - (n - 1) / 2) * gap, sy = 92;
+        fx += `<rect x="${cx - 5}" y="20" width="10" height="3" rx="1" fill="${x.url("blkh")}"/><path d="M${cx} 23 V${sy - 14}" stroke="#141418" stroke-width="1.3"/><rect x="${cx - 3}" y="${sy - 16}" width="6" height="6" rx="1" fill="${x.url("brs")}"/>`;
+        const d = `M${cx - 4} ${sy - 11} C${cx - 8} ${sy - 10} ${cx - w / 2} ${sy - 6} ${cx - w / 2} ${sy + 4} H${cx + w / 2} C${cx + w / 2} ${sy - 6} ${cx + 8} ${sy - 10} ${cx + 4} ${sy - 11} Z`;
+        fx += `<path d="${d}" fill="${sc}"/><path d="${d}" fill="${x.url("shg")}"/>` + E(cx, sy + 4, w / 2, 3, x.on ? x.url("lit") : "#c9a868") + (x.on ? E(cx, sy + 5, 4, 2, "#ffffff", `opacity="${x.op(1)}"`) : "");
+        fx += hl(`M${cx - w / 2 + 4} ${sy} C${cx - w / 2 + 5} ${sy - 6} ${cx - 8} ${sy - 9} ${cx - 4} ${sy - 10}`, .3, 1);
+        light += `<polygon points="${poly([[cx - w / 2, sy + 4], [cx + w / 2, sy + 4], [cx + w / 2 + 14, 150], [cx - w / 2 - 14, 150]])}" fill="${x.url("beam")}" opacity="${x.op(.45)}"/>` + E(cx, 151, w * .9, 3.6, x.url("pool"), `opacity="${x.op(.85)}"`) + glo(x, cx, sy + 6, w * .9, 12, .6);
+      }
+      const extra = rg(x.id("lit"), [[0, "#ffffff"], [.4, x.hot], [1, x.c]]) + lg(x.id("brs"), [[0, "#6e4a17"], [.35, "#fbe7a6"], [.7, "#b07f33"], [1, "#4d3210"]]) +
+        lg(x.id("shg"), [[0, "#000", .45], [.3, "#fff", .18], [.45, "#fff", .05], [.8, "#000", .2], [1, "#000", .55]]);
+      return svg(x, { bg, light, fx }, extra);
+    } }),
+
+    base({ id: "bulbgroup", name: "Bulb group", colors: ["#ffd8a8", "#fff3e0", "#ffffff", "#a5d8ff", "#ffc9de"], cast: "around", glow: { x: .5, y: .5, r: 1.3 }, options: [COUNTOPT], render(o) {
+      const x = ctx(o), n = +((o.opt && o.opt.count) || 2);
+      const LAY = { 2: [[76, 98, 1], [124, 98, 1]], 3: [[58, 104, .9], [142, 104, .9], [100, 92, 1]], 4: [[42, 108, .8], [158, 108, .8], [80, 96, .92], [120, 96, .92]] }[n] || [];
+      const bg = wallBg(x, 8, 172, 43) + `<rect x="8" y="172" width="184" height="20" fill="#2a2830"/><rect x="8" y="171" width="184" height="1.4" fill="#fff" fill-opacity=".12"/>`;
+      let fx = "", light = "";
+      const glassD = "M-6 26 C-6 18 -22 6 -22 -14 A22 22 0 1 1 22 -14 C22 6 6 18 6 26 Z";
+      LAY.forEach(([cx, cy, s]) => {
+        fx += shadow(x, cx, 174, 18 * s, 3, .7);
+        light += glo(x, cx, cy - 14 * s, 44 * s, 44 * s, .55);
+        let b = `<path d="${glassD}" fill="${x.on ? x.url("lit") : x.url("frost")}"/><path d="${glassD}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".7"/>` + hl("M-15 -24 C-18 -18 -18 -10 -15 -4", x.on ? .3 : .55, 2);
+        b += `<rect x="-7" y="25" width="14" height="5" rx="1" fill="${x.url("aluh")}"/>`;
+        for (let k = 0; k < 4; k++) b += `<path d="M-7 ${31 + k * 3} L7 ${30 + k * 3} L7 ${32 + k * 3} L-7 ${33 + k * 3} Z" fill="${x.url("aluh")}"/>`;
+        b += `<path d="M-5 43 H5 L3 47 H-3 Z" fill="#1d1d22"/><circle cx="0" cy="48" r="2" fill="#c9a24a"/>`;
+        fx += `<g transform="translate(${cx} ${cy}) scale(${s})">${b}</g>`;
+        if (x.on) light += E(cx, 174, 26 * s, 4, x.url("pool"), `opacity="${x.op(.6)}"`);
+      });
+      const extra = rg(x.id("lit"), [[0, "#ffffff"], [.45, x.hot], [1, x.c]], .5, .45, .6) + rg(x.id("frost"), [[0, "#f4f2ee"], [.7, "#d8d6d2"], [1, "#a8a6a2"]], .4, .35, .7);
+      return svg(x, { bg, light, fx }, extra);
+    } }),
+
+    base({ id: "poollight", name: "Underwater pool light", colors: ["#3fa9ff", "#3ce0d0", "#b05cff", "#ff5ca8", "#ffffff", "#4cd964"], cast: "around", glow: { x: .5, y: .55, r: 1.3 }, render(o) {
+      const x = ctx(o), L = x.L;
+      let bg = `<rect x="8" y="8" width="184" height="26" fill="#121a2a"/><rect x="8" y="30" width="184" height="8" fill="#c8c0b0"/><rect x="8" y="30" width="184" height="1.6" fill="#fff" fill-opacity=".5"/>` +
+        `<rect x="8" y="38" width="184" height="154" fill="${x.url("water")}"/>`;
+      for (let y = 44; y < 160; y += 10) bg += `<path d="M8 ${y} H192" stroke="#fff" stroke-opacity=".08" stroke-width=".7"/>`;
+      for (let xx = 14; xx < 192; xx += 10) bg += `<path d="M${xx} 38 V160" stroke="#fff" stroke-opacity=".07" stroke-width=".7"/>`;
+      bg += `<rect x="8" y="44" width="184" height="5" fill="#2a4a8a" fill-opacity=".55"/>`;
+      bg += `<path d="M8 160 H192 V192 H8 Z" fill="#0a2240" fill-opacity=".5"/>`;
+      for (let i = -8; i <= 28; i++) { const bx = 8 + i * 9; bg += `<path d="M${f(100 + (bx - 100) * .5)} 160 L${f(bx + (bx - 100) * .4)} 192" stroke="#fff" stroke-opacity=".06" stroke-width=".7"/>`; }
+      bg += `<path d="M8 168 H192 M8 178 H192" stroke="#fff" stroke-opacity=".05"/>`;
+      bg += `<path d="M8 38 Q30 35 52 38 T96 38 T140 38 T192 38 V42 H8 Z" fill="#9fd4ff" fill-opacity=".25"/>`;
+      const cx = 100, cy = 104;
+      let light = `<rect x="8" y="38" width="184" height="154" fill="${x.url("wglow")}" opacity="${x.op(1)}"/>`;
+      let rays = ""; for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + .2, a2 = a + .16; rays += `<polygon points="${poly([[cx, cy], [cx + Math.cos(a) * 120, cy + Math.sin(a) * 120], [cx + Math.cos(a2) * 120, cy + Math.sin(a2) * 120]])}" fill="${x.url("ray")}"/>`; }
+      light += `<g opacity="${x.op(.5)}">${rays}</g>`;
+      let caus = ""; const r = rnd(51); for (let i = 0; i < 16; i++) { const px = 14 + r() * 172, py = 46 + r() * 140; caus += `<path d="M${f(px)} ${f(py)} q6 -4 12 0 t12 0" fill="none" stroke="${x.hot}" stroke-width="1" stroke-linecap="round"/>`; }
+      light += `<g class="${P}caus" opacity="${x.op(.35)}">${caus}</g>`;
+      light += `<path class="${P}wave" d="M8 39 Q30 36 52 39 T96 39 T140 39 T192 39" fill="none" stroke="${x.hot}" stroke-width="1.6" opacity="${x.op(.7)}"/>`;
+      let fx = E(cx, cy + 2, 30, 30, "#000", `opacity=".25"`);
+      fx += `<circle cx="${cx}" cy="${cy}" r="28" fill="${x.url("ring")}"/><circle cx="${cx}" cy="${cy}" r="28" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width=".8"/>`;
+      fx += `<circle cx="${cx}" cy="${cy}" r="21" fill="${x.on ? x.url("lens") : x.url("lensoff")}"/>`;
+      for (let k = 1; k <= 4; k++) fx += `<circle cx="${cx}" cy="${cy}" r="${f(k * 4.6)}" fill="none" stroke="#fff" stroke-opacity="${x.on ? (.25 * L).toFixed(2) : .12}" stroke-width=".6"/>`;
+      fx += `<circle cx="${cx}" cy="${cy - 24.6}" r="1.8" fill="#8a9098"/><path d="M${cx - 1.2} ${cy - 24.6} H${cx + 1.2}" stroke="#333" stroke-width=".5"/>`;
+      fx += hl(`M${cx - 20} ${cy - 14} A24 24 0 0 1 ${cx - 6} ${cy - 25}`, .6, 1.4);
+      if (x.on) fx += E(cx, cy, 40, 40, x.url("halo"), `opacity="${x.op(.6)}"`);
+      fx += [[60, 150, 0], [148, 132, .8], [132, 168, 1.6]].map(([bx, by, d]) => `<circle class="${P}bub" style="animation-delay:${d}s" cx="${bx}" cy="${by}" r="1.6" fill="none" stroke="#cfe8ff" stroke-opacity=".6" stroke-width=".6"/>`).join("");
+      const extra = lg(x.id("water"), [[0, "#0d3a6a"], [.6, "#0a2648"], [1, "#061528"]], 0, 0, 0, 1) +
+        rg(x.id("wglow"), [[0, x.hot, .8], [.3, x.c, .55], [.75, x.c, .18], [1, x.c, .05]], .5, .43, .62) +
+        rg(x.id("ray"), [[0, "#ffffff", .5], [.5, x.c, .25], [1, x.c, 0]], 0, 0, 1) +
+        lg(x.id("ring"), [[0, "#f4f6f8"], [.4, "#a8b0b8"], [.6, "#e4e8ec"], [1, "#6a737c"]], 0, 0, 1, 1) +
+        rg(x.id("lens"), [[0, "#ffffff"], [.45, x.hot], [1, x.c]]) + rg(x.id("lensoff"), [[0, "#4a6a8a"], [.7, "#1e3450"], [1, "#0e1e30"]], .4, .35, .7);
+      return svg(x, { bg, light, fx }, extra);
+    } }),
+
+    base({ id: "spalight", name: "Spa light", colors: ["#3ce0d0", "#3fa9ff", "#b05cff", "#ff5ca8", "#ffb347", "#ffffff"], cast: "around", glow: { x: .5, y: .5, r: 1.2 }, render(o) {
+      const x = ctx(o);
+      let bg = `<rect x="8" y="8" width="184" height="184" fill="#18161c"/>` + `<rect x="8" y="8" width="184" height="80" fill="${x.url("wall")}"/>`;
+      for (let i = 0; i < 9; i++) bg += `<rect x="8" y="${88 + i * 12}" width="184" height="11" fill="#4a3826"/><path d="M8 ${88 + i * 12} H192" stroke="#000" stroke-opacity=".45"/>`;
+      let fx = shadow(x, 100, 182, 84, 8);
+      fx += `<path d="M22 112 H178 L172 182 H28 Z" fill="${x.url("cab")}"/>`;
+      for (let i = 0; i < 16; i++) fx += `<path d="M${f(30 + i * 9.4)} 116 L${f(31 + i * 9)} 182" stroke="#000" stroke-opacity=".3" stroke-width=".8"/>`;
+      fx += `<rect x="22" y="112" width="156" height="5" fill="#3a2a1a"/>`;
+      fx += `<path d="M28 60 Q28 52 36 52 H164 Q172 52 172 60 L178 110 Q178 118 170 118 H30 Q22 118 22 110 Z" fill="${x.url("shell")}"/>`;
+      const waterD = "M40 64 Q40 60 44 60 H156 Q160 60 160 64 L164 104 Q164 108 160 108 H40 Q36 108 36 104 Z";
+      fx += `<path d="${waterD}" fill="${x.url("spaw")}"/>`;
+      fx += `<path d="M44 96 Q60 88 76 96 M86 96 Q100 88 114 96 M124 96 Q140 88 156 96" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1.4"/>`;
+      if (x.on) fx += `<path d="${waterD}" fill="${x.url("spalit")}" opacity="${x.op(1)}"/>`;
+      fx += `<circle cx="100" cy="68" r="5" fill="#c8d0d8"/><circle cx="100" cy="68" r="3.6" fill="${x.on ? x.url("lens") : "#3a5068"}"/>`;
+      [[52, 72], [148, 72], [60, 100], [140, 100]].forEach(([jx, jy]) => { fx += `<circle cx="${jx}" cy="${jy}" r="2" fill="#aeb6be"/><circle cx="${jx}" cy="${jy}" r=".9" fill="#2a3440"/>`; });
+      fx += `<path d="M48 82 Q60 79 72 82 T96 82 M108 88 Q120 85 132 88 T156 88" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width=".8"/>`;
+      if (x.on) {
+        const r = rnd(61); let bub = "";
+        for (let i = 0; i < 14; i++) bub += `<circle class="${P}bub" style="animation-delay:${(r() * 2.4).toFixed(2)}s" cx="${f(48 + r() * 104)}" cy="${f(76 + r() * 28)}" r="${f(.8 + r() * 1.2)}" fill="#ffffff" fill-opacity=".55"/>`;
+        fx += bub + `<g opacity="${x.op(.35)}"><path class="${P}steam" d="M70 58 C64 46 76 40 70 26" fill="none" stroke="#e8eef4" stroke-width="3" stroke-linecap="round"/><path class="${P}steam" style="animation-delay:1.3s" d="M120 58 C114 46 126 40 120 26" fill="none" stroke="#e8eef4" stroke-width="3" stroke-linecap="round"/></g>`;
+        fx += E(100, 68, 14, 9, x.url("halo"), `opacity="${x.op(.9)}"`);
+      }
+      fx += hl("M32 58 Q34 54 40 54 H120", .55, 1);
+      const light = E(100, 84, 96, 52, x.url("halo"), `opacity="${x.op(.35)}"`);
+      const extra = lg(x.id("cab"), [[0, "#6e5034"], [.5, "#5a3e26"], [1, "#3a2818"]], 0, 0, 0, 1) +
+        lg(x.id("shell"), [[0, "#f4f4f2"], [.5, "#d8d8d4"], [1, "#a8a8a2"]], 0, 0, 0, 1) +
+        lg(x.id("spaw"), [[0, "#2a5a7a"], [1, "#0e2a40"]], 0, 0, 0, 1) +
+        rg(x.id("spalit"), [[0, x.hot, .95], [.35, x.c, .7], [1, x.c, .3]], .5, .15, .9) +
+        rg(x.id("lens"), [[0, "#ffffff"], [.5, x.hot], [1, x.c]]);
+      return svg(x, { bg, light, fx }, extra);
+    } }),
+  ];
+
+  (window.HDA = window.HDA || []).push({
+    id: "lights9",
+    tab: "Grow, UV & special lights",
+    group: "Lights",
+    kind: "light",
+    intro: "Grow lights, UV lamps, emergency and EXIT lights, light groups and pool and spa lights. Lit, each glows in the light color; the slider dims it. Grow lights have a Spectrum menu (the diode chips change), emergency lights a Mode menu (on battery lights the heads), groups a Count menu.",
+    css: `.hda-anim .hda-lights9-blink{animation:hda-lights9-blink 1s steps(1) infinite}
+@keyframes hda-lights9-blink{0%{opacity:1}50%{opacity:.12}}
+.hda-anim .hda-lights9-hum{animation:hda-lights9-hum 3.2s ease-in-out infinite}
+@keyframes hda-lights9-hum{0%,100%{opacity:1}50%{opacity:.78}}
+.hda-anim .hda-lights9-pulse{animation:hda-lights9-pulse 2.6s ease-in-out infinite}
+@keyframes hda-lights9-pulse{0%,100%{opacity:1}50%{opacity:.62}}
+.hda-anim .hda-lights9-caus{animation:hda-lights9-caus 3.6s ease-in-out infinite alternate}
+@keyframes hda-lights9-caus{0%{transform:translate(0,0)}100%{transform:translate(7px,3px)}}
+.hda-anim .hda-lights9-wave{animation:hda-lights9-wave 2.8s ease-in-out infinite alternate}
+@keyframes hda-lights9-wave{0%{transform:translate(0,0)}100%{transform:translate(-10px,0)}}
+.hda-anim .hda-lights9-bub{transform-box:fill-box;animation:hda-lights9-bub 2.4s linear infinite}
+@keyframes hda-lights9-bub{0%{transform:translate(0,0);opacity:0}20%{opacity:.9}100%{transform:translate(0,-20px);opacity:0}}
+.hda-anim .hda-lights9-steam{animation:hda-lights9-steam 4s ease-in-out infinite}
+@keyframes hda-lights9-steam{0%{transform:translate(0,6px);opacity:0}40%{opacity:1}100%{transform:translate(4px,-10px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-lights9-blink,.hda-anim .hda-lights9-hum,.hda-anim .hda-lights9-pulse,.hda-anim .hda-lights9-caus,.hda-anim .hda-lights9-wave,.hda-anim .hda-lights9-bub,.hda-anim .hda-lights9-steam{animation:none}}`,
+    icons,
+  });
+})();
+
+(function () {
   const P = "hda-lock-";
   const H = () => window.HDAH;
   const f = (n) => (+n).toFixed(1);
@@ -24233,10 +27185,33 @@ ${fil(x, `M${gx - 2} ${gy - 8} L${gx - 3} ${gy + 2} M${gx + 2} ${gy - 8} L${gx +
   const rg = (id, a, cx, cy, r) => `<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r || .5}">${stops(a)}</radialGradient>`;
 
   function pal(c) { const h = H(); return { l: h.shade(c, .55), m: c, d: h.shade(c, -.3), k: h.shade(c, -.58), e: h.shade(c, -.45) }; }
+  const AMB = "#ffb020", JAM = "#ff3b30";
+  const LSTATE = [["auto", "From on/off"], ["locked", "Locked"], ["unlocked", "Unlocked"], ["locking", "Locking"], ["unlocking", "Unlocking"], ["jammed", "Jammed"]];
+  const lockState = (o) => { const s = o.opt && o.opt.state; return s && s !== "auto" ? s : (o.on ? "locked" : "unlocked"); };
   function ctx(o) {
-    const u = o.uid, on = !!o.on, lv = o.level == null ? 1 : o.level;
-    return { o, u, on, B: .35 + .65 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p: pal(o.color || BLK), st: on ? GRN : RED, n: 0 };
+    const u = o.uid, ls = lockState(o), on = ls !== "unlocked", lv = o.level == null ? 1 : o.level;
+    const mv = ls === "locking" ? 1 : ls === "unlocking" ? -1 : 0, jam = ls === "jammed", mid = !!mv || jam;
+    return { o, u, on, ls, mv, jam, mid, fr: ls === "locked" ? 1 : ls === "unlocked" ? 0 : .5, B: .35 + .65 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p: pal(o.color || BLK),
+      st: jam ? JAM : mv ? AMB : on ? GRN : RED, hk: jam ? "hj" : mv ? "ha" : on ? "hg" : "hr", cls: jam ? P + "jblink" : mv ? P + "mblink" : on ? P + "breath" : "", n: 0 };
   }
+  const mcls = (x, a, b, m1, m2, j) => x.mid ? `${P}${x.jam ? j : x.mv > 0 ? m1 : m2}` : `${P}${x.on ? a : b}`;
+  function arrows(x, cx, cy, dir) {
+    if (!x.mv) return "";
+    let s = ""; for (let i = 0; i < 3; i++) s += `<path class="${P}chev${i}" d="M${f(-4.6 + i * 3.4)} -2.8L${f(-1.8 + i * 3.4)} 0L${f(-4.6 + i * 3.4)} 2.8"/>`;
+    return `<g transform="translate(${f(cx)} ${f(cy)}) rotate(${{ r: 0, d: 90, l: 180, u: 270 }[dir]})" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${s.replace(/ class="[^"]*"/g, "")}</g>` +
+      `<g transform="translate(${f(cx)} ${f(cy)}) rotate(${{ r: 0, d: 90, l: 180, u: 270 }[dir]})" fill="none" stroke="${AMB}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${s}</g>`;
+  }
+  function mark(x, cx, cy, s) {
+    if (x.jam) return `<g class="${P}jblink"><path d="M${f(cx)} ${f(cy - s * .48)}L${f(cx + s * .52)} ${f(cy + s * .42)}H${f(cx - s * .52)}Z" fill="${JAM}" stroke="${JAM}" stroke-width="${f(s * .1)}" stroke-linejoin="round"/></g>` +
+      `<path d="M${f(cx)} ${f(cy - s * .16)}V${f(cy + s * .1)}" stroke="#fff" stroke-width="${f(s * .11)}" stroke-linecap="round"/><circle cx="${f(cx)}" cy="${f(cy + s * .26)}" r="${f(s * .065)}" fill="#fff"/>`;
+    const r = s * .36, cw = x.mv > 0, a0 = -Math.PI / 2 + (cw ? .5 : -.5), a1 = a0 + (cw ? 1 : -1) * Math.PI * 1.45;
+    const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx2 = -Math.sin(a1) * (cw ? 1 : -1), ty2 = Math.cos(a1) * (cw ? 1 : -1), hs = s * .2;
+    const head = `M${f(ex + tx2 * hs)} ${f(ey + ty2 * hs)}L${f(ex - ty2 * hs * .9)} ${f(ey + tx2 * hs * .9)}L${f(ex + ty2 * hs * .9)} ${f(ey - tx2 * hs * .9)}Z`;
+    return `<g class="${P}${cw ? "spin" : "spinr"}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * .5)}" fill="none"/><path d="M${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))}A${f(r)} ${f(r)} 0 1 ${cw ? 1 : 0} ${f(ex)} ${f(ey)}" fill="none" stroke="${AMB}" stroke-width="${f(s * .11)}" stroke-linecap="round"/><path d="${head}" fill="${AMB}"/></g>`;
+  }
+  const word = (x, cx, cy, s) => x.mid ? tx(cx, cy, s, x.jam ? JAM : AMB, x.jam ? "JAMMED" : x.mv > 0 ? "LOCKING" : "UNLOCKING") : "";
+  const badge = (x) => x.jam ? `<g class="${P}badge"><circle cx="26" cy="26" r="11" fill="#000" fill-opacity=".45" transform="translate(1 1.6)"/><circle cx="26" cy="26" r="11" fill="#1c1416"/><circle cx="26" cy="26" r="10.3" fill="none" stroke="${JAM}" stroke-width="1.3"/>` +
+    `<path d="M26 19.2L32.4 30.6H19.6Z" fill="${AMB}" stroke="${AMB}" stroke-width="1.2" stroke-linejoin="round"/><path d="M26 23.2V27" stroke="#1c1416" stroke-width="1.6" stroke-linecap="round"/><circle cx="26" cy="29" r=".95" fill="#1c1416"/></g>` : "";
 
   function defs(x, extra) {
     const p = x.p, id = x.id;
@@ -24257,7 +27232,7 @@ ${lg(id("gap"), [[0, "#000", .9], [1, "#14121c", .9]])}
 ${rg(id("sh"), [[0, "#000", .55], [.6, "#000", .2], [1, "#000", 0]])}
 ${rg(id("hg"), [[0, GRN, .85], [.45, GRN, .28], [1, GRN, 0]])}
 ${rg(id("hr"), [[0, RED, .85], [.45, RED, .28], [1, RED, 0]])}
-${rg(id("hk"), [[0, KEY, .55], [.6, KEY, .18], [1, KEY, 0]])}
+${rg(id("hk"), [[0, KEY, .55], [.6, KEY, .18], [1, KEY, 0]])}${x.mid ? rg(id("ha"), [[0, AMB, .85], [.45, AMB, .28], [1, AMB, 0]]) + rg(id("hj"), [[0, JAM, .9], [.45, JAM, .32], [1, JAM, 0]]) : ""}
 ${rg(id("vig"), [[0, "#000", 0], [.62, "#000", .06], [1, "#000", .5]], .5, .48, .74)}
 <clipPath id="${id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>
 <filter id="${id("bl")}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2"/></filter>
@@ -24297,7 +27272,7 @@ ${extra || ""}</defs>`;
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x, extra)}
 <g class="hda-bg"><g clip-path="${x.url("wc")}">${surface(x, kind, tex)}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/>${after || ""}</g>
 <rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g>
-${hw}</svg>`;
+${hw}${badge(x)}</svg>`;
   }
   function jamb(x, E, c1, c2) {
     c1 = c1 || "#c9ccd2"; c2 = c2 || "#8c919a"; const g = x.id("jb" + (x.n++));
@@ -24313,20 +27288,20 @@ ${hw}</svg>`;
   const hole = (E, y, hh) => `<g class="hda-bg"><rect x="${E + 5}" y="${f(y - hh / 2 - 1.2)}" width="10" height="${f(hh + 2.4)}" rx="1" fill="#050508"/></g>`;
 
   function bolt(x, E, y, L, h, shape, steady) {
-    const k = x.id("bc" + (x.n++)), out = steady || x.on, y0 = y - h / 2;
+    const k = x.id("bc" + (x.n++)), fr = steady ? 1 : x.fr, out = fr >= 1, y0 = y - h / 2;
     let body;
     if (shape === "latch") body = `<path d="M${E - 2} ${f(y0)}H${E + L - 5}L${E + L} ${f(y + h / 2)}H${E - 2}Z" fill="${x.url("bolt")}"/><path d="M${E + L - 5} ${f(y0)}L${E + L} ${f(y + h / 2)}" stroke="#fff" stroke-opacity=".5" stroke-width=".8"/>`;
     else if (shape === "hook") body = `<path d="M${E - 2} ${f(y0)}H${E + L}V${f(y0 + h + 5)}H${E + L - 5}V${f(y0 + h)}H${E - 2}Z" fill="${x.url("bolt")}"/><path d="M${E} ${f(y0 + .6)}H${E + L - .6}" stroke="#fff" stroke-opacity=".6" stroke-width=".8"/>`;
     else body = `<path d="${rr(E - 2, y0, L + 2, h, 1.6)}" fill="${x.url("bolt")}"/><path d="M${E} ${f(y0 + .9)}H${E + L - 1.5}" stroke="#fff" stroke-opacity=".7" stroke-width=".9"/><path d="M${E + L - .6} ${f(y0 + 1.5)}V${f(y0 + h - 1.5)}" stroke="#000" stroke-opacity=".3"/>`;
-    const cls = steady ? "" : ` class="${P}${out ? "bo" : "bi"}"`;
+    const cls = steady ? "" : ` class="${mcls(x, "bo", "bi", "mxo", "mxi", "jx")}"`;
     const bt = `${hole(E, y, h + (shape === "hook" ? 5 : 0))}<clipPath id="${k}"><rect x="${E}" y="0" width="${200 - E}" height="200"/></clipPath>
-<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${-L - 3} 0)"`}><g${cls}>${body}</g></g></g>`;
+<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${fr ? f(-(L + 3) * (1 - fr)) : -L - 3} 0)"`}><g${cls}>${body}</g></g></g>` + (steady ? "" : arrows(x, E + 11, y - h / 2 - 8, x.mv > 0 ? "r" : "l"));
     return bt;
   }
   function boltUp(x, cx, edgeY, L, w) {
-    const k = x.id("bc" + (x.n++)), out = x.on;
+    const k = x.id("bc" + (x.n++)), out = x.fr >= 1, dy = out ? 0 : x.fr ? f((L + 3) * (1 - x.fr)) : L + 3;
     return `<rect x="${f(cx - w / 2 - 1.2)}" y="${edgeY - L - 1}" width="${f(w + 2.4)}" height="${L + 1}" rx="1" fill="#050508"/><clipPath id="${k}"><rect x="0" y="0" width="200" height="${edgeY}"/></clipPath>
-<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(0 ${L + 3})"`}><g class="${P}${out ? "buo" : "bui"}"><path d="${rr(cx - w / 2, edgeY - L, w, L + 2, 1.4)}" fill="${x.url("bv")}"/><path d="M${f(cx - w / 2 + .9)} ${edgeY - L + 1}V${edgeY}" stroke="#fff" stroke-opacity=".6" stroke-width=".8"/></g></g></g>`;
+<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(0 ${dy})"`}><g class="${mcls(x, "buo", "bui", "myo", "myi", "jy")}"><path d="${rr(cx - w / 2, edgeY - L, w, L + 2, 1.4)}" fill="${x.url("bv")}"/><path d="M${f(cx - w / 2 + .9)} ${edgeY - L + 1}V${edgeY}" stroke="#fff" stroke-opacity=".6" stroke-width=".8"/></g></g></g>` + arrows(x, cx + w / 2 + 7, edgeY - L / 2, x.mv > 0 ? "u" : "d");
   }
 
   const shd = (x, d, dx, dy, op) => `<path d="${d}" transform="translate(${dx == null ? 2.5 : dx} ${dy == null ? 4 : dy})" fill="#000" opacity="${op || .5}" filter="${x.url("bl")}"/>`;
@@ -24355,14 +27330,15 @@ ${hw}</svg>`;
   }
   function led(x, cx, cy, r) {
     r = r || 1.8; const c = x.st;
-    return `<circle class="${x.on ? P + "breath" : ""}" cx="${cx}" cy="${cy}" r="${f(r + 6)}" fill="${x.url(x.on ? "hg" : "hr")}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .4)}" fill="#fff" fill-opacity=".85"/>`;
+    return `<circle class="${x.cls}" cx="${cx}" cy="${cy}" r="${f(r + 6)}" fill="${x.url(x.hk)}"/><circle${x.mid ? ` class="${x.cls}"` : ""} cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .4)}" fill="#fff" fill-opacity=".85"/>`;
   }
   function ring(x, cx, cy, r, w) {
     const c = x.st;
-    return `<g class="${x.on ? P + "breath" : ""}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-opacity=".28" stroke-width="${f(w + 5)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-opacity=".18" stroke-width="${f(w + 10)}"/></g>
+    return `<g class="${x.cls}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-opacity=".28" stroke-width="${f(w + 5)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-opacity=".18" stroke-width="${f(w + 10)}"/></g>
 <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-width="${w}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="${f(w * .3)}"/>`;
   }
   function glyph(x, cx, cy, s, c) {
+    if (x.mid) return mark(x, cx, cy, s * 1.15);
     c = c || x.st; const lk = x.on, ly = lk ? 0 : -s * .16;
     return `<path d="M${f(cx - s * .28)} ${f(cy - s * .05 + ly)}V${f(cy - s * .3 + ly)}A${f(s * .28)} ${f(s * .28)} 0 0 1 ${f(cx + s * .28)} ${f(cy - s * .3 + ly)}V${f(cy - s * (lk ? .05 : .2) + ly)}" fill="none" stroke="${c}" stroke-width="${f(s * .12)}" stroke-linecap="round"/>
 <path d="${rr(cx - s * .42, cy - s * .08, s * .84, s * .62, s * .1)}" fill="${c}"/><circle cx="${f(cx)}" cy="${f(cy + s * .2)}" r="${f(s * .08)}" fill="#000" fill-opacity=".45"/>`;
@@ -24389,7 +27365,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
   const N10 = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 
   const icons = [];
-  const add = (id, name, def, fn) => icons.push({ id, name, colors: sw(def), picker: true, colorLabel: "Finish", render: (o) => fn(ctx(o)) });
+  const add = (id, name, def, fn) => icons.push({ id, name, colors: sw(def), picker: true, colorLabel: "Finish", options: [{ id: "state", name: "State", values: LSTATE }], render: (o) => fn(ctx(o)) });
 
   add("keypad", "Keypad deadbolt", NIC, (x) => {
     const E = 164, d = rr(98, 38, 46, 116, 15);
@@ -24406,7 +27382,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const glass = rr(94.5, 32.5, 39, 123, 6.5);
     const hw = jamb(x, E, "#b48a5e", "#6e4b2c") + strike(x, E, 100) + bolt(x, E, 100, 15, 9) + plate(x, d) +
       `<path d="${glass}" fill="${x.url("scr")}"/>` + (x.on ? `<path d="${glass}" fill="${KEY}" fill-opacity="${f(.07 * x.B)}"/>` : "") +
-      pad(x, 96, 46, 3, N12, 11, 11, 2.5, 6, "touch") + ring(x, 114, 136, 8, 1.6) + glyph(x, 114, 136, 9) +
+      pad(x, 96, 46, 3, N12, 11, 11, 2.5, 6, "touch") + ring(x, 114, 136, 8, 1.6) + glyph(x, 114, 136, 9) + word(x, 114, 40, 5.2) +
       `<path d="M94.5 39C104 34 120 33 133.5 36V60C118 52 104 51 94.5 56Z" fill="#fff" fill-opacity=".08"/><path d="${glass}" fill="none" stroke="#fff" stroke-opacity=".14"/>`;
     return scene(x, "oak", tex, hw);
   });
@@ -24414,7 +27390,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
   add("retrofit", "Retrofit lock", WHT, (x) => {
     const E = 166, cx = 106, cy = 100;
     const tex = panel(20, 20, 50, 70) + panel(20, 110, 50, 70) + speck(5, 30);
-    const knob = `<g transform="rotate(${x.on ? 90 : 0} ${cx} ${cy})"><g class="${P}${x.on ? "rl" : "ru"}">
+    const knob = `<g transform="rotate(${90 * x.fr} ${cx} ${cy})"><g class="${mcls(x, "rl", "ru", "mrl", "mru", "jr")}">
 <path d="${rr(cx - 6.5, cy - 24, 13, 48, 6.5)}" fill="#000" opacity=".35" transform="translate(1.5 2)"/><path d="${rr(cx - 6.5, cy - 24, 13, 48, 6.5)}" fill="${x.url("f")}"/>
 <path d="M${cx - 3} ${cy - 21}V${cy + 21}" stroke="#fff" stroke-opacity=".45" stroke-width="1.4" stroke-linecap="round"/><circle cx="${cx}" cy="${cy - 17}" r="1.6" fill="${x.st}"/></g></g>`;
     const hw = jamb(x, E, "#d6d9de", "#9da2ab") + strike(x, E, cy) + bolt(x, E, cy, 15, 9) +
@@ -24456,8 +27432,6 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     return scene(x, "walnut", tex, hw);
   });
 
-  // (parts) Multi-Function: Lock (on = locked), Doorbell (a stage: idle / ringing) and Door (a contact: open swings the
-  // door edge away from the jamb, the bolt showing in the gap). A Device Image (no o.mf) is drawn exactly as before.
   const VPARTS = [{ id: "lock", name: "Lock", type: "switch" }, { id: "bell", name: "Doorbell", type: "stage", values: [["idle", "Idle"], ["ringing", "Ringing"]], def: "idle" },
     { id: "door", name: "Door", type: "contact" }];
   add("video", "Video doorbell lock", NIC, (x0) => {
@@ -24484,10 +27458,10 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
   add("btpadlock", "Bluetooth padlock", NIC, (x) => {
     let tex = ""; for (let i = 0; i < 6; i++) tex += `<path d="${rr(40 + i * 21, 20, 9, 30, 4.5)}" fill="#000" fill-opacity=".38"/><path d="M${44 + i * 21} 22V48" stroke="#fff" stroke-opacity=".08"/>`;
     tex += `<path d="M8 176H192" stroke="#000" stroke-opacity=".3" stroke-width="2"/>` + speck(9, 50, .5);
-    const lift = x.on ? 0 : -10, shk = `M98 116V86A13.5 13.5 0 0 1 125 86V116`;
+    const lift = -10 * (1 - x.fr), shk = `M98 116V86A13.5 13.5 0 0 1 125 86V116`;
     const hw = `<path d="${rr(88, 60, 46, 50, 6)}" fill="#000" fill-opacity=".3"/><path d="${rr(90, 62, 42, 46, 5)}" fill="${x.url("stv")}"/><path d="${rr(90, 62, 42, 46, 5)}" fill="none" stroke="#000" stroke-opacity=".3"/>
 <path d="${rr(104, 58, 14, 34, 3)}" fill="${x.url("stl")}"/><rect x="107.5" y="72" width="7" height="12" rx="3" fill="#0a0a0d"/>` +
-      `<g transform="translate(0 ${lift})"><g class="${P}${x.on ? "sl" : "su"}"><path d="${shk}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="7.5" transform="translate(2 3)"/>
+      `<g transform="translate(0 ${lift})"><g class="${mcls(x, "sl", "su", "msl", "msu", "jy")}"><path d="${shk}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="7.5" transform="translate(2 3)"/>
 <path d="${shk}" fill="none" stroke="#5d646c" stroke-width="7.5"/><path d="${shk}" fill="none" stroke="#e6eaee" stroke-width="4"/><path d="M96.5 112V86A15 15 0 0 1 104 73" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.2"/></g></g>` +
       plate(x, rr(82, 108, 59, 58, 14), { fill: "fv", gloss: .45 }) + `<path d="${rr(82, 108, 59, 58, 14)}" fill="${x.url("f")}" opacity=".35"/>` +
       led(x, 111.5, 124, 2) + `<circle cx="111.5" cy="145" r="7.5" fill="#000" fill-opacity=".3"/><circle cx="111.5" cy="144.4" r="7" fill="${x.url("fs")}"/>` + glyph(x, 111.5, 144, 7, x.p.k) +
@@ -24502,11 +27476,11 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
       for (let bx = 8 - (row % 2) * 12; bx < 134; bx += 24) { const v = r(); tex += `<rect x="${f(bx + .8)}" y="${f(y + .8)}" width="22.4" height="9.4" rx="1" fill="${v > .5 ? "#000" : "#e09a7c"}" fill-opacity="${(.04 + v * .1).toFixed(2)}"/><path d="M${bx} ${y}v11" stroke="#c9b8a8" stroke-opacity=".16" stroke-width="1.5"/>`; }
       tex += `<path d="M8 ${y}H134" stroke="#c9b8a8" stroke-opacity=".18" stroke-width="1.5"/>`;
     }
-    const lift = x.on ? 0 : -20;
+    const lift = -20 * (1 - x.fr);
     let gd = `<rect x="146" y="20" width="50" height="172" fill="#c8ccd2"/>`;
     for (let y = 20; y < 191; y += 34.4) gd += `<rect x="146" y="${f(y)}" width="50" height="34" fill="url(#${x.u}-gdp)"/><rect x="154" y="${f(y + 7)}" width="42" height="20" rx="1.5" fill="#000" fill-opacity=".08"/><path d="M154 ${f(y + 27)}h42" stroke="#fff" stroke-opacity=".4"/><path d="M146 ${f(y + 33)}h50" stroke="#000" stroke-opacity=".35" stroke-width="1.4"/>`;
     const after = `<rect x="134" y="8" width="66" height="192" fill="#050508"/><rect x="146" y="150" width="50" height="50" fill="#16151c"/><path d="M146 176H196" stroke="#2c2a35"/><rect x="150" y="186" width="46" height="6" fill="#3a3842"/>` +
-      `<g transform="translate(0 ${lift})"><g class="${P}${x.on ? "gl" : "gu"}">${gd}</g></g>` +
+      `<g transform="translate(0 ${lift})"><g class="${mcls(x, "gl", "gu", "mgl", "mgu", "jy")}">${gd}</g></g>` +
       `<rect x="134" y="8" width="12" height="192" fill="url(#${x.u}-trim)"/><path d="M146 8V200" stroke="#000" stroke-opacity=".4"/><rect x="134" y="8" width="66" height="12" fill="url(#${x.u}-trim2)"/>`;
     const extra = lg(x.id("gdp"), [[0, "#e4e7eb"], [1, "#a6abb3"]], 0, 0, 0, 1) + lg(x.id("trim"), [[0, "#d9dce0"], [1, "#9298a1"]]) + lg(x.id("trim2"), [[0, "#d9dce0"], [1, "#9298a1"]], 0, 0, 0, 1);
     const box = rr(52, 50, 54, 112, 10);
@@ -24540,7 +27514,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const hw = `<g class="hda-bg"><path d="${rr(E + 6, 92, 12, 34, 2)}" fill="${x.url("stv")}"/></g>` + bolt(x, E, 104, 17, 9, "hook") +
       plate(x, rr(116, 44, 22, 116, 8), { fill: "f" }) + led(x, 127, 56, 1.8) +
       `<path d="${rr(120, 70, 14, 44, 7)}" fill="#000" fill-opacity=".35"/><path d="${rr(121, 71, 12, 42, 6)}" fill="${x.p.k}"/>` +
-      `<g transform="translate(0 ${x.on ? 0 : -16})"><g class="${P}${x.on ? "tl" : "tu"}"><path d="${rr(121.5, 92, 11, 20, 5.5)}" fill="${x.url("fs")}"/><path d="M124.5 95v14" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linecap="round"/></g></g>` +
+      `<g transform="translate(0 ${-16 * (1 - x.fr)})"><g class="${mcls(x, "tl", "tu", "mtl", "mtu", "jy")}"><path d="${rr(121.5, 92, 11, 20, 5.5)}" fill="${x.url("fs")}"/><path d="M124.5 95v14" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linecap="round"/></g></g>` +
       `<path d="${rr(121, 124, 12, 26, 6)}" fill="#000" fill-opacity=".4"/>` + glyph(x, 127, 137, 8, x.on ? GRN : "#9aa0a8");
     return scene(x, "plaster", speck(19, 90, 1), hw, glass, after);
   });
@@ -24552,7 +27526,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const sc = rr(101.5, 46.5, 23, 26, 3);
     const hw = jamb(x, E, "#d1b48c", "#8c6b45") + strike(x, E, 112, 26) + bolt(x, E, 112, 13, 9, "latch") +
       plate(x, rr(97, 40, 32, 46, 6)) + `<path d="${sc}" fill="${x.url("scr")}"/>` + pad(x, 102.5, 48, 3, ["1", "2", "3", "4", "5", "6", "7", "8", "9"], 6, 6.5, 2, 2, "touch") +
-      `<rect x="103" y="77" width="20" height="3" rx="1.5" fill="${x.st}"/><rect class="${x.on ? P + "breath" : ""}" x="99" y="74" width="28" height="9" rx="4.5" fill="${x.url(x.on ? "hg" : "hr")}"/>` +
+      `<rect x="103" y="77" width="20" height="3" rx="1.5" fill="${x.st}"/><rect class="${x.cls}" x="99" y="74" width="28" height="9" rx="4.5" fill="${x.url(x.hk)}"/>` +
       ring(x, 113, 112, 15.5, 1.4) + lever(x, 113, 112, 58, 13);
     return scene(x, "maple", tex, hw, lite);
   });
@@ -24618,7 +27592,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
       `<rect x="22" y="44" width="8" height="24" rx="3" fill="${x.url("stl")}"/><rect x="22" y="132" width="8" height="24" rx="3" fill="${x.url("stl")}"/>` +
       plate(x, rr(56, 40, 74, 66, 8)) + `<path d="${rr(62, 46, 62, 48, 4)}" fill="#000" fill-opacity=".3"/>` + pad(x, 64.5, 48, 4, N12, 12, 9, 2.5, 3, "btn") + led(x, 93, 100, 1.6) +
       `${shd(x, circ(82, 144, 24), 2, 4)}${spokes}<circle cx="82" cy="144" r="10" fill="${x.url("fs")}"/><circle cx="82" cy="144" r="10" fill="none" stroke="${x.p.e}" stroke-width=".7"/><circle cx="79" cy="141" r="3" fill="#fff" fill-opacity=".3"/>` +
-      `<g class="${x.on ? P + "breath" : ""}"><rect x="112" y="136" width="26" height="16" rx="3" fill="${x.url(x.on ? "hg" : "hr")}"/></g><path d="${rr(114, 139, 22, 10, 2)}" fill="${x.url("scr")}"/>` + glyph(x, 125, 144.5, 7);
+      `<g class="${x.cls}"><rect x="112" y="136" width="26" height="16" rx="3" fill="${x.url(x.hk)}"/></g><path d="${rr(114, 139, 22, 10, 2)}" fill="${x.url("scr")}"/>` + glyph(x, 125, 144.5, 7);
     return scene(x, "gunwall", "", hw, body);
   });
 
@@ -24626,11 +27600,11 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     let tex = ""; const r = rnd(33);
     for (let bx = 8; bx < 192; bx += 26) tex += `<rect x="${bx}" y="8" width="26" height="184" fill="${r() > .5 ? "#fff" : "#000"}" fill-opacity="${(.02 + r() * .06).toFixed(2)}"/><path d="M${bx} 8V192" stroke="#1a0b06" stroke-opacity=".7" stroke-width="2"/>`;
     tex += grain(77, 8, 190);
-    const lift = x.on ? 0 : -10, shk = `M101 118V90A12 12 0 0 1 125 90V118`;
+    const lift = -10 * (1 - x.fr), shk = `M101 118V90A12 12 0 0 1 125 90V118`;
     const hasp = lg(x.id("galv"), [[0, "#c9ced3"], [.5, "#8d949b"], [1, "#5a6067"]], 0, 0, 0, 1);
     const hw = `${shd(x, rr(30, 74, 84, 22, 3))}<path d="${rr(30, 74, 84, 22, 3)}" fill="url(#${x.u}-galv)"/><path d="M30 74.6H114" stroke="#fff" stroke-opacity=".5"/><rect x="26" y="72" width="8" height="26" rx="3" fill="url(#${x.u}-galv)"/>` + screw(44, 85) + screw(64, 85) +
       `<path d="${rr(102, 70, 22, 30, 3)}" fill="#000" fill-opacity=".35"/><path d="${rr(104, 68, 18, 30, 3)}" fill="url(#${x.u}-galv)"/><rect x="109" y="74" width="8" height="12" rx="3.5" fill="#0a0a0d"/>` +
-      `<g transform="translate(0 ${lift})"><g class="${P}${x.on ? "sl" : "su"}"><path d="${shk}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="9" transform="translate(2 3)"/><path d="${shk}" fill="none" stroke="#4c5259" stroke-width="9"/><path d="${shk}" fill="none" stroke="#d3d8dd" stroke-width="5"/><path d="M99.5 114V90A13.5 13.5 0 0 1 106 79" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.3"/></g></g>` +
+      `<g transform="translate(0 ${lift})"><g class="${mcls(x, "sl", "su", "msl", "msu", "jy")}"><path d="${shk}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="9" transform="translate(2 3)"/><path d="${shk}" fill="none" stroke="#4c5259" stroke-width="9"/><path d="${shk}" fill="none" stroke="#d3d8dd" stroke-width="5"/><path d="M99.5 114V90A13.5 13.5 0 0 1 106 79" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.3"/></g></g>` +
       `${shd(x, rr(84, 110, 58, 66, 10), 3, 5, .6)}<path d="${rr(84, 110, 58, 66, 10)}" fill="${x.url("rub")}"/>` +
       `<path d="${rr(90, 114, 46, 58, 7)}" fill="${x.url("fv")}"/><path d="${rr(90, 114, 46, 58, 7)}" fill="${x.url("fx")}"/><path d="${rr(90, 114, 46, 58, 7)}" fill="${x.url("gl")}" opacity=".3"/><path d="${rr(90, 114, 46, 58, 7)}" fill="none" stroke="${x.p.e}" stroke-width=".7"/>` +
       fingerprint(x, 113, 136, 9) + ring(x, 113, 136, 11, 1.4) + led(x, 113, 160, 1.6) + `<path d="M86 122V164M140 122V164" stroke="#fff" stroke-opacity=".1" stroke-width="1.4"/>`;
@@ -24645,7 +27619,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const keeper = `<path d="${rr(105, 88, 12, 30, 1.5)}" fill="${x.url("fd")}"/><path d="M105.5 88.5H116.5" stroke="#fff" stroke-opacity=".45"/><path d="${rr(105, 88, 12, 30, 1.5)}" fill="none" stroke="${x.p.e}" stroke-width=".6"/>`;
     const hw = plate(x, rr(102, 50, 22, 106, 3)) + screw(113, 57) + screw(113, 149) +
       `<path d="${rr(104, 86, 15, 34, 1.5)}" fill="#050508"/>` +
-      `<g transform="translate(${x.on ? 0 : 7} 0)"><g class="${P}${x.on ? "kl" : "ku"}">${keeper}</g></g>` +
+      `<g transform="translate(${7 * (1 - x.fr)} 0)"><g class="${mcls(x, "kl", "ku", "mkl", "mku", "jx")}">${keeper}</g></g>` + arrows(x, 111, 80, x.mv > 0 ? "l" : "r") +
       `<path d="M${Dn - 2} 97H108L112 103H${Dn - 2}Z" fill="${x.url("bolt")}"/><path d="M108 97L112 103" stroke="#fff" stroke-opacity=".5"/>` +
       plate(x, rr(170, 72, 18, 50, 5), { fill: "fv" }) + led(x, 179, 82, 1.6) +
       `<path d="M174 100a7 7 0 0 1 10 0M176 104a4 4 0 0 1 6 0" fill="none" stroke="${x.on ? KEY : "#8b93a0"}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="${x.on ? .9 : .5}"/><circle cx="179" cy="108" r="1" fill="${x.on ? KEY : "#8b93a0"}"/>` +
@@ -24662,7 +27636,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     const hw = jamb(x, E, "#6a4c38", "#2e1f16") + strike(x, E, 114, 22) + bolt(x, E, 114, 10, 7, "latch", true) + strike(x, E, 150) + bolt(x, E, 150, 15, 9) +
       `<g class="hda-bg">${plate(x, rr(42, 28, 38, 18, 3)) + tx(61, 37, 10, x.p.k, "214")}</g>` +
       plate(x, rr(102, 28, 34, 150, 10)) + `<path d="${rd}" fill="${x.url("scr")}"/>` + (x.on ? `<g class="${P}pulse">${arcs(KEY, f(.5 + .5 * x.B))}</g>` : arcs("#8b93a0", .35)) +
-      `<g class="${x.on ? P + "breath" : ""}"><rect x="104" y="86" width="30" height="10" rx="5" fill="${x.url(x.on ? "hg" : "hr")}"/></g><rect x="108" y="89.5" width="22" height="3" rx="1.5" fill="${x.st}"/>` +
+      `<g class="${x.cls}"><rect x="104" y="86" width="30" height="10" rx="5" fill="${x.url(x.hk)}"/></g><rect x="108" y="89.5" width="22" height="3" rx="1.5" fill="${x.st}"/>` +
       lever(x, 119, 114, 58, 0, true) + `<path d="${rr(113, 144, 12, 14, 6)}" fill="#000" fill-opacity=".35"/><path d="${rr(114, 144, 10, 12, 5)}" fill="${x.url("f")}"/><path d="M119 147v6" stroke="#000" stroke-opacity=".6" stroke-width="1.4"/>`;
     return scene(x, "veneer", tex, hw, sheen);
   });
@@ -24701,6 +27675,52 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
 @keyframes hda-lock-pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .hda-anim .hda-lock-breath{animation:hda-lock-breath 2.8s ease-in-out infinite}
 @keyframes hda-lock-breath{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-lock-mxo,.hda-lock-mxi,.hda-lock-jx,.hda-lock-myo,.hda-lock-myi,.hda-lock-jy,.hda-lock-mrl,.hda-lock-mru,.hda-lock-jr,.hda-lock-spin,.hda-lock-spinr{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-lock-mxo{animation:hda-lock-mxo 1.8s ease-in-out infinite}
+@keyframes hda-lock-mxo{0%{transform:translateX(-50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock-mxi{animation:hda-lock-mxi 1.8s ease-in-out infinite}
+@keyframes hda-lock-mxi{0%{transform:translateX(50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock-myo{animation:hda-lock-myo 1.8s ease-in-out infinite}
+@keyframes hda-lock-myo{0%{transform:translateY(50%)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-myi{animation:hda-lock-myi 1.8s ease-in-out infinite}
+@keyframes hda-lock-myi{0%{transform:translateY(-50%)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mrl{animation:hda-lock-mrl 1.8s ease-in-out infinite}
+@keyframes hda-lock-mrl{0%{transform:rotate(-45deg)}65%,100%{transform:rotate(0)}}
+.hda-anim .hda-lock-mru{animation:hda-lock-mru 1.8s ease-in-out infinite}
+@keyframes hda-lock-mru{0%{transform:rotate(45deg)}65%,100%{transform:rotate(0)}}
+.hda-anim .hda-lock-msl{animation:hda-lock-msl 1.8s ease-in-out infinite}
+@keyframes hda-lock-msl{0%{transform:translateY(-5px)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-msu{animation:hda-lock-msu 1.8s ease-in-out infinite}
+@keyframes hda-lock-msu{0%{transform:translateY(5px)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mgl{animation:hda-lock-mgl 2.4s ease-in-out infinite}
+@keyframes hda-lock-mgl{0%{transform:translateY(-10px)}70%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mgu{animation:hda-lock-mgu 2.4s ease-in-out infinite}
+@keyframes hda-lock-mgu{0%{transform:translateY(10px)}70%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mtl{animation:hda-lock-mtl 1.8s ease-in-out infinite}
+@keyframes hda-lock-mtl{0%{transform:translateY(-8px)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mtu{animation:hda-lock-mtu 1.8s ease-in-out infinite}
+@keyframes hda-lock-mtu{0%{transform:translateY(8px)}65%,100%{transform:translateY(0)}}
+.hda-anim .hda-lock-mkl{animation:hda-lock-mkl 1.8s ease-in-out infinite}
+@keyframes hda-lock-mkl{0%{transform:translateX(3.5px)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock-mku{animation:hda-lock-mku 1.8s ease-in-out infinite}
+@keyframes hda-lock-mku{0%{transform:translateX(-3.5px)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock-jx{animation:hda-lock-jx 2.2s linear infinite}
+@keyframes hda-lock-jx{0%,40%,100%{transform:translateX(0)}8%,24%{transform:translateX(1.2px)}16%,32%{transform:translateX(-1.2px)}}
+.hda-anim .hda-lock-jy{animation:hda-lock-jy 2.2s linear infinite}
+@keyframes hda-lock-jy{0%,40%,100%{transform:translateY(0)}8%,24%{transform:translateY(1.2px)}16%,32%{transform:translateY(-1.2px)}}
+.hda-anim .hda-lock-jr{animation:hda-lock-jr 2.2s linear infinite}
+@keyframes hda-lock-jr{0%,40%,100%{transform:rotate(0)}8%,24%{transform:rotate(4deg)}16%,32%{transform:rotate(-4deg)}}
+.hda-anim .hda-lock-mblink{animation:hda-lock-mblink .9s steps(1,end) infinite}
+@keyframes hda-lock-mblink{0%,55%{opacity:1}56%,100%{opacity:.2}}
+.hda-anim .hda-lock-jblink{animation:hda-lock-jblink .5s steps(1,end) infinite}
+@keyframes hda-lock-jblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
+.hda-anim .hda-lock-chev0,.hda-anim .hda-lock-chev1,.hda-anim .hda-lock-chev2{animation:hda-lock-chev 1.2s ease-in-out infinite}
+.hda-anim .hda-lock-chev1{animation-delay:.2s}.hda-anim .hda-lock-chev2{animation-delay:.4s}
+@keyframes hda-lock-chev{0%,100%{opacity:.25}35%{opacity:1}}
+.hda-anim .hda-lock-spin{animation:hda-lock-spin 1.4s linear infinite}
+@keyframes hda-lock-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.hda-anim .hda-lock-spinr{animation:hda-lock-spinr 1.4s linear infinite}
+@keyframes hda-lock-spinr{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
 @media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-lock-"]{animation:none!important}}`;
 
   (window.HDA = window.HDA || []).push({
@@ -24708,8 +27728,7 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     tab: "Smart locks",
     group: "More",
     kind: "device",
-    intro: "Twenty smart locks, each on its own bit of door, gate or frame. On means LOCKED: the bolt slides out into the strike, the status light turns green and keypads light up; off means UNLOCKED: bolt pulled back, red light. The slider sets keypad brightness; the color is the hardware finish.",
-    
+    intro: "Twenty smart locks, each on its own bit of door, gate or frame. On means LOCKED: the bolt slides out into the strike, the status light turns green and keypads light up; off means UNLOCKED: bolt pulled back, red light. The State menu also shows Locking and Unlocking (bolt part-way, amber light blinking, arrows) and Jammed (bolt stuck half out, red warning light and badge). The slider sets keypad brightness; the color is the hardware finish.",
     css,
     icons,
   });
@@ -24738,11 +27757,37 @@ ${shd(x, d, 2, 6, .55)}<path d="${d}" fill="${x.url("fv")}"/><path d="${d}" fill
     if (m === "plastic") return { m, c, k: s(c, -.45), d: s(c, -.18), l: s(c, .3), hi: s(c, .6), rim: s(c, .5) };
     return { m, c, k: s(c, -.6), d: s(c, -.32), l: s(c, .42), hi: s(c, .72), rim: s(c, .6) };
   }
+  const AMB = "#ffb020", JAM = "#ff3b30";
+  const LSTATE = [["auto", "From on/off"], ["locked", "Locked"], ["unlocked", "Unlocked"], ["locking", "Locking"], ["unlocking", "Unlocking"], ["jammed", "Jammed"]];
+  function lockState(o) {
+    const s = o.opt && o.opt.state, ls = s && s !== "auto" ? s : (o.on ? "locked" : "unlocked");
+    const mv = ls === "locking" ? 1 : ls === "unlocking" ? -1 : 0, jam = ls === "jammed", on = ls !== "unlocked";
+    return { ls, on, mv, jam, mid: !!mv || jam, fr: ls === "locked" ? 1 : ls === "unlocked" ? 0 : .5,
+      st: jam ? JAM : mv ? AMB : on ? GRN : RED, hk: jam ? "hj" : mv ? "ha" : on ? "hg" : "hr", cls: P + (jam ? "jblink" : mv ? "mblink" : on ? "breath" : "blink") };
+  }
+  const stDefs = (x) => x.mid ? rg(x.id("ha"), [[0, AMB, .85], [.45, AMB, .28], [1, AMB, 0]]) + rg(x.id("hj"), [[0, JAM, .9], [.45, JAM, .32], [1, JAM, 0]]) : "";
+  function arrows(x, cx, cy, dir) {
+    if (!x.mv) return "";
+    let s = ""; for (let i = 0; i < 3; i++) s += `<path class="${P}chev${i}" d="M${f(-4.6 + i * 3.4)} -2.8L${f(-1.8 + i * 3.4)} 0L${f(-4.6 + i * 3.4)} 2.8"/>`;
+    const t = `translate(${f(cx)} ${f(cy)}) rotate(${dir === "l" ? 180 : 0})`;
+    return `<g transform="${t}" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${s.replace(/ class="[^"]*"/g, "")}</g><g transform="${t}" fill="none" stroke="${AMB}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${s}</g>`;
+  }
+  function mark(x, cx, cy, s) {
+    if (x.jam) return `<g class="${P}jblink"><path d="M${f(cx)} ${f(cy - s * .48)}L${f(cx + s * .52)} ${f(cy + s * .42)}H${f(cx - s * .52)}Z" fill="${JAM}" stroke="${JAM}" stroke-width="${f(s * .1)}" stroke-linejoin="round"/></g>` +
+      `<path d="M${f(cx)} ${f(cy - s * .16)}V${f(cy + s * .1)}" stroke="#fff" stroke-width="${f(s * .11)}" stroke-linecap="round"/><circle cx="${f(cx)}" cy="${f(cy + s * .26)}" r="${f(s * .065)}" fill="#fff"/>`;
+    const r = s * .36, cw = x.mv > 0, a0 = -Math.PI / 2 + (cw ? .5 : -.5), a1 = a0 + (cw ? 1 : -1) * Math.PI * 1.45;
+    const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx2 = -Math.sin(a1) * (cw ? 1 : -1), ty2 = Math.cos(a1) * (cw ? 1 : -1), hs = s * .2;
+    const head = `M${f(ex + tx2 * hs)} ${f(ey + ty2 * hs)}L${f(ex - ty2 * hs * .9)} ${f(ey + tx2 * hs * .9)}L${f(ex + ty2 * hs * .9)} ${f(ey - tx2 * hs * .9)}Z`;
+    return `<g class="${P}${cw ? "spin" : "spinr"}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * .5)}" fill="none"/><path d="M${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))}A${f(r)} ${f(r)} 0 1 ${cw ? 1 : 0} ${f(ex)} ${f(ey)}" fill="none" stroke="${AMB}" stroke-width="${f(s * .11)}" stroke-linecap="round"/><path d="${head}" fill="${AMB}"/></g>`;
+  }
+  const markDisc = (x, cx, cy, r) => x.mid ? `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="#141418"/>${mark(x, cx, cy, r * 1.7)}` : "";
+  const badge = (x) => x.jam ? `<g class="${P}badge"><circle cx="26" cy="26" r="11" fill="#000" fill-opacity=".45" transform="translate(1 1.6)"/><circle cx="26" cy="26" r="11" fill="#1c1416"/><circle cx="26" cy="26" r="10.3" fill="none" stroke="${JAM}" stroke-width="1.3"/>` +
+    `<path d="M26 19.2L32.4 30.6H19.6Z" fill="${AMB}" stroke="${AMB}" stroke-width="1.2" stroke-linejoin="round"/><path d="M26 23.2V27" stroke="#1c1416" stroke-width="1.6" stroke-linecap="round"/><circle cx="26" cy="29" r=".95" fill="#1c1416"/></g>` : "";
   function ctx(o) {
-    const u = o.uid, on = !!o.on, lv = o.level == null ? 1 : o.level, p = metal(o.color || BS);
+    const u = o.uid, S = lockState(o), on = S.on, lv = o.level == null ? 1 : o.level, p = metal(o.color || BS);
     const light = p.m === "satin" || p.m === "polish" || p.m === "plastic";
     const glass = light ? H().shade(p.c, p.m === "plastic" ? -.12 : -.42) : (p.m === "bronze" ? "#120c09" : "#0c0c0e");
-    return { o, u, on, B: .4 + .6 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p, light, glass, st: on ? GRN : RED, n: 0 };
+    return Object.assign({ o, u, on, B: .4 + .6 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p, light, glass, n: 0 }, S);
   }
 
   function defs(x, extra) {
@@ -24765,7 +27810,7 @@ ${lg(id("bolt"), [[0, "#f3f5f7"], [.42, "#aeb5bd"], [.56, "#cfd5db"], [1, "#565d
 ${lg(id("stv"), [[0, "#e2e6ea"], [.5, "#9aa1a9"], [1, "#5a6067"]], 0, 0, 0, 1)}
 ${lg(id("gap"), [[0, "#000", .9], [1, "#14121c", .9]])}
 ${rg(id("hg"), [[0, GRN, .9], [.45, GRN, .3], [1, GRN, 0]])}
-${rg(id("hr"), [[0, RED, .8], [.45, RED, .25], [1, RED, 0]])}
+${rg(id("hr"), [[0, RED, .8], [.45, RED, .25], [1, RED, 0]])}${stDefs(x)}
 ${rg(id("vig"), [[0, "#000", 0], [.62, "#000", .06], [1, "#000", .5]], .5, .48, .74)}
 ${p.m === "satin" || p.m === "bronze" ? `<pattern id="${id("br")}" width="2.6" height="40" patternUnits="userSpaceOnUse"><path d="M.6 0V40" stroke="#fff" stroke-opacity=".07" stroke-width=".5"/><path d="M1.9 0V40" stroke="#000" stroke-opacity=".07" stroke-width=".4"/></pattern>` : ""}
 ${p.m === "matte" ? `<pattern id="${id("br")}" width="3" height="3" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".45" fill="#fff" fill-opacity=".05"/><circle cx="2.3" cy="2.2" r=".4" fill="#000" fill-opacity=".12"/></pattern>` : ""}
@@ -24797,7 +27842,7 @@ ${extra || ""}</defs>`;
     const c = DOOR[kind];
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x, lg(x.id("dg"), [[0, c[0]], [1, c[1]]], 0, 0, .3, 1))}
 <g clip-path="${x.url("wc")}"><g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("dg")}"/>${t || ""}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g>${hw}</g>
-<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g></svg>`;
+<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g>${badge(x)}</svg>`;
   }
   const E = 164;
   function jamb(x) {
@@ -24812,11 +27857,11 @@ ${extra || ""}</defs>`;
 <circle cx="${E + 11}" cy="${y - h / 2 + 3.5}" r="1.4" fill="#4b5158"/><circle cx="${E + 11}" cy="${y + h / 2 - 3.5}" r="1.4" fill="#4b5158"/><rect x="${E + 5}" y="${f(y - 6)}" width="9" height="12" rx="1" fill="#050508"/>`;
   }
   function bolt(x, y, latch) {
-    const k = x.id("bc" + (x.n++)), out = latch || x.on, L = latch ? 12 : 15, h = latch ? 9 : 10, y0 = y - h / 2;
+    const k = x.id("bc" + (x.n++)), fr = latch ? 1 : x.fr, out = fr >= 1, L = latch ? 12 : 15, h = latch ? 9 : 10, y0 = y - h / 2;
     const body = latch ? `<path d="M${E - 2} ${f(y0)}H${E + L - 5}L${E + L} ${f(y + h / 2)}H${E - 2}Z" fill="${x.url("bolt")}"/>`
       : `<path d="${rr(E - 2, y0, L + 2, h, 1.6)}" fill="${x.url("bolt")}"/><path d="M${E} ${f(y0 + .9)}H${E + L - 1.5}" stroke="#fff" stroke-opacity=".7" stroke-width=".9"/>`;
-    const cls = latch ? "" : ` class="${P}${out ? "bo" : "bi"}"`;
-    return `<clipPath id="${k}"><rect x="${E}" y="0" width="${200 - E}" height="200"/></clipPath><g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${-L - 3} 0)"`}><g${cls}>${body}</g></g></g>`;
+    const cls = latch ? "" : ` class="${P}${x.mid ? (x.jam ? "jx" : x.mv > 0 ? "mxo" : "mxi") : out ? "bo" : "bi"}"`;
+    return `<clipPath id="${k}"><rect x="${E}" y="0" width="${200 - E}" height="200"/></clipPath><g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${fr ? f(-(L + 3) * (1 - fr)) : -L - 3} 0)"`}><g${cls}>${body}</g></g></g>` + (latch ? "" : arrows(x, E + 11, y - h / 2 - 8, x.mv > 0 ? "r" : "l"));
   }
   const edge = (x, y, latch) => `<g class="hda-bg">${jamb(x) + strike(x, y, latch ? 26 : 30)}</g>${bolt(x, y, latch)}`;
 
@@ -24860,14 +27905,14 @@ ${extra || ""}</defs>`;
       const k = n < 9 ? n + 1 : L[n - 9];
       if (typeof k === "number") s1 += dig(k, px, py, s, col, op, opt.w || .85);
       else if (k === "gear") s1 += gear(px, py, s * .78, col, op);
-      else s1 += (on ? halo(x, px, py, R * 1.25, 1) : "") + check(px, py, s * .9, on ? "#f2fff7" : col, on ? 1 : op);
+      else s1 += (x.ls === "locked" ? halo(x, px, py, R * 1.25, 1) : "") + check(px, py, s * .9, on ? "#f2fff7" : col, on ? 1 : op);
     }
     return btn + (on ? `<g opacity="${f(.4 * B)}"><g class="${P}pulse" filter="${x.url("gw")}">${glow}</g></g>` : "") + s1;
   }
   function logo(x, cx, cy, r, onGlass) {
     const fill = onGlass ? (x.light ? H().shade(x.p.c, .2) : "#d9d9db") : H().shade(x.p.c, x.light ? -.25 : .25);
     return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${fill}" fill-opacity="${onGlass ? .9 : 1}"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${x.url("mv")}" opacity=".6"/>` +
-      `<g class="${x.on ? P + "breath" : P + "blink"}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r + 1.3)}" fill="none" stroke="${x.st}" stroke-width="1" stroke-opacity="${x.on ? .95 : .8}"/>${halo(x, cx, cy, r * 1.7, x.on)}</g>`;
+      `<g class="${x.cls}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r + 1.3)}" fill="none" stroke="${x.st}" stroke-width="1" stroke-opacity="${x.on ? .95 : .8}"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * 1.7)}" fill="${x.url(x.hk)}"/></g>` + markDisc(x, cx, cy, r);
   }
   const press = (x, cx, cy, r) => x.on ? `<circle class="${P}press" cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="#ffffff" fill-opacity="0"/>` : "";
   const shd = (x, d, dx, dy, op) => `<path d="${d}" transform="translate(${dx == null ? 2.5 : dx} ${dy == null ? 4.5 : dy})" fill="#000" opacity="${op || .55}" filter="${x.url("bl")}"/>`;
@@ -24899,7 +27944,7 @@ ${extra || ""}</defs>`;
   function sl(x, cx, y0, W, Hh) {
     const x0 = cx - W / 2, r = W * .26, d = rr(x0, y0, W, Hh, r), dIn = rr(x0 + 3.5, y0 + 3.5, W - 7, Hh - 7, r - 3.2);
     const k = Hh / 122;
-    x.glass = x.p.m === "bronze" ? "#120c09" : "#0c0c0e"; x.light = false;
+    x.glass = x.p.m === "bronze" ? "#120c09" : "#0c0c0e"; x.light = false; 
     let s = body(x, d, dIn, true) + logo(x, cx, y0 + 16 * k, 6.5 * k, true);
     const gx = W * .26, gy = 19 * k, top = y0 + 36 * k;
     s += keypad(x, cx, top, gx, gy, 9 * k, "bare", "cg", { w: .9 }) + press(x, cx, top + gy * 2, 7 * k);
@@ -24936,7 +27981,7 @@ ${extra || ""}</defs>`;
       if (n < 9) k += dig(n + 1, px, py, 6.4, digC, 1, .8);
       else if (n === 10) k += dig(0, px, py, 6.4, digC, 1, .8);
       else if (n === 9) k += gear(px, py, 5, digC, 1);
-      else k += (on ? halo(x, px, py, 11, 1) : "") + check(px, py, 6, on ? "#f2fff7" : digC, 1);
+      else k += (x.ls === "locked" ? halo(x, px, py, 11, 1) : "") + check(px, py, 6, on ? "#f2fff7" : digC, 1);
     }
     s += (on ? `<g opacity="${f(.4 * x.B)}"><g class="${P}pulse" filter="${x.url("gw")}">${glow}</g></g>` : "") + k + press(x, cx, top + gy, 6.5);
     const by = y0 + Hh - 27; s += keyway(x, cx, by, 8);
@@ -24947,7 +27992,7 @@ ${extra || ""}</defs>`;
     let s = body(x, d, dIn, true) + logo(x, cx, y0 + 15, 5.2, true);
     s += `<g fill="none" stroke="#fff" stroke-opacity="${x.on ? .35 : .7}" stroke-width=".7"><rect x="${cx - 3.6}" y="${y0 + 36}" width="7.2" height="10" rx="1"/><path d="M${cx - 5} ${y0 + 33.5}a7 5 0 0 1 10 0"/></g>`;
     s += keypad(x, cx, y0 + 56, 12, 14, 6, "bare", "cg", { hide: true, w: .8 });
-    s += `<rect x="${cx - 7}" y="${y0 + 118}" width="14" height="1.8" rx=".9" fill="${x.st}" class="${x.on ? P + "breath" : P + "blink"}"/>`;
+    s += `<rect x="${cx - 7}" y="${y0 + 118}" width="14" height="1.8" rx=".9" fill="${x.st}" class="${x.cls}"/>`;
     const hy = 152, lv = rr(cx - 76, hy - 5.5, 76, 11, 5);
     s += shd(x, circ(cx, hy, 15), 2, 3) + `<circle cx="${cx}" cy="${hy}" r="15" fill="${x.url("ms")}"/><circle cx="${cx}" cy="${hy}" r="15" fill="none" stroke="${x.p.k}" stroke-width=".6"/>` +
       shd(x, lv, 2, 6) + `<path d="${lv}" fill="${x.url("m")}"/><path d="${lv}" fill="${x.url("mv")}"/><path d="${lv}" fill="none" stroke="${x.p.k}" stroke-width=".6"/><path d="M${cx - 4} ${hy - 4}H${cx - 72}" stroke="${x.p.hi}" stroke-opacity=".5" stroke-width=".9" stroke-linecap="round"/>` +
@@ -24973,7 +28018,7 @@ ${extra || ""}</defs>`;
   }
 
   const icons = [];
-  const add = (id, name, colors, fn) => icons.push({ id, name, colors, picker: true, colorLabel: "Finish", render: (o) => fn(ctx(o)) });
+  const add = (id, name, colors, fn) => icons.push({ id, name, colors, picker: true, colorLabel: "Finish", options: [{ id: "state", name: "State", values: LSTATE }], render: (o) => fn(ctx(o)) });
   const put = (x, kind, t, lock) => scene(x, kind, t, (lock.latch ? `<g class="hda-bg">${jamb(x) + strike(x, lock.by) + strike(x, lock.latch, 26)}</g>${bolt(x, lock.by) + bolt(x, lock.latch, true)}` : edge(x, lock.by, lock.lever)) + lock.s);
   const A2 = [BS, SN, ORB];
 
@@ -25012,6 +28057,24 @@ ${extra || ""}</defs>`;
 @keyframes hda-lock2-blink{0%,60%{opacity:1}61%,100%{opacity:.15}}
 .hda-anim .hda-lock2-press{animation:hda-lock2-press 4s ease-out infinite}
 @keyframes hda-lock2-press{0%,70%{fill-opacity:0}74%{fill-opacity:.5}100%{fill-opacity:0}}
+.hda-lock2-mxo,.hda-lock2-mxi,.hda-lock2-jx,.hda-lock2-spin,.hda-lock2-spinr{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-lock2-mxo{animation:hda-lock2-mxo 1.8s ease-in-out infinite}
+@keyframes hda-lock2-mxo{0%{transform:translateX(-50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock2-mxi{animation:hda-lock2-mxi 1.8s ease-in-out infinite}
+@keyframes hda-lock2-mxi{0%{transform:translateX(50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-lock2-jx{animation:hda-lock2-jx 2.2s linear infinite}
+@keyframes hda-lock2-jx{0%,40%,100%{transform:translateX(0)}8%,24%{transform:translateX(1.2px)}16%,32%{transform:translateX(-1.2px)}}
+.hda-anim .hda-lock2-mblink{animation:hda-lock2-mblink .9s steps(1,end) infinite}
+@keyframes hda-lock2-mblink{0%,55%{opacity:1}56%,100%{opacity:.2}}
+.hda-anim .hda-lock2-jblink{animation:hda-lock2-jblink .5s steps(1,end) infinite}
+@keyframes hda-lock2-jblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
+.hda-anim .hda-lock2-chev0,.hda-anim .hda-lock2-chev1,.hda-anim .hda-lock2-chev2{animation:hda-lock2-chev 1.2s ease-in-out infinite}
+.hda-anim .hda-lock2-chev1{animation-delay:.2s}.hda-anim .hda-lock2-chev2{animation-delay:.4s}
+@keyframes hda-lock2-chev{0%,100%{opacity:.25}35%{opacity:1}}
+.hda-anim .hda-lock2-spin{animation:hda-lock2-spin 1.4s linear infinite}
+@keyframes hda-lock2-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.hda-anim .hda-lock2-spinr{animation:hda-lock2-spinr 1.4s linear infinite}
+@keyframes hda-lock2-spinr{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
 @media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-lock2-"]{animation:none!important}}`;
 
   (window.HDA = window.HDA || []).push({
@@ -25019,8 +28082,7 @@ ${extra || ""}</defs>`;
     tab: "Smart deadbolts: keypad & glass",
     group: "More",
     kind: "device",
-    intro: "Smart deadbolts with glass touchscreens and keypads, redrawn from product photos (outside face only, no logos): keyed and key-free, slim and lever versions, a retrofit, a smart-standard lock, an entrance handle lock and a handleset. On means LOCKED: bolt out, check lit green, digits backlit; off means UNLOCKED: bolt in, red status. The color is that model's real finishes.",
-    
+    intro: "Smart deadbolts with glass touchscreens and keypads, redrawn from product photos (outside face only, no logos): keyed and key-free, slim and lever versions, a retrofit, a smart-standard lock, an entrance handle lock and a handleset. On means LOCKED: bolt out, check lit green, digits backlit; off means UNLOCKED: bolt in, red status. The color is that model's real finishes. The State menu also shows Locking and Unlocking (bolt part-way, amber light, arrows) and Jammed (red warning light and badge).",
     onWord: "Locked", offWord: "Unlocked",
     css,
     icons,
@@ -25321,7 +28383,7 @@ ${DEF.join("")}</defs>`;
     return s;
   }
   const pillow = (o, x, y, a, c) => `<g transform="rotate(${a} ${x} ${y})"><path d="M${x - 13} ${y - 11}Q${x} ${y - 14} ${x + 13} ${y - 11}Q${x + 15} ${y} ${x + 13} ${y + 11}Q${x} ${y + 14} ${x - 13} ${y + 11}Q${x - 15} ${y} ${x - 13} ${y - 11}Z" fill="${mat(o, c, "v")}"/><path d="M${x - 13} ${y - 11}Q${x} ${y - 14} ${x + 13} ${y - 11}Q${x + 15} ${y} ${x + 13} ${y + 11}Q${x} ${y + 14} ${x - 13} ${y + 11}Q${x - 15} ${y} ${x - 13} ${y - 11}Z" fill="url(#${o.uid}-fab)"/><path d="M${x - 9} ${y - 7}Q${x} ${y - 1} ${x + 9} ${y - 7}" fill="none" stroke="#000" stroke-opacity=".18"/></g>`;
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // (multi-function) o.parts holds only the parts the user ticked. A part left out follows the one device as a Device
   // Image (no o.mf: every part follows o.on and the slider is the volume, exactly as today) and stays off, never
   // animated, as a Multi-Function Image (o.mf). A reading (volume, %) is o.pval.volume when o.mf (left out = no bar).
   const MF = {
@@ -29519,7 +32581,6 @@ ${extra || ""}</defs>`;
   }
   const usbc = (x, cx, cy, w) => { w = w || 7; const h = w * .36; return `<path d="${rr(cx - w / 2, cy - h / 2, w, h, h / 2)}" fill="#0b0b0d"/><path d="${rr(cx - w * .32, cy - h * .16, w * .64, h * .32, h * .16)}" fill="#555a60"/><path d="${rr(cx - w / 2, cy - h / 2, w, h, h / 2)}" fill="none" stroke="#9aa0a6" stroke-opacity=".6" stroke-width=".4"/>`; };
   const usba = (x, cx, cy, w) => { w = w || 9; const h = w * .4; return `<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx=".5" fill="#0b0b0d"/><rect x="${f(cx - w * .38)}" y="${f(cy - h * .32)}" width="${f(w * .76)}" height="${f(h * .3)}" fill="#3d73d9"/><rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx=".5" fill="none" stroke="#9aa0a6" stroke-opacity=".6" stroke-width=".4"/>`; };
-  // (bd = where the cord ends up at the bottom, from the plug's center; a top plug's cord swings past the lower outlet)
   function plug(x, cx, cy, s, col, bend) {
     if (!x.on) return "";
     const bd = bend == null ? 6 : bend;
@@ -29531,10 +32592,6 @@ ${extra || ""}</defs>`;
       `<path d="${d}" fill="${col}"/><path d="${d}" fill="${x.url("pv")}"/><path d="${d}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width=".6"/>` +
       `<path d="M${f(cx - w * .3)} ${f(cy - h * .2)}V${f(cy + h * .3)}M${f(cx - w * .12)} ${f(cy - h * .2)}V${f(cy + h * .3)}" stroke="#000" stroke-opacity=".12" stroke-width=".8"/>` + led(x, cx + w * .22, cy - h * .15, GRN, "hg", 1.1);
   }
-  // ---------- (parts) Multi-Function: two receptacles = parts top + bottom (a floor box: left + right), each with its own
-  // plug in and lit when on; outlet + USB / night light as two parts. A Device Image (no o.mf, no parts) is drawn as before;
-  // as a Multi-Function Image (o.mf) o.parts holds only the ticked parts, a part left out is drawn off (no plug, no glow)
-  // and the drawing's own LED follows any part on.
   const MFM = (o) => !!(o.mf || o.parts);
   const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
   const xs = (x, on) => (on === x.on ? x : Object.assign({}, x, { on }));
@@ -29545,8 +32602,80 @@ ${extra || ""}</defs>`;
     usb: [{ id: "outlet", name: "Outlet", type: "switch" }, { id: "usb", name: "USB ports", type: "switch" }],
     night: [{ id: "outlet", name: "Outlet", type: "switch" }, { id: "light", name: "Night light", type: "switch" }] };
   const anyOn = (o, ps) => { let t = 0, a = 0; ps.forEach((p) => { if (o.parts && o.parts[p.id] != null) { t = 1; if (o.parts[p.id]) a = 1; } }); return t ? !!a : !o.mf && !!o.on; };
-  // the two receptacles' plugs as a Multi-Function Image (top plug's cord swings left of the lower outlet)
   const plugs2 = (x, cx, yt, yb, s, col) => plug(xs(x, pp(x, "top")), cx, yt, s, col, -26) + plug(xs(x, pp(x, "bottom")), cx, yb, s, col);
+  function plugIn(lin, kind, cx, by, k, col, side, sd) {
+    const NH = window.HDAH, sh = (a) => NH.shade(col, a), v = NH.hx(col), dark = (v[0] * .3 + v[1] * .59 + v[2] * .11) / 255 < .45;
+    const R = (x0, y0, w, h, r) => `M${f(x0 + r)} ${f(y0)}H${f(x0 + w - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w)} ${f(y0 + r)}V${f(y0 + h - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w - r)} ${f(y0 + h)}H${f(x0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0)} ${f(y0 + h - r)}V${f(y0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + r)} ${f(y0)}Z`;
+    sd = sd || [.05, .1]; side = side || 1;
+    const shadow = (d) => `<path d="${d}" fill="#000" fill-opacity=".14" transform="translate(${f(sd[0] * k * 2.2)} ${f(sd[1] * k * 2.2)})"/><path d="${d}" fill="#000" fill-opacity=".3" transform="translate(${f(sd[0] * k)} ${f(sd[1] * k)})"/>`;
+    const front = lin([[0, sh(dark ? .3 : .55)], [.42, col], [1, sh(dark ? -.35 : -.24)]], 0, 0, .45, 1);
+    const sideG = lin([[0, sh(-.42)], [.32, sh(dark ? .22 : .3)], [.62, col], [1, sh(-.48)]], 0, 0, 1, 0);
+    const edge = `fill="none" stroke="${sh(-.6)}" stroke-opacity=".75" stroke-width="${f(Math.max(.35, .014 * k))}"`;
+    const hiOp = dark ? .3 : .85, lw = f(Math.max(.4, .022 * k));
+    const top = (x0, y0, w, r) => `<path d="M${f(x0 + r)} ${f(y0 + .04 * k)}H${f(x0 + w - r)}" stroke="#fff" stroke-opacity="${hiOp}" stroke-width="${lw}" stroke-linecap="round"/>`;
+    const sheen = (d) => `<path d="${d}" fill="${lin([[0, "#fff", dark ? .14 : .4], [.45, "#fff", 0], [1, "#000", dark ? 0 : .06]], 0, 0, 1, 1)}"/>`;
+    const rivets = (y) => [-1, 1].map((i) => `<circle cx="${f(cx + i * .25 * k)}" cy="${f(y)}" r="${f(.035 * k)}" fill="${sh(-.4)}"/><circle cx="${f(cx + i * .25 * k - .01 * k)}" cy="${f(y - .012 * k)}" r="${f(.016 * k)}" fill="#fff" fill-opacity="${dark ? .25 : .7}"/>`).join("");
+    let s = "", ox = cx, oy = by, w = .12 * k, c = col;
+    if (kind === "ground3") {
+      const W = .74 * k, Hh = .92 * k, x0 = cx - W / 2, y0 = by - .36 * k, r = .22 * k, d = R(x0, y0, W, Hh, r), yb = y0 + Hh - .05 * k;
+      const neck = `M${f(cx - .17 * k)} ${f(yb)}H${f(cx + .17 * k)}L${f(cx + .11 * k)} ${f(yb + .32 * k)}Q${f(cx)} ${f(yb + .36 * k)} ${f(cx - .11 * k)} ${f(yb + .32 * k)}Z`;
+      s += shadow(d) + shadow(neck) + `<path d="${neck}" fill="${sideG}"/>` + [.08, .16, .24].map((t) => `<path d="M${f(cx - (.16 - t * .2) * k)} ${f(yb + t * k)}H${f(cx + (.16 - t * .2) * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`).join("");
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="${R(x0 + .08 * k, y0 + .08 * k, W - .16 * k, Hh - .2 * k, r * .7)}" fill="none" stroke="${sh(dark ? .18 : -.12)}" stroke-opacity=".55" stroke-width="${lw}"/>`;
+      for (let i = 0; i < 4; i++) [-1, 1].forEach((e) => { const yy = y0 + .34 * k + i * .1 * k, xa = cx + e * (W / 2 - .07 * k), xb = cx + e * (W / 2 - .19 * k);
+        s += `<path d="M${f(xa)} ${f(yy)}H${f(xb)}" stroke="${sh(-.5)}" stroke-opacity=".55" stroke-width="${lw}" stroke-linecap="round"/><path d="M${f(xa)} ${f(yy + .03 * k)}H${f(xb)}" stroke="#fff" stroke-opacity="${hiOp * .5}" stroke-width="${lw}" stroke-linecap="round"/>`; });
+      s += top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = yb + .3 * k; w = .15 * k;
+    } else if (kind === "wart") {
+      const W = 1.08 * k, Hh = 1.14 * k, x0 = cx - W / 2, y0 = by - .4 * k, r = .16 * k, d = R(x0, y0, W, Hh, r);
+      c = dark ? "#2a2b2f" : "#efefed";
+      const boot = R(cx - .1 * k, y0 + Hh + .02 * k, .2 * k, .2 * k, .06 * k);
+      s += shadow(R(x0, y0, W + .06 * k, Hh + .3 * k, r)) + `<path d="${R(x0 + .06 * k, y0 + .1 * k, W, Hh, r)}" fill="${sh(-.5)}"/>` +
+        `<path d="${boot}" fill="${lin([[0, NH.shade(c, -.35)], [.4, NH.shade(c, .2)], [1, NH.shade(c, -.45)]], 0, 0, 1, 0)}"/><path d="${boot}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="${lw}"/>`;
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="M${f(x0 + .12 * k)} ${f(y0 + Hh * .62)}L${f(x0 + W * .62)} ${f(y0 + .12 * k)}" stroke="#fff" stroke-opacity="${dark ? .06 : .22}" stroke-width="${f(.16 * k)}" stroke-linecap="round"/>` +
+        `<path d="${R(x0 + .09 * k, y0 + .09 * k, W - .18 * k, Hh - .18 * k, r * .6)}" fill="none" stroke="${sh(dark ? .2 : -.18)}" stroke-opacity=".5" stroke-width="${lw}"/>` + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = y0 + Hh + .2 * k; w = Math.max(1.4, .075 * k);
+    } else if (kind === "right") {
+      const W = .84 * k, Hh = .58 * k, hx = cx + side * .04 * k, x0 = hx - W / 2, y0 = by - .27 * k, r = .2 * k, d = R(x0, y0, W, Hh, r), my = y0 + Hh * .52;
+      const ex = side > 0 ? x0 + W - .05 * k : x0 + .05 * k, L = .28 * k;
+      const boot = `M${f(ex)} ${f(my - .17 * k)}L${f(ex + side * L)} ${f(my - .1 * k)}Q${f(ex + side * (L + .04 * k))} ${f(my)} ${f(ex + side * L)} ${f(my + .1 * k)}L${f(ex)} ${f(my + .17 * k)}Z`;
+      s += shadow(d) + shadow(boot) + `<path d="${boot}" fill="${lin([[0, sh(dark ? .2 : .35)], [.45, col], [1, sh(-.5)]], 0, 0, 0, 1)}"/>` +
+        [.08, .16].map((t) => `<path d="M${f(ex + side * t * k)} ${f(my - (.16 - t * .25) * k)}V${f(my + (.16 - t * .25) * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`).join("");
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d);
+      for (let i = 0; i < 3; i++) { const xx = hx - side * (W / 2 - .12 * k - i * .07 * k);
+        s += `<path d="M${f(xx)} ${f(y0 + .15 * k)}V${f(y0 + Hh - .15 * k)}" stroke="${sh(-.5)}" stroke-opacity=".55" stroke-width="${lw}" stroke-linecap="round"/><path d="M${f(xx + .025 * k)} ${f(y0 + .15 * k)}V${f(y0 + Hh - .15 * k)}" stroke="#fff" stroke-opacity="${hiOp * .45}" stroke-width="${lw}" stroke-linecap="round"/>`; }
+      s += rivets(by + .02 * k) + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      ox = ex + side * (L + .02 * k); oy = my; w = .13 * k;
+    } else {
+      const W = .6 * k, Hh = .64 * k, x0 = cx - W / 2, y0 = by - .31 * k, r = .16 * k, d = R(x0, y0, W, Hh, r), neck = R(cx - .12 * k, y0 + Hh - .05 * k, .24 * k, .22 * k, .08 * k);
+      s += shadow(d) + shadow(neck) + `<path d="${neck}" fill="${sideG}"/><path d="M${f(cx - .1 * k)} ${f(y0 + Hh + .07 * k)}H${f(cx + .1 * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`;
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="${R(x0 + .07 * k, y0 + .07 * k, W - .14 * k, Hh - .16 * k, r * .7)}" fill="none" stroke="${sh(dark ? .18 : -.12)}" stroke-opacity=".5" stroke-width="${lw}"/>` +
+        rivets(by) + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = y0 + Hh + .15 * k; w = .11 * k;
+    }
+    return { s, x: ox, y: oy, w, c };
+  }
+  function linF(x) { const L = []; const fn = (a, x1, y1, x2, y2) => { const id = x.id("pk" + (x.n++)); L.push(lg(id, a, x1, y1, x2, y2)); return `url(#${id})`; };
+    fn.defs = () => L.length ? `<defs>${L.join("")}</defs>` : ""; return fn; }
+  function wire(x, d, w, col) {
+    const v = H().hx(col), dark = (v[0] * .3 + v[1] * .59 + v[2] * .11) / 255 < .45;
+    return `<path d="${d}" fill="none" stroke="#000" stroke-opacity=".32" stroke-width="${f(w + 1.2)}" stroke-linecap="round" transform="translate(${f(w * .5)} ${f(w)})" filter="${x.url("bl")}"/>` +
+      `<path d="${d}" fill="none" stroke="${H().shade(col, -.55)}" stroke-width="${f(w)}" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${col}" stroke-width="${f(w * .62)}" stroke-linecap="round"/>` +
+      `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="${dark ? .2 : .6}" stroke-width="${f(Math.max(.5, w * .2))}" stroke-linecap="round" transform="translate(${f(-w * .17)} ${f(-w * .17)})"/>`;
+  }
+  const PK = { std: [["flat2", "#26272a"], ["ground3", "#f1f0ec"]], tr: [["wart", "#f1f0ec"], ["ground3", "#8f9298"]],
+    plain: [["right", "#8f9298"], ["wart", "#f1f0ec"]], smart: [["flat2", "#26272a"], ["right", "#f1f0ec"]] };
+  function plugPair(x, kind, cx, yT, yB, t, b) {
+    const k = STD.S, lin = linF(x);
+    let cords = "", heads = "";
+    const one = (i, by) => { const [kd, col] = PK[kind][i], p = plugIn(lin, kd, cx, by, k, col, -1); heads += p.s;
+      const d = kd === "right" ? `M${f(p.x)} ${f(p.y)}C${f(p.x - 4)} ${f(p.y)} ${f(p.x - 6)} ${f(p.y + 3)} ${f(p.x - 6)} ${f(p.y + 12)}S${f(p.x - 9)} ${f(p.y + 70)} ${f(p.x - 4)} 206`
+        : i === 0 ? `M${f(p.x)} ${f(p.y)}C${f(p.x)} ${f(p.y + 9)} ${f(cx - 36)} ${f(p.y + 6)} ${f(cx - 37)} ${f(p.y + 24)}S${f(cx - 40)} ${f(p.y + 80)} ${f(cx - 34)} 206`
+        : `M${f(p.x)} ${f(p.y)}C${f(p.x)} ${f(p.y + 14)} ${f(p.x + 5)} ${f(p.y + 20)} ${f(p.x + 7)} 206`;
+      cords += wire(x, d, p.w, p.c); };
+    if (t) one(0, yT);
+    if (b) one(1, yB);
+    return lin.defs() + cords + heads;
+  }
   const downGlow = (x, cx, y, w, grad, op) => x.on ? `<g class="${P}breath" opacity="${f((op || .9) * x.B)}"><ellipse cx="${f(cx)}" cy="${f(y + 12)}" rx="${f(w * .75)}" ry="22" fill="${x.url(grad)}" filter="${x.url("gw")}"/></g>` : "";
 
   function invis(x, usbC, aura) {
@@ -29584,7 +32713,6 @@ ${extra || ""}</defs>`;
     if (kind === "usb" && r !== "au" && r !== "it") Hh += 18;
     const X = 100 - W / 2, Y = 100 - Hh / 2 + (kind === "usb" && r !== "au" && r !== "it" ? 9 : 0);
     let s = "";
-    // (parts) each socket's own on: a double = top (first) + bottom (second), a single = the outlet part (else any part)
     const so = (i) => (!x.mf ? x.on : dbl ? pp(x, i ? "bottom" : "top") : kind === "usb" || kind === "night" ? pp(x, "outlet") : x.on);
     const uo = x.mf ? pp(x, "usb") : x.on, lo = x.mf ? pp(x, "light") : x.on;
     if (kind === "night") s += downGlow(xs(x, lo), 100, Y + Hh, W, "wm", .9);
@@ -29603,15 +32731,24 @@ ${extra || ""}</defs>`;
     if (x.mf) return s + socks.map(([cx, cy], i) => plug(xs(x, so(i)), cx, cy - .2 * 30 * 1.3, 30 * 1.3, x.dark ? "#2e2f33" : "#f2f2f0")).join("");
     return s + plug(x, px, py - .2 * 30 * 1.3, 30 * 1.3, x.dark ? "#2e2f33" : "#f2f2f0");
   }
+  const pOn = (x, id) => x.o.parts && x.o.parts[id] != null ? x.on && !!x.o.parts[id] : x.on;
+  function splitMarks(x, t, b, lx, ty, by, dimTop, dimBot) {
+    if (!x.on || t === b) return "";
+    const dead = (d) => `<path d="${d}" fill="#000" fill-opacity="${x.dark ? .45 : .32}"/>`;
+    const lamp = (cy, on) => on ? led(x, lx, cy, GRN, "hg", 1.1) : `<circle cx="${f(lx)}" cy="${f(cy)}" r="1.1" fill="#000" fill-opacity=".45"/><circle cx="${f(lx)}" cy="${f(cy)}" r=".6" fill="#fff" fill-opacity=".15"/>`;
+    return (t ? "" : dead(dimTop)) + (b ? "" : dead(dimBot)) + lamp(ty, t) + lamp(by, b);
+  }
   function duplex(x, kind) {
     if (REG !== "us") return regional(x, "double");
     const { X, Y, W, Hh, S } = STD, cx = 100;
     let s = plate(x, X, Y, W, Hh, 3, [[cx, Y + Hh / 2]]);
     s += ovalFace(x, cx, Y + 40, S) + ovalFace(x, cx, Y + 98, S) + slots(x, cx, Y + 36, S, kind) + slots(x, cx, Y + 94, S, kind);
     if (kind === "tr") s += word(x, "TR", cx, Y + 64, 4.2, H().shade(x.dev, -.4), .8) + word(x, "TR", cx, Y + 122, 4.2, H().shade(x.dev, -.4), .8);
-    return s + (x.mf ? plugs2(x, cx, Y + 39, Y + 97, S) : plug(x, cx, Y + 97, S));
+    const t = pOn(x, "top"), b = pOn(x, "bottom"), oval = (cy) => { const rx = .66 * S, ry = .58 * S; return `M${f(cx - rx)} ${f(cy)}A${f(rx)} ${f(ry)} 0 0 1 ${f(cx + rx)} ${f(cy)}V${f(cy + ry * .15)}A${f(rx)} ${f(ry)} 0 0 1 ${f(cx - rx)} ${f(cy + ry * .15)}Z`; };
+    s += splitMarks(x, t, b, cx + 28, Y + 40, Y + 98, oval(Y + 40), oval(Y + 98));
+    return s + plugPair(x, kind, cx, Y + 36, Y + 94, t, b);
   }
-  function decora(x, kind, opt) {
+  function rockerFace(x, kind, opt) {
     if (REG !== "us") return regional(x, kind === "usb" || kind === "smart" || kind === "night" ? kind : "plain");
     opt = opt || {};
     const { X, Y, W, Hh, S } = STD, cx = 100, fx = cx - 21, fy = Y + 28, fw = 42, fh = 84;
@@ -29642,15 +32779,18 @@ ${extra || ""}</defs>`;
       if (xl.on) s += `<rect class="${P}breath" x="${cx - 26}" y="${ly - 6}" width="52" height="12" rx="6" fill="${WARM}" fill-opacity="${f(.55 * x.B)}" filter="${x.url("gw")}"/>`;
       s += `<circle cx="${cx + 30}" cy="${ly}" r="1.4" fill="#1a1a1a" fill-opacity=".55"/><circle cx="${cx}" cy="${Y + Hh - 26}" r="2.2" fill="none" stroke="#000" stroke-opacity=".2" stroke-width=".5"/>`;
     }
-    return s + (!x.mf ? plug(x, cx, bot + 3, S) : one ? plug(xo, cx, bot + 3, S) : plugs2(x, cx, top + 3, bot + 3, S));
+    if (!opt.split) return s + (!x.mf ? plug(x, cx, bot + 3, S) : one ? plug(xo, cx, bot + 3, S) : plugs2(x, cx, top + 3, bot + 3, S));
+    const t = pOn(x, "top"), b = pOn(x, "bottom");
+    s += splitMarks(x, t, b, cx + 28, top + 3, bot + 3, rr(fx + 1, fy + 1, fw - 2, my - fy - 7, 1.5), rr(fx + 1, my + 6, fw - 2, fy + fh - my - 7, 1.5));
+    return s + plugPair(x, kind, cx, top, bot, t, b);
   }
 
   const icons = [];
   const REG_IDS = { duplex: 1, "rocker-style-outlet": 1, usb: 1, smart: 1, night: 1, floor: 1, popup: 1, weather: 1, tvbox: 1 };
-  const add = (id, name, colors, label, fn) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label,
+  const add = (id, name, colors, label, fn, extra) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label,
     render: (o) => { REG = REG_IDS[id] && o.opt && o.opt.region || "us";
       const mf = !!PARTS[id] && MFM(o); if (mf) o = Object.assign({}, o, { on: anyOn(o, PARTS[id]) });
-      try { const x = ctx(o); x.mf = mf; return fn(x); } finally { REG = "us"; } } }, REG_IDS[id] ? { options: [REG_OPT] } : {}, PARTS[id] ? { parts: PARTS[id] } : {}));
+      try { const x = ctx(o); x.mf = mf; return fn(x); } finally { REG = "us"; } } }, REG_IDS[id] ? { options: [REG_OPT] } : {}, PARTS[id] ? { parts: PARTS[id] } : {}, extra || {}));
   const RGB = ["#ff4fd8", "#4dabf7", "#69db7c", "#ffa94d", "#9775fa", "#ffffff"];
   const auraCtx = (o) => { const x = ctx(Object.assign({}, o, { color: o.color2 || WH })); x.o = o; return x; };
   icons.push({ id: "hidden-plug-outlet", name: "Hidden plug outlet", colors: [WH, LA, IV, GY, BK, BN], picker: true, colorLabel: "Plate", render: (o) => { const x = ctx(o); return scene(x, "beige", null, invis(x, false, false)); } });
@@ -29659,13 +32799,13 @@ ${extra || ""}</defs>`;
   icons.push({ id: "hidden-plug-usb-c-ring", name: "Hidden plug, USB-C ring", colors: RGB, picker: true, colorLabel: "Light", colors2: [WH, LA, IV, GY, BK, BN], picker2: true, colorLabel2: "Plate", render: (o) => { const x = auraCtx(o); return scene(x, "navy", null, invis(x, true, true)); } });
 
   add("duplex", "Standard duplex", PLATES, "Plate", (x) => scene(x, "sage", null, duplex(x, "std")));
-  add("rocker-style-outlet", "Rocker-style outlet", [BK, WH, LA, IV, GY, BN], "Plate", (x) => scene(x, "blue", null, decora(x, "plain")));
-  add("usb", "USB-A/C outlet", [BN, WH, BK, GY, LA, IV], "Plate", (x) => scene(x, "cream", null, decora(x, "usb")));
-  add("gfci", "GFCI outlet", [WH, LA, IV, GY, BK, BN], "Plate", (x) => scene(x, "mint", null, decora(x, "gfci")));
-  add("smart", "Smart outlet", [WH, BK, GY, LA, IV, BN], "Plate", (x) => scene(x, "plum", null, decora(x, "smart")));
-  add("tamper", "Tamper-resistant", [LA, WH, IV, GY, BK, BN], "Plate", (x) => scene(x, "sky", null, duplex(x, "tr")));
-  add("tslot", "20A T-slot", [GY, WH, IV, LA, BK, BN], "Plate", (x) => scene(x, "white", null, decora(x, "tslot")));
-  add("night", "Night-light outlet", [WH, LA, IV, BK, GY, BN], "Plate", (x) => scene(x, "olive", null, decora(x, "night")));
+  add("rocker-style-outlet", "Rocker-style outlet", [BK, WH, LA, IV, GY, BN], "Plate", (x) => scene(x, "blue", null, rockerFace(x, "plain", { split: 1 })));
+  add("usb", "USB-A/C outlet", [BN, WH, BK, GY, LA, IV], "Plate", (x) => scene(x, "cream", null, rockerFace(x, "usb")));
+  add("gfci", "GFCI outlet", [WH, LA, IV, GY, BK, BN], "Plate", (x) => scene(x, "mint", null, rockerFace(x, "gfci")));
+  add("smart", "Smart outlet", [WH, BK, GY, LA, IV, BN], "Plate", (x) => scene(x, "plum", null, rockerFace(x, "smart", { split: 1 })));
+  add("tamper", "Tamper-resistant", [LA, WH, IV, GY, BK, BN], "Plate", (x) => scene(x, "sky", null, duplex(x, "tr"))); 
+  add("tslot", "20A T-slot", [GY, WH, IV, LA, BK, BN], "Plate", (x) => scene(x, "white", null, rockerFace(x, "tslot")));
+  add("night", "Night-light outlet", [WH, LA, IV, BK, GY, BN], "Plate", (x) => scene(x, "olive", null, rockerFace(x, "night")));
 
   add("station", "Outlet shelf", [WH, BK, GY, LA, IV, BN], "Plate", (x) => {
     const { X, Y, W, S } = STD, cx = 100, Hh = 112;
@@ -29707,7 +32847,6 @@ ${extra || ""}</defs>`;
     const xx = Object.assign({}, x, { dev: "#f1f1ee", dark: false });
     s += slots(xx, cx, Y + 38, 28, "std") + slots(xx, cx, Y + 80, 28, "std") + `<rect x="${cx - 8}" y="${Y + 57}" width="16" height="5" rx="1" fill="#e2e2de" stroke="#000" stroke-opacity=".3" stroke-width=".4"/>`;
     s += x.on ? led(xx, cx + 13, Y + 59.5, GRN, "hg", .9) : `<g class="${P}blink"><circle cx="${cx + 13}" cy="${Y + 59.5}" r=".9" fill="${RED}"/></g>`;
-    // (parts) a plug in each receptacle that is on, the top one's cord beside the lower one, both out through the notch
     const wp = (yy, dx) => `<path d="M${cx + dx} ${yy + 14}V${Y + Hh - 12}C${cx + dx} ${Y + Hh + 6} ${cx + 10 + dx} 186 ${cx + 10 + dx} 200" fill="none" stroke="#e57a2b" stroke-width="4.5"/><path d="M${cx - 1 + dx} ${yy + 16}V${Y + Hh - 12}" stroke="#fff" stroke-opacity=".3"/><path d="${rr(cx - 10, yy, 20, 16, 3)}" fill="#e57a2b" fill-opacity=".8"/>`;
     const lid = rr(X + 6, Y + 8, W - 12, Hh - 26, 8);
     s += `<path d="${lid}" fill="${h.mix(x.c, "#ffffff", .3)}" fill-opacity=".28"/><path d="${lid}" fill="none" stroke="${h.shade(x.c, -.35)}" stroke-width="1.4"/><path d="M${X + 14} ${Y + 14}V${Y + Hh - 30}" stroke="#fff" stroke-opacity=".45" stroke-width="2.2" stroke-linecap="round"/>`;
@@ -29768,7 +32907,6 @@ ${extra || ""}</defs>`;
     const bx = X + 78, br = rr(bx - 14, Y + 26, 28, 48, 4);
     s += `<path d="${br}" fill="#151517"/>`; for (let i = 0; i < 18; i++) s += `<path d="M${f(bx - 13 + i * 1.5)} ${Y + 27}V${Y + 73}" stroke="#3a3b3f" stroke-width=".6"/>`;
     s += `<path d="M${bx - 14} ${Y + 50}H${bx + 14}" stroke="#000" stroke-width="1.4"/>`;
-    // (parts) a flat plug in each receptacle that is on, each cord into the brush plate, the TV cables up out of it
     const tvp = (yy) => `<path d="${rr(dx - 9, yy, 18, 9, 2)}" fill="#2a2b2f"/><path d="M${dx + 9} ${yy + 4}C${dx + 22} ${yy + 4} ${bx - 6} ${yy + 4} ${bx - 2} ${yy < Y + 40 ? yy + 12 : yy - 2}" fill="none" stroke="#2a2b2f" stroke-width="3"/>` + led(x, dx + 6, yy + 3, GRN, "hg", .9);
     if (x.mf && x.on) s += (pp(x, "top") ? tvp(Y + 24) : "") + (pp(x, "bottom") ? tvp(Y + 54) : "") + `<path d="M${bx - 2} ${Y + 50}C${bx + 4} ${Y + 30} ${bx + 6} ${Y + 20} ${bx + 6} 0" fill="none" stroke="#1d1e21" stroke-width="3.5"/><path d="M${bx + 5} ${Y + 50}C${bx + 10} ${Y + 30} ${bx + 12} ${Y + 20} ${bx + 12} 0" fill="none" stroke="#3a3c42" stroke-width="2"/>`;
     else if (x.on) s += `<path d="${rr(dx - 9, Y + 54, 18, 9, 2)}" fill="#2a2b2f"/><path d="M${dx + 9} ${Y + 58}C${dx + 22} ${Y + 58} ${bx - 6} ${Y + 58} ${bx - 2} ${Y + 52}" fill="none" stroke="#2a2b2f" stroke-width="3"/><path d="M${bx - 2} ${Y + 50}C${bx + 4} ${Y + 30} ${bx + 6} ${Y + 20} ${bx + 6} 0" fill="none" stroke="#1d1e21" stroke-width="3.5"/><path d="M${bx + 5} ${Y + 50}C${bx + 10} ${Y + 30} ${bx + 12} ${Y + 20} ${bx + 12} 0" fill="none" stroke="#3a3c42" stroke-width="2"/>` + led(x, dx + 6, Y + 57, GRN, "hg", .9);
@@ -29787,8 +32925,7 @@ ${extra || ""}</defs>`;
     tab: "Outlets",
     group: "More",
     kind: "device",
-    intro: "In-wall outlets: the InvisOutlet line (Pro, Aura, C Pro with USB-C, C Aura) plus common outlets from a plain duplex to GFCI, smart, floor and pop-up types. On means power on: LEDs and night-lights glow, a plug is in and its lamp is lit. The color is the plate or finish (the light on Aura models).",
-    
+    intro: "In-wall outlets: hidden-plug outlets (plain, light ring, USB-C, USB-C with ring) plus common outlets from a plain duplex to GFCI, smart, floor and pop-up types. On means power on: LEDs and night-lights glow, a plug is in and its lamp is lit. The color is the plate or finish (the light on light-ring models). Split outlets show each plug with its cord, so you can see which half is on.",
     onWord: "On", offWord: "Off",
     css,
     icons,
@@ -32103,10 +35240,6 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
 
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {});
   const BODY = ["#eef0f2", "#2c2f36", "#9fc5b8", "#e8c9a6", "#8fb4d9"];
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
-  // Image (no o.mf, as today) and stays off / closed / blank, never animated, as a Multi-Function Image (o.mf). A value
-  // part's reading is o.pval[id] (a number), a stage part's value o.pval[id] (one of its stage ids). Pieces that exist
-  // only as parts (the aquarium's heater and thermometer, the pet door's mode arrows) are drawn only when o.mf.
   const MF = {
     has: (o, k) => !!(o.parts && o.parts[k] != null),
     on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
@@ -32116,6 +35249,68 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
   };
   const lit = (x, k) => Object.assign({}, x, { on: true, L: k == null ? .8 : k });
 
+  const CK = (() => {
+    const g = (n) => (+n).toFixed(1);
+    const STATE = { id: "state", name: "State", values: [["auto", "From on/off"], ["live", "Live"], ["rec", "Recording"], ["motion", "Motion"], ["privacy", "Privacy"], ["offline", "Offline"]] };
+    const BELL = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+    const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] };
+    const IRA = { id: "ir", name: "Night IR", values: [["auto", "Auto"], ["off", "Off"], ["on", "On"]] };
+    const PAN = { id: "pan", name: "Pan", values: [["center", "Center"], ["left", "Left"], ["right", "Right"]] };
+    const cam = (o) => { const s = (o.opt || {}).state || "auto"; return s === "auto" ? (o.on ? "on" : "off") : s; };
+    const bell = (o) => o.on ? ((o.opt || {}).state || "ring") : "idle";
+    const active = (s) => s === "on" || s === "live" || s === "rec" || s === "motion";
+    const COL = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940", privacy: "#c9ced6", offline: "#8a8f98" };
+    const LED = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940" };
+    function badge(s, bx, by) {
+      const c = COL[s]; if (!c) return "";
+      bx = bx == null ? 28 : bx; by = by == null ? 28 : by;
+      let gl = "";
+      if (s === "rec") gl = `<circle cx="${bx}" cy="${by}" r="7" fill="${c}" opacity=".22"/><g class="${P}ckblink"><circle cx="${bx}" cy="${by}" r="4.4" fill="${c}"/><circle cx="${g(bx - 1.4)}" cy="${g(by - 1.4)}" r="1.3" fill="#fff" fill-opacity=".6"/></g>`;
+      else if (s === "live") gl = `<circle cx="${bx}" cy="${by}" r="2.3" fill="${c}"/><path d="M${g(bx - 3.2)} ${g(by - 3.6)}A5 5 0 0 0 ${g(bx - 3.2)} ${g(by + 3.6)}M${g(bx + 3.2)} ${g(by - 3.6)}A5 5 0 0 1 ${g(bx + 3.2)} ${g(by + 3.6)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path class="${P}ckglow" d="M${g(bx - 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 0 ${g(bx - 5.6)} ${g(by + 5.4)}M${g(bx + 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 1 ${g(bx + 5.6)} ${g(by + 5.4)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "motion") gl = `<g class="${P}ckglow" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="${g(bx + 1.2)}" cy="${g(by - 5.6)}" r="1.9" fill="${c}" stroke="none"/>` +
+        `<path d="M${g(bx + .4)} ${g(by - 2.8)}L${g(bx - 1)} ${g(by + 2)}L${g(bx - 4.4)} ${g(by + 6.2)}M${g(bx - 1)} ${g(by + 2)}L${g(bx + 2.6)} ${g(by + 3.4)}L${g(bx + 3.4)} ${g(by + 6.6)}M${g(bx - 4.6)} ${g(by - .6)}L${g(bx + .4)} ${g(by - 2.8)}L${g(bx + 4)} ${g(by)}"/></g>`;
+      else if (s === "privacy") gl = `<path d="M${g(bx - 6.4)} ${by}Q${bx} ${g(by - 6)} ${g(bx + 6.4)} ${by}Q${bx} ${g(by + 6)} ${g(bx - 6.4)} ${by}Z" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="${bx}" cy="${by}" r="2" fill="${c}"/>` +
+        `<path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "offline") gl = `<circle cx="${bx}" cy="${g(by + 4)}" r="1.2" fill="${c}"/><path d="M${g(bx - 2.8)} ${g(by + 1.2)}A4 4 0 0 1 ${g(bx + 2.8)} ${g(by + 1.2)}M${g(bx - 5.3)} ${g(by - 1.3)}A7.5 7.5 0 0 1 ${g(bx + 5.3)} ${g(by - 1.3)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#ff5a5a" stroke-width="1.5" stroke-linecap="round"/>`;
+      return `<g><circle cx="${g(bx + 1)}" cy="${g(by + 1.6)}" r="11" fill="#000" fill-opacity=".45"/><circle cx="${bx}" cy="${by}" r="11" fill="#16181e"/><circle cx="${bx}" cy="${by}" r="10.2" fill="none" stroke="${c}" stroke-width="1.3"/>` +
+        `<path d="M${g(bx - 7)} ${g(by - 6)}A9 9 0 0 1 ${g(bx + 6)} ${g(by - 7)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>${gl}</g>`;
+    }
+    const motion = (cx, cy, r) => [0, 1].map((i) => `<circle class="${P}ckring" style="animation-delay:${(-i * .8).toFixed(1)}s" cx="${g(cx)}" cy="${g(cy)}" r="${g(r * (1.3 + i * .5))}" fill="none" stroke="#ffa940" stroke-opacity="${i ? .4 : .75}" stroke-width="${i ? 1.4 : 1.8}"${i ? ` stroke-dasharray="3 3"` : ""}/>`).join("");
+    function cap(u, k, cx, cy, r, col) {
+      const id = `${u}-ckc${k}`;
+      return `<defs><radialGradient id="${id}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${H.shade(col, .55)}"/><stop offset=".6" stop-color="${col}"/><stop offset="1" stop-color="${H.shade(col, -.45)}"/></radialGradient></defs>` +
+        `<circle cx="${g(cx)}" cy="${g(cy + r * .14)}" r="${g(r)}" fill="#000" fill-opacity=".4"/><circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="url(#${id})"/>` +
+        `<path d="M${g(cx - r * .97)} ${g(cy)}H${g(cx + r * .97)}" stroke="${H.shade(col, -.5)}" stroke-width="${g(Math.max(.8, r * .09))}"/><path d="M${g(cx - r * .9)} ${g(cy + r * .1)}H${g(cx + r * .9)}" stroke="#fff" stroke-opacity=".28" stroke-width="${g(Math.max(.5, r * .05))}"/>` +
+        `<circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="none" stroke="#000" stroke-opacity=".38" stroke-width=".8"/><ellipse cx="${g(cx - r * .32)}" cy="${g(cy - r * .5)}" rx="${g(r * .36)}" ry="${g(r * .15)}" fill="#fff" fill-opacity=".4" transform="rotate(-18 ${g(cx - r * .32)} ${g(cy - r * .5)})"/>`;
+    }
+    const irDots = (cx, cy, R, n, rr) => { let s = ""; rr = rr || 1.1;
+      for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, px = g(cx + Math.cos(a) * R), py = g(cy + Math.sin(a) * R);
+        s += `<circle cx="${px}" cy="${py}" r="${g(rr * 3)}" fill="#ff3a4a" opacity=".22"/><circle cx="${px}" cy="${py}" r="${g(rr)}" fill="#ff3a4a"/>`; }
+      return s; };
+    function bellOver(s, cx, ly, lr, w) {
+      if (s === "motion") return `<g class="${P}ckglow">` + [0, 1].map((i) => { const r = lr + 5 + i * 6; return `<path d="M${g(cx - r)} ${g(ly - 2)}A${g(r)} ${g(r)} 0 0 1 ${g(cx + r)} ${g(ly - 2)}" fill="none" stroke="#ff8a6a" stroke-opacity="${(.8 - i * .3).toFixed(2)}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>`; }).join("") + `</g>`;
+      if (s === "live") return `<g class="${P}ckglow"><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.9)}" fill="#6aa8ff" opacity=".22"/><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.05)}" fill="none" stroke="#6aa8ff" stroke-opacity=".8" stroke-width="1.4"/></g>` +
+        `<circle class="${P}ckblink" cx="${g(cx + w / 2 + 7)}" cy="${g(ly - lr)}" r="3" fill="#ff3b3b"/>`;
+      if (s === "talk") return [0, 1, 2].map((i) => `<path class="${P}ckwave" style="animation-delay:${(-i * .4).toFixed(1)}s" d="M${g(cx + w / 2 + 4 + i * 6)} ${g(ly - 6 - i * 2)}q${g(5 + i)} ${g(6 + i * 2)} 0 ${g(12 + i * 4)}" fill="none" stroke="#7ee7ff" stroke-opacity="${(.9 - i * .2).toFixed(2)}" stroke-width="1.5" stroke-linecap="round"/>`).join("");
+      return "";
+    }
+    const css = `
+.${P}ckring{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}ckblink{animation:${P}ckblink 1.1s steps(1,end) infinite}
+@keyframes ${P}ckblink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .${P}ckring{animation:${P}ckring 1.6s ease-out infinite}
+@keyframes ${P}ckring{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.hda-anim .${P}ckglow{animation:${P}ckglow 1.8s ease-in-out infinite}
+@keyframes ${P}ckglow{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-anim .${P}ckwave{animation:${P}ckwave 1.3s ease-out infinite}
+@keyframes ${P}ckwave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}ckblink,.hda-anim .${P}ckring,.hda-anim .${P}ckglow,.hda-anim .${P}ckwave{animation:none!important}}`;
+    return { STATE, BELL, IR, IRA, PAN, cam, bell, active, LED, badge, motion, cap, irDots, bellOver, css };
+  })();
+
+  const camWrap = (u, cs, body, cx, cy, lr, c) => (cs === "offline" ? `<g opacity=".8">${body}</g>` : body) + (cs === "motion" ? CK.motion(cx, cy, lr * 1.3) : "") + (cs === "privacy" ? CK.cap(u, 0, cx, cy, lr * 1.3, c) : "") + CK.badge(cs);
   const icons = [
     ic("feeder", "Automatic feeder", sw(BODY, "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
       const back = wallB(x, "cream", 8, 130) + kickB(x, 130) + tileFloor(x, 130);
@@ -32155,8 +35350,6 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
       return scene(x, back, body); }),
 
     ic("litter", "Self-cleaning litter", sw(["#eef0f2", "#2c2f36", "#8e959e", "#c9b99a", "#6d8fb3"], "#eef0f2"), "Body", (o) => {
-      // (parts) State: cycling turns the drum (as on today); ready = a green light, full = amber (the drawer handle too),
-      // error = a blinking red light; left out = the drum still, the light off
       const st = o.mf ? MF.st(o, "state") : null, x = X(o.mf ? Object.assign({}, o, { on: st === "cycling" }) : o), c = o.color;
       const scol = { ready: GREEN, cycling: "#7ee7ff", full: "#ffb547", error: "#ff5a4f" }[st];
       const back = wallB(x, "lav", 8, 142) + baseB(x, 142, "#8a6142");
@@ -32178,8 +35371,6 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
       return scene(x, back, body); }, { parts: [{ id: "state", name: "State", type: "stage", values: [["ready", "Ready"], ["cycling", "Cycling"], ["full", "Drawer full"], ["error", "Error"]], def: "ready" }] }),
 
     ic("door", "Smart pet door", sw(["#eef0f2", "#2c2f36", "#8a6142", "#9aa1aa", "#c9b99a"], "#eef0f2"), "Body", (o) => {
-      // (parts) Mode: locked = the latch bar, a red light and a shut padlock; in / out / both = unlocked, arrows on the
-      // display show the way; left out = unlocked, no arrows. Flap (contact): open = the flap swung up (a pet going through).
       const md = o.mf ? MF.st(o, "mode") : null, x = X(o.mf ? Object.assign({}, o, { on: md !== "locked" }) : o), c = o.color, fo = o.mf && MF.on(o, "flap");
       const wood = "#7d5a3e";
       const back = `<rect x="8" y="8" width="184" height="168" fill="${x.lg([[0, H.shade(wood, .1)], [1, H.shade(wood, -.25)]], 0, 0, 1, 0)}"/>` +
@@ -32202,25 +35393,23 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
           (md === "out" || md === "both" ? `<path d="M112 166H103M105.5 164L103 166L105.5 168" fill="none" stroke="#bff5d6" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>` : "") : "");
       return scene(x, back, body); }, { parts: [{ id: "mode", name: "Mode", type: "stage", values: [["both", "In & out"], ["in", "In only"], ["out", "Out only"], ["locked", "Locked"]], def: "both" }, { id: "flap", name: "Flap", type: "contact" }] }),
 
-    ic("treatcam", "Treat camera", sw(["#eef0f2", "#2c2f36", "#9fc5b8", "#f2c6a8", "#8e959e"], "#eef0f2"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("treatcam", "Treat camera", sw(["#eef0f2", "#2c2f36", "#9fc5b8", "#f2c6a8", "#8e959e"], "#eef0f2"), "Body", (o) => { const cs = CK.cam(o), dead = cs === "offline", x = X(Object.assign({}, o, { on: CK.active(cs) })), c = dead ? H.mix(o.color || "#eef0f2", "#80838a", .7) : o.color, ir = (o.opt || {}).ir === "on" && cs !== "privacy" && !dead;
       const back = wallB(x, "sage", 8, 126) + baseB(x, 126, "#7a5638");
       const treat = (cx, cy) => `<path d="M${f(cx - 3.4)} ${f(cy - 1.2)}h6.8a1.6 1.6 0 1 1 0 2.4h-6.8a1.6 1.6 0 1 1 0-2.4z" fill="#b97a3f"/><path d="M${f(cx - 3)} ${f(cy - .8)}h6" stroke="#fff" stroke-opacity=".35" stroke-width=".6"/>`;
       const body = `<ellipse cx="100" cy="160" rx="44" ry="6" fill="#000" fill-opacity=".4"/>` +
-        (x.on ? `<path d="M86 122Q60 92 34 128" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.2" stroke-dasharray="2 3"/>` : "") +
+        (cs === "on" ? `<path d="M86 122Q60 92 34 128" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1.2" stroke-dasharray="2 3"/>` : "") +
         box(x, 64, 44, 72, 112, 20, 3, 4, c) +
         `<rect x="70" y="52" width="60" height="46" rx="16" fill="${x.lg([[0, "#272a31"], [1, "#0a0b0e"]])}"/><path d="M76 58Q100 50 124 58" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="1.6" stroke-linecap="round"/>` +
         `<circle cx="100" cy="75" r="13" fill="#2c2f36"/><circle cx="100" cy="75" r="10" fill="${x.rg([[0, "#4f6fa8"], [.4, "#1a2440"], [1, "#05070c"]], .4, .38, .6)}"/><circle cx="100" cy="75" r="4" fill="#06080d"/><circle cx="96.5" cy="71.5" r="2.4" fill="#fff" fill-opacity=".6"/>` +
-        [0, 1, 2, 3].map((i) => `<circle cx="${80 + (i % 2) * 40}" cy="${63 + Math.floor(i / 2) * 24}" r="1.2" fill="#3a1a1a"/>`).join("") +
-        (x.on ? `<g class="${P}blink">${led(x, 120, 61, 1.3, "#ff3b3b")}</g>` : led(x, 120, 61, 1.3, "#ff3b3b")) +
+        [0, 1, 2, 3].map((i) => `<circle cx="${80 + (i % 2) * 40}" cy="${63 + Math.floor(i / 2) * 24}" r="1.2" fill="${ir ? "#ff3a4a" : "#3a1a1a"}"/>${ir ? `<circle cx="${80 + (i % 2) * 40}" cy="${63 + Math.floor(i / 2) * 24}" r="4" fill="#ff3a4a" opacity=".25"/>` : ""}`).join("") +
+        (x.on ? `<g class="${cs === "live" ? "" : P + "blink"}">${led(x, 120, 61, 1.3, CK.LED[cs] || "#ff3b3b")}</g>` : led(x, 120, 61, 1.3, "#ff3b3b")) +
         [0, 1, 2, 3, 4].map((i) => `<circle cx="${92 + i * 4}" cy="106" r=".9" fill="${H.shade(c, -.5)}"/>`).join("") +
         `<ellipse cx="100" cy="127" rx="16" ry="9" fill="${H.shade(c, -.38)}"/><ellipse cx="100" cy="128" rx="14" ry="7.5" fill="#0d0e11"/>` + treat(96, 131) + treat(104, 132) +
-        (x.on ? [0, 1].map((i) => `<g class="${P}toss" style="animation-delay:${(-i * 1.1).toFixed(1)}s">${treat(90, 124)}</g>`).join("") : "") +
+        (cs === "on" ? [0, 1].map((i) => `<g class="${P}toss" style="animation-delay:${(-i * 1.1).toFixed(1)}s">${treat(90, 124)}</g>`).join("") : "") +
         `<rect x="88" y="146" width="24" height="3" rx="1.5" fill="${H.shade(c, -.25)}"/>`;
-      return scene(x, back, body); }),
+      return scene(x, back, camWrap(o.uid, cs, body, 100, 75, 10, c)); }, { options: [CK.STATE, CK.IR] }),
 
     ic("aquarium", "Aquarium", sw(["#bfe3ff", "#ffffff", "#7ad3ff", "#c4a8ff", "#ffd8a8", "#7ef0c0"], "#bfe3ff"), "Light", (o) => {
-      // (parts) Light = the hood light and its rays, Filter = the bubbles, Heater = a glass heater in the back corner (glows
-      // orange when on), Temperature = a stick-on thermometer on the glass; heater and thermometer only when ticked (o.mf)
       const x = X(MF.as(o, "light")), c = o.color, xf = MF.as(o, "filter"), hh = o.mf && MF.has(o, "heater"), ho = hh && MF.on(o, "heater"), wt = o.mf ? MF.val(o, "temp") : null;
       const back = wallB(x, "navy", 8, 192);
       const top = x.on ? H.mix(H.mix(c, "#1a6a96", .5), "#0c2a3d", 1 - x.lv * .8) : "#0f1c26", bot = x.on ? "#0b2638" : "#070e14";
@@ -32289,7 +35478,7 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         (x.on ? `<path d="M100 122Q128 68 158 92" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1.2" stroke-dasharray="2 3"/><g class="${P}launch">${tball(x, 140, 82, 6.5)}</g>` : tball(x, 160, 170, 6.5));
       return scene(x, back, body); }),
 
-    ic("birdcam", "Bird feeder camera", sw(["#6b8f5e", "#eef0f2", "#8a6142", "#2c2f36", "#c9b99a"], "#6b8f5e"), "Body", (o) => { const x = X(o), c = o.color;
+    ic("birdcam", "Bird feeder camera", sw(["#6b8f5e", "#eef0f2", "#8a6142", "#2c2f36", "#c9b99a"], "#6b8f5e"), "Body", (o) => { const cs = CK.cam(o), dead = cs === "offline", x = X(Object.assign({}, o, { on: CK.active(cs) })), c = dead ? H.mix(o.color || "#eef0f2", "#80838a", .7) : o.color, ir = (o.opt || {}).ir === "on" && cs !== "privacy" && !dead;
       const back = skyB(x, 128) + treeLine(x, 128) + grassB(x, 128, "#4b7536", 41);
       const cp = clipU(x, "seed", `<rect x="74" y="80" width="52" height="40" rx="3"/>`);
       const sh = 40 * x.lv; let seeds = ""; const r = rnd(12);
@@ -32305,9 +35494,9 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         `<path d="M112 56L132 68L126 72L106 60Z" fill="${x.lg([[0, "#2f5592"], [1, "#101c33"]])}" stroke="#aab3bd" stroke-width=".8"/>` +
         `<rect x="54" y="122" width="92" height="7" rx="2" fill="${x.lg([[0, "#8a6142"], [1, "#4f3522"]])}"/><path d="M54 122.6H146" stroke="#fff" stroke-opacity=".3"/>` +
         `<rect x="86" y="128" width="28" height="14" rx="5" fill="${x.lg([[0, "#2c2f36"], [1, "#0e1013"]])}"/><circle cx="100" cy="135" r="5" fill="${x.rg([[0, "#4f6fa8"], [.5, "#1a2440"], [1, "#05070c"]], .4, .38, .6)}"/><circle cx="98.4" cy="133.4" r="1.4" fill="#fff" fill-opacity=".6"/>` +
-        (x.on ? `<g class="${P}blink">${led(x, 109, 132, 1, "#ff3b3b")}</g>` : led(x, 109, 132, 1, "#ff3b3b")) +
+        (x.on ? `<g class="${cs === "live" ? "" : P + "blink"}">${led(x, 109, 132, 1, CK.LED[cs] || "#ff3b3b")}</g>` : led(x, 109, 132, 1, "#ff3b3b")) +
         `<ellipse cx="120" cy="121" rx="8" ry="2" fill="#c9b48a"/>` + bird;
-      return scene(x, back, body); }),
+      return scene(x, back, camWrap(o.uid, cs, body, 100, 135, 5, "#2c2f36")); }, { options: [CK.STATE] }),
 
     ic("collar", "Collar on dock", sw(["#e0483e", "#3a6fd8", "#2f8f5e", "#2c2f36", "#f2a541", "#c47ad8"], "#e0483e"), "Strap", (o) => { const x = X(o), c = o.color;
       const back = tileB(x, 8, 118, "#e9e1d2") + counterB(x, 118, "#cfd0d6");
@@ -32373,9 +35562,8 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
   (window.HDA = window.HDA || []).push({
     id: "pets", tab: "Pet devices", group: "Home", kind: "device",
     intro: "Ten pet gadgets on kitchen floors, in the yard and on the counter. On means working: kibble drops into the bowl, the fountain flows, the litter globe turns, the pet door unlocks, treats fly, fish swim under the light, the bed glows warm, balls launch. The slider is the level: food, water, light, warmth or battery.",
-    
     levelLabel: "Level", onWord: "On", offWord: "Off",
-    css, icons,
+    css: css + CK.css, icons,
   });
 })();
 
@@ -34079,10 +37267,6 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
   const glass = (x, x0, y0, w, h) => `<path d="M${f(x0 + 2)} ${f(y0 + 1.5)}H${f(x0 + w * .7)}L${f(x0 + w * .45)} ${f(y0 + h - 1.5)}H${f(x0 + 2)}Z" fill="#fff" fill-opacity=".07"/>`;
   const watts = (x) => x.on ? Math.round(2 + 1498 * Math.pow(x.lv, 1.25)) : 0;
 
-  // ---------- (parts) Multi-Function: each outlet its own switch part (o1..oN), plus USB / light / power where drawn ----------
-  // A Device Image (no o.mf, no parts) is drawn exactly as before. As a Multi-Function Image (o.mf) o.parts holds only the
-  // ticked parts (true = on); a part left out is drawn off and never animated, every outlet shows its own little LED, and
-  // the drawing's own light (master LED, rocker, ring) is on when any switch part is on. o.pval.power = a power reading (W).
   const MFM = (o) => !!(o.mf || o.parts);
   const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
   const tick = (o, k) => !!(o.parts && o.parts[k] != null);
@@ -34097,12 +37281,92 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
     energy: [{ id: "outlet", name: "Outlet", type: "switch" }, { id: "power", name: "Power", type: "value", unit: "W", min: 0, max: 1800, def: 60 }],
     ev: [EVST],
   };
-  // the drawing's own on as a Multi-Function Image: any of its switch parts on (a stage drawing: its stage decides)
   const anyOn = (o, ps) => { const sw = ps.filter((p) => !p.type || p.type === "switch"); if (!sw.length) return !!o.on;
     let t = 0, a = 0; sw.forEach((p) => { if (tick(o, p.id)) { t = 1; if (o.parts[p.id]) a = 1; } }); return t ? !!a : !o.mf && !!o.on; };
-  // a small status LED per outlet, only drawn as a Multi-Function Image
   const oled = (x, o, k, cx, cy, r, col) => (o.mf ? led(sub(x, pon(o, k)), cx, cy, r || 1, col || "#34d399", .7) : "");
   const stv = (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null);
+  const METER = { id: "meter", name: "Meter", values: [["off", "Off"], ["on", "On"]] };
+  function meter(x, o) {
+    if (!(o.opt && o.opt.meter === "on")) return "";
+    const X0 = 128, Y0 = 16, w = 58, h = 20, col = x.led, lit = x.on ? H.mix(col, "#ffffff", .3) : "#ffffff";
+    return `<rect x="${X0 + 1}" y="${Y0 + 2}" width="${w}" height="${h}" rx="7" fill="#000" fill-opacity=".35"/><rect x="${X0}" y="${Y0}" width="${w}" height="${h}" rx="7" fill="${x.lg([[0, "#1b1e26"], [1, "#0b0d12"]])}"/>` +
+      `<rect x="${X0 + .5}" y="${Y0 + .5}" width="${w - 1}" height="${h - 1}" rx="6.5" fill="none" stroke="${x.on ? col : "#ffffff"}" stroke-opacity="${x.on ? .55 : .14}" stroke-width=".9"/>` +
+      (x.on ? `<g class="${P}pulse"><rect x="${X0}" y="${Y0}" width="${w}" height="${h}" rx="7" fill="${x.rg([[0, col, .3], [1, col, 0]], .5, .5, .7)}"/></g>` : "") +
+      `<path d="M${X0 + 9.5} ${Y0 + 4}L${X0 + 6} ${Y0 + 11}H${X0 + 9}L${X0 + 7.5} ${Y0 + 16}L${X0 + 12.5} ${Y0 + 8.6}H${X0 + 9.6}L${X0 + 11} ${Y0 + 4}Z" fill="${lit}" fill-opacity="${x.on ? .95 : .2}"/>` +
+      digits(x, X0 + 46, Y0 + 5, 10, watts(x), 4, col) +
+      `<path d="M${X0 + 47.6} ${Y0 + 7.6}L${X0 + 49.2} ${Y0 + 14.6}L${X0 + 50.8} ${Y0 + 9.6}L${X0 + 52.4} ${Y0 + 14.6}L${X0 + 54} ${Y0 + 7.6}" fill="none" stroke="${lit}" stroke-opacity="${x.on ? 1 : .2}" stroke-width="1" stroke-linejoin="round"/>`;
+  }
+  const part = (x, id) => x.o.parts && x.o.parts[id] != null ? x.on && !!x.o.parts[id] : x.on;
+  function as(x, on, fn) { const keep = [x.on, x.an, x.L]; x.on = on; x.an = on && x.o.anim; x.L = on ? .35 + .65 * x.lv : 0; try { return fn(); } finally { x.on = keep[0]; x.an = keep[1]; x.L = keep[2]; } }
+  function plugIn(lin, kind, cx, by, k, col, side, sd) {
+    const NH = window.HDAH, sh = (a) => NH.shade(col, a), v = NH.hx(col), dark = (v[0] * .3 + v[1] * .59 + v[2] * .11) / 255 < .45;
+    const R = (x0, y0, w, h, r) => `M${f(x0 + r)} ${f(y0)}H${f(x0 + w - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w)} ${f(y0 + r)}V${f(y0 + h - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w - r)} ${f(y0 + h)}H${f(x0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0)} ${f(y0 + h - r)}V${f(y0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + r)} ${f(y0)}Z`;
+    sd = sd || [.05, .1]; side = side || 1;
+    const shadow = (d) => `<path d="${d}" fill="#000" fill-opacity=".14" transform="translate(${f(sd[0] * k * 2.2)} ${f(sd[1] * k * 2.2)})"/><path d="${d}" fill="#000" fill-opacity=".3" transform="translate(${f(sd[0] * k)} ${f(sd[1] * k)})"/>`;
+    const front = lin([[0, sh(dark ? .3 : .55)], [.42, col], [1, sh(dark ? -.35 : -.24)]], 0, 0, .45, 1);
+    const sideG = lin([[0, sh(-.42)], [.32, sh(dark ? .22 : .3)], [.62, col], [1, sh(-.48)]], 0, 0, 1, 0);
+    const edge = `fill="none" stroke="${sh(-.6)}" stroke-opacity=".75" stroke-width="${f(Math.max(.35, .014 * k))}"`;
+    const hiOp = dark ? .3 : .85, lw = f(Math.max(.4, .022 * k));
+    const top = (x0, y0, w, r) => `<path d="M${f(x0 + r)} ${f(y0 + .04 * k)}H${f(x0 + w - r)}" stroke="#fff" stroke-opacity="${hiOp}" stroke-width="${lw}" stroke-linecap="round"/>`;
+    const sheen = (d) => `<path d="${d}" fill="${lin([[0, "#fff", dark ? .14 : .4], [.45, "#fff", 0], [1, "#000", dark ? 0 : .06]], 0, 0, 1, 1)}"/>`;
+    const rivets = (y) => [-1, 1].map((i) => `<circle cx="${f(cx + i * .25 * k)}" cy="${f(y)}" r="${f(.035 * k)}" fill="${sh(-.4)}"/><circle cx="${f(cx + i * .25 * k - .01 * k)}" cy="${f(y - .012 * k)}" r="${f(.016 * k)}" fill="#fff" fill-opacity="${dark ? .25 : .7}"/>`).join("");
+    let s = "", ox = cx, oy = by, w = .12 * k, c = col;
+    if (kind === "ground3") {
+      const W = .74 * k, Hh = .92 * k, x0 = cx - W / 2, y0 = by - .36 * k, r = .22 * k, d = R(x0, y0, W, Hh, r), yb = y0 + Hh - .05 * k;
+      const neck = `M${f(cx - .17 * k)} ${f(yb)}H${f(cx + .17 * k)}L${f(cx + .11 * k)} ${f(yb + .32 * k)}Q${f(cx)} ${f(yb + .36 * k)} ${f(cx - .11 * k)} ${f(yb + .32 * k)}Z`;
+      s += shadow(d) + shadow(neck) + `<path d="${neck}" fill="${sideG}"/>` + [.08, .16, .24].map((t) => `<path d="M${f(cx - (.16 - t * .2) * k)} ${f(yb + t * k)}H${f(cx + (.16 - t * .2) * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`).join("");
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="${R(x0 + .08 * k, y0 + .08 * k, W - .16 * k, Hh - .2 * k, r * .7)}" fill="none" stroke="${sh(dark ? .18 : -.12)}" stroke-opacity=".55" stroke-width="${lw}"/>`;
+      for (let i = 0; i < 4; i++) [-1, 1].forEach((e) => { const yy = y0 + .34 * k + i * .1 * k, xa = cx + e * (W / 2 - .07 * k), xb = cx + e * (W / 2 - .19 * k);
+        s += `<path d="M${f(xa)} ${f(yy)}H${f(xb)}" stroke="${sh(-.5)}" stroke-opacity=".55" stroke-width="${lw}" stroke-linecap="round"/><path d="M${f(xa)} ${f(yy + .03 * k)}H${f(xb)}" stroke="#fff" stroke-opacity="${hiOp * .5}" stroke-width="${lw}" stroke-linecap="round"/>`; });
+      s += top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = yb + .3 * k; w = .15 * k;
+    } else if (kind === "wart") {
+      const W = 1.08 * k, Hh = 1.14 * k, x0 = cx - W / 2, y0 = by - .4 * k, r = .16 * k, d = R(x0, y0, W, Hh, r);
+      c = dark ? "#2a2b2f" : "#efefed";
+      const boot = R(cx - .1 * k, y0 + Hh + .02 * k, .2 * k, .2 * k, .06 * k);
+      s += shadow(R(x0, y0, W + .06 * k, Hh + .3 * k, r)) + `<path d="${R(x0 + .06 * k, y0 + .1 * k, W, Hh, r)}" fill="${sh(-.5)}"/>` +
+        `<path d="${boot}" fill="${lin([[0, NH.shade(c, -.35)], [.4, NH.shade(c, .2)], [1, NH.shade(c, -.45)]], 0, 0, 1, 0)}"/><path d="${boot}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="${lw}"/>`;
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="M${f(x0 + .12 * k)} ${f(y0 + Hh * .62)}L${f(x0 + W * .62)} ${f(y0 + .12 * k)}" stroke="#fff" stroke-opacity="${dark ? .06 : .22}" stroke-width="${f(.16 * k)}" stroke-linecap="round"/>` +
+        `<path d="${R(x0 + .09 * k, y0 + .09 * k, W - .18 * k, Hh - .18 * k, r * .6)}" fill="none" stroke="${sh(dark ? .2 : -.18)}" stroke-opacity=".5" stroke-width="${lw}"/>` + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = y0 + Hh + .2 * k; w = Math.max(1.4, .075 * k);
+    } else if (kind === "right") {
+      const W = .84 * k, Hh = .58 * k, hx = cx + side * .04 * k, x0 = hx - W / 2, y0 = by - .27 * k, r = .2 * k, d = R(x0, y0, W, Hh, r), my = y0 + Hh * .52;
+      const ex = side > 0 ? x0 + W - .05 * k : x0 + .05 * k, L = .28 * k;
+      const boot = `M${f(ex)} ${f(my - .17 * k)}L${f(ex + side * L)} ${f(my - .1 * k)}Q${f(ex + side * (L + .04 * k))} ${f(my)} ${f(ex + side * L)} ${f(my + .1 * k)}L${f(ex)} ${f(my + .17 * k)}Z`;
+      s += shadow(d) + shadow(boot) + `<path d="${boot}" fill="${lin([[0, sh(dark ? .2 : .35)], [.45, col], [1, sh(-.5)]], 0, 0, 0, 1)}"/>` +
+        [.08, .16].map((t) => `<path d="M${f(ex + side * t * k)} ${f(my - (.16 - t * .25) * k)}V${f(my + (.16 - t * .25) * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`).join("");
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d);
+      for (let i = 0; i < 3; i++) { const xx = hx - side * (W / 2 - .12 * k - i * .07 * k);
+        s += `<path d="M${f(xx)} ${f(y0 + .15 * k)}V${f(y0 + Hh - .15 * k)}" stroke="${sh(-.5)}" stroke-opacity=".55" stroke-width="${lw}" stroke-linecap="round"/><path d="M${f(xx + .025 * k)} ${f(y0 + .15 * k)}V${f(y0 + Hh - .15 * k)}" stroke="#fff" stroke-opacity="${hiOp * .45}" stroke-width="${lw}" stroke-linecap="round"/>`; }
+      s += rivets(by + .02 * k) + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      ox = ex + side * (L + .02 * k); oy = my; w = .13 * k;
+    } else {
+      const W = .6 * k, Hh = .64 * k, x0 = cx - W / 2, y0 = by - .31 * k, r = .16 * k, d = R(x0, y0, W, Hh, r), neck = R(cx - .12 * k, y0 + Hh - .05 * k, .24 * k, .22 * k, .08 * k);
+      s += shadow(d) + shadow(neck) + `<path d="${neck}" fill="${sideG}"/><path d="M${f(cx - .1 * k)} ${f(y0 + Hh + .07 * k)}H${f(cx + .1 * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`;
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="${R(x0 + .07 * k, y0 + .07 * k, W - .14 * k, Hh - .16 * k, r * .7)}" fill="none" stroke="${sh(dark ? .18 : -.12)}" stroke-opacity=".5" stroke-width="${lw}"/>` +
+        rivets(by) + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = y0 + Hh + .15 * k; w = .11 * k;
+    }
+    return { s, x: ox, y: oy, w, c };
+  }
+  function plugAt(x, kind, cx, cy, s, col, side, rot) {
+    if (REG !== "us") return { s: plugHead(x, cx, cy + 1.5 * s, 1.12 * s, col, rot ? -rot : 0), x: rot ? cx + 8 * s : cx, y: rot ? cy : cy + 12 * s };
+    const p = plugIn(x.lg, kind, cx, cy - 3.1 * s, 18 * s, col, side, rot ? [-.1, .05] : null);
+    if (rot) { p.s = `<g transform="rotate(${rot} ${f(cx)} ${f(cy)})">${p.s}</g>`; const dx = p.x - cx, dy = p.y - cy; p.x = cx + dy; p.y = cy - dx; }
+    return p;
+  }
+  function plugged(x, on, kind, cx, cy, s, col, w, rest, flow, side, rot, n) {
+    if (!on) return "";
+    const p = plugAt(x, kind, cx, cy, s, col, side, rot);
+    return cord(x, [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10].concat(rest), w, p.c || col, flow, n) + p.s;
+  }
+  function hood(x) {
+    const d = "M66 98H134V142Q134 150 126 150H124V145H108V150H74Q66 150 66 142Z";
+    return `<path d="${d}" fill="#000" fill-opacity=".22" transform="translate(2 3)"/>` +
+      `<path d="${d}" fill="${x.lg([[0, "#d9e2ea", .34], [.5, "#9fb0bf", .18], [1, "#55606b", .3]], 0, 0, 1, 1)}" stroke="#c9d3dc" stroke-opacity=".55" stroke-width="1.1"/>` +
+      `<path d="M70 104V138" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/><path d="M80 101H122" stroke="#fff" stroke-opacity=".3" stroke-width="1"/>` +
+      `<rect x="64" y="95" width="72" height="6" rx="3" fill="${M.v(x, "#4a4e56")}"/><path d="M66 96H134" stroke="#fff" stroke-opacity=".3"/>`;
+  }
 
   const NO_REG = { heavy: 1, ev: 1 };
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label,
@@ -34118,9 +37382,8 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         box(x, 80, 58, 40, 46, 10, 3, 4, "#eef0f2") +
         `<path d="M84 64Q100 58 116 64" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.2" stroke-linecap="round"/>` +
         holes(x, 100, 89, .8) + ringLed(x, 100, 70, 5.4, 5.4, 1.4) + button(x, 100, 70, 3.8, "#e4e6ea") +
-        plugHead(x, 100, 90, .9, "#3a3d45") +
-        cord(x, [100, 102, 100, 128, 96, 146, 112, 166, 128, 184, 160, 180, 200, 186], 3.4, "#3a3d45", x.led);
-      return scene(x, back, body); }),
+        plugged(x, x.on, "wart", 100, 89, .8, "#2c2e33", 1.9, [100, 128, 96, 146, 112, 166, 128, 184, 160, 180, 200, 186], x.led) + meter(x, o);
+      return scene(x, back, body); }, { options: [REG_OPT, METER] }),
 
     ic("round", "Round smart plug", sw(LEDS, "#f2f6ff"), "LED", (o) => { const x = X(o);
       const back = wallB(x, "blue", 8, 166) + baseB(x, 166, "#6e4a33");
@@ -34130,9 +37393,9 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         ringLed(x, 100, 91, 26, 26, 1.6) +
         `<circle cx="100" cy="91" r="22" fill="${x.rg([[0, "#ffffff"], [.7, "#eceef2"], [1, "#cfd2d9"]], .4, .35, .7)}"/>
 <path d="M82 80A22 22 0 0 1 104 69.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-opacity=".9"/>` +
-        holes(x, 100, 90, .8) + plugHead(x, 100, 92, .9, "#f0f0f2") +
-        cord(x, [100, 104, 100, 130, 92, 150, 76, 166, 60, 182, 34, 180, 6, 186], 3.4, "#e8e8ec", x.led);
-      return scene(x, back, body); }),
+        holes(x, 100, 90, .8) +
+        plugged(x, x.on, "ground3", 100, 90, .8, "#8f949b", 3.4, [100, 130, 92, 150, 76, 166, 60, 182, 34, 180, 6, 186], x.led) + meter(x, o);
+      return scene(x, back, body); }, { options: [REG_OPT, METER] }),
 
     ic("side", "Side-button plug", sw(BODY, "#eef0f2"), "Body", (o) => { const x = X(o, { body: o.color, led: "#4da3ff" }); const p = pal(x.body);
       const back = wallB(x, "clay");
@@ -34141,13 +37404,12 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         `<path d="M110 104L121 107V151L110 148Z" fill="${x.lg([[0, H.shade(x.body, -.12)], [1, H.shade(x.body, -.42)]], 0, 0, 1, 0)}" opacity=".55"/>` +
         `<ellipse cx="116.4" cy="116" rx="3" ry="5.4" fill="#000" fill-opacity=".3"/><ellipse cx="116" cy="115.4" rx="2.6" ry="5" fill="${M.h(x, H.shade(x.body, -.05))}"/>` +
         led(x, 116, 130, 1.3, "#4da3ff") +
-        holes(x, 90, 128, .82) + plugHead(x, 90, 130, .9, "#2d3037") +
+        holes(x, 90, 128, .82) +
         `<path d="M74 103Q90 99 106 103" fill="none" stroke="${p.l}" stroke-opacity=".8" stroke-width="1.2" stroke-linecap="round"/>` +
-        cord(x, [90, 142, 90, 162, 104, 172, 130, 176, 156, 180, 176, 190, 196, 200], 3.4, "#2d3037", "#4da3ff");
-      return scene(x, back, body); }),
+        plugged(x, x.on, "flat2", 90, 128, .82, "#2d3037", 3, [90, 162, 104, 172, 130, 176, 156, 180, 176, 190, 196, 200], "#4da3ff") + meter(x, o);
+      return scene(x, back, body); }, { options: [REG_OPT, METER] }),
 
     ic("energy", "Energy monitor plug", sw(["#7dd3fc", "#f2f6ff", "#34d399", "#ffb347", "#ff5257"], "#7dd3fc"), "Display", (o) => { const x = X(o);
-      // (parts) the readout: o.pval.power when the Power part is ticked, else (Device Image) today's watts from the slider
       const xd = o.mf ? sub(x, x.on || tick(o, "power")) : x, pw = stv(o, "power");
       const rd = !o.mf ? watts(x) : tick(o, "power") && pw != null ? Math.max(0, Math.min(9999, Math.round(+pw || 0))) : "";
       const back = tileB(x, 8, 152) + counterB(x, 152, "#c9cbd2");
@@ -34158,8 +37420,8 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         `<path d="M114.5 69L116 74L117.4 70.5L118.8 74L120.3 69" fill="none" stroke="${xd.on ? H.mix(x.led, "#fff", .25) : "#fff"}" stroke-opacity="${xd.on ? 1 : .08}" stroke-width=".9" stroke-linejoin="round"/>` +
         glass(x, 77, 58, 46, 20) +
         button(x, 92, 88, 3.4, "#3d4048") + led(x, 108, 88, 1.3) +
-        holes(x, 100, 108, .82) + plugHead(x, 100, 110, .9, "#e8e8ec") +
-        cord(x, [100, 122, 100, 140, 112, 156, 136, 162, 160, 168, 180, 164, 200, 168], 3.4, "#e8e8ec", x.led);
+        holes(x, 100, 108, .82) +
+        plugged(x, x.on, "right", 100, 108, .82, "#e8e8ec", 3.2, [117, 106, 121, 110, 122, 120, 123, 136, 138, 158, 160, 164, 176, 170, 190, 164, 204, 168], x.led, 1);
       return scene(x, back, body); }),
 
     ic("outdoor", "Outdoor plug", sw(["#2c2f36", "#8d949d", "#3f5a45", "#e9ebee", "#6b5a45"], "#2c2f36"), "Body", (o) => { const x = X(o, { body: o.color, led: "#34d399" });
@@ -34171,21 +37433,24 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         `<path d="M72 52Q100 44 128 52" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.3" stroke-linecap="round"/>` +
         ringLed(x, 100, 74, 8, 8, 1.4, "#34d399") + button(x, 100, 74, 6, H.shade(x.body, .08)) +
         pocket(84) + pocket(116) +
-        `<rect x="72.5" y="106" width="23" height="31" rx="5.4" fill="${rub}"/><path d="M75 113H93M75 118H93M75 123H93M75 128H93" stroke="#fff" stroke-opacity=".08"/><path d="M73 107H95" stroke="#fff" stroke-opacity=".25"/>` +
+        (x.on && part(x, "o1") !== part(x, "o2") ? as(x, part(x, "o1"), () => led(x, 84, 101, 1.1, "#34d399")) + as(x, part(x, "o2"), () => led(x, 116, 101, 1.1, "#34d399")) : "") +
+        (part(x, "o1") ? holes(x, 84, 121, .78) + `<path d="M72 106Q84 92 96 106L96 103Q84 88 72 103Z" fill="${rub}"/>`
+          : `<rect x="72.5" y="106" width="23" height="31" rx="5.4" fill="${rub}"/><path d="M75 113H93M75 118H93M75 123H93M75 128H93" stroke="#fff" stroke-opacity=".08"/><path d="M73 107H95" stroke="#fff" stroke-opacity=".25"/>`) +
         holes(x, 116, 121, .78) +
         `<path d="M104 106Q116 92 128 106L128 103Q116 88 104 103Z" fill="${rub}"/>` +
-        plugHead(x, 116, 123, .9, "#e8792c") + oled(x, o, "o1", 93, 143.5, .9) + oled(x, o, "o2", 125, 143.5, .9) +
-        cord(sub(x, pon(o, "o2")), [116, 135, 116, 156, 128, 166, 146, 174, 164, 182, 176, 194, 186, 206], 4, "#e8792c", "#34d399");
-      return scene(x, back, body); }),
+        as(x, part(x, "o1"), () => plugged(x, x.on, "ground3", 84, 121, .78, "#8c9097", 3.6, [84, 144, 111, 140, 112, 154, 113, 170, 126, 186, 134, 206], "#34d399")) +
+        as(x, part(x, "o2"), () => plugged(x, x.on, "ground3", 116, 121, .78, "#2b2d33", 4, [117, 150, 128, 166, 146, 174, 164, 182, 176, 194, 186, 206], "#34d399")) +
+        (o.opt && o.opt.cover === "hood" ? hood(x) : "") + meter(x, o);
+      return scene(x, back, body); }, { options: [REG_OPT, { id: "cover", name: "Cover", values: [["flaps", "Flaps"], ["hood", "Rain hood"]] }, METER] }),
 
     ic("inwall", "In-wall smart outlet", sw(LEDS, "#f2f6ff"), "LED", (o) => { const x = X(o);
       const back = wallB(x, "navy");
-      const bar = (y) => `<rect x="88.5" y="${y - 2.2}" width="23" height="4.4" rx="2.2" fill="#14161b"/>` + (pon(o, y < 100 ? "o1" : "o2") ? `<g class="${P}pulse"><rect x="86" y="${y - 3}" width="28" height="7" rx="3.5" fill="${M.halo(x, x.led)}" opacity="${a2(.9 * x.L)}"/></g><rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#fff", .5)}"/>`
+      const bar = (y) => as(x, part(x, y < 100 ? "o1" : "o2"), () => bar0(y)), bar0 = (y) => `<rect x="88.5" y="${y - 2.2}" width="23" height="4.4" rx="2.2" fill="#14161b"/>` + (x.on ? `<g class="${P}pulse"><rect x="86" y="${y - 3}" width="28" height="7" rx="3.5" fill="${M.halo(x, x.led)}" opacity="${a2(.9 * x.L)}"/></g><rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#fff", .5)}"/>`
         : `<rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#15161b", .7)}"/>`);
       const inner = bar(66) + bar(134) + `<rect x="95" y="97.5" width="10" height="5" rx="1.6" fill="#000" fill-opacity=".25"/><rect x="95" y="97" width="10" height="5" rx="1.6" fill="${M.v(x, "#e4e6ea")}"/>`;
       const body = spot(x, 100, 100, 60, 70, x.led, .22) + plateD(x, 100, 100, 1.45, "#eef0f2", inner) +
-        plugHead(x, 100, 121, 1.1, "#3a3d45") +
-        cord(sub(x, pon(o, "o2")), [100, 135, 100, 156, 112, 170, 132, 178, 152, 186, 170, 188, 200, 196], 4, "#3a3d45", x.led);
+        as(x, part(x, "o1"), () => plugged(x, x.on, "flat2", 100, 81.15, 1.45, "#f2f2f0", 3.6, [100, 100, 74, 98, 72, 116, 70, 134, 66, 160, 60, 206], x.led)) +
+        as(x, part(x, "o2"), () => plugged(x, x.on, "ground3", 100, 118.85, 1.45, "#3a3d45", 4, [100, 156, 112, 170, 132, 178, 152, 186, 170, 188, 200, 196], x.led));
       return scene(x, back, body); }),
 
     ic("usbc", "USB-C outlet", sw(["#eef0f2", "#e6dcc6", "#2c2f36", "#9aa1aa", "#c9d2dc"], "#eef0f2"), "Body", (o) => { const x = X(o, { body: o.color, led: "#4da3ff" });
@@ -34208,8 +37473,8 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
       const back = wallB(x, "gray", 8, 92) + `<rect x="8" y="92" width="184" height="100" fill="${x.lg([[0, "#5a3f2b"], [1, "#8d6646"]])}"/>` +
         `<path d="M8 92.6H192" stroke="#000" stroke-opacity=".5" stroke-width="1.4"/>` + [104, 118, 136, 158, 184].map((y, i) => `<path d="M8 ${y}C60 ${y - 2} 120 ${y + 3} 192 ${y - 1}" fill="none" stroke="#2a180b" stroke-opacity="${(.15 + i * .03).toFixed(2)}" stroke-width=".7"/>`).join("");
       let outs = "";
-      const lt = (i) => (MFM(o) ? pon(o, "o" + (i + 1)) : i < n);
-      [46, 76, 106, 136].forEach((cx, i) => { const lit = lt(i);
+      const lit4 = (i) => (MFM(o) ? pon(o, "o" + (i + 1)) : i < n);
+      [46, 76, 106, 136].forEach((cx, i) => { const lit = lit4(i);
         outs += `<rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="#000" fill-opacity=".12"/>` +
           (lit ? `<g class="${P}pulse"><rect x="${cx - 13}" y="117" width="26" height="30" rx="6" fill="none" stroke="${x.led}" stroke-opacity="${a2(.45 * x.L)}" stroke-width="3"/></g><rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="none" stroke="${H.mix(x.led, "#fff", .4)}" stroke-width="1"/>`
             : `<rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="none" stroke="#9aa0aa" stroke-opacity=".5" stroke-width=".8"/>`) +
@@ -34219,9 +37484,10 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         `<rect x="155" y="118" width="12" height="5.4" rx="1" fill="#0b0c10"/><rect x="156.4" y="119.2" width="9" height="1.6" fill="#5a6070"/><rect x="155" y="127" width="12" height="5.4" rx="1" fill="#0b0c10"/><rect x="156.4" y="128.2" width="9" height="1.6" fill="#5a6070"/>
 <rect x="155.4" y="137" width="11" height="4.4" rx="2.2" fill="#0b0c10"/>` + oled(x, o, "usb", 161, 147, .9) +
         cord(x, [24, 132, 14, 132, 10, 124, 4, 112], 3.6, "#e4e4ea") +
-        plugHead(x, 46, 133, .9, "#2d3037", 90) + plugHead(x, 106, 133, .9, "#e9e9ee", 90) +
-        cord(x, [54, 133, 64, 133, 62, 96, 60, 70, 58, 44, 70, 20, 66, 0], 3.2, "#2d3037", lt(0) ? x.led : null) +
-        cord(x, [114, 133, 124, 133, 122, 98, 126, 70, 130, 44, 120, 22, 128, 0], 3.2, "#e9e9ee", lt(2) ? x.led : null);
+        plugged(x, lit4(0), "ground3", 46, 132, .82, "#2d3037", 3.2, [64, 132, 62, 96, 60, 70, 58, 44, 70, 20, 66, 0], x.led, 0, -90) +
+        plugged(x, lit4(1), "flat2", 76, 132, .82, "#e9e9ee", 2.8, [88, 132, 92, 100, 90, 72, 88, 46, 96, 24, 92, 0], x.led, 0, -90) +
+        plugged(x, lit4(2), "wart", 106, 132, .82, "#2b2d33", 1.8, [124, 132, 122, 98, 126, 70, 130, 44, 120, 22, 128, 0], x.led, 0, -90) +
+        plugged(x, lit4(3), "right", 136, 132, .82, "#c9ccd2", 3, [134, 152, 140, 160, 146, 170, 152, 180, 150, 192, 158, 206], x.led, -1, -90);
       return scene(x, back, body); }),
 
     ic("surge", "Surge protector", sw(["#ff5257", "#ffb347", "#34d399", "#4da3ff", "#f2f6ff"], "#ff5257"), "Switch light", (o) => { const x = X(o);
@@ -34287,8 +37553,8 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         `<g transform="rotate(${f(ang)} 92 82)"><rect x="91" y="72.5" width="2" height="6" rx="1" fill="#6b707a"/></g>`;
       const body = plateT(x, 92, 100, 1.05) + spot(x, 92, 82, 40, 40, x.led, .3) +
         box(x, 68, 52, 48, 74, 9, 4, 4, "#eef0f2") + arc + knob +
-        holes(x, 92, 112, .8) + plugHead(x, 92, 114, .9, "#3a3d45") +
-        cord(x, [92, 126, 92, 150, 110, 156, 130, 160, 152, 164, 166, 180, 178, 204], 3.4, "#3a3d45", x.led);
+        holes(x, 92, 112, .8) +
+        plugged(x, x.on, "ground3", 92, 112, .8, "#3a3d45", 3.4, [92, 150, 110, 156, 130, 160, 152, 164, 166, 180, 178, 204], x.led);
       return scene(x, back, body); }),
 
     ic("night", "Night-light plug", ["#ffc477", "#fff1d6", "#a5d8ff", "#c4b5fd", "#7ee8c4"], "Light", (o) => { const x0 = X(o), x = sub(x0, pon(o, "light")), xo = sub(x0, pon(o, "outlet")); const c = x.led;
@@ -34300,7 +37566,7 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
         `<path d="M80 130H120V143Q120 152 111 152H89Q80 152 80 143Z" fill="${lens}"/>` +
         (x.on ? `<g class="${P}breath"><ellipse cx="100" cy="146" rx="26" ry="12" fill="${M.halo(x, c)}" opacity="${a2(.7 * x.L)}"/></g>` : "") +
         `<path d="M80 130H120" stroke="#000" stroke-opacity=".2"/><path d="M84 134Q100 132 116 134" fill="none" stroke="#fff" stroke-opacity=".6" stroke-linecap="round"/>` +
-        holes(x, 100, 112, .78) + `<circle cx="112" cy="99" r="1.8" fill="#16171c"/><circle cx="111.5" cy="98.5" r=".6" fill="#fff" fill-opacity=".5"/>` +
+        holes(x, 100, 112, .78) + plugged(xo, xo.on, "right", 100, 112, .78, "#9a9ea5", 3, [118, 110, 124, 114, 126, 124, 128, 140, 130, 158, 140, 170, 150, 180, 168, 184, 206, 188], null, 1) + `<circle cx="112" cy="99" r="1.8" fill="#16171c"/><circle cx="111.5" cy="98.5" r=".6" fill="#fff" fill-opacity=".5"/>` +
         led(xo, 88, 99, 1, "#4da3ff");
       return scene(x, back, body); }, { glow: { x: .5, y: .72, r: .7 }, cast: "down" }),
 
@@ -34402,8 +37668,6 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
       return scene(x, back, body); }, { glow: { x: .84, y: .4, r: .8 }, cast: "both" }),
 
     ic("ev", "EV charger", sw(["#34d399", "#4da3ff", "#f2f6ff", "#ffb347", "#c4b5fd"], "#34d399"), "LED", (o) => {
-      // (parts) the Charging state stage (Multi-Function): idle = no car (ring dark, standby LED), plugged in = ring dimly lit,
-      // charging = today's on look (ring fills with the slider, sweep, power along the cord), charged = full ring, still
       const st = o.mf ? stv(o, "state") : null, x = X(st ? Object.assign({}, o, { on: st !== "idle" }) : o), chg = st ? st === "charging" : x.on;
       const back = wallB(x, "garage", 8, 172) + `<path d="M64 8V172M136 8V172" stroke="#000" stroke-opacity=".12"/>` + concreteB(x, 172, "#6c6f75");
       const segs = 30, lit = st === "done" ? segs : st === "connected" ? 0 : x.on ? Math.max(1, Math.round(x.lv * segs)) : 0; let ring = "";
@@ -34442,7 +37706,6 @@ ${lg(id("dn"), [[0, "#000", .45], [1, "#000", 0]], 0, 0, 0, 1)}
   (window.HDA = window.HDA || []).push({
     id: "plug", tab: "Plugs & power strips", group: "More", kind: "device",
     intro: "Twenty smart plugs, US outlets and power strips on real walls, floors and counters. On means powered: the LED lights in your color, the plugged-in thing comes alive (lamp, string lights, night light, phone, kettle), power runs along the cord, and the watt or amp displays climb with the slider.",
-    
     css, icons,
   });
 })();
@@ -37425,6 +40688,463 @@ ${extra || ""}</defs>`;
 })();
 
 (function () {
+  const P = "hda-relays-";
+  const H = () => window.HDAH;
+  const n1 = (v) => (+v).toFixed(1);
+  const GREEN = "#3ee07a", RED = "#ff4f4f", AMB = "#ffb547", BLUE = "#4aa8ff", CYAN = "#7dd3fc", WHITE = "#f4f8ff";
+  const BLK = ["#050608", "#25282d", "#6f757d"], WHT = ["#7d8187", "#e4e6e8", "#ffffff"], REDW = ["#4a0909", "#c62828", "#ff9a90"],
+    BLUW = ["#0a2350", "#1f5bc6", "#9cc2ff"], ORGW = ["#5a2604", "#e06a10", "#ffc690"], YELW = ["#5a4c04", "#d9b812", "#fff29a"],
+    GRYW = ["#25282c", "#7b8087", "#c9cdd2"], GRNW = ["#0a3a12", "#2e9a3e", "#a6e8b0"], CU = ["#5a2a10", "#c27a45", "#ffd2ae"];
+  const CHW = [REDW, BLUW, ORGW, YELW, REDW, BLUW, ORGW, YELW];
+
+  function pal(c) {
+    const h = H(), x = h.hx(c), lt = (x[0] * .3 + x[1] * .59 + x[2] * .11) / 255 > .62;
+    return { l: h.shade(c, lt ? .5 : .3), m: c, d: h.shade(c, lt ? -.14 : -.3), k: h.shade(c, lt ? -.32 : -.55), lt };
+  }
+  const st = (a) => a.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] != null ? ` stop-opacity="${s[2]}"` : ""}/>`).join("");
+  const lg = (id, v, a) => `<linearGradient id="${id}" ${v ? 'x1="0" y1="0" x2="0" y2="1"' : 'x1="0" x2="1"'}>${st(a)}</linearGradient>`;
+  const rg = (id, a, at) => `<radialGradient id="${id}" ${at || ""}>${st(a)}</radialGradient>`;
+  const halo = (id, c) => rg(id, [[0, c, .9], [.4, c, .3], [1, c, 0]]);
+
+  function defs(o, extra) {
+    const u = o.uid, p = pal(o.color);
+    return `<defs>
+${lg(u + "-v", 1, [[0, p.l], [.45, p.m], [1, p.d]])}${lg(u + "-t", 1, [[0, H().shade(p.l, .15)], [1, p.l]])}${lg(u + "-s", 0, [[0, p.d], [1, p.k]])}
+${lg(u + "-fx", 0, [[0, "#fff", .18], [.12, "#fff", 0], [.86, "#000", 0], [1, "#000", .28]])}
+<linearGradient id="${u}-g" x1="0" y1="0" x2="1" y2="1">${st([[0, "#fff", .45], [.4, "#fff", 0]])}</linearGradient>
+${lg(u + "-wall", 1, [[0, "#fff", .085], [1, "#fff", .035]])}${lg(u + "-flr", 1, [[0, "#a3a8ae", .3], [1, "#5d6369", .16]])}
+${lg(u + "-mt", 1, [[0, "#f2f4f6"], [.45, "#a9b0b7"], [.55, "#7d848c"], [1, "#d9dde1"]])}${lg(u + "-mth", 0, [[0, "#545a61"], [.35, "#eef0f2"], [.65, "#b9bfc6"], [1, "#454b52"]])}
+${lg(u + "-bk", 1, [[0, "#3e434a"], [.5, "#1b1e23"], [1, "#08090c"]])}${lg(u + "-gang", 1, [[0, "#3f74c4"], [1, "#1d4a8e"]])}
+${lg(u + "-cav", 1, [[0, "#05070a"], [1, "#141a22"]])}${lg(u + "-rel", 1, [[0, "#4f8cf0"], [.5, "#1f5fd0"], [1, "#123c8c"]])}
+${lg(u + "-term", 1, [[0, "#3d8af0"], [1, "#163f9a"]])}${lg(u + "-grn", 1, [[0, "#43b866"], [1, "#1f6e38"]])}
+${lg(u + "-lcd", 1, [[0, "#081014"], [1, "#16242b"]])}${lg(u + "-encl", 1, [[0, "#4a5058"], [1, "#2a2e34"]])}
+${lg(u + "-duct", 1, [[0, "#9aa0a7"], [.5, "#c9cdd2"], [1, "#7d838a"]])}${lg(u + "-pnl", 1, [[0, "#9aa1a9"], [1, "#6d747c"]])}
+${rg(u + "-sh", [[0, "#000", .6], [1, "#000", 0]])}
+${rg(u + "-dome", [[0, "#fff", .7], [.5, "#fff", .1], [1, "#000", .2]], 'cx=".35" cy=".3" r=".8"')}
+${halo(u + "-hg", GREEN)}${halo(u + "-hr", RED)}${halo(u + "-ha", AMB)}${halo(u + "-hb", BLUE)}${halo(u + "-hc", CYAN)}${halo(u + "-hw", WHITE)}
+${rg(u + "-bulb", [[0, "#fffbe8"], [.35, "#ffe9a8", .95], [1, "#ffb84a", 0]])}${halo(u + "-hl", o.color)}
+${extra || ""}</defs>`;
+  }
+  const svg = (o, body, extra) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(o, `<clipPath id="${o.uid}-all"><rect width="200" height="200" rx="6"/></clipPath>` + (extra || ""))}<g clip-path="url(#${o.uid}-all)">${body}</g></svg>`;
+  const BG = (s) => `<g class="hda-bg">${s}</g>`;
+  const sh = (o, cx, cy, rx, ry) => `<ellipse cx="${n1(cx)}" cy="${n1(cy)}" rx="${n1(rx)}" ry="${n1(ry || 5)}" fill="url(#${o.uid}-sh)"/>`;
+  const rr = (x, y, w, h, r) => { r = Math.min(r, w / 2, h / 2); return `M${n1(x + r)} ${n1(y)}H${n1(x + w - r)}A${r} ${r} 0 0 1 ${n1(x + w)} ${n1(y + r)}V${n1(y + h - r)}A${r} ${r} 0 0 1 ${n1(x + w - r)} ${n1(y + h)}H${n1(x + r)}A${r} ${r} 0 0 1 ${n1(x)} ${n1(y + h - r)}V${n1(y + r)}A${r} ${r} 0 0 1 ${n1(x + r)} ${n1(y)}Z`; };
+  const txt = (x, y, s, size, col, anchor, wt) => `<text x="${n1(x)}" y="${n1(y)}" font-family="Arial,Helvetica,sans-serif" font-size="${size}" font-weight="${wt || 700}" fill="${col}" text-anchor="${anchor || "middle"}">${s}</text>`;
+  const screw = (x, y, r) => `<circle cx="${n1(x)}" cy="${n1(y)}" r="${r}" fill="#5b6168"/><circle cx="${n1(x - r * .15)}" cy="${n1(y - r * .15)}" r="${n1(r * .82)}" fill="#c3c8ce"/><path d="M${n1(x - r * .6)} ${n1(y + r * .25)}L${n1(x + r * .6)} ${n1(y - r * .25)}" stroke="#3a3f46" stroke-width="${n1(r * .34)}"/>`;
+
+  const tube = (d, w, c) => `<path d="${d}" fill="none" stroke="${c[0]}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="${d}" fill="none" stroke="${c[1]}" stroke-width="${n1(w * .66)}" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<path d="${d}" fill="none" stroke="${c[2]}" stroke-opacity=".6" stroke-width="${n1(w * .2)}" stroke-linejoin="round" transform="translate(${n1(-w * .15)} ${n1(-w * .15)})"/>`;
+  const flow = (o, d, on, w, op, rev) => on ? `<path class="${P}flow${rev ? " " + P + "rev" : ""}" d="${d}" fill="none" stroke="#fff3b0" stroke-opacity="${n1(op == null ? .9 : op)}" stroke-width="${n1(w || 1.6)}" stroke-linecap="round" stroke-dasharray="2 6"/>` : "";
+  const wire = (o, d, w, c, on, op, rev) => tube(d, w, c) + flow(o, d, on, w * .42, op, rev);
+  const led = (o, x, y, r, on, col, hid, cls) => `<g${cls && on ? ` class="${P}${cls}"` : ""}>` + (on ? `<circle cx="${n1(x)}" cy="${n1(y)}" r="${n1(r * 4.2)}" fill="url(#${o.uid}-${hid})"/>` : "") +
+    `<circle cx="${n1(x)}" cy="${n1(y)}" r="${r}" fill="${on ? col : "#30353c"}" stroke="#000" stroke-opacity=".35" stroke-width=".4"/><circle cx="${n1(x - r * .3)}" cy="${n1(y - r * .35)}" r="${n1(r * .38)}" fill="#fff" opacity="${on ? .85 : .25}"/></g>`;
+  const contact = (x, y, w, closed, col, on) => `<circle cx="${n1(x)}" cy="${n1(y)}" r="1.5" fill="${col}"/><circle cx="${n1(x + w)}" cy="${n1(y)}" r="1.5" fill="${on || col}"/>` +
+    `<path d="M${n1(x)} ${n1(y)}L${closed ? n1(x + w) + " " + n1(y) : n1(x + w * .88) + " " + n1(y - w * .42)}" stroke="${closed ? on || col : col}" stroke-width="1.8" stroke-linecap="round"/>` +
+    `<path d="M${n1(x - 5)} ${n1(y)}H${n1(x)}M${n1(x + w)} ${n1(y)}H${n1(x + w + 5)}" stroke="${col}" stroke-width="1.2"/>`;
+  function box3d(o, x, y, w, h, d, r, g) {
+    const u = o.uid;
+    return `<path d="M${n1(x + 2)} ${n1(y)}L${n1(x + d + 2)} ${n1(y - d)}H${n1(x + w + d - 2)}L${n1(x + w - 2)} ${n1(y)}Z" fill="url(#${u}-${g ? g + "t" : "t"})"/>` +
+      `<path d="M${n1(x + w)} ${n1(y + 2)}L${n1(x + w + d)} ${n1(y - d + 2)}V${n1(y + h - d - 2)}L${n1(x + w)} ${n1(y + h - 2)}Z" fill="url(#${u}-${g ? g + "s" : "s"})"/>` +
+      `<path d="${rr(x, y, w, h, r || 3)}" fill="url(#${u}-${g || "v"})"/><path d="${rr(x, y, w, h, r || 3)}" fill="url(#${u}-fx)"/><path d="${rr(x, y, w, h, r || 3)}" fill="url(#${u}-g)" opacity=".35"/>` +
+      `<path d="M${n1(x + 3)} ${n1(y + .6)}H${n1(x + w - 3)}" stroke="#fff" stroke-opacity=".35"/>`;
+  }
+  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgecd", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+  function digits(str, x, y, s, col, dim) {
+    const w = s * .52, t = Math.max(.7, s * .14); let out = "", X = x;
+    String(str).split("").forEach((ch) => {
+      if (ch === ".") { out += `<circle cx="${n1(X - t * .4)}" cy="${n1(y + s)}" r="${n1(t * .55)}" fill="${col}"/>`; X += t * .9; return; }
+      const sg = { a: [X + t * .6, y, X + w - t * .6, y], b: [X + w, y + t * .6, X + w, y + s / 2 - t * .5], c: [X + w, y + s / 2 + t * .5, X + w, y + s - t * .6],
+        d: [X + t * .6, y + s, X + w - t * .6, y + s], e: [X, y + s / 2 + t * .5, X, y + s - t * .6], f: [X, y + t * .6, X, y + s / 2 - t * .5], g: [X + t * .6, y + s / 2, X + w - t * .6, y + s / 2] };
+      const on = SEG[ch] || "";
+      for (const k in sg) { const q = sg[k], lit = on.indexOf(k) >= 0; if (!lit && !dim) continue;
+        out += `<path d="M${n1(q[0])} ${n1(q[1])}L${n1(q[2])} ${n1(q[3])}" stroke="${lit ? col : dim}" stroke-width="${n1(t)}" stroke-linecap="round"/>`; }
+      X += w + t * 2.2;
+    });
+    return out;
+  }
+  const ch = (o, i) => o.parts && o.parts["c" + i] != null ? !!o.parts["c" + i] : o.on;
+  const opt = (o, k, d) => (o.opt && o.opt[k]) || d;
+  const parts = (n, key, when) => Array.from({ length: n }, (_, i) => {
+    const p = { id: "c" + (i + 1), name: "Ch " + (i + 1) }; const w = when(i + 1); if (w) p.when = { opt: key, is: w }; return p; });
+
+  const wallBg = (o, fy) => `<rect width="200" height="200" fill="url(#${o.uid}-wall)"/>` + (fy ? `<path d="M0 ${fy}H200V200H0Z" fill="url(#${o.uid}-flr)"/><path d="M0 ${fy}H200" stroke="#000" stroke-opacity=".3"/>` : "");
+  const gangBox = (o, x, y, w, h) => BG(wallBg(o) + `<path d="${rr(x - 6, y - 6, w + 12, h + 12, 6)}" fill="#000" opacity=".25"/><path d="${rr(x, y, w, h, 5)}" fill="url(#${o.uid}-gang)"/>` +
+    `<path d="${rr(x + 6, y + 6, w - 12, h - 12, 3)}" fill="url(#${o.uid}-cav)"/><path d="M${x + 7} ${y + 7}H${x + w - 7}" stroke="#000" stroke-opacity=".6" stroke-width="2"/>` +
+    screw(x + w / 2, y + 3.4, 2) + screw(x + w / 2, y + h - 3.4, 2) + `<path d="M${x + 1} ${y + 1}H${x + w - 1}" stroke="#fff" stroke-opacity=".25"/>`);
+  const rail = (o, y, x1, x2) => `<rect x="${x1}" y="${y - 9}" width="${x2 - x1}" height="18" fill="#1a1d21" opacity=".5"/><rect x="${x1}" y="${y - 7}" width="${x2 - x1}" height="14" fill="url(#${o.uid}-mt)"/>` +
+    `<path d="M${x1} ${y - 4}H${x2}M${x1} ${y + 4}H${x2}" stroke="#000" stroke-opacity=".25"/>` +
+    Array.from({ length: Math.floor((x2 - x1) / 16) }, (_, i) => `<path d="${rr(x1 + 5 + i * 16, y - 1.6, 8, 3.2, 1.6)}" fill="#2a2e33"/>`).join("");
+  const duct = (o, y, h) => `<rect x="8" y="${y}" width="184" height="${h}" rx="1.5" fill="url(#${o.uid}-duct)"/>` +
+    Array.from({ length: 23 }, (_, i) => `<rect x="${12 + i * 8}" y="${y + (y < 100 ? h - 7 : 0)}" width="3" height="7" fill="#3a3f45" opacity=".75"/>`).join("") + `<path d="M8 ${y + .6}H192" stroke="#fff" stroke-opacity=".4"/>`;
+  const enclosure = (o) => BG(`<rect width="200" height="200" fill="url(#${o.uid}-encl)"/><rect x="4" y="4" width="192" height="192" rx="4" fill="#d6d9dc" opacity=".12"/>` + duct(o, 6, 22) + duct(o, 172, 22));
+
+  const TYPES = [["relay", "Relay"], ["dimmer", "Dimmer"], ["dry", "Dry contact"], ["pilot", "Pilot wire"]];
+  const PILOT = [["comfort", "Comfort"], ["eco", "Eco"], ["frost", "Frost guard"], ["off", "Off"]];
+  function inwall(o) {
+    const u = o.uid, p = pal(o.color), ty = opt(o, "type", "relay"), n = ty === "pilot" ? 1 : +opt(o, "ch", "1");
+    const x = 48, y = 92, w = 98, h = 72, d = 12, pc = p.lt ? "#2b3036" : "#dfe3e8";
+    const on = (i) => ch(o, i), any = Array.from({ length: n }, (_, i) => on(i + 1)).some(Boolean);
+    let T = [];
+    if (ty === "dry") { T.push(["+", REDW, any], ["-", BLK, any]); for (let i = 1; i <= n; i++) T.push(["C" + i, GRYW, on(i)], ["NO", CHW[i - 1], on(i)]); }
+    else if (ty === "pilot") T = [["L", BLK, any], ["N", WHT, any], ["PW", BLK.map((c, k) => k ? ["#000", "#3a3f46", "#8d939b"][k] : c), any]];
+    else { T = [["L", BLK, any], ["N", WHT, any]]; for (let i = 1; i <= n; i++) T.push(["O" + i, CHW[i - 1], on(i)]); }
+    const dimOp = ty === "dimmer" ? .3 + .7 * o.level : .9;
+    let s = gangBox(o, 28, 22, 150, 160) + sh(o, x + w / 2 + 8, y + h + 3, w * .58, 6) + box3d(o, x, y, w, h, d, 5);
+    const tw = (w - 10) / T.length, top = (i) => [x + d * .5 + 6 + (i + .5) * tw, y - d * .5];
+    if (ty === "dry") s += `<path d="M${x + 6} ${y - 1.5}L${x + 6 + d - 2} ${y - d + .5}H${x + w + d - 6}L${x + w - 4} ${y - 1.5}Z" fill="url(#${u}-grn)" stroke="#0d3a1a" stroke-width=".6"/>`;
+    T.forEach((t, i) => { const q = top(i); s += `<path d="${rr(q[0] - tw * .38, q[1] - 3.4, tw * .76, 6.8, 1.5)}" fill="#000" opacity=".45"/>` + screw(q[0], q[1], Math.min(2.6, tw * .3)); });
+    s += `<path d="${rr(x + 7, y + 7, w - 14, h - 28, 3)}" fill="${p.lt ? "#000" : "#fff"}" fill-opacity=".06" stroke="${pc}" stroke-opacity=".35" stroke-width=".6"/>`;
+    const fx = x + 7, fy = y + 7, fw = w - 14, fh = h - 28;
+    if (ty === "pilot") {
+      const m = o.on ? opt(o, "pmode", "comfort") : "off", cols = { comfort: RED, eco: GREEN, frost: CYAN, off: "#b8bec6" }, hid = { comfort: "hr", eco: "hg", frost: "hc", off: "hw" };
+      PILOT.forEach((pm, i) => { const cx = fx + 12 + i * (fw - 24) / 3, lit = pm[0] === m;
+        s += led(o, cx, fy + 14, 2.6, lit, cols[pm[0]], hid[pm[0]]) + txt(cx, fy + 30, pm[1][0], 8, pc); });
+      s += `<path d="M${fx + 8} ${fy + 36}H${fx + fw - 8}" stroke="${pc}" stroke-opacity=".3"/>`;
+    } else {
+      const cols = n === 1 ? 1 : 2, rows = n === 4 ? 2 : 1, cw = fw / cols, chh = fh / rows;
+      for (let i = 0; i < n; i++) {
+        const cx = fx + (i % cols + .5) * cw, cy = fy + (Math.floor(i / cols) + .5) * chh, lit = on(i + 1), sw = Math.min(cw * .42, 20);
+        if (ty === "dimmer") {
+          const bw = Math.min(cw * .7, 34);
+          s += `<path d="M${n1(cx - bw / 2)} ${n1(cy - 2)}q${n1(bw / 8)} -7 ${n1(bw / 4)} 0t${n1(bw / 4)} 0t${n1(bw / 4)} 0t${n1(bw / 4)} 0" fill="none" stroke="${lit ? AMB : pc}" stroke-width="1.4"/>` +
+            `<path d="${rr(cx - bw / 2, cy + 4, bw, 3.4, 1.7)}" fill="${pc}" fill-opacity=".25"/>` + (lit ? `<path d="${rr(cx - bw / 2, cy + 4, Math.max(3.4, bw * o.level), 3.4, 1.7)}" fill="${AMB}"/>` : "");
+        } else s += contact(cx - sw / 2, cy + 2, sw, lit, pc, lit ? GREEN : null);
+        if (n > 1) s += txt(cx - (ty === "dimmer" ? Math.min(cw * .35, 17) + 4 : sw / 2 + 7), cy - 3, i + 1, 6, pc);
+      }
+    }
+    for (let i = 0; i < n; i++) s += led(o, x + 13 + i * 11, y + h - 11, 2.1, on(i + 1), ty === "dimmer" ? AMB : GREEN, ty === "dimmer" ? "ha" : "hg");
+    s += led(o, x + w - 28, y + h - 11, 1.8, true, BLUE, "hb", "blink") + `<circle cx="${x + w - 13}" cy="${y + h - 11}" r="4.4" fill="${p.d}" stroke="#000" stroke-opacity=".4"/><circle cx="${x + w - 13.6}" cy="${y + h - 11.6}" r="3" fill="${p.l}" opacity=".6"/>`;
+    s += `<path d="M${x + w - 18} ${y + 14}a5 5 0 0 1 7 0M${x + w - 20} ${y + 11}a8 8 0 0 1 11 0" fill="none" stroke="${pc}" stroke-opacity=".5" stroke-width="1"/>`;
+    T.forEach((t, i) => { const q = top(i), ex = 40 + (i + .5) * 120 / T.length, dd = `M${n1(q[0])} ${n1(q[1] - 1)}C${n1(q[0])} ${n1(q[1] - 26)} ${n1(ex)} 46 ${n1(ex)} -6`;
+      const fop = t[0].startsWith("O") ? dimOp : .9;
+      s += wire(o, dd, 4.4, t[1], t[2], fop, t[0] === "N" || t[0] === "-") + `<path d="${rr(q[0] - 2.6, q[1] - 5.5, 5.2, 4, 1)}" fill="${t[1][1]}"/>`; });
+    T.forEach((t, i) => { const q = top(i); s += txt(x + d * .5 + 6 + (i + .5) * tw - d * .5, y + 6.2, t[0], 4.6, pc, "middle", 600); });
+    return svg(o, s);
+  }
+
+  function leads(o) {
+    const u = o.uid, p = pal(o.color), dim = opt(o, "type", "relay") === "dimmer", lv = dim ? o.level : 1;
+    const x = 58, y = 104, w = 78, h = 50, d = 10;
+    let s = gangBox(o, 22, 18, 156, 168) + sh(o, x + w / 2 + 6, y + h + 3, w * .56, 5);
+    const bx = 150, by = 44;
+    s += (o.on ? `<circle cx="${bx}" cy="${by}" r="${n1(26 + 14 * lv)}" fill="url(#${u}-bulb)" opacity="${n1(.35 + .6 * lv)}"/>` : "") +
+      `<path d="M${bx - 9} ${by + 4}C${bx - 13} ${by - 4} ${bx - 11} ${by - 16} ${bx} ${by - 17}C${bx + 11} ${by - 16} ${bx + 13} ${by - 4} ${bx + 9} ${by + 4}L${bx + 6} ${by + 11}H${bx - 6}Z" fill="${o.on ? H().mix("#fff4d0", "#ffd27a", 1 - lv) : "#d9dde2"}" fill-opacity="${o.on ? .95 : .35}" stroke="#fff" stroke-opacity=".5" stroke-width=".7"/>` +
+      `<path d="M${bx - 3} ${by + 6}V${by - 4}l3 -3 3 3V${by + 6}" fill="none" stroke="${o.on ? "#fff7d6" : "#7d838a"}" stroke-width="${o.on ? 1.3 : .8}"/>` +
+      `<path d="${rr(bx - 6, by + 11, 12, 10, 2)}" fill="url(#${u}-mth)"/><path d="M${bx - 6} ${by + 14}H${bx + 6}M${bx - 6} ${by + 17}H${bx + 6}" stroke="#454b52" stroke-width=".7"/>` +
+      `<path d="${rr(bx - 7, by + 21, 14, 7, 2)}" fill="url(#${u}-bk)"/>`;
+    s += box3d(o, x, y, w, h, d, 4);
+    s += `<path d="${rr(x + 6, y + 6, 46, h - 12, 2)}" fill="#ebebe5"/>` + [0, 1, 2, 3, 4].map((i) => `<path d="M${x + 10} ${y + 12 + i * 6}H${x + (i % 2 ? 40 : 46)}" stroke="#555b62" stroke-width="1.6" stroke-opacity=".55"/>`).join("") +
+      `<rect x="${x + 40}" y="${y + 28}" width="9" height="9" fill="none" stroke="#3b4046" stroke-width="1.2"/><rect x="${x + 42.5}" y="${y + 30.5}" width="4" height="4" fill="#3b4046"/>` +
+      led(o, x + 64, y + 16, 2.2, o.on, dim ? AMB : GREEN, dim ? "ha" : "hg") + `<circle cx="${x + 64}" cy="${y + 33}" r="4" fill="#000" opacity=".5"/><circle cx="${x + 64}" cy="${y + 33}" r="2.4" fill="${p.l}" opacity=".5"/>`;
+    const L = [[BLK, 30, 24, o.on, false], [WHT, 46, 14, o.on, true], [BLUW, 64, 10, false, false], [REDW, 0, 0, o.on, false]];
+    L.forEach((l, i) => { const sx = x + d * .5 + 16 + i * 14, sy = y - d * .5;
+      if (i === 3) { const dd = `M${sx} ${sy}C${sx + 4} ${sy - 30} ${bx} ${by + 60} ${bx} ${by + 28}`; s += wire(o, dd, 4.2, l[0], l[3], n1(.3 + .6 * lv)); }
+      else { const dd = `M${sx} ${sy}C${sx} ${sy - 30} ${l[1] + 10} ${l[2] + 34} ${l[1]} ${l[2]}`;
+        s += wire(o, dd, 4.2, l[0], l[3], .9, l[4]) + `<path d="M${l[1]} ${l[2]}l-3 -6" stroke="url(#${u}-mth)" stroke-width="2"/><path d="M${l[1]} ${l[2]}l-3 -6" stroke="${CU[1]}" stroke-width="1.6" stroke-linecap="round"/>`; }
+      s += `<ellipse cx="${sx}" cy="${sy}" rx="3.2" ry="1.6" fill="#000" opacity=".5"/>`; });
+    return svg(o, s);
+  }
+
+  const RADIO = [["wifi", "Wi-Fi"], ["zigbee", "Zigbee"], ["zwave", "Z-Wave"]];
+  function minibox(o) {
+    const u = o.uid, p = pal(o.color), n = +opt(o, "ch", "1"), rad = opt(o, "radio", "wifi"), rc = { wifi: BLUE, zigbee: AMB, zwave: GREEN }[rad], rh = { wifi: "hb", zigbee: "ha", zwave: "hg" }[rad];
+    const x = 42, y = 90, w = 116, h = 56, d = 10, pc = p.lt ? "#2b3036" : "#dfe3e8", any = ch(o, 1) || (n > 1 && ch(o, 2));
+    let s = gangBox(o, 18, 30, 164, 150) + sh(o, x + w / 2 + 6, y + h + 3, w * .56, 6) + box3d(o, x, y, w, h, d, 9);
+    const IN = [["L", BLK, any, 0], ["N", WHT, any, 1]], OUT = [];
+    for (let i = 1; i <= n; i++) OUT.push(["O" + i, CHW[i - 1], ch(o, i), i - 1]);
+    const tp = (k, right) => [right ? x + w - 10 - k * 12 + d * .5 : x + 12 + k * 12 + d * .5, y - d * .5];
+    IN.forEach((t) => { const q = tp(t[3]); s += screw(q[0], q[1], 2.4); });
+    OUT.forEach((t) => { const q = tp(t[3], true); s += screw(q[0], q[1], 2.4); });
+    const cx = 100, cy = y + 26;
+    s += `<circle cx="${cx}" cy="${cy}" r="13" fill="#000" opacity=".22"/>` + (any ? `<circle cx="${cx}" cy="${cy}" r="24" fill="url(#${u}-${rh})" opacity=".8"/>` : "") +
+      `<circle cx="${cx}" cy="${cy}" r="11" fill="none" stroke="${any ? rc : "#5c626a"}" stroke-width="2.2" opacity="${any ? 1 : .6}"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="8.6" fill="url(#${u}-v)"/><circle cx="${cx}" cy="${cy}" r="8.6" fill="url(#${u}-dome)"/>` +
+      `<path d="M${cx} ${cy - 4.5}V${cy - .5}M${cx - 3.4} ${cy - 3}a4.6 4.6 0 1 0 6.8 0" fill="none" stroke="${pc}" stroke-width="1.3" stroke-linecap="round"/>`;
+    for (let i = 1; i <= n; i++) s += led(o, x + 14 + (i - 1) * 10, y + h - 10, 1.9, ch(o, i), GREEN, "hg") + txt(x + 14 + (i - 1) * 10, y + h - 15, i, 4.6, pc);
+    s += led(o, x + w - 14, y + h - 10, 1.7, true, rc, rh, "blink") + `<path d="M${x + w - 24} ${y + 12}a6 6 0 0 1 8 0M${x + w - 26} ${y + 9}a9 9 0 0 1 12 0" fill="none" stroke="${pc}" stroke-opacity=".45" stroke-width="1"/>`;
+    IN.forEach((t) => { const q = tp(t[3]), dd = `M${n1(q[0])} ${n1(q[1])}C${n1(q[0])} ${n1(q[1] - 26)} 30 ${52 + t[3] * 8} -4 ${52 + t[3] * 10}`; s += wire(o, dd, 4.4, t[1], t[2], .9, t[0] === "N"); });
+    OUT.forEach((t) => { const q = tp(t[3], true), dd = `M${n1(q[0])} ${n1(q[1])}C${n1(q[0])} ${n1(q[1] - 26)} 170 ${52 + t[3] * 8} 204 ${52 + t[3] * 10}`; s += wire(o, dd, 4.4, t[1], t[2]); });
+    return svg(o, s);
+  }
+
+  function board(o) {
+    const u = o.uid, p = pal(o.color), n = +opt(o, "ch", "4"), cols = Math.min(n, 4), rows = n > 4 ? 2 : 1;
+    const cw = 34, bw = cols * cw + 34, bh = rows * 50 + 30, bx = 100 - bw / 2 + 6, by = 100 - bh / 2;
+    let s = BG(`<rect width="200" height="200" fill="#1c2026"/><rect width="200" height="200" fill="url(#${u}-wall)"/>` +
+      [[bx + 4, by + 4], [bx + bw - 4, by + 4], [bx + 4, by + bh - 4], [bx + bw - 4, by + bh - 4]].map((q) => `<circle cx="${q[0] + 2}" cy="${q[1] + 3}" r="5" fill="#000" opacity=".4"/>`).join(""));
+    s += sh(o, 100 + 6, by + bh + 4, bw * .55, 6) + `<path d="${rr(bx, by, bw, bh, 4)}" fill="${p.d}"/><path d="${rr(bx, by, bw, bh - 2, 4)}" fill="${p.m}"/><path d="${rr(bx, by, bw, bh, 4)}" fill="url(#${u}-g)" opacity=".25"/>`;
+    [[bx + 4, by + 4], [bx + bw - 4, by + 4], [bx + 4, by + bh - 4], [bx + bw - 4, by + bh - 4]].forEach((q) => { s += `<circle cx="${q[0]}" cy="${q[1]}" r="2.6" fill="#d9c27a"/><circle cx="${q[0]}" cy="${q[1]}" r="1.4" fill="#1a1d21"/>`; });
+    s += `<path d="${rr(bx + 3, by + bh / 2 - 16, 8, 32, 1)}" fill="#15171a"/>` + [0, 1, 2, 3].map((i) => `<rect x="${bx + 5.6}" y="${by + bh / 2 - 13 + i * 7.4}" width="2.8" height="2.8" fill="#e6c76a"/>`).join("") +
+      `<path d="M${bx + 12} ${by + 10}H${bx + bw - 10}M${bx + 12} ${by + bh - 10}H${bx + bw - 10}" stroke="#fff" stroke-opacity=".12" stroke-width="1.2"/>`;
+    for (let i = 0; i < n; i++) {
+      const r = Math.floor(i / cols), c = i % cols, cx = bx + 26 + c * cw, cy = by + 30 + r * 50, lit = ch(o, i + 1), toTop = rows === 2 && r === 0;
+      const ty = toTop ? by + 6 : by + bh - 6, ex = cx, dd = toTop ? `M${ex} ${ty}V-6` : `M${ex} ${ty}V206`;
+      s += wire(o, dd, 3.6, CHW[i], lit) + `<path d="${rr(cx - 8, ty - 5, 16, 10, 1.5)}" fill="url(#${u}-term)"/>` + screw(cx - 3.6, ty, 1.9) + screw(cx + 3.6, ty, 1.9);
+      s += `<path d="M${cx - 12} ${cy - 13}l4 -4h24l-4 4z" fill="#5f97f4"/><path d="M${cx + 12} ${cy - 13}l4 -4v22l-4 4z" fill="#123c8c"/><path d="${rr(cx - 12, cy - 13, 24, 26, 1.5)}" fill="url(#${u}-rel)"/>` +
+        `<path d="${rr(cx - 9, cy - 9, 18, 13, 1.5)}" fill="#0b1830" stroke="#9cc2ff" stroke-opacity=".4" stroke-width=".6"/>` + contact(cx - 5, cy + 1, 10, lit, "#c8cdd4", lit ? "#ffe27a" : null) +
+        `<path d="M${cx - 6} ${cy - 5}h12" stroke="#d07a3a" stroke-width="2.2" opacity=".85"/>` + `<path d="M${cx - 10} ${cy + 7}h20" stroke="#fff" stroke-opacity=".35" stroke-width=".8"/>` +
+        led(o, cx + 12, cy + (toTop ? 16 : -18), 1.7, lit, RED, "hr") + txt(cx - 12, cy + (toTop ? 21 : -16), i + 1, 5, "#f2f4f6");
+    }
+    return svg(o, s);
+  }
+
+  function dinBody(o, x, w, nt, nb, topOn, botOn, cols) {
+    const u = o.uid, p = pal(o.color), y = 48, h = 104;
+    let s = sh(o, x + w / 2 + 4, y + h + 2, w * .55, 4) + `<path d="${rr(x, y, w, h, 2.5)}" fill="url(#${u}-v)"/>` +
+      `<path d="${rr(x, y, w, 26, 2.5)}" fill="#000" opacity=".16"/><path d="${rr(x, y + h - 26, w, 26, 2.5)}" fill="#000" opacity=".16"/>` +
+      `<rect x="${x + 2}" y="${y + 26}" width="${w - 4}" height="${h - 52}" fill="url(#${u}-t)"/><rect x="${x + 2}" y="${y + 26}" width="${w - 4}" height="${h - 52}" fill="url(#${u}-fx)"/>` +
+      `<path d="M${x + 2} ${y + 26}H${x + w - 2}" stroke="#fff" stroke-opacity=".5"/><path d="M${x + 2} ${y + h - 26}H${x + w - 2}" stroke="#000" stroke-opacity=".35"/>` +
+      `<path d="${rr(x, y, w, h, 2.5)}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width=".7"/>` + (w > 30 ? [1, 2, 3, 4, 5, 6, 7].filter((k) => k * 22 < w - 6).map((k) => `<path d="M${x + k * 22} ${y + 2}V${y + 24}M${x + k * 22} ${y + h - 24}V${y + h - 2}" stroke="#000" stroke-opacity=".12"/>`).join("") : "");
+    const tx = (k, N) => x + (k + .5) * w / N, cl = cols || [];
+    for (let k = 0; k < nt; k++) { const X = tx(k, nt); s += wire(o, `M${n1(X)} ${y + 2}V22`, 3.6, cl[k] || (k % 2 ? BLUW : BLK), topOn[k], .9, k % 2 === 1 && !cols) + `<rect x="${n1(X - 3.4)}" y="${y}" width="6.8" height="4" fill="#0b0d10"/>` + screw(X, y + 14, 3.1); }
+    for (let k = 0; k < nb; k++) { const X = tx(k, nb); s += wire(o, `M${n1(X)} ${y + h - 2}V178`, 3.6, CHW[k] || REDW, botOn[k]) + `<rect x="${n1(X - 3.4)}" y="${y + h - 4}" width="6.8" height="4" fill="#0b0d10"/>` + screw(X, y + h - 14, 3.1); }
+    return s;
+  }
+  const lever = (o, cx, cy, on, col) => `<path d="${rr(cx - 3.6, cy - 10, 7.2, 20, 2)}" fill="#0d0f12"/><path d="${rr(cx - 3, on ? cy - 9.5 : cy + 1, 6, 8.5, 1.5)}" fill="${col || "#e9ecef"}"/><path d="M${cx - 2} ${on ? cy - 8 : cy + 2.5}h4" stroke="#fff" stroke-opacity=".7"/>`;
+  function handle(o, cx, cy, ww, on, col, tie) {
+    const hh = 30, hy = on ? cy - hh / 2 + 1 : cy + 1;
+    return `<path d="${rr(cx - ww / 2 - 1, cy - hh / 2, ww + 2, hh, 2)}" fill="#0b0d10"/>` +
+      `<path d="${rr(cx - ww / 2, hy, ww, hh / 2 - 2, 2)}" fill="${col}"/><path d="${rr(cx - ww / 2, hy, ww, hh / 2 - 2, 2)}" fill="url(#${o.uid}-fx)"/>` +
+      `<path d="M${n1(cx - ww / 2 + 2)} ${n1(hy + 4)}H${n1(cx + ww / 2 - 2)}M${n1(cx - ww / 2 + 2)} ${n1(hy + 7)}H${n1(cx + ww / 2 - 2)}" stroke="#000" stroke-opacity=".3"/>` +
+      `<path d="M${n1(cx - ww / 2 + 1)} ${n1(on ? hy + .6 : hy + hh / 2 - 2.6)}H${n1(cx + ww / 2 - 1)}" stroke="#fff" stroke-opacity=".45"/>` + (tie ? "" : "");
+  }
+  const flag = (cx, cy, w, on) => `<path d="${rr(cx - w / 2, cy - 3, w, 6, 1)}" fill="#0b0d10"/><rect x="${n1(cx - w / 2 + 1)}" y="${cy - 2}" width="${w - 2}" height="4" fill="${on ? "#e8312f" : "#33b04a"}"/>`;
+
+  const MODS = [["r4", "Relay, 4 ch"], ["r1", "Relay, 1 ch"], ["r2", "Relay, 2 ch"], ["r8", "Relay, 8 ch"], ["contactor", "Contactor"], ["breaker", "Breaker"], ["meter", "Energy meter"]];
+  function din(o) {
+    const p = pal(o.color), m = opt(o, "mod", "r4"), pc = p.lt ? "#2b3036" : "#dfe3e8";
+    const W = { r1: 36, r2: 46, r4: 80, r8: 150, contactor: 54, breaker: 46, meter: 58 }[m], x = 100 - W / 2;
+    let s = enclosure(o) + BG(rail(o, 100, 10, 190));
+    if (m[0] === "r") {
+      const n = +m.slice(1), on = Array.from({ length: n }, (_, i) => ch(o, i + 1)), any = on.some(Boolean);
+      const nt = Math.max(2, Math.min(n, 4));
+      s += dinBody(o, x, W, nt, n, Array.from({ length: nt }, () => any), on);
+      const cw = (W - 4) / n;
+      for (let i = 0; i < n; i++) { const cx = x + 2 + (i + .5) * cw;
+        s += led(o, cx, 82, n > 4 ? 1.6 : 2, on[i], GREEN, "hg") + lever(o, cx, 102, on[i]) + txt(cx, 121, i + 1, 5.4, pc); }
+      if (W >= 46) s += led(o, x + W - 6, 80, 1.4, true, BLUE, "hb", "blink");
+    } else if (m === "contactor") {
+      const on = [o.on, o.on, o.on];
+      s += dinBody(o, x, W, 3, 3, on, on) + `<path d="${rr(x + 10, 80, W - 20, 13, 2)}" fill="#0b0d10"/><rect x="${x + 12}" y="82" width="${W - 24}" height="9" fill="${o.on ? "#e8312f" : "#33b04a"}"/>` +
+        txt(100, 89.6, o.on ? "I" : "O", 7.5, "#fff") + `<path d="${rr(x + 14, 98, W - 28, 20, 3)}" fill="#0b0d10"/><path d="${rr(o.on ? x + 15 : x + W - 27, 99, 12, 18, 2.5)}" fill="#f0f2f4"/>` +
+        txt(x + 14, 125, "AUTO", 4, pc, "start") + txt(x + W - 14, 125, "0", 4.6, pc, "end") + led(o, x + W - 7, 80, 1.4, o.on, GREEN, "hg");
+    } else if (m === "breaker") {
+      const on = [o.on, o.on];
+      s += dinBody(o, x, W, 2, 2, on, on, [BLK, BLUW]) + handle(o, 100, 104, W - 18, o.on, "#555b63") + flag(100, 81, 18, o.on) + led(o, x + 6, 81, 1.6, o.on, GREEN, "hg") + led(o, x + W - 6, 81, 1.4, true, BLUE, "hb", "blink");
+    } else {
+      const on = [o.on, o.on], kw = o.on ? (o.level * 3.6).toFixed(1) : "0.0";
+      s += dinBody(o, x, W, 2, 2, on, on, [BLK, BLUW]) + `<path d="${rr(x + 6, 78, W - 12, 22, 2)}" fill="url(#${o.uid}-lcd)" stroke="#000" stroke-opacity=".5"/>` +
+        (o.on ? `<path d="${rr(x + 6, 78, W - 12, 22, 2)}" fill="${CYAN}" fill-opacity=".08"/>` : "") + digits(kw, x + 12, 83, 12, o.on ? "#9fe8ff" : "#2b3a40", o.on ? "rgba(159,232,255,.08)" : null) +
+        txt(x + W - 9, 97, "kW", 4.4, o.on ? "#9fe8ff" : "#3a4a50", "end") + led(o, x + 12, 110, 1.8, o.on, RED, "hr", "pulse") + txt(x + 18, 112, "imp", 4.4, pc, "start", 600) +
+        `<path d="${rr(x + W - 18, 105, 10, 10, 2)}" fill="#0b0d10"/><circle cx="${x + W - 13}" cy="110" r="3" fill="#d9dde2"/>`;
+    }
+    return svg(o, s);
+  }
+
+  function cunit(o) {
+    const u = o.uid, p = pal(o.color), n = +opt(o, "count", "4"), main = o.parts && o.parts.main != null ? o.parts.main : o.on;
+    const bw = 20, mw = 36, tot = mw + n * bw, x0 = 100 - tot / 2;
+    let s = BG(wallBg(o)) + sh(o, 104, 172, 86, 7) + `<path d="${rr(12, 30, 176, 140, 10)}" fill="url(#${u}-v)"/><path d="${rr(12, 30, 176, 140, 10)}" fill="url(#${u}-fx)"/><path d="${rr(12, 30, 176, 140, 10)}" fill="url(#${u}-g)" opacity=".3"/>` +
+      `<path d="${rr(20, 38, 160, 124, 6)}" fill="none" stroke="#000" stroke-opacity=".15"/>` +
+      `<path d="${rr(x0 - 6, 70, tot + 12, 64, 3)}" fill="#0c0e11"/>` + `<path d="${rr(x0 - 4, 52, tot + 8, 12, 2)}" fill="#f6f4e8" stroke="#000" stroke-opacity=".2"/>`;
+    const put = (x, w, on, col, lbl, smart) => { const cx = x + w / 2;
+      return `<path d="${rr(x + .6, 72, w - 1.2, 60, 1.5)}" fill="#eef0f2"/><path d="${rr(x + .6, 72, w - 1.2, 60, 1.5)}" fill="url(#${u}-fx)"/><path d="M${x + .6} 72.6H${x + w - .6}" stroke="#fff"/>` +
+        handle(o, cx, 106, w - 8, on, col) + flag(cx, 80, w - 8, on) + (smart ? led(o, cx, 126, 1.5, on, GREEN, "hg") : "") +
+        `<path d="M${n1(x + 3)} 58H${n1(x + w - 3)}" stroke="#4a5058" stroke-width="1.4" stroke-opacity=".55"/>` + (lbl ? txt(cx, 126.6, lbl, 4, "#565c63") : ""); };
+    s += put(x0, mw, main, "#d22a2a", "", false) + txt(x0 + mw / 2, 128, "MAIN", 4.4, "#565c63");
+    for (let i = 1; i <= n; i++) s += put(x0 + mw + (i - 1) * bw, bw, main && ch(o, i), "#555b63", "", true);
+    s += `<path d="M24 150h30" stroke="#000" stroke-opacity=".15" stroke-width="2"/>` + led(o, 172, 150, 1.6, true, BLUE, "hb", "blink");
+    return svg(o, s);
+  }
+
+  function loadc(o) {
+    const u = o.uid, p = pal(o.color);
+    let s = BG(wallBg(o)) + sh(o, 104, 194, 70, 5) + `<path d="${rr(36, 8, 128, 184, 4)}" fill="url(#${u}-v)"/><path d="${rr(36, 8, 128, 184, 4)}" fill="url(#${u}-fx)"/>` +
+      `<path d="${rr(42, 14, 116, 172, 3)}" fill="none" stroke="#000" stroke-opacity=".2"/>` + screw(44, 16, 2) + screw(156, 16, 2) + screw(44, 184, 2) + screw(156, 184, 2);
+    s += `<path d="${rr(76, 22, 48, 30, 2)}" fill="#0c0e11"/><path d="${rr(78, 24, 44, 26, 2)}" fill="url(#${u}-bk)"/>` +
+      `<path d="${rr(o.on ? 82 : 98, 30, 20, 14, 2)}" fill="#33373d"/><path d="M${o.on ? 86 : 102} 37h12" stroke="#000" stroke-opacity=".5" stroke-width="3"/>` + txt(100, 58, "MAIN", 5, "#2b3036");
+    s += `<path d="${rr(56, 64, 88, 112, 2)}" fill="#0c0e11"/>`;
+    for (let i = 0; i < 6; i++) {
+      const left = i < 3, r = i % 3, y = 68 + r * 36, x = left ? 59 : 101, on = ch(o, i + 1), hx = left ? (on ? x + 22 : x + 6) : (on ? x + 6 : x + 22);
+      s += `<path d="${rr(x, y, 40, 32, 2)}" fill="url(#${u}-bk)"/><path d="M${x + 1} ${y + .6}H${x + 39}" stroke="#fff" stroke-opacity=".2"/>` +
+        `<path d="${rr(x + 5, y + 10, 30, 12, 2)}" fill="#050608"/><path d="${rr(hx, y + 9, 12, 14, 2)}" fill="#6a7078"/><path d="M${hx + 3} ${y + 12}v8M${hx + 6} ${y + 12}v8M${hx + 9} ${y + 12}v8" stroke="#000" stroke-opacity=".45"/>` +
+        led(o, left ? x + 6 : x + 34, y + 27, 1.5, on, GREEN, "hg") + txt(left ? x + 34 : x + 6, y + 29, i + 1, 5.4, "#9aa0a7");
+    }
+    return svg(o, s);
+  }
+
+  const SIG = [["pwm", "PWM"], ["v010", "0-10V"], ["dali", "DALI"], ["dmx", "DMX"]];
+  function ledctl(o) {
+    const u = o.uid, type = opt(o, "type", "inline"), lv = o.level, col = o.color, outN = { single: 2, rgb: 4, rgbw: 5 }[opt(o, "out", "rgb")];
+    const sig = opt(o, "sig", "v010"), b = Object.assign({}, o, { color: type === "inline" ? "#2a2d33" : "#e9eaec", uid: o.uid + "n" });
+    let s = defs(b) + BG(wallBg(o, 158));
+    const sy = 168;
+    s += (o.on ? `<ellipse cx="100" cy="${sy}" rx="110" ry="${n1(16 + 14 * lv)}" fill="url(#${u}-hl)" opacity="${n1(.25 + .6 * lv)}"/>` : "") +
+      `<rect x="6" y="${sy - 5}" width="188" height="10" rx="1.5" fill="#f2f2ee"/><rect x="6" y="${sy - 5}" width="188" height="10" rx="1.5" fill="url(#${u}-fx)" opacity=".5"/>` +
+      Array.from({ length: 16 }, (_, i) => { const x = 12 + i * 11.6; return `<rect x="${n1(x)}" y="${sy - 3}" width="5.6" height="6" rx=".8" fill="${o.on ? H().mix("#ffffff", col, .55) : "#e6e3d5"}" stroke="#b8b49f" stroke-width=".4"/>` +
+        (o.on ? `<circle cx="${n1(x + 2.8)}" cy="${sy}" r="${n1(3 + 3 * lv)}" fill="${col}" opacity="${n1(.3 + .5 * lv)}"/>` : "") + (i % 4 === 3 ? `<path d="M${n1(x + 8.4)} ${sy - 5}v10" stroke="#c98a2a" stroke-width=".6"/>` : ""); }).join("");
+    if (type === "inline") {
+      const x = 58, y = 82, w = 84, h = 40, d = 9;
+      s += sh(o, x + w / 2 + 4, y + h + 4, w * .55, 4) + box3d(b, x, y, w, h, d, 6) +
+        `<path d="${rr(x + 8, y + 8, 30, h - 16, 3)}" fill="#000" opacity=".25"/><circle cx="${x + 23}" cy="${y + h / 2}" r="5" fill="#2a1416" stroke="#000"/><circle cx="${x + 21.5}" cy="${y + h / 2 - 1.5}" r="1.6" fill="#fff" opacity=".35"/>` +
+        led(o, x + w - 14, y + 12, 2, o.on, GREEN, "hg") + led(o, x + w - 14, y + 26, 1.6, o.on, AMB, "ha", "blink");
+      s += wire(o, `M${x} ${y + h / 2}C${x - 22} ${y + h / 2} 30 60 -4 50`, 5, BLK, o.on, .9) + `<path d="${rr(x - 10, y + h / 2 - 4, 10, 8, 2)}" fill="url(#${u}-bk)"/>`;
+      const cols = [BLK, REDW, GRNW, BLUW, WHT].slice(0, outN);
+      cols.forEach((c, i) => { const yy = y + 12 + i * 4; s += wire(o, `M${x + w} ${yy}C${x + w + 30} ${yy} ${150 + i * 3} ${sy - 30} ${150 + i * 3} ${sy - 5}`, 2.6, c, o.on && i > 0, n1(.3 + .6 * lv)); });
+      s += `<path d="${rr(146, sy - 8, 6 + outN * 3, 5, 1)}" fill="#1a1d21"/>`;
+    } else {
+      const x = 74, W = 52;
+      s += BG(rail(o, 100, 10, 190));
+      s += dinBody(b, x, W, 2, 2, [o.on, o.on], [o.on, o.on], [BLK, BLUW]).replace(/V178/g, "V150") +
+        `<path d="${rr(x + 8, 78, W - 16, 14, 2)}" fill="url(#${u}-lcd)"/>` + txt(100, 88, { pwm: "PWM", v010: "0-10V", dali: "DALI", dmx: "DMX" }[sig], 7, o.on ? "#9fe8ff" : "#3a4a50") +
+        led(o, x + 12, 104, 1.8, o.on, GREEN, "hg") + led(o, x + 22, 104, 1.6, o.on, AMB, "ha", "blink") + `<path d="${rr(x + W - 22, 98, 12, 12, 6)}" fill="#0b0d10"/><circle cx="${x + W - 16}" cy="104" r="3.6" fill="#d9dde2"/>`;
+      s += wire(o, `M${x + 13} 150C${x + 13} 158 ${x + 13} 158 ${x + 13} ${sy - 5}`, 3.4, BLK, o.on) + wire(o, `M${x + 39} 150C${x + 39} 158 ${x + 39} 158 ${x + 39} ${sy - 5}`, 3.4, REDW, o.on, n1(.3 + .6 * lv));
+    }
+    return svg(o, s);
+  }
+
+  const MESH = [["zigbee", "Zigbee"], ["zwave", "Z-Wave"], ["thread", "Thread"]];
+  function waves(o, cx, cy, col, n, sp) {
+    if (!o.on) return "";
+    return Array.from({ length: n || 3 }, (_, i) => `<path class="${P}wave" style="animation-delay:${n1(i * .45)}s" d="M${n1(cx - 12 - i * (sp || 9))} ${n1(cy - 2 - i * 5)}A${n1(16 + i * 12)} ${n1(16 + i * 12)} 0 0 1 ${n1(cx + 12 + i * (sp || 9))} ${n1(cy - 2 - i * 5)}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round"/>`).join("");
+  }
+  const plate = (o, x, y, w, h) => `<path d="${rr(x + 2, y + 3, w, h, 6)}" fill="#000" opacity=".25"/><path d="${rr(x, y, w, h, 6)}" fill="#ecebe5"/><path d="${rr(x, y, w, h, 6)}" fill="url(#${o.uid}-fx)" opacity=".6"/>` +
+    `<path d="M${x + 4} ${y + 1}H${x + w - 4}" stroke="#fff" stroke-opacity=".8"/>`;
+  const outlet = (cx, cy) => `<path d="${rr(cx - 15, cy - 18, 30, 36, 8)}" fill="#e2e1da" stroke="#b9b8b0" stroke-width=".8"/><rect x="${cx - 7}" y="${cy - 9}" width="2.6" height="9" rx=".8" fill="#2a2d31"/><rect x="${cx + 4.4}" y="${cy - 9}" width="2.6" height="9" rx=".8" fill="#2a2d31"/><path d="M${cx - 3} ${cy + 10}a3 3 0 0 1 6 0v2.6h-6z" fill="#2a2d31"/>`;
+  function plugrep(o) {
+    const u = o.uid, p = pal(o.color), rad = opt(o, "mesh", "zigbee"), rc = { zigbee: AMB, zwave: GREEN, thread: CYAN }[rad], rh = { zigbee: "ha", zwave: "hg", thread: "hc" }[rad], pass = opt(o, "pass", "no") === "yes";
+    let s = BG(wallBg(o) + plate(o, 66, 34, 68, 132) + outlet(100, 136) + screw(100, 100, 2.2));
+    s += waves(o, 100, 38, rc, 3) + sh(o, 104, 104, 34, 6) +
+      `<path d="${rr(68, 42, 64, 60, 16)}" fill="${p.k}" transform="translate(3 3)" opacity=".5"/><path d="${rr(66, 40, 68, 62, 16)}" fill="url(#${u}-v)"/><path d="${rr(66, 40, 68, 62, 16)}" fill="url(#${u}-fx)"/><path d="${rr(66, 40, 68, 62, 16)}" fill="url(#${u}-g)" opacity=".4"/>` +
+      `<path d="${rr(72, 46, 56, 50, 12)}" fill="none" stroke="#000" stroke-opacity=".08"/>`;
+    if (pass) s += outlet(100, 74).replace(/#e2e1da/, p.l).replace(/#b9b8b0/, p.d) + led(o, 122, 52, 1.8, o.on, rc, rh, "blink");
+    else s += `<circle cx="100" cy="70" r="12" fill="#000" opacity=".06"/>` + (o.on ? `<circle cx="100" cy="70" r="22" fill="url(#${u}-${rh})" opacity=".55"/>` : "") +
+      `<circle cx="100" cy="70" r="9" fill="none" stroke="${o.on ? rc : "#7d838a"}" stroke-width="2.4" opacity="${o.on ? 1 : .5}"${o.on ? ` class="${P}breathe"` : ""}/><circle cx="100" cy="70" r="5" fill="url(#${u}-v)"/><circle cx="100" cy="70" r="5" fill="url(#${u}-dome)"/>` +
+      `<path d="M92 92h16" stroke="#000" stroke-opacity=".12" stroke-width="1.4"/>`;
+    return svg(o, s);
+  }
+
+  function extender(o) {
+    const u = o.uid, p = pal(o.color), na = +opt(o, "ant", "2"), sg = { strong: 3, fair: 2, weak: 1 }[opt(o, "sig", "strong")];
+    let s = BG(wallBg(o) + plate(o, 70, 52, 60, 120) + outlet(100, 142));
+    const ant = (x, lean) => `<g transform="rotate(${lean} ${x} 62)"><path d="${rr(x - 4, 14, 8, 50, 4)}" fill="${p.k}"/><path d="${rr(x - 3.4, 14, 6.8, 48, 3.4)}" fill="url(#${u}-v)"/><path d="M${x - 1.4} 18V58" stroke="#fff" stroke-opacity=".35" stroke-width="1.2"/></g>`;
+    const xs = na === 4 ? [[64, -10], [80, -3], [120, 3], [136, 10]] : na === 2 ? [[66, -8], [134, 8]] : [];
+    s += waves(o, 100, 46, CYAN, 3, 11) + xs.map((a) => ant(a[0], a[1])).join("") + sh(o, 104, 128, 38, 6) +
+      `<path d="${rr(60, 52, 80, 74, 12)}" fill="url(#${u}-v)"/><path d="${rr(60, 52, 80, 74, 12)}" fill="url(#${u}-fx)"/><path d="${rr(60, 52, 80, 74, 12)}" fill="url(#${u}-g)" opacity=".4"/>` +
+      Array.from({ length: 5 }, (_, r) => Array.from({ length: 7 }, (_, c) => `<circle cx="${73 + c * 9}" cy="${62 + r * 6}" r="1.3" fill="#000" opacity=".22"/>`).join("")).join("");
+    s += `<path d="${rr(70, 96, 60, 20, 6)}" fill="#000" opacity=".12"/>` + led(o, 78, 106, 1.8, true, o.on ? WHITE : RED, o.on ? "hw" : "hr") +
+      led(o, 90, 106, 1.8, o.on, BLUE, "hb", "blink");
+    for (let i = 0; i < 3; i++) { const lit = o.on && i < sg, hh = 4 + i * 3; s += `<rect x="${104 + i * 7}" y="${110 - hh}" width="4.4" height="${hh}" rx="1" fill="${lit ? (sg === 1 ? AMB : GREEN) : "#3a3f46"}"/>` + (lit ? `<rect x="${104 + i * 7}" y="${110 - hh}" width="4.4" height="${hh}" rx="1" fill="#fff" opacity=".25"/>` : ""); }
+    return svg(o, s);
+  }
+
+  function generic(o) {
+    const u = o.uid, p = pal(o.color), shp = opt(o, "shape", "box");
+    let s = BG(wallBg(o, 150));
+    const cord = (x, y) => tube(`M${x} ${y}C${x + 20} ${y + 10} 176 150 186 168`, 3.6, BLK) + `<path d="${rr(180, 164, 14, 10, 2)}" fill="url(#${u}-bk)"/>`;
+    if (shp === "box") {
+      const x = 42, y = 92, w = 106, h = 58, d = 16;
+      s += cord(x + w + 6, y + 30) + sh(o, x + w / 2 + 10, y + h + 2, w * .62, 6) + box3d(o, x, y, w, h, d, 5) +
+        Array.from({ length: 6 }, (_, i) => `<path d="M${x + w + 4} ${y + 8 + i * 6.4}l${d - 8} ${-(d - 8)}" stroke="#000" stroke-opacity=".3" stroke-width="1.6"/>`).join("") +
+        `<path d="M${x + 10} ${y + h - 12}H${x + 60}" stroke="#000" stroke-opacity=".15" stroke-width="2"/>` +
+        led(o, x + w - 30, y + h - 12, 2.2, o.on, GREEN, "hg") + led(o, x + w - 20, y + h - 12, 1.6, o.on, AMB, "ha", "blink") +
+        `<circle cx="${x + 14}" cy="${y + 16}" r="6" fill="#000" opacity=".18"/><circle cx="${x + 14}" cy="${y + 16}" r="4.6" fill="url(#${u}-v)"/><path d="M${x + 14} ${y + 12.6}v3M${x + 11.8} ${y + 13.8}a3.2 3.2 0 1 0 4.4 0" fill="none" stroke="${o.on ? GREEN : "#6b7178"}" stroke-width="1" stroke-linecap="round"/>`;
+    } else if (shp === "tower") {
+      const x = 74, y = 40, w = 52, h = 112, d = 14;
+      s += cord(x + w + 4, y + h - 20) + sh(o, x + w / 2 + 8, y + h + 2, 44, 6) + box3d(o, x, y, w, h, d, 5) +
+        Array.from({ length: 9 }, (_, i) => `<path d="M${x + 10} ${y + 40 + i * 6}H${x + w - 10}" stroke="#000" stroke-opacity=".22" stroke-width="2"/>`).join("") +
+        `<circle cx="${x + w / 2}" cy="${y + 18}" r="7" fill="#000" opacity=".18"/><circle cx="${x + w / 2}" cy="${y + 18}" r="5.4" fill="url(#${u}-v)"/>` +
+        (o.on ? `<circle cx="${x + w / 2}" cy="${y + 18}" r="7.4" fill="none" stroke="${GREEN}" stroke-width="1.2"/>` : "") + led(o, x + w / 2 - 6, y + 32, 1.6, o.on, GREEN, "hg") + led(o, x + w / 2 + 6, y + 32, 1.6, o.on, AMB, "ha", "blink");
+    } else {
+      s += cord(150, 128) + sh(o, 104, 142, 62, 9) + `<path d="M40 112V124A60 18 0 0 0 160 124V112Z" fill="url(#${u}-s)"/><ellipse cx="100" cy="112" rx="60" ry="18" fill="url(#${u}-v)"/><ellipse cx="100" cy="112" rx="60" ry="18" fill="url(#${u}-g)" opacity=".5"/>` +
+        `<ellipse cx="100" cy="111" rx="40" ry="11" fill="none" stroke="#000" stroke-opacity=".12"/>` + (o.on ? `<path class="${P}breathe" d="M48 126A56 14 0 0 0 152 126" fill="none" stroke="${GREEN}" stroke-width="2" opacity=".85"/>` : "") +
+        led(o, 100, 111, 2.2, o.on, GREEN, "hg");
+    }
+    return svg(o, s);
+  }
+
+  function sensor(o) {
+    const u = o.uid, p = pal(o.color), shp = opt(o, "shape", "round"), mount = opt(o, "mount", "wall");
+    let s = "", cx = 100, cy = 96;
+    const ripple = o.on ? [0, 1, 2].map((i) => `<circle class="${P}rip" style="animation-delay:${n1(i * .7)}s" cx="${cx}" cy="${mount === "wall" ? cy : 112}" r="44" fill="none" stroke="${CYAN}" stroke-width="1.4" opacity="${o.anim ? 0 : n1(.5 - i * .15)}" transform="${o.anim ? "" : `translate(${cx} ${mount === "wall" ? cy : 112}) scale(${n1(1 + i * .25)}) translate(${-cx} ${mount === "wall" ? -cy : -112})`}"/>`).join("") : "";
+    if (mount === "wall") {
+      s += BG(wallBg(o)) + ripple + sh(o, cx + 4, cy + 44, 40, 5);
+      const d = shp === "round" ? null : rr(cx - 38, cy - 38, 76, 76, 16);
+      s += (d ? `<path d="${d}" fill="${p.k}" transform="translate(3 4)" opacity=".5"/><path d="${d}" fill="url(#${u}-v)"/><path d="${d}" fill="url(#${u}-fx)"/><path d="${d}" fill="url(#${u}-g)" opacity=".4"/>`
+        : `<circle cx="${cx + 3}" cy="${cy + 4}" r="38" fill="${p.k}" opacity=".5"/><circle cx="${cx}" cy="${cy}" r="38" fill="url(#${u}-v)"/><circle cx="${cx}" cy="${cy}" r="38" fill="url(#${u}-dome)" opacity=".6"/>`) +
+        `<circle cx="${cx}" cy="${cy}" r="${shp === "round" ? 28 : 26}" fill="none" stroke="#000" stroke-opacity=".1"/>` +
+        `<circle cx="${cx}" cy="${cy - 6}" r="9" fill="#14181e"/><circle cx="${cx}" cy="${cy - 6}" r="9" fill="url(#${u}-dome)"/>` +
+        Array.from({ length: 4 }, (_, i) => `<path d="M${cx - 12 + i * 8} ${cy + 18}v5" stroke="#000" stroke-opacity=".25" stroke-width="2" stroke-linecap="round"/>`).join("") +
+        led(o, cx, cy + 10, 1.8, o.on, CYAN, "hc", "blink");
+    } else {
+      s += BG(wallBg(o, 120)) + ripple + sh(o, cx + 4, 136, 46, 7);
+      if (shp === "round") s += `<path d="M50 110V124A50 16 0 0 0 150 124V110Z" fill="url(#${u}-s)"/><ellipse cx="${cx}" cy="110" rx="50" ry="16" fill="url(#${u}-v)"/><ellipse cx="${cx}" cy="110" rx="50" ry="16" fill="url(#${u}-g)" opacity=".5"/><ellipse cx="${cx}" cy="110" rx="36" ry="11" fill="none" stroke="#000" stroke-opacity=".1"/>`;
+      else s += `<path d="M52 120l18 -18h82l-18 18z" fill="url(#${u}-t)"/><path d="M134 120l18 -18v14l-18 18z" fill="url(#${u}-s)"/><path d="${rr(52, 120, 82, 14, 3)}" fill="url(#${u}-v)"/><path d="${rr(52, 120, 82, 14, 3)}" fill="url(#${u}-fx)"/>`;
+      const lx = shp === "round" ? cx : 102, ly = shp === "round" ? 108 : 111;
+      s += `<ellipse cx="${lx}" cy="${ly + 1}" rx="12" ry="5" fill="#14181e"/><ellipse cx="${lx}" cy="${ly}" rx="12" ry="5" fill="url(#${u}-dome)"/>` +
+        led(o, shp === "round" ? cx + 30 : 120, shp === "round" ? 114 : 127, 1.8, o.on, CYAN, "hc", "blink");
+    }
+    return svg(o, s);
+  }
+
+  const css = `
+.hda-relays-flow{stroke-dashoffset:0}
+.hda-anim .hda-relays-flow{animation:hda-relays-flow .9s linear infinite}
+.hda-anim .hda-relays-flow.hda-relays-rev{animation-direction:reverse}
+@keyframes hda-relays-flow{to{stroke-dashoffset:-16}}
+.hda-anim .hda-relays-blink{animation:hda-relays-blink 1.6s steps(1,end) infinite}
+@keyframes hda-relays-blink{0%,69%{opacity:1}70%,100%{opacity:.25}}
+.hda-anim .hda-relays-pulse{animation:hda-relays-pulse .7s steps(1,end) infinite}
+@keyframes hda-relays-pulse{0%,30%{opacity:1}31%,100%{opacity:.15}}
+.hda-anim .hda-relays-breathe{animation:hda-relays-breathe 2.4s ease-in-out infinite}
+@keyframes hda-relays-breathe{50%{opacity:.35}}
+.hda-relays-wave{opacity:.75}
+.hda-anim .hda-relays-wave{animation:hda-relays-wave 1.4s ease-out infinite}
+@keyframes hda-relays-wave{0%{opacity:0}30%{opacity:.95}100%{opacity:0}}
+.hda-relays-rip{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-relays-rip{animation:hda-relays-rip 2.1s ease-out infinite}
+@keyframes hda-relays-rip{0%{transform:scale(.6);opacity:.8}100%{transform:scale(1.5);opacity:0}}
+`;
+
+  const DARK = ["#1d1f23", "#f2f2ee", "#8d939b"], LIGHT = ["#f2f2ee", "#e8dfc8", "#1d1f23"], DINC = ["#e9eaec", "#f7f7f3", "#3b3f45"];
+  const icons = [
+    { id: "inwall", name: "In-wall relay", colors: DARK, picker: true, colorLabel: "Body",
+      options: [{ id: "type", name: "Type", values: TYPES }, { id: "ch", name: "Channels", values: [["1", "1"], ["2", "2"], ["4", "4"]], when: { opt: "type", is: ["relay", "dimmer", "dry"] } },
+        { id: "pmode", name: "Mode", values: PILOT, when: { opt: "type", is: "pilot" } }],
+      parts: parts(4, "ch", (i) => i === 1 ? null : i === 2 ? ["2", "4"] : "4"), render: inwall },
+    { id: "leads", name: "Flying-lead module", colors: DARK, picker: true, colorLabel: "Body", options: [{ id: "type", name: "Type", values: [["relay", "Relay"], ["dimmer", "Dimmer"]] }], render: leads },
+    { id: "minibox", name: "Mini relay box", colors: LIGHT, picker: true, colorLabel: "Body",
+      options: [{ id: "ch", name: "Channels", values: [["1", "1"], ["2", "2"]] }, { id: "radio", name: "Radio", values: RADIO }], parts: parts(2, "ch", (i) => i === 2 ? "2" : null), render: minibox },
+    { id: "board", name: "Relay board", colors: ["#1f6e3e", "#1a3f8a", "#2b2b30", "#7a1d1d"], picker: true, colorLabel: "Board",
+      options: [{ id: "ch", name: "Channels", values: [["4", "4"], ["1", "1"], ["2", "2"], ["8", "8"]] }], parts: parts(8, "ch", (i) => i === 1 ? null : i === 2 ? ["2", "4", "8"] : i <= 4 ? ["4", "8"] : "8"), render: board },
+    { id: "din", name: "DIN-rail module", colors: DINC, picker: true, colorLabel: "Body", options: [{ id: "mod", name: "Module", values: MODS }],
+      parts: parts(8, "mod", (i) => i === 1 ? ["r1", "r2", "r4", "r8"] : i === 2 ? ["r2", "r4", "r8"] : i <= 4 ? ["r4", "r8"] : "r8"), render: din },
+    { id: "cunit", name: "Breaker row", colors: ["#f4f4f0", "#d9dcdf", "#2e3238"], picker: true, colorLabel: "Box",
+      options: [{ id: "count", name: "Breakers", values: [["4", "4"], ["3", "3"], ["6", "6"]] }],
+      parts: [{ id: "main", name: "Main" }].concat(parts(6, "count", (i) => i <= 3 ? null : i === 4 ? ["4", "6"] : "6")), render: cunit },
+    { id: "loadc", name: "Smart load center", colors: ["#9aa1a9", "#d8d4c8", "#eef0f2"], picker: true, colorLabel: "Panel", parts: parts(6, "x", () => null), render: loadc },
+    { id: "ledctl", name: "LED controller", colors: ["#ffd8a8", "#ff4d6d", "#4dabf7", "#69db7c", "#ffffff"], picker: true, colorLabel: "Light",
+      options: [{ id: "type", name: "Type", values: [["inline", "Inline"], ["din", "DIN driver"]] }, { id: "out", name: "Output", values: [["rgb", "RGB"], ["single", "Single color"], ["rgbw", "RGBW"]], when: { opt: "type", is: "inline" } },
+        { id: "sig", name: "Signal", values: SIG.slice(1).concat([SIG[0]]), when: { opt: "type", is: "din" } }], render: ledctl },
+    { id: "plugrep", name: "Plug-in repeater", colors: LIGHT, picker: true, colorLabel: "Body",
+      options: [{ id: "mesh", name: "Network", values: MESH }, { id: "pass", name: "Outlet", values: [["no", "No"], ["yes", "Pass-through"]] }], render: plugrep },
+    { id: "extender", name: "Wi-Fi extender", colors: LIGHT, picker: true, colorLabel: "Body",
+      options: [{ id: "ant", name: "Antennas", values: [["2", "2"], ["4", "4"], ["0", "None"]] }, { id: "sig", name: "Signal", values: [["strong", "Strong"], ["fair", "Fair"], ["weak", "Weak"]] }], render: extender },
+    { id: "generic", name: "Generic device", colors: ["#8d939b", "#f2f2ee", "#1d1f23", "#3f6fb0"], picker: true, colorLabel: "Body",
+      options: [{ id: "shape", name: "Shape", values: [["box", "Box"], ["tower", "Tower"], ["puck", "Puck"]] }], render: generic },
+    { id: "sensor", name: "Generic sensor", colors: LIGHT, picker: true, colorLabel: "Body",
+      options: [{ id: "shape", name: "Shape", values: [["round", "Round"], ["square", "Square"]] }, { id: "mount", name: "Mount", values: [["wall", "Wall"], ["table", "Table"]] }], render: sensor },
+  ];
+
+  (window.HDA = window.HDA || []).push({
+    id: "relays", tab: "Relays & modules", group: "Utility", kind: "device", levelLabel: "Level",
+    intro: "Twelve relay, module and fallback drawings. Builders: the in-wall relay (Type: relay, dimmer, dry contact, pilot wire; Channels 1/2/4), the relay board (1-8), the DIN-rail module (relays 1-8 ch, contactor, breaker, energy meter) and breaker panels with a chip per channel or breaker. On = LED lit, contact closed, handle up (or toward the center) and current moving in the wires. The slider is dimmer level or LED brightness.",
+    css, icons,
+  });
+})();
+
+(function () {
   const H = window.HDAH, P = "hda-safety-";
   const f = (n) => (+n).toFixed(1);
   const R = Math.PI / 180;
@@ -37861,10 +41581,6 @@ ${alarm(x, 100, 100, 52, 124, 126)}`;
   const rot = (px, py, cx, cy, d) => { const a = d * R, c = Math.cos(a), s = Math.sin(a), dx = px - cx, dy = py - cy; return [cx + dx * c - dy * s, cy + dx * s + dy * c]; };
   const RED = "#ff3b3b", BLUE = "#4da3ff", GREEN = "#34d399", WARM = "#fff1d1", IRC = "#ff3a52", FOV = "#bfe3ff";
 
-  // ---------- (parts) Multi-Function: floodlight / spotlight cameras = Light + Siren (switches) + Motion (stage);
-  // sirens = an Alarm stage (off / siren / strobe / both, Hubitat's alarm attribute); alarm keypads / panels = an Arm
-  // state stage (disarmed / home / away / night / alarm). Stage values come in o.pval[id] and are used only as a
-  // Multi-Function Image (o.mf); a Device Image (no o.mf, no parts) is drawn exactly as before.
   const SV = (o, k) => (o.mf && o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null);
   const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
   const ARM = { id: "arm", name: "Arm state", type: "stage", values: [["disarmed", "Disarmed"], ["home", "Armed home"], ["away", "Armed away"], ["night", "Armed night"], ["alarm", "Alarm"]], def: "disarmed" };
@@ -37872,17 +41588,18 @@ ${alarm(x, 100, 100, 52, 124, 126)}`;
   const CAM = [{ id: "light", name: "Light", type: "switch" }, { id: "siren", name: "Siren", type: "switch" },
     { id: "motion", name: "Motion", type: "stage", values: [["inactive", "No motion"], ["active", "Motion"]], def: "inactive" }];
   function ctx(o) {
-    const c = o.color || "#eceef1", lv = o.level == null ? 1 : o.level, arm = SV(o, "arm"), al = SV(o, "alarm");
-    const on = arm ? arm !== "disarmed" : al ? al !== "off" : !!o.on;
-    const L = on ? .4 + .6 * lv : 0;
-    return { c, on, lv, L, id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, op: (k) => (k * L).toFixed(2), sp: 1.7 - .9 * lv,
+    const opt = o.opt || {}, cs = o.cam ? CK.cam(o) : (o.on ? "on" : "off"), dead = cs === "offline", arm = SV(o, "arm"), al = SV(o, "alarm");
+    const c0 = o.color || "#eceef1", c = dead ? H.mix(c0, "#80838a", .7) : c0, lv = o.level == null ? 1 : o.level;
+    const on = arm ? arm !== "disarmed" : al ? al !== "off" : o.cam ? CK.active(cs) : !!o.on;
+    const L = on ? .4 + .6 * lv : 0, irv = opt.ir || "auto";
+    const ir = cs !== "privacy" && !dead && (irv === "on" || (irv === "auto" && on));
+    return { c, on, lv, L, cs, cam: o.cam, pan: opt.pan || "center", u: o.uid, ir, irk: on ? L : .85,
+      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, op: (k) => (k * L).toFixed(2), sp: 1.7 - .9 * lv,
       mf: !!o.mf, st: arm || (on ? "away" : "disarmed"), alarm: arm === "alarm",
       siren: al ? al === "siren" || al === "both" : on, strobe: al ? al === "strobe" || al === "both" : on };
   }
-  // the same drawing context with another on (a part's own on)
   const xo = (x, on) => { if (on === x.on) return x; const L = on ? .4 + .6 * x.lv : 0; return Object.assign({}, x, { on, L, op: (k) => (k * L).toFixed(2) }); };
   const homeish = (x) => x.mf && (x.st === "home" || x.st === "night");
-  // armed home = a house in place of the lock, armed night = a crescent moon
   const modeG = (x, cx, cy, s, col, lockFn) => !homeish(x) ? lockFn() : x.st === "home"
     ? `<path d="M${f(cx - 6 * s)} ${f(cy + 7 * s)}V${f(cy + 1 * s)}L${cx} ${f(cy - 5 * s)}L${f(cx + 6 * s)} ${f(cy + 1 * s)}V${f(cy + 7 * s)}Z" fill="${col}"/><rect x="${f(cx - 1.6 * s)}" y="${f(cy + 3 * s)}" width="${f(3.2 * s)}" height="${f(4 * s)}" fill="#000" fill-opacity=".35"/>`
     : `<path d="M${f(cx + 1 * s)} ${f(cy - 5 * s)}A${f(6.5 * s)} ${f(6.5 * s)} 0 1 0 ${f(cx + 6 * s)} ${f(cy + 5 * s)}A${f(5 * s)} ${f(5 * s)} 0 1 1 ${f(cx + 1 * s)} ${f(cy - 5 * s)}Z" fill="${col}"/>`;
@@ -38010,7 +41727,31 @@ ${m === "wood" ? `<path d="M8 ${y + 9}C60 ${y + 7} 120 ${y + 11} 192 ${y + 8}M8 
 <g clip-path="${x.url("wc")}">${texture(kind, x)}${o2.shelf ? shelf(x, o2.shelf, o2.mat) : ""}${o2.under || ""}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/>
 ${o2.clip || ""}</g>
 <rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g>
-<g clip-path="${x.url("wc")}">${body}</g></svg>`;
+<g clip-path="${x.url("wc")}">${x.cs === "offline" ? `<g opacity=".8">${body}</g>` : body}${camTop(x)}</g></svg>`;
+  }
+  const LENS = {
+    bullet: { caps: [[52, 99, 11, "rotate(-14 108 96) translate(52 99) scale(.62 1) translate(-52 -99)"]], m: [rot(52, 99, 108, 96, -14), 9] },
+    dome: { caps: [[100, 76, 17.5, "translate(100 76) scale(1 .82) translate(-100 -76)"]], m: [[100, 76], 15] },
+    turret: { caps: [[100, 116, 17.5]], m: [[100, 116], 16] },
+    cube: { caps: [[100, 92, 16]], m: [[100, 92], 15] },
+    pantilt: { caps: [], m: [[100, 92], 16] },
+    flood: { caps: [[100, 110, 12.5]], m: [[100, 110], 12] },
+    spot: { caps: [[100, 104, 18.5]], m: [[100, 104], 17] },
+    battery: { caps: [[104, 82, 17, "rotate(-8 104 94)"]], m: [rot(104, 82, 104, 94, -8), 15] },
+    solar: { caps: [[100, 129, 14]], m: [[100, 129], 13] },
+    baby: { caps: [[100, 89, 16.5]], m: [[100, 89], 15] },
+    ptz: { caps: [[110, 110, 13.5, "translate(110 110) scale(1 .78) translate(-110 -110)"]], m: [[110, 108], 12], bx: 172 },
+    dual: { caps: [[100, 82, 15], [100, 126, 15]], m: [[100, 104], 26] },
+  };
+  const panDx = (x) => x.cam === "ptz" || x.cam === "pantilt" ? (x.pan === "left" ? (x.cam === "ptz" ? -12 : -9) : x.pan === "right" ? (x.cam === "ptz" ? 12 : 9) : 0) : 0;
+  function camTop(x) {
+    const Q = x.cam && LENS[x.cam]; if (!Q) return "";
+    const dx = panDx(x); let s = "";
+    if (x.cs === "motion") s += CK.motion(Q.m[0][0] + dx, Q.m[0][1], Q.m[1]);
+    if (x.cs === "privacy") s += Q.caps.map((p, i) => { const k = CK.cap(x.u, i, p[0], p[1], p[2], x.c);
+      if (x.cam === "ptz") return `<g transform="translate(${p[0] + dx} 110) scale(${dx ? .82 : 1} .78) translate(-110 -110)">${k}</g>`;
+      return p[3] ? `<g transform="${p[3]}">${k}</g>` : k; }).join("");
+    return s + CK.badge(x.cs, Q.bx, Q.by);
   }
 
   const drop = (x, shape, dx, dy, a) => `<g transform="translate(${dx == null ? 3.5 : dx} ${dy == null ? 5 : dy})" fill="#000" stroke="none" opacity="${a || .5}" filter="${x.url("bl")}">${shape}</g>`;
@@ -38018,7 +41759,8 @@ ${o2.clip || ""}</g>
   const edge = (d, a) => `<path d="${d}" fill="none" stroke="#000" stroke-opacity="${a || .35}" stroke-width=".8"/>`;
   const gl = (x, d, a) => `<path d="${d}" fill="${x.url("gloss")}" opacity="${a || .35}"/>`;
   const anim = (cls, dur, delay) => `class="${P}${cls}" style="animation-duration:${f(dur)}s;animation-delay:${(delay || 0).toFixed(2)}s"`;
-  const glowE = (x, cx, cy, rx, ry, k, g) => x.on ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url(g)}" opacity="${x.op(k)}"/>` : "";
+  const glowE = (x, cx, cy, rx, ry, k, g) => g === "hI" ? (x.ir ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url(g)}" opacity="${(k * x.irk).toFixed(2)}"/>` : "")
+    : x.on ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url(g)}" opacity="${x.op(k)}"/>` : "";
   const contact = (x, cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url("sh")}"/>`;
   const screw = (x, cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${x.url("silr")}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".6"/><path d="M${f(cx - r * .6)} ${f(cy + r * .3)}L${f(cx + r * .6)} ${f(cy - r * .3)}" stroke="#2a2d33" stroke-width="${f(r * .35)}" stroke-linecap="round"/>`;
 
@@ -38033,15 +41775,16 @@ ${o2.clip || ""}</g>
     let s = "", g = "";
     for (let i = 0; i < n; i++) {
       const a = (i / n) * 2 * Math.PI - Math.PI / 2, px = f(cx + Rr * Math.cos(a)), py = f(cy + Rr * Math.sin(a));
-      s += `<circle cx="${px}" cy="${py}" r="${r}" fill="#120c10"/><circle cx="${px}" cy="${py}" r="${f(r * .6)}" fill="${x.on ? "#ff4a5e" : "#3a2a36"}" opacity="${x.on ? x.op(1) : .9}"/>`;
-      if (x.on) g += `<circle cx="${px}" cy="${py}" r="${f(r * 3.4)}" fill="${x.url("hI")}"/>`;
+      s += `<circle cx="${px}" cy="${py}" r="${r}" fill="#120c10"/><circle cx="${px}" cy="${py}" r="${f(r * .6)}" fill="${x.ir ? "#ff4a5e" : "#3a2a36"}" opacity="${x.ir ? (x.irk).toFixed(2) : .9}"/>`;
+      if (x.ir) g += `<circle cx="${px}" cy="${py}" r="${f(r * 3.4)}" fill="${x.url("hI")}"/>`;
     }
-    if (!x.on) return s;
-    return `<circle cx="${cx}" cy="${cy}" r="${f(Rr * 2)}" fill="${x.url("hI")}" opacity="${x.op(.55)}" ${anim("ir", 2.6, 0)}/>${s}<g opacity="${x.op(.9)}" ${anim("ir", 2.6, 0)}>${g}</g>`;
+    if (!x.ir) return s;
+    return `<circle cx="${cx}" cy="${cy}" r="${f(Rr * 2)}" fill="${x.url("hI")}" opacity="${(.55 * x.irk).toFixed(2)}" ${anim("ir", 2.6, 0)}/>${s}<g opacity="${(.9 * x.irk).toFixed(2)}" ${anim("ir", 2.6, 0)}>${g}</g>`;
   }
   function sled(x, cx, cy, r, col, offGreen) {
-    const h = col === BLUE ? "hB" : "hR";
-    if (x.on) return `<g ${anim("blink", 1.2, 0)}><circle cx="${cx}" cy="${cy}" r="${f(r * 4.5)}" fill="${x.url(h)}" opacity="${x.op(1)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col || RED}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .45)}" fill="#fff" fill-opacity=".85"/></g>`;
+    if (x.on && CK.LED[x.cs]) col = CK.LED[x.cs]; 
+    const h = col === BLUE ? "hB" : col === GREEN || col === CK.LED.live ? "hG" : "hR";
+    if (x.on) return `<g ${x.cs === "live" ? "" : anim("blink", 1.2, 0)}><circle cx="${cx}" cy="${cy}" r="${f(r * 4.5)}" fill="${x.url(h)}" opacity="${x.op(1)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col || RED}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .45)}" fill="#fff" fill-opacity=".85"/></g>`;
     if (offGreen) return `<circle cx="${cx}" cy="${cy}" r="${f(r * 2.6)}" fill="${x.url("hG")}" opacity=".35"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${GREEN}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .4)}" fill="#fff" fill-opacity=".7"/>`;
     return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#1b1e28"/><circle cx="${cx}" cy="${cy}" r="${f(r * .5)}" fill="${H.shade(col || RED, -.5)}" opacity=".6"/>`;
   }
@@ -38083,6 +41826,67 @@ ${o2.clip || ""}</g>
   const SW = ["#eceef1", "#2a2c31", "#8d939b", "#6b4e36", "#4a4e55", "#cbbd9f"];
   const sw = (first, n) => [first].concat(SW.filter((c) => c !== first)).slice(0, n || 5);
   const body = (d) => Object.assign({ picker: true, colorLabel: "Body" }, d);
+
+  const CK = (() => {
+    const g = (n) => (+n).toFixed(1);
+    const STATE = { id: "state", name: "State", values: [["auto", "From on/off"], ["live", "Live"], ["rec", "Recording"], ["motion", "Motion"], ["privacy", "Privacy"], ["offline", "Offline"]] };
+    const BELL = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+    const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] };
+    const IRA = { id: "ir", name: "Night IR", values: [["auto", "Auto"], ["off", "Off"], ["on", "On"]] };
+    const PAN = { id: "pan", name: "Pan", values: [["center", "Center"], ["left", "Left"], ["right", "Right"]] };
+    const cam = (o) => { const s = (o.opt || {}).state || "auto"; return s === "auto" ? (o.on ? "on" : "off") : s; };
+    const bell = (o) => o.on ? ((o.opt || {}).state || "ring") : "idle";
+    const active = (s) => s === "on" || s === "live" || s === "rec" || s === "motion";
+    const COL = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940", privacy: "#c9ced6", offline: "#8a8f98" };
+    const LED = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940" };
+    function badge(s, bx, by) {
+      const c = COL[s]; if (!c) return "";
+      bx = bx == null ? 28 : bx; by = by == null ? 28 : by;
+      let gl = "";
+      if (s === "rec") gl = `<circle cx="${bx}" cy="${by}" r="7" fill="${c}" opacity=".22"/><g class="${P}ckblink"><circle cx="${bx}" cy="${by}" r="4.4" fill="${c}"/><circle cx="${g(bx - 1.4)}" cy="${g(by - 1.4)}" r="1.3" fill="#fff" fill-opacity=".6"/></g>`;
+      else if (s === "live") gl = `<circle cx="${bx}" cy="${by}" r="2.3" fill="${c}"/><path d="M${g(bx - 3.2)} ${g(by - 3.6)}A5 5 0 0 0 ${g(bx - 3.2)} ${g(by + 3.6)}M${g(bx + 3.2)} ${g(by - 3.6)}A5 5 0 0 1 ${g(bx + 3.2)} ${g(by + 3.6)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path class="${P}ckglow" d="M${g(bx - 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 0 ${g(bx - 5.6)} ${g(by + 5.4)}M${g(bx + 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 1 ${g(bx + 5.6)} ${g(by + 5.4)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "motion") gl = `<g class="${P}ckglow" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="${g(bx + 1.2)}" cy="${g(by - 5.6)}" r="1.9" fill="${c}" stroke="none"/>` +
+        `<path d="M${g(bx + .4)} ${g(by - 2.8)}L${g(bx - 1)} ${g(by + 2)}L${g(bx - 4.4)} ${g(by + 6.2)}M${g(bx - 1)} ${g(by + 2)}L${g(bx + 2.6)} ${g(by + 3.4)}L${g(bx + 3.4)} ${g(by + 6.6)}M${g(bx - 4.6)} ${g(by - .6)}L${g(bx + .4)} ${g(by - 2.8)}L${g(bx + 4)} ${g(by)}"/></g>`;
+      else if (s === "privacy") gl = `<path d="M${g(bx - 6.4)} ${by}Q${bx} ${g(by - 6)} ${g(bx + 6.4)} ${by}Q${bx} ${g(by + 6)} ${g(bx - 6.4)} ${by}Z" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="${bx}" cy="${by}" r="2" fill="${c}"/>` +
+        `<path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "offline") gl = `<circle cx="${bx}" cy="${g(by + 4)}" r="1.2" fill="${c}"/><path d="M${g(bx - 2.8)} ${g(by + 1.2)}A4 4 0 0 1 ${g(bx + 2.8)} ${g(by + 1.2)}M${g(bx - 5.3)} ${g(by - 1.3)}A7.5 7.5 0 0 1 ${g(bx + 5.3)} ${g(by - 1.3)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#ff5a5a" stroke-width="1.5" stroke-linecap="round"/>`;
+      return `<g><circle cx="${g(bx + 1)}" cy="${g(by + 1.6)}" r="11" fill="#000" fill-opacity=".45"/><circle cx="${bx}" cy="${by}" r="11" fill="#16181e"/><circle cx="${bx}" cy="${by}" r="10.2" fill="none" stroke="${c}" stroke-width="1.3"/>` +
+        `<path d="M${g(bx - 7)} ${g(by - 6)}A9 9 0 0 1 ${g(bx + 6)} ${g(by - 7)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>${gl}</g>`;
+    }
+    const motion = (cx, cy, r) => [0, 1].map((i) => `<circle class="${P}ckring" style="animation-delay:${(-i * .8).toFixed(1)}s" cx="${g(cx)}" cy="${g(cy)}" r="${g(r * (1.3 + i * .5))}" fill="none" stroke="#ffa940" stroke-opacity="${i ? .4 : .75}" stroke-width="${i ? 1.4 : 1.8}"${i ? ` stroke-dasharray="3 3"` : ""}/>`).join("");
+    function cap(u, k, cx, cy, r, col) {
+      const id = `${u}-ckc${k}`;
+      return `<defs><radialGradient id="${id}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${H.shade(col, .55)}"/><stop offset=".6" stop-color="${col}"/><stop offset="1" stop-color="${H.shade(col, -.45)}"/></radialGradient></defs>` +
+        `<circle cx="${g(cx)}" cy="${g(cy + r * .14)}" r="${g(r)}" fill="#000" fill-opacity=".4"/><circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="url(#${id})"/>` +
+        `<path d="M${g(cx - r * .97)} ${g(cy)}H${g(cx + r * .97)}" stroke="${H.shade(col, -.5)}" stroke-width="${g(Math.max(.8, r * .09))}"/><path d="M${g(cx - r * .9)} ${g(cy + r * .1)}H${g(cx + r * .9)}" stroke="#fff" stroke-opacity=".28" stroke-width="${g(Math.max(.5, r * .05))}"/>` +
+        `<circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="none" stroke="#000" stroke-opacity=".38" stroke-width=".8"/><ellipse cx="${g(cx - r * .32)}" cy="${g(cy - r * .5)}" rx="${g(r * .36)}" ry="${g(r * .15)}" fill="#fff" fill-opacity=".4" transform="rotate(-18 ${g(cx - r * .32)} ${g(cy - r * .5)})"/>`;
+    }
+    const irDots = (cx, cy, R, n, rr) => { let s = ""; rr = rr || 1.1;
+      for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, px = g(cx + Math.cos(a) * R), py = g(cy + Math.sin(a) * R);
+        s += `<circle cx="${px}" cy="${py}" r="${g(rr * 3)}" fill="#ff3a4a" opacity=".22"/><circle cx="${px}" cy="${py}" r="${g(rr)}" fill="#ff3a4a"/>`; }
+      return s; };
+    function bellOver(s, cx, ly, lr, w) {
+      if (s === "motion") return `<g class="${P}ckglow">` + [0, 1].map((i) => { const r = lr + 5 + i * 6; return `<path d="M${g(cx - r)} ${g(ly - 2)}A${g(r)} ${g(r)} 0 0 1 ${g(cx + r)} ${g(ly - 2)}" fill="none" stroke="#ff8a6a" stroke-opacity="${(.8 - i * .3).toFixed(2)}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>`; }).join("") + `</g>`;
+      if (s === "live") return `<g class="${P}ckglow"><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.9)}" fill="#6aa8ff" opacity=".22"/><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.05)}" fill="none" stroke="#6aa8ff" stroke-opacity=".8" stroke-width="1.4"/></g>` +
+        `<circle class="${P}ckblink" cx="${g(cx + w / 2 + 7)}" cy="${g(ly - lr)}" r="3" fill="#ff3b3b"/>`;
+      if (s === "talk") return [0, 1, 2].map((i) => `<path class="${P}ckwave" style="animation-delay:${(-i * .4).toFixed(1)}s" d="M${g(cx + w / 2 + 4 + i * 6)} ${g(ly - 6 - i * 2)}q${g(5 + i)} ${g(6 + i * 2)} 0 ${g(12 + i * 4)}" fill="none" stroke="#7ee7ff" stroke-opacity="${(.9 - i * .2).toFixed(2)}" stroke-width="1.5" stroke-linecap="round"/>`).join("");
+      return "";
+    }
+    const css = `
+.${P}ckring{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}ckblink{animation:${P}ckblink 1.1s steps(1,end) infinite}
+@keyframes ${P}ckblink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .${P}ckring{animation:${P}ckring 1.6s ease-out infinite}
+@keyframes ${P}ckring{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.hda-anim .${P}ckglow{animation:${P}ckglow 1.8s ease-in-out infinite}
+@keyframes ${P}ckglow{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-anim .${P}ckwave{animation:${P}ckwave 1.3s ease-out infinite}
+@keyframes ${P}ckwave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}ckblink,.hda-anim .${P}ckring,.hda-anim .${P}ckglow,.hda-anim .${P}ckwave{animation:none!important}}`;
+    return { STATE, BELL, IR, IRA, PAN, cam, bell, active, LED, badge, motion, cap, irDots, bellOver, css };
+  })();
 
   const icons = [
      body({ id: "bullet", name: "Bullet camera", colors: sw("#eceef1"), render(o) {
@@ -38157,14 +41961,16 @@ ${gl(x, rrp(73, 69, 54, 24, 10), .25)}<path d="${rrp(64, 60, 72, 72, 18)}" fill=
 ${drop(x, `<circle cx="100" cy="88" r="34"/>`, 3, 5, .5)}<circle cx="100" cy="88" r="34" fill="${x.url("br")}"/>
 <clipPath id="${u}"><circle cx="100" cy="88" r="33"/></clipPath>
 ${glowE(x, 100, 92, 34, 30, .3, "hI")}
-<g clip-path="url(#${u})"><g ${x.on ? anim("pan", 6, 0) : ""}>${face}</g></g>
+<g clip-path="url(#${u})">${(() => { const dx = panDx(x);
+        const tf = x.cs === "privacy" ? `translate(0 46)` : dx ? `translate(${100 + dx} 92) scale(.8 1) translate(-100 -92)` : "";
+        return tf ? `<g transform="${tf}">${face}</g>` : `<g ${x.on ? anim("pan", 6, 0) : ""}>${face}</g>`; })()}</g>
 <path d="M68 82A34 10 0 0 0 132 82" fill="none" stroke="#000" stroke-opacity=".14" stroke-width="1.2"/><ellipse cx="88" cy="66" rx="10" ry="5" fill="#fff" fill-opacity=".35" transform="rotate(-25 88 66)"/>`;
       return scene(x, "sage", F, { shelf: 156 });
     } }),
 
      body({ id: "flood", name: "Floodlight camera", colors: sw("#eceef1"), parts: CAM, render(o) {
       const x = ctx(o), Lc = rot(58, 75, 82, 54, -24), Rc = rot(142, 75, 118, 54, 24);
-      const lt = xo(x, pon(o, "light")), xm = o.mf ? xo(x, SV(o, "motion") === "active") : x, sir = o.mf && pon(o, "siren");
+      const lt = o.mf ? xo(x, pon(o, "light")) : x, xm = o.mf ? xo(x, SV(o, "motion") === "active") : x, sir = o.mf && pon(o, "siren");
       const lamp = (x0, face) => `<path d="${rrp(x0, 46, 56, 32, 10)}" fill="${x.url("bh")}"/><path d="${rrp(x0, 46, 56, 32, 10)}" fill="${x.url("bv")}" opacity=".45"/>${hl(`M${x0 + 8} 47.5H${x0 + 48}`, .55, 1.2)}
 <path d="${rrp(x0 + 4, 58, 48, 17, 6)}" fill="${face}"/>${lt.on ? "" : `<path d="M${x0 + 10} 62H${x0 + 46}M${x0 + 10} 66.5H${x0 + 46}M${x0 + 10} 71H${x0 + 46}" stroke="#000" stroke-opacity=".2" stroke-width=".8"/>`}
 <path d="${rrp(x0 + 4, 58, 48, 17, 6)}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".8"/>`;
@@ -38183,7 +41989,7 @@ ${sled(xm, 100, 90, 1.5)}<circle cx="100" cy="125" r="2.4" fill="${x.url("frost"
     } }),
 
      body({ id: "spot", name: "Spotlight camera", colors: sw("#2a2c31"), parts: CAM, render(o) {
-      const x = ctx(o), lt = xo(x, pon(o, "light")), xm = o.mf ? xo(x, SV(o, "motion") === "active") : x, sir = o.mf && pon(o, "siren");
+      const x = ctx(o), lt = o.mf ? xo(x, pon(o, "light")) : x, xm = o.mf ? xo(x, SV(o, "motion") === "active") : x, sir = o.mf && pon(o, "siren");
       const strip = lt.on ? `<path d="${rrp(76, 66, 48, 11, 5.5)}" fill="${x.url("lampOn")}"/><path d="${rrp(76, 66, 48, 11, 5.5)}" fill="#fff" opacity="${lt.op(.5)}"/>`
         : `<path d="${rrp(76, 66, 48, 11, 5.5)}" fill="#2c3038"/>${[84, 92, 100, 108, 116].map((cx) => `<circle cx="${cx}" cy="71.5" r="2.2" fill="#4a505c"/><circle cx="${cx - .6}" cy="70.9" r=".7" fill="#fff" fill-opacity=".4"/>`).join("")}`;
       const F = (lt.on ? `<ellipse cx="100" cy="190" rx="90" ry="40" fill="${x.url("hW")}" opacity="${lt.op(.6)}"/>` : "") +
@@ -38249,8 +42055,8 @@ ${x.on ? note(142, 70, 0) + note(52, 64, -1.6) : ""}`;
     } }),
 
      body({ id: "ptz", name: "PTZ camera", colors: sw("#eceef1"), render(o) {
-      const x = ctx(o), D = "M78 98A32 32 0 0 0 142 98Z";
-      const F = cone(x, 110, 124, 90, 70, 18, FOV, 1.1, 7) +
+      const x = ctx(o), D = "M78 98A32 32 0 0 0 142 98Z", dx = panDx(x);
+      const F = cone(x, 110 + dx, 124, 90 - dx * 2.5, 70, 18, FOV, 1.1, dx ? 0 : 7) +
         drop(x, `<path d="${rrp(20, 34, 18, 48, 5)}"/><rect x="30" y="44" width="84" height="12"/><path d="${rrp(76, 70, 68, 30, 8)}"/><path d="${D}"/>`, 4, 7, .55) +
         `<path d="${rrp(20, 34, 18, 48, 5)}" fill="${x.url("bv")}"/>${screw(x, 29, 42, 1.8)}${screw(x, 29, 74, 1.8)}
 <path d="M34 44H104Q114 44 114 54V64H102V56H34Z" fill="${x.url("bv")}"/>${hl("M36 45.5H104", .55, 1)}${edge("M34 56H102V64")}
@@ -38258,7 +42064,7 @@ ${x.on ? note(142, 70, 0) + note(52, 64, -1.6) : ""}`;
 <path d="${rrp(76, 70, 68, 30, 8)}" fill="${x.url("bh")}"/><ellipse cx="110" cy="71" rx="33" ry="4" fill="${x.url("bv")}"/>${hl("M80 76V94", .3, 1.2)}
 <path d="M78 98H142" stroke="#000" stroke-opacity=".4" stroke-width="1.4"/>
 <path d="${D}" fill="#0a0c12"/>
-<g transform="translate(110 110) scale(1 .78) translate(-110 -110)"><circle cx="110" cy="110" r="15" fill="${x.url("blk")}"/>${irRing(x, 110, 110, 12, 8, 1.1)}${lens(x, 110, 110, 8)}</g>
+<g transform="translate(${110 + dx} 110) scale(${dx ? .82 : 1} .78) translate(-110 -110)"><circle cx="110" cy="110" r="15" fill="${x.url("blk")}"/>${irRing(x, 110, 110, 12, 8, 1.1)}${lens(x, 110, 110, 8)}</g>
 <path d="${D}" fill="${x.url("dome")}" opacity=".5"/><path d="M84 102A26 26 0 0 0 98 124" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/>
 ${sled(x, 134, 86, 1.6)}${edge(rrp(76, 70, 68, 30, 8))}`;
       return scene(x, "corner", F);
@@ -38274,7 +42080,7 @@ ${sled(x, 134, 86, 1.6)}${edge(rrp(76, 70, 68, 30, 8))}`;
 <path d="${rrp(72, 60, 56, 94, 18)}" fill="${x.url("blk")}"/><path d="${rrp(72, 60, 56, 94, 18)}" fill="${x.url("blkv")}" opacity=".5"/>
 ${glowE(x, 100, 104, 40, 56, .35, "hI")}
 <circle cx="100" cy="82" r="17" fill="#05060a"/>${lens(x, 100, 82, 13)}<circle cx="100" cy="126" r="17" fill="#05060a"/>${lens(x, 100, 126, 13)}
-${[84, 92, 108, 116].map((cx) => `<circle cx="${cx}" cy="104" r="1.8" fill="#120c10"/><circle cx="${cx}" cy="104" r="1.1" fill="${x.on ? "#ff4a5e" : "#3a2a36"}"/>${x.on ? `<circle cx="${cx}" cy="104" r="5" fill="${x.url("hI")}" ${anim("ir", 2.6, 0)}/>` : ""}`).join("")}
+${[84, 92, 108, 116].map((cx) => `<circle cx="${cx}" cy="104" r="1.8" fill="#120c10"/><circle cx="${cx}" cy="104" r="1.1" fill="${x.ir ? "#ff4a5e" : "#3a2a36"}"/>${x.ir ? `<circle cx="${cx}" cy="104" r="5" fill="${x.url("hI")}" ${anim("ir", 2.6, 0)}/>` : ""}`).join("")}
 ${sled(x, 100, 146, 1.6)}${gl(x, rrp(74, 62, 52, 30, 16), .2)}${edge(rrp(66, 46, 68, 114, 22))}`;
       return scene(x, "stone", F);
     } }),
@@ -38399,14 +42205,17 @@ ${sled(x, 124, 52, 1.5, RED, true)}${edge(rrp(64, 44, 72, 70, 12))}${waves(xo(x,
       return scene(x, "garage", F);
     } }),
   ];
+  const CAMS = { bullet: 1, dome: 1, turret: 1, cube: 1, pantilt: 1, flood: 1, spot: 1, battery: 1, solar: 1, baby: 1, ptz: 1, dual: 1 };
+  icons.forEach((ic) => { if (!CAMS[ic.id]) return; const orig = ic.render;
+    ic.options = [CK.STATE].concat(ic.id === "pantilt" ? [] : [CK.IRA], ic.id === "ptz" || ic.id === "pantilt" ? [CK.PAN] : []);
+    ic.render = function (o) { return orig.call(this, Object.assign({}, o, { cam: ic.id })); }; });
 
   (window.HDA = window.HDA || []).push({
     id: "security",
     tab: "Cameras & alarms",
     group: "Security",
     kind: "device",
-    intro: "Twenty cameras and alarm parts, each on its own eave, wall, shelf or soffit. Cameras: Active means recording (status LED blinks, IR ring glows, view cone shows, pan-tilt heads pan). Alarms: Active means armed (red LEDs, strobes flash, sirens sound, panels turn red). The slider sets how strong the glow, light and sound look.",
-    
+    intro: "Twenty cameras and alarm parts, each on its own eave, wall, shelf or soffit. Cameras: Active means recording (status LED blinks, IR ring glows, view cone shows, pan-tilt heads pan). Alarms: Active means armed (red LEDs, strobes flash, sirens sound, panels turn red). The slider sets how strong the glow, light and sound look. Cameras also have a State menu (Live, Recording, Motion, Privacy, Offline), Night IR, and Pan on the pan-tilt and PTZ heads.",
     levelLabel: "Intensity",
     onWord: "Active", offWord: "Off",
     css: `.hda-security-blink,.hda-security-strobe,.hda-security-ir,.hda-security-wave,.hda-security-pulse,.hda-security-pan,.hda-security-sweep,.hda-security-float{animation-iteration-count:infinite}
@@ -38427,7 +42236,7 @@ ${sled(x, 124, 52, 1.5, RED, true)}${edge(rrp(64, 44, 72, 70, 12))}${waves(xo(x,
 @keyframes hda-security-pan{0%,100%{transform:translate(-9px,0) scale(.8,1)}25%,75%{transform:translate(0,0) scale(1,1)}50%{transform:translate(9px,0) scale(.8,1)}}
 @keyframes hda-security-sweep{0%,100%{transform:rotate(-32deg)}50%{transform:rotate(32deg)}}
 @keyframes hda-security-float{0%{transform:translate(0,6px);opacity:0}25%{opacity:1}100%{transform:translate(4px,-14px);opacity:0}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-security-blink,.hda-anim .hda-security-strobe,.hda-anim .hda-security-ir,.hda-anim .hda-security-pulse,.hda-anim .hda-security-wave,.hda-anim .hda-security-pan,.hda-anim .hda-security-sweep,.hda-anim .hda-security-float{animation:none}}`,
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-security-blink,.hda-anim .hda-security-strobe,.hda-anim .hda-security-ir,.hda-anim .hda-security-pulse,.hda-anim .hda-security-wave,.hda-anim .hda-security-pan,.hda-anim .hda-security-sweep,.hda-anim .hda-security-float{animation:none}}` + CK.css,
     icons,
   });
 })();
@@ -38578,6 +42387,19 @@ ${extra || ""}</defs>`;
 .hda-sensor-dots{opacity:.8}
 .hda-anim .hda-sensor-dots{animation:hda-sensor-dots 1.6s ease-in-out infinite}
 @keyframes hda-sensor-dots{0%,100%{opacity:.35}50%{opacity:1}}
+.hda-sensor-p-single,.hda-sensor-p-double,.hda-sensor-p-long{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-sensor-p-single{animation:hda-sensor-p-single 1.6s ease-out infinite}
+.hda-anim .hda-sensor-p-double{animation:hda-sensor-p-double 1.6s ease-out infinite}
+.hda-anim .hda-sensor-p-long{animation:hda-sensor-p-long 2.2s ease-in-out infinite}
+@keyframes hda-sensor-p-single{0%,30%,100%{transform:translate(0,0)}10%,18%{transform:translate(0,3px)}}
+@keyframes hda-sensor-p-double{0%,40%,100%{transform:translate(0,0)}7%{transform:translate(0,3px)}14%{transform:translate(0,0)}21%{transform:translate(0,3px)}28%{transform:translate(0,0)}}
+@keyframes hda-sensor-p-long{0%,85%,100%{transform:translate(0,0)}8%,75%{transform:translate(0,3px)}}
+.hda-anim .hda-sensor-f-single{animation:hda-sensor-f-single 1.6s ease-out infinite}
+.hda-anim .hda-sensor-f-double{animation:hda-sensor-f-double 1.6s ease-out infinite}
+.hda-anim .hda-sensor-f-long{animation:hda-sensor-f-long 2.2s ease-in-out infinite}
+@keyframes hda-sensor-f-single{0%,32%,100%{opacity:.15}10%,20%{opacity:1}}
+@keyframes hda-sensor-f-double{0%,42%,100%{opacity:.15}7%,11%{opacity:1}14%{opacity:.15}21%,25%{opacity:1}}
+@keyframes hda-sensor-f-long{0%,88%,100%{opacity:.15}8%,78%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-sensor-"]{animation:none!important}}
 `;
 
@@ -38869,20 +42691,23 @@ ${extra || ""}</defs>`;
       `<path d="${rr(61, 36, 54, 10, 4)}" fill="#fff" fill-opacity=".14"/>` + led(o, 70, 71, 1.2, "r", o.on),
       lin(u + "-lcdf", [[0, "#ffb2a0"], [1, "#ff5a48"]], 1)); }),
 
-    ic("button", "Scene button", WH, (o) => { const u = o.uid, d = o.on ? 3 : 0, p = pal(o.color);
+    ic("button", "Scene button", WH, (o) => { const u = o.uid, act = (o.opt && o.opt.act) || "idle", ac = o.on && o.anim && act !== "idle", d = o.on && !ac ? 3 : 0, p = pal(o.color);
+      const mk = !o.on || act === "idle" ? "" : `<g class="${P}f-${act}"><ellipse cx="100" cy="${112 + d}" rx="22" ry="9" fill="url(#${u}-hc)"/><g fill="${C.c}">` +
+        (act === "single" ? `<ellipse cx="100" cy="${112 + d}" rx="4.2" ry="2"/>` : act === "double" ? `<ellipse cx="94.5" cy="${112 + d}" rx="3.6" ry="1.8"/><ellipse cx="105.5" cy="${112 + d}" rx="3.6" ry="1.8"/>` : `<rect x="88" y="${110.4 + d}" width="24" height="3.2" rx="1.6"/>`) + `</g></g>`;
       return svg(o, `<g class="hda-bg"><g mask="url(#${u}-fade)"><path d="M0 112H200V200H0Z" fill="url(#${u}-wood)" opacity=".7"/><path d="M0 112H200V200H0Z" fill="url(#${u}-grain)"/><path d="M0 112H200" stroke="#fff" stroke-opacity=".2"/></g></g>` +
       (o.on ? rings(o, 100, 134, 96, 34, C.c, 3, 1.6) : "") + sh(o, 100, 142, 64, 16) +
       `<path d="${band(48, 152, 112, 132, 22)}" fill="url(#${u}-c)"/><path d="M48 132A52 22 0 0 0 152 132" fill="none" stroke="#000" stroke-opacity=".3"/>` +
+      (ac ? `<g class="${P}p-${act}">` : "") +
       (o.on ? `<ellipse cx="100" cy="${112 + d}" rx="53" ry="23" fill="none" stroke="${C.c}" stroke-width="2.6"/><ellipse cx="100" cy="${118 + d}" rx="64" ry="30" fill="url(#${u}-hc)" opacity=".55"/>` : `<ellipse cx="100" cy="112" rx="52.5" ry="22.5" fill="none" stroke="${p.k}" stroke-width="1.6"/>`) +
       `<ellipse cx="100" cy="${112 + d}" rx="50" ry="20.6" fill="url(#${u}-s)"/><ellipse cx="100" cy="${112 + d}" rx="50" ry="20.6" fill="${o.on ? "#000" : "#fff"}" fill-opacity="${o.on ? .08 : .06}"/>` +
       `<ellipse cx="100" cy="${112 + d}" rx="13" ry="5.4" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="1.4"/><ellipse cx="100" cy="${112 + d}" rx="3" ry="1.3" fill="#000" fill-opacity=".25"/>` +
-      `<path d="M62 ${106 + d}Q76 ${96 + d} 98 ${95 + d}" fill="none" stroke="#fff" stroke-opacity="${o.on ? .4 : .75}" stroke-width="2.2" stroke-linecap="round"/>`); }),
+      `<path d="M62 ${106 + d}Q76 ${96 + d} 98 ${95 + d}" fill="none" stroke="#fff" stroke-opacity="${o.on ? .4 : .75}" stroke-width="2.2" stroke-linecap="round"/>` + mk + (ac ? "</g>" : "")); },
+      { options: [{ id: "act", name: "Action", values: [["idle", "Idle"], ["single", "Single"], ["double", "Double"], ["long", "Long press"]] }] }),
   ];
 
   (window.HDA = window.HDA || []).push({
     id: "sensor", tab: "Sensors", group: "More", kind: "device",
     intro: "Twenty sensors, each drawn where it lives. On means triggered: motion seen, door or window open, water, smoke, a hot or cold reading, a button pressed; off means idle and all clear. The slider sets how strong the event is (beams, puddle size, smoke, the reading on the display).",
-    
     css, icons,
   });
 })();
@@ -38920,6 +42745,12 @@ ${extra || ""}</defs>`;
 @keyframes hda-shades-led{0%,100%{opacity:1}50%{opacity:.35}}
 .hda-anim .hda-shades-flap{transform-box:fill-box;transform-origin:50% 0;animation:hda-shades-flap 2.2s ease-in-out infinite alternate}
 @keyframes hda-shades-flap{from{transform:skewX(-2deg) scaleY(1)}to{transform:skewX(2deg) scaleY(.94)}}
+.hda-anim .hda-shades-mvl{animation:hda-shades-mvl 1.8s ease-in-out infinite}
+.hda-anim .hda-shades-mvr{animation:hda-shades-mvr 1.8s ease-in-out infinite}
+@keyframes hda-shades-mvl{0%,100%{transform:translateX(0)}50%{transform:translateX(-2.6px)}}
+@keyframes hda-shades-mvr{0%,100%{transform:translateX(0)}50%{transform:translateX(2.6px)}}
+.hda-anim .hda-shades-chev{animation:hda-shades-chev 1.1s ease-in-out infinite}
+@keyframes hda-shades-chev{0%,100%{opacity:1}50%{opacity:.3}}
 `;
 
   function defs(o, extra) {
@@ -39064,10 +42895,8 @@ ${extra || ""}</defs>`;
     }
     return s;
   }
-  // (parts) PV = the Multi-Function readings (0..1, null = part not ticked) while a Multi-Function Image renders, else null
   let PV = null;
   const pv = (k, d) => (PV ? (PV[k] == null ? 0 : PV[k]) : d);
-  // raised blinds: the slats left below the open ones pile up flat on the bottom rail
   function pile(o, x, y, w, k, kind) {
     const fill = kind === "alu" ? `url(#${o.uid}-alu)` : `url(#${o.uid}-slat)`; let s = "";
     for (let i = 0; i < k; i++) { const yy = y + i * 2.2; s += `<rect x="${f1(x)}" y="${f1(yy)}" width="${f1(w)}" height="2.2" rx=".5" fill="${fill}"/><rect x="${f1(x)}" y="${f1(yy + 1.8)}" width="${f1(w)}" height=".4" fill="#000" opacity=".4"/>`; }
@@ -39091,7 +42920,38 @@ ${extra || ""}</defs>`;
   const pinch = (x0, x1, top, n) => { let s = ""; const fw = (x1 - x0) / n; for (let j = 1; j < n; j++) s += `<path d="M${f1(x0 + j * fw)} ${top + 1}v6" stroke="#000" stroke-opacity=".3" stroke-width="1.2"/>`; return s; };
 
   const icons = [];
-  const add = (id, name, colors, label, render) => icons.push({ id, name, colors, picker: true, colorLabel: label, render });
+  const add = (id, name, colors, label, render, extra) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {}));
+
+  const TILTV = [["open", "Open"], ["half", "Half"], ["closed", "Closed"]];
+  const SLATS = { options: [{ id: "tilt", name: "Slats", values: TILTV }] };
+  const VANES = { options: [{ id: "tilt", name: "Vanes", values: TILTV }] };
+  const TILTF = { open: 1, half: .5, closed: 0 };
+  const tiltO = (o) => { const t = TILTF[(o.opt && o.opt.tilt) || "open"]; return t === 1 || t == null ? o : Object.assign({}, o, { level: (+o.level || 0) * t }); };
+  const OPENV = [["center", "Center split"], ["left", "Left"], ["right", "Right"]];
+  const OPENS = { id: "opens", name: "Opens", values: OPENV };
+  const STATE = { id: "state", name: "State", values: [["stopped", "Stopped"], ["opening", "Opening"], ["closing", "Closing"], ["partial", "Partial"]] };
+  const sideOf = (o, def) => (o.opt && o.opt.opens) || def || "center";
+  function spans(o, x0, x1, lw, def) {
+    const s = sideOf(o, def);
+    if (s === "left") return [[x0, x0 + lw], [x0 + lw, x0 + 2 * lw]];
+    if (s === "right") return [[x1 - 2 * lw, x1 - lw], [x1 - lw, x1]];
+    return [[x0, x0 + lw], [x1 - lw, x1]];
+  }
+  const openDir = (o, def) => { const s = sideOf(o, def); return s === "left" ? [-1, -1] : s === "right" ? [1, 1] : [-1, 1]; };
+  const stOf = (o) => (o.opt && o.opt.state) || "stopped";
+  function mv(o, d, inner) {
+    const st = stOf(o); if (st !== "opening" && st !== "closing") return inner;
+    const k = st === "closing" ? -d : d;
+    return `<g class="${P}${k < 0 ? "mvl" : "mvr"}">${inner}</g>`;
+  }
+  function stateBadge(o, cx, cy, dirs) {
+    const st = stOf(o); if (st === "stopped") return "";
+    let s = `<rect x="${cx - 13}" y="${cy - 5.5}" width="26" height="11" rx="5.5" fill="#101418" opacity=".72"/><rect x="${cx - 13}" y="${cy - 5.5}" width="26" height="11" rx="5.5" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width=".6"/>`;
+    if (st === "partial") return s + `<rect x="${cx - 3.2}" y="${cy - 3}" width="2.2" height="6" rx=".8" fill="#ffc46b"/><rect x="${cx + 1}" y="${cy - 3}" width="2.2" height="6" rx=".8" fill="#ffc46b"/>`;
+    const ch = (x, d) => `<path d="M${f1(x - d * 1.6)} ${cy - 3}L${f1(x + d * 1.6)} ${cy}L${f1(x - d * 1.6)} ${cy + 3}" fill="none" stroke="#5ef0b4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const k = st === "closing" ? -1 : 1, a = dirs[0] * k, b = dirs[1] * k;
+    return s + `<g class="${P}chev">${ch(cx - 6, a)}${ch(cx - 2, a)}${ch(cx + 2, b)}${ch(cx + 6, b)}</g>`;
+  }
 
   add("roller", "Roller shade", sw(FAB), "Fabric", (o) => {
     const a = amt(o), g = G.roller, { x, y, w, h } = g, u = o.uid;
@@ -39157,6 +43017,7 @@ ${extra || ""}</defs>`;
   });
 
   add("wood", "Wood blinds", sw(WOOD), "Slats", (o) => {
+    o = tiltO(o);
     const g = G.wood, { x, y, w } = g, u = o.uid, a = amt(o), nO = Math.round(12 * (1 - pv("lift", 0))), ho = (g.h - 2) * nO / 12, h = PV ? ho + (12 - nO) * 2.2 + 2 : g.h;
     const tape = H().shade(o.color, -.12);
     return svg(o, stdWindow(o, g) +
@@ -39165,9 +43026,10 @@ ${extra || ""}</defs>`;
       `<rect x="${x - 5}" y="${y + h - 1}" width="${w + 10}" height="6" rx="1.2" fill="url(#${u}-slat)"/><rect x="${x - 5}" y="${y + h - 1}" width="${w + 10}" height="6" fill="url(#${u}-grain)"/>` +
       `<rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="11" rx="1.5" fill="url(#${u}-slat)"/><rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="11" fill="url(#${u}-grain)"/><rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="1.4" fill="#fff" opacity=".35"/>` +
       `<path d="M${x - 1} ${y + 2}V${y + 58}" stroke="#eef3f6" stroke-opacity=".75" stroke-width="1.8" stroke-linecap="round" transform="rotate(${f1(a * 6)} ${x - 1} ${y + 2})"/>` + stdSill(o, g));
-  });
+  }, SLATS);
 
   add("mini", "Mini blinds", sw(ALU), "Slats", (o) => {
+    o = tiltO(o);
     const g = G.mini, { x, y, w } = g, u = o.uid, nO = Math.round(22 * (1 - pv("lift", 0))), ho = (g.h - 9) * nO / 22, h = PV ? ho + (22 - nO) * 2.2 + 9 : g.h;
     return svg(o, stdWindow(o, g) +
       (PV ? slats(o, x + 1, y + 6, w - 2, ho, nO, "alu") + pile(o, x + 1, y + 6 + ho, w - 2, 22 - nO, "alu") : slats(o, x + 1, y + 6, w - 2, h - 9, 22, "alu")) +
@@ -39175,9 +43037,10 @@ ${extra || ""}</defs>`;
       `<rect x="${x + 1}" y="${y + h - 4}" width="${w - 2}" height="3.4" rx="1" fill="url(#${u}-alu)"/>` +
       `<rect x="${x}" y="${y}" width="${w}" height="6" rx="1" fill="url(#${u}-alu)"/><rect x="${x}" y="${y}" width="${w}" height="1" fill="#fff" opacity=".5"/>` +
       `<path d="M${x + 7} ${y + 6}V${y + 66}" stroke="#e7f2f8" stroke-opacity=".8" stroke-width="1.6" stroke-linecap="round"/><path d="M${x + 6.4} ${y + 8}V${y + 64}" stroke="#fff" stroke-opacity=".7" stroke-width=".4"/>` + stdSill(o, g));
-  });
+  }, SLATS);
 
   add("vertical", "Vertical blinds", sw(FAB, "#f6f4ef"), "Fabric", (o) => {
+    o = tiltO(o);
     const a = amt(o), x = 36, y = 26, w = 128, h = 150, u = o.uid, n = 12, p = w / n, ta = pv("tilt", a), sp = PV ? p * (1 - .8 * pv("lift", 0)) : p, vw = p * (1.1 - .86 * ta);
     let v = "", chain = [];
     for (let i = 0; i < n; i++) {
@@ -39190,7 +43053,7 @@ ${extra || ""}</defs>`;
       `<rect x="${x + w / 2 + 3}" y="${y + 70}" width="2.4" height="16" rx="1.2" fill="#9aa0a6"/>` +
       `<g${an(o, "soft")}>${v}</g><path d="M${chain[0]} ${y + h - 6}H${chain[n - 1]}" stroke="#d8d8d8" stroke-opacity=".6" stroke-width=".7" stroke-dasharray="1.4 1"/>` +
       `<rect x="${x - 2}" y="${y}" width="${w + 4}" height="6" rx="1" fill="url(#${u}-metal)"/>`);
-  });
+  }, VANES);
 
   add("zebra", "Zebra shade", sw(FAB, "#a3a7aa"), "Fabric", (o) => {
     const a = amt(o), g = G.zebra, { x, y, w, h } = g, u = o.uid;
@@ -39207,24 +43070,23 @@ ${extra || ""}</defs>`;
 
   add("drapes", "Motorized drapes", sw(FAB, "#3a5577"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, top = 28, bot = 176, half = 76;
-    const lw = half * (1 - .8 * a), lx1 = 24 + lw, rx0 = 176 - lw;
+    const lw = half * (1 - .8 * a), [[p0, p1], [q0, q1]] = spans(o, 24, 176, lw), dr = openDir(o);
     return svg(o, room(o, { wall: "#5c5468", x: 60, y: 42, w: 80, h: 94 }) + trim(o, 60, 42, 80, 94) + view(o, 60, 42, 80, 94) + sash(60, 42, 80, 94, "cross") + sill(o, 50, 142, 100) +
-      `<rect x="26" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".22"/><rect x="${f1(rx0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".22"/>` +
-      `<g${an(o, "soft")}>${drape(o, 24, lx1, top, bot, 5)}${pinch(24, lx1, top, 5)}</g><g${an(o, "soft")}>${drape(o, rx0, 176, top, bot, 5)}${pinch(rx0, 176, top, 5)}</g>` +
-      `<rect x="20" y="22" width="160" height="6" rx="1.5" fill="url(#${u}-dmetal)"/><rect x="170" y="19" width="16" height="12" rx="3" fill="url(#${u}-dmetal)"/>` + led(o, 181, 25));
-  });
+      mv(o, dr[0], `<rect x="${f1(p0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".22"/>`) + mv(o, dr[1], `<rect x="${f1(q0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".22"/>`) +
+      mv(o, dr[0], `<g${an(o, "soft")}>${drape(o, p0, p1, top, bot, 5)}${pinch(p0, p1, top, 5)}</g>`) + mv(o, dr[1], `<g${an(o, "soft")}>${drape(o, q0, q1, top, bot, 5)}${pinch(q0, q1, top, 5)}</g>`) +
+      `<rect x="20" y="22" width="160" height="6" rx="1.5" fill="url(#${u}-dmetal)"/><rect x="170" y="19" width="16" height="12" rx="3" fill="url(#${u}-dmetal)"/>` + led(o, 181, 25) + stateBadge(o, 100, 13, dr));
+  }, { options: [OPENS, STATE] });
 
   add("sheer", "Sheer curtains", sw(SHEER), "Fabric", (o) => {
     const a = amt(o), u = o.uid, top = 31, bot = 177, half = 68;
-    const lw = half * (1 - .74 * a), lx1 = 32 + lw, rx0 = 168 - lw;
+    const lw = half * (1 - .74 * a), [[p0, p1], [q0, q1]] = spans(o, 32, 168, lw);
     const panel = (x0, x1, cl2) => `<g${an(o, cl2)}><rect x="${f1(x0)}" y="${top}" width="${f1(x1 - x0)}" height="${bot - top}" fill="${o.color}" opacity=".3"/>${drape(o, x0, x1, top, bot, 9, "sfold")}</g>`;
-    let rings = ""; for (let i = 0; i < 6; i++) { rings += `<ellipse cx="${f1(34 + i * (lw - 4) / 5)}" cy="30" rx="2.2" ry="3" fill="none" stroke="url(#${u}-brass)" stroke-width="1"/><ellipse cx="${f1(166 - i * (lw - 4) / 5)}" cy="30" rx="2.2" ry="3" fill="none" stroke="url(#${u}-brass)" stroke-width="1"/>`; }
+    let rings = ""; for (let i = 0; i < 6; i++) { rings += `<ellipse cx="${f1(p0 + 2 + i * (lw - 4) / 5)}" cy="30" rx="2.2" ry="3" fill="none" stroke="url(#${u}-brass)" stroke-width="1"/><ellipse cx="${f1(q1 - 2 - i * (lw - 4) / 5)}" cy="30" rx="2.2" ry="3" fill="none" stroke="url(#${u}-brass)" stroke-width="1"/>`; }
     return svg(o, room(o, { wall: "#7a676c", x: 58, y: 44, w: 84, h: 92 }) + trim(o, 58, 44, 84, 92) + view(o, 58, 44, 84, 92) + sash(58, 44, 84, 92, "cross") + sill(o, 48, 142, 104) +
-      panel(32, lx1, "sway") + panel(rx0, 168, "sway2") +
+      panel(p0, p1, "sway") + panel(q0, q1, "sway2") +
       `<rect x="26" y="28.5" width="148" height="3" rx="1.5" fill="url(#${u}-brass)"/><circle cx="25" cy="30" r="4" fill="url(#${u}-brass)"/><circle cx="175" cy="30" r="4" fill="url(#${u}-brass)"/>` + rings);
-  });
+  }, { options: [OPENS] });
 
-  // the sheers parted (Multi-Function, sheer part open): two panels gathered toward the sides, their pleats bunched closer
   function sheers(o, top, bot, sw2) {
     let t = "";
     [[36, 36 + sw2], [164 - sw2, 164]].forEach(([a0, a1]) => { t += `<rect x="${f1(a0)}" y="${top}" width="${f1(a1 - a0)}" height="${bot - top}" fill="#f5f2ea" opacity=".5"/>`; for (let i = 0; i < 8; i++) t += `<rect x="${f1(a0 + (i + .2) * (a1 - a0) / 8)}" y="${top}" width="${f1(Math.max(1, 3.5 * (a1 - a0) / 64))}" height="${bot - top}" fill="#fff" opacity=".26"/>`; });
@@ -39232,14 +43094,14 @@ ${extra || ""}</defs>`;
   }
   add("layered", "Drapes over sheers", sw(FAB, "#b9805f"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, top = 30, bot = 177, half = 64;
-    const lw = half * (1 - .78 * a), lx1 = 28 + lw, rx0 = 172 - lw;
+    const lw = half * (1 - .78 * a), [[p0, p1], [q0, q1]] = spans(o, 28, 172, lw);
     let sv = ""; for (let i = 0; i < 16; i++) sv += `<rect x="${36 + i * 8}" y="${top}" width="3.5" height="${bot - top}" fill="#fff" opacity=".22"/>`;
     return svg(o, room(o, { wall: "#3d485b", x: 60, y: 44, w: 80, h: 92 }) + trim(o, 60, 44, 80, 92) + view(o, 60, 44, 80, 92) + sash(60, 44, 80, 92, "cross") + sill(o, 50, 142, 100) +
       (PV && pv("sheer", 0) > 0 ? sheers(o, top, bot, 64 * (1 - .8 * pv("sheer", 0))) : `<g${an(o, "sway2")}><rect x="36" y="${top}" width="128" height="${bot - top}" fill="#f5f2ea" opacity=".42"/>${sv}</g>`) +
-      `<rect x="30" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/><rect x="${f1(rx0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/>` +
-      `<g${an(o, "soft")}>${drape(o, 28, lx1, top, bot, 6)}</g><g${an(o, "soft")}>${drape(o, rx0, 172, top, bot, 6)}</g>` +
+      `<rect x="${f1(p0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/><rect x="${f1(q0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/>` +
+      `<g${an(o, "soft")}>${drape(o, p0, p1, top, bot, 6)}</g><g${an(o, "soft")}>${drape(o, q0, q1, top, bot, 6)}</g>` +
       `<rect x="22" y="25.5" width="156" height="4.4" rx="2.2" fill="url(#${u}-trunk)"/><circle cx="20" cy="27.7" r="4.6" fill="url(#${u}-trunk)"/><circle cx="180" cy="27.7" r="4.6" fill="url(#${u}-trunk)"/><circle cx="18.6" cy="26.3" r="1.4" fill="#fff" opacity=".3"/><circle cx="178.6" cy="26.3" r="1.4" fill="#fff" opacity=".3"/>`);
-  });
+  }, { options: [OPENS] });
 
   add("cafe", "Cafe curtains", sw(["#c0463c", "#3a5577", "#5d8a55", "#d9a441", "#333333"]), "Fabric", (o) => {
     const a = amt(o), u = o.uid, x = 50, y = 32, w = 100, h = 96;
@@ -39254,10 +43116,10 @@ ${extra || ""}</defs>`;
       `<g class="hda-bg"><rect y="134" width="200" height="40" fill="url(#${u}-tile)"/><rect y="172" width="200" height="8" fill="#9a958d"/><rect y="172" width="200" height="1.5" fill="#fff" opacity=".6"/><rect y="180" width="200" height="20" fill="#3e4c50"/><path d="M66 180V200M134 180V200" stroke="#000" stroke-opacity=".35"/><rect x="58" y="186" width="5" height="1.6" rx=".8" fill="#c9ccd0"/><rect x="137" y="186" width="5" height="1.6" rx=".8" fill="#c9ccd0"/></g>` +
       trim(o, x, y, w, h) + view(o, x, y, w, h) + sash(x, y, w, h, "h") + sill(o, 40, 134, 120) +
       `<g class="hda-bg"><path d="M128 120L130 134H140L142 120Z" fill="#b8643f"/><rect x="127" y="118" width="16" height="3" rx="1" fill="#c97750"/><g fill="url(#${u}-leaf)"><ellipse cx="132" cy="113" rx="4" ry="6" transform="rotate(-20 132 113)"/><ellipse cx="138" cy="112" rx="4" ry="6.5" transform="rotate(18 138 112)"/><ellipse cx="135" cy="109" rx="3.4" ry="6"/></g></g>` +
-      panel(44, 44 + lw, "sway") + panel(156 - lw, 156, "sway2") +
+      spans(o, 44, 156, lw).map((sp, i) => panel(sp[0], sp[1], i ? "sway2" : "sway")).join("") +
       `<rect x="44" y="${rod - 2}" width="112" height="2" rx="1" fill="url(#${u}-brass)"/>` +
       `<g${an(o, "soft")}><path d="${val}" fill="url(#${u}-ging)"/><g clip-path="url(#${u}-vc)">${vf}</g><path d="${val}" fill="none" stroke="#000" stroke-opacity=".15"/></g><clipPath id="${u}-vc"><path d="${val}"/></clipPath>`, tile);
-  });
+  }, { options: [OPENS] });
 
   add("shutters", "Plantation shutters", sw(PAINT), "Finish", (o) => {
     const g = G.shutters, { x, y, w, h } = g, u = o.uid, a = amt(o);
@@ -39336,18 +43198,19 @@ ${extra || ""}</defs>`;
 
   add("panels", "Sliding panels", sw(FAB, "#e7dfcf"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, x = 26, y = 26, w = 148, h = 150, top = 26, bot = 174;
-    let s = "";
-    for (let i = 0; i < 4; i++) {
-      const px = 22 + i * (38.7 - 34.7 * a), pw = 40;
-      s += `<rect x="${f1(px - 3)}" y="${top}" width="3" height="${bot - top}" fill="#000" opacity=".25"/>` +
+    const side = sideOf(o, "left");
+    const pane = (px, i, mir) => { const pw = 40, ex = mir ? px + pw : px - 3, hx = mir ? px + pw - 1 : px;
+      return `<rect x="${f1(ex)}" y="${top}" width="3" height="${bot - top}" fill="#000" opacity=".25"/>` +
         `<g${an(o, i % 2 ? "sway2" : "soft")}><rect x="${f1(px)}" y="${top}" width="${pw}" height="${bot - top}" fill="url(#${u}-fv)"/><rect x="${f1(px)}" y="${top}" width="${pw}" height="${bot - top}" fill="url(#${u}-wv)"/>` +
         `<rect x="${f1(px)}" y="${top}" width="${pw}" height="${bot - top}" fill="#000" opacity="${f2(.14 - i * .04)}"/>` +
         `<path d="M${f1(px + 9)} ${top}V${bot}M${f1(px + 23)} ${top}V${bot}M${f1(px + 31)} ${top}V${bot}" stroke="#fff" stroke-opacity=".08" stroke-width="1.2"/>` +
-        `<rect x="${f1(px)}" y="${bot - 3}" width="${pw}" height="3" fill="url(#${u}-dmetal)"/><rect x="${f1(px)}" y="${top}" width="1" height="${bot - top}" fill="#fff" opacity=".25"/></g>`;
-    }
+        `<rect x="${f1(px)}" y="${bot - 3}" width="${pw}" height="3" fill="url(#${u}-dmetal)"/><rect x="${f1(hx)}" y="${top}" width="1" height="${bot - top}" fill="#fff" opacity=".25"/></g>`; };
+    let s = "";
+    if (side === "center") for (let i = 0; i < 2; i++) { const px = 22 + i * (39 - 35 * a); s += pane(px, i, false) + pane(200 - px - 40, i, true); }
+    else for (let i = 0; i < 4; i++) { const px = 22 + i * (38.7 - 34.7 * a); s += side === "right" ? pane(200 - px - 40, i, true) : pane(px, i, false); }
     return svg(o, room(o, { wall: "#686260", x, y, w, h, floor: 182 }) + trim(o, x, y, w, h, 5, `url(#${u}-dmetal)`) + view(o, x, y, w, h) + sash(x, y, w, h, "v", "#3c3936") + s +
       `<rect x="18" y="18" width="164" height="8" rx="1.5" fill="url(#${u}-metal)"/><path d="M18 21H182M18 23.5H182" stroke="#000" stroke-opacity=".18" stroke-width=".5"/>`);
-  });
+  }, { options: [{ id: "opens", name: "Opens", values: [["left", "Left"], ["right", "Right"], ["center", "Center split"]] }] });
 
   add("arched", "Arched window", sw(FAB, "#f6f4ef"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, cx = 100, cy = 72, r = 46;
@@ -39390,11 +43253,6 @@ ${extra || ""}</defs>`;
       `<rect x="44" y="136" width="30" height="16" rx="6" fill="url(#${u}-cg)" transform="rotate(-6 59 144)"/><rect x="126" y="136" width="30" height="16" rx="6" fill="url(#${u}-cg)" transform="rotate(6 141 144)"/><path d="M50 140Q59 138 68 137M132 137Q141 138 150 140" stroke="#fff" stroke-opacity=".35" fill="none"/></g>`);
   });
 
-  // ---------- (parts) Multi-Function: position readings as value parts (0-100 %) ----------
-  // Blinds: Tilt (slats / vanes / zebra bands open) + Lift (raised; vertical blinds: drawn aside); shutters: Tilt only.
-  // Top-down/bottom-up: Top rail (lowered %) + Bottom rail (raised %). Dual layers: Sheer + Blackout (open %).
-  // o.mf: o.pval holds the ticked readings. A reading left out: tilt closed, lift down, rails home; in a dual layer the other
-  // layer stays out of the way (no sheer layer on the blackout roller, the drapes pulled aside). Device Images: today's look.
   const pc = (id, name, def) => ({ id, name, type: "value", unit: "%", min: 0, max: 100, def });
   const TILT = pc("tilt", "Tilt (open)", 50), LIFT = pc("lift", "Lift (raised)", 40);
   const SP = {
@@ -39419,8 +43277,7 @@ ${extra || ""}</defs>`;
   (window.HDA = window.HDA || []).push({
     id: "shades", tab: "Blinds & curtains", group: "Home", kind: "device",
     levelLabel: "Open", onWord: "Open", offWord: "Closed",
-    intro: "Twenty window coverings on a real window with a sunny yard behind it. The slider sets how far open (blinds and shutters tilt their slats, shades lift, drapes part); Closed shuts them. Open ones let daylight onto the wall, and fabric sways while the clouds drift.",
-    
+    intro: "Twenty window coverings on a real window with a sunny yard behind it. The slider sets how far open (blinds and shutters tilt their slats, shades lift, drapes part); Closed shuts them. The Slats (or Vanes) menu sets how far blinds can turn open, and Opens picks which way curtains draw. Open ones let daylight onto the wall, and fabric sways while the clouds drift.",
     css, icons,
   });
 })();
@@ -39697,7 +43554,7 @@ ${extra || ""}</defs>`;
 
     ic("pod", "Pod brewer", [BK, WH, RED, NAVY, SAGE, SS], (o) => { const V = CF(o), u = o.uid;
       return svg(o, room(o, "zel", "wood") + plug(o, 30, 96, [62, 158]) + sh(o, 104, 165, 52, 5) +
-        `<path d="${rr(140, 46, 18, 106, 6)}" fill="url(#${u}-glb)"/>${!o.mf ? `<path d="${rr(141, 70, 16, 81, 5)}" fill="url(#${u}-wt)"/>` : V.wl == null ? "" : `<path d="${rr(141, n1(151 - 100 * Math.max(.1, V.wl)), 16, n1(100 * Math.max(.1, V.wl)), 5)}" fill="url(#${u}-wt)"/>`}<path d="${rr(140, 46, 18, 106, 6)}" fill="none" stroke="#e8f6ff" stroke-opacity=".4"/>` + (V.B.on ? bubbles(V.B, [[146, 140, 1], [151, 130, 1.2], [148, 118, .9]]) : "") +
+        `<path d="${rr(140, 46, 18, 106, 6)}" fill="url(#${u}-glb)"/>${!o.mf ? `<path d="${rr(141, 70, 16, 81, 5)}" fill="url(#${u}-wt)"/>` : V.wl == null ? "" : `<path d="${rr(141, +n1(151 - 100 * Math.max(.1, V.wl)), 16, +n1(100 * Math.max(.1, V.wl)), 5)}" fill="url(#${u}-wt)"/>`}<path d="${rr(140, 46, 18, 106, 6)}" fill="none" stroke="#e8f6ff" stroke-opacity=".4"/>` + (V.B.on ? bubbles(V.B, [[146, 140, 1], [151, 130, 1.2], [148, 118, .9]]) : "") +
         face(o, rr(66, 30, 80, 132, 14), "c") + face(o, "M60 44Q60 28 76 28H138Q150 28 150 42V58H60Z") + groove("M60 58H150") +
         `<path d="${rr(86, 32, 40, 6, 3)}" fill="#000" fill-opacity=".22"/>` +
         face(o, rr(60, 58, 90, 24, 9)) + `<path d="M66 60H144" stroke="#fff" stroke-opacity=".35"/>` +
@@ -39941,6 +43798,321 @@ ${extra || ""}</defs>`;
 })();
 
 (function () {
+  const P = "hda-smoke-";
+  const H = () => window.HDAH;
+  const n1 = (v) => (+v).toFixed(1);
+  const GREEN = "#34d399", RED = "#ff5257", ORNG = "#ff9a4a", CYAN = "#7dd3fc", AMB = "#ffb547";
+  const CU = ["#4f2410", "#b8693a", "#ffd2ae"], PVC = ["#7f868e", "#e4e7ea", "#ffffff"], IRON = ["#08090b", "#34373d", "#8d939b"],
+    GALV = ["#4b5158", "#a9b0b7", "#eef1f3"], HOSE = ["#123d1a", "#2f8a3e", "#9be3a6"], BLKP = ["#050608", "#24272c", "#6f757d"];
+  const dur = (o, a, b) => n1(Math.max(.25, a - b * o.level));
+
+  function pal(c) {
+    const h = H(), x = h.hx(c), lt = (x[0] * .3 + x[1] * .59 + x[2] * .11) / 255 > .7;
+    return { l: h.shade(c, lt ? .6 : .38), m: c, d: h.shade(c, lt ? -.16 : -.32), k: h.shade(c, lt ? -.36 : -.58), lt };
+  }
+  const st = (a) => a.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] != null ? ` stop-opacity="${s[2]}"` : ""}/>`).join("");
+  const lg = (id, v, a) => `<linearGradient id="${id}" ${v ? 'x1="0" y1="0" x2="0" y2="1"' : 'x1="0" x2="1"'}>${st(a)}</linearGradient>`;
+  const rg = (id, a, at) => `<radialGradient id="${id}" ${at || ""}>${st(a)}</radialGradient>`;
+  const halo = (id, c) => rg(id, [[0, c, .85], [.45, c, .28], [1, c, 0]]);
+
+  function defs(o, extra) {
+    const u = o.uid, p = pal(o.color);
+    return `<defs>
+${lg(u + "-v", 1, [[0, p.l], [.5, p.m], [1, p.d]])}${lg(u + "-c", 0, [[0, p.k], [.2, p.m], [.4, p.l], [.62, p.m], [1, p.k]])}
+${lg(u + "-tp", 0, [[0, p.d], [.4, p.l], [1, p.d]])}${lg(u + "-sd", 0, [[0, p.d], [1, p.k]])}
+${lg(u + "-fx", 0, [[0, "#fff", .2], [.14, "#fff", 0], [.84, "#000", 0], [1, "#000", .3]])}
+<linearGradient id="${u}-g" x1="0" y1="0" x2="1" y2="1">${st([[0, "#fff", .5], [.42, "#fff", 0]])}</linearGradient>
+${lg(u + "-wall", 1, [[0, "#fff", .085], [1, "#fff", .035]])}${lg(u + "-flr", 1, [[0, "#a3a8ae", .34], [1, "#5d6369", .2]])}
+${lg(u + "-mt", 0, [[0, "#525960"], [.35, "#eef0f2"], [.6, "#b9bfc6"], [1, "#454b52"]])}${lg(u + "-mtv", 1, [[0, "#f2f4f6"], [.5, "#a2a9b1"], [1, "#545a61"]])}
+${lg(u + "-bs", 0, [[0, "#5e3f10"], [.35, "#f6d886"], [.6, "#c9973a"], [1, "#4e340c"]])}${lg(u + "-bsv", 1, [[0, "#f9e09a"], [.5, "#c18f34"], [1, "#5e3f10"]])}
+${lg(u + "-bk", 1, [[0, "#41464e"], [.5, "#1b1e23"], [1, "#08090c"]])}${lg(u + "-bkh", 0, [[0, "#08090c"], [.38, "#454a52"], [1, "#0b0d10"]])}
+${lg(u + "-lcd", 1, [[0, "#081014"], [1, "#16242b"]])}${lg(u + "-lcdg", 1, [[0, "#b9d7a3"], [1, "#8fb37c"]])}
+${lg(u + "-wt", 1, [[0, "#86d4f6", .8], [.3, "#3d8fd0", .85], [1, "#123f7a", .95]])}
+${lg(u + "-soil", 1, [[0, "#5b4431"], [1, "#2a1e14"]])}${lg(u + "-grass", 1, [[0, "#2f6a2a"], [1, "#48923c"]])}
+${lg(u + "-sky", 1, [[0, "#0d1a2e", 0], [1, "#3a5a7a", .35]])}${lg(u + "-hedge", 1, [[0, "#2e5a2a"], [1, "#16301a"]])}
+${lg(u + "-pvc", 0, [[0, "#80878f"], [.35, "#ffffff"], [.7, "#d9dde1"], [1, "#7a8189"]])}
+${rg(u + "-sh", [[0, "#000", .6], [1, "#000", 0]])}
+${halo(u + "-hg", GREEN)}${halo(u + "-hr", RED)}${halo(u + "-ho", ORNG)}${halo(u + "-hb", CYAN)}
+${rg(u + "-fl", [[0, "#f2fbff"], [.3, "#7ab8ff"], [.75, "#2a5cff", .85], [1, "#1b3fd6", 0]], 'cx=".5" cy=".85" r=".8"')}
+${rg(u + "-warm", [[0, "#ffb35c", .8], [.5, "#ff8a3c", .3], [1, "#ff7a2a", 0]])}
+${rg(u + "-dial", [[0, "#ffffff"], [.8, "#e9ecef"], [1, "#9aa1a9"]], 'cx=".4" cy=".35" r=".75"')}
+${rg(u + "-mist", [[0, "#dff4ff", .5], [1, "#dff4ff", 0]])}
+<pattern id="${u}-blk" width="40" height="20" patternUnits="userSpaceOnUse"><path d="M0 .5H40M0 10.5H40M.5 0V10.5M20.5 10.5V20" stroke="#000" stroke-opacity=".32" fill="none"/><path d="M0 1.5H40M0 11.5H40" stroke="#fff" stroke-opacity=".06" fill="none"/></pattern>
+<pattern id="${u}-brk" width="24" height="10" patternUnits="userSpaceOnUse"><rect width="24" height="10" fill="#9a4a32" fill-opacity=".55"/><rect x="1" y="1" width="22" height="3.6" fill="#b85d40" fill-opacity=".45"/><path d="M0 .5H24M0 5.5H24M.5 0V5.5M12.5 5.5V10" stroke="#d8cfc4" stroke-opacity=".45" fill="none"/></pattern>
+<pattern id="${u}-sid" width="40" height="11" patternUnits="userSpaceOnUse"><rect width="40" height="11" fill="#c9cfd4" fill-opacity=".16"/><path d="M0 10.5H40" stroke="#000" stroke-opacity=".35"/><path d="M0 9H40" stroke="#fff" stroke-opacity=".1" stroke-width="2"/></pattern>
+<pattern id="${u}-bld" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M1 9L2 3M4 9L5.5 1.5M7 9L6.5 4" stroke="#7fc56e" stroke-opacity=".5" stroke-width=".8" fill="none"/><path d="M2.5 9L3.5 5" stroke="#16361a" stroke-opacity=".6" stroke-width=".8"/></pattern>
+<pattern id="${u}-plt" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M2.5 0V5" stroke="#000" stroke-opacity=".18"/></pattern>
+${extra || ""}</defs>`;
+  }
+  const svg = (o, body, extra) => `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(o, `<clipPath id="${o.uid}-all"><rect width="200" height="200" rx="6"/></clipPath>` + (extra || ""))}<g clip-path="url(#${o.uid}-all)">${body}</g></svg>`;
+  const sh = (o, cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry || 5}" fill="url(#${o.uid}-sh)"/>`;
+  const rr = (x, y, w, h, r) => `M${n1(x + r)} ${n1(y)}H${n1(x + w - r)}A${r} ${r} 0 0 1 ${n1(x + w)} ${n1(y + r)}V${n1(y + h - r)}A${r} ${r} 0 0 1 ${n1(x + w - r)} ${n1(y + h)}H${n1(x + r)}A${r} ${r} 0 0 1 ${n1(x)} ${n1(y + h - r)}V${n1(y + r)}A${r} ${r} 0 0 1 ${n1(x + r)} ${n1(y)}Z`;
+  const hl = (x1, y1, x2, y2, w, op) => `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="#fff" stroke-opacity="${op || .4}" stroke-width="${w || 2}" stroke-linecap="round"/>`;
+
+  const tube = (d, w, c, cap) => `<path d="${d}" fill="none" stroke="${c[0]}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="${cap || "butt"}"/>` +
+    `<path d="${d}" fill="none" stroke="${c[1]}" stroke-width="${n1(w * .66)}" stroke-linejoin="round" stroke-linecap="${cap || "butt"}"/>` +
+    `<path d="${d}" fill="none" stroke="${c[2]}" stroke-opacity=".7" stroke-width="${n1(w * .2)}" stroke-linejoin="round" transform="translate(${n1(-w * .17)} ${n1(-w * .17)})"/>`;
+  const band = (x, y, w, h, c) => `<rect x="${n1(x - w / 2)}" y="${n1(y - h / 2)}" width="${w}" height="${h}" rx="1.2" fill="${c[1]}" stroke="${c[0]}" stroke-width=".8"/><rect x="${n1(x - w / 2 + 1)}" y="${n1(y - h / 2 + 1)}" width="${n1(w * .3)}" height="${n1(h - 2)}" rx=".8" fill="${c[2]}" opacity=".5"/>`;
+  const flow = (o, d, w, col, a, b) => o.on ? `<path class="${P}flow" d="${d}" fill="none" stroke="${col || "#bfeaff"}" stroke-opacity=".75" stroke-width="${w || 2.4}" stroke-linecap="round" stroke-dasharray="2.5 7" style="animation-duration:${dur(o, a || 1.2, b || .85)}s"/>` : "";
+  const led = (o, x, y, r, on, col, hid) => (on ? `<circle cx="${x}" cy="${y}" r="${r * 4.5}" fill="url(#${o.uid}-${hid})"/>` : "") +
+    `<circle cx="${x}" cy="${y}" r="${r}" fill="${on ? col : "#353a41"}"/><circle cx="${n1(x - r * .3)}" cy="${n1(y - r * .35)}" r="${n1(r * .4)}" fill="#fff" opacity="${on ? .8 : .3}"/>`;
+  const state = (o, x, y, r) => led(o, x, y, r, true, o.on ? GREEN : RED, o.on ? "hg" : "hr");
+  const screw = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r || 1.6}" fill="#8b929a"/><path d="M${n1(x - (r || 1.6) * .7)} ${y}H${n1(x + (r || 1.6) * .7)}" stroke="#3a3f46" stroke-width=".6"/>`;
+
+  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgecd", 7: "abc", 8: "abcdefg", 9: "abcdfg", "-": "g", " ": "" };
+  function digits(str, x, y, s, col, dim) {
+    const w = s * .52, t = Math.max(.7, s * .14); let out = "", X = x;
+    String(str).split("").forEach((ch) => {
+      if (ch === ".") { out += `<circle cx="${n1(X - t * .4)}" cy="${n1(y + s)}" r="${n1(t * .55)}" fill="${col}"/>`; X += t * .9; return; }
+      const sg = { a: [X + t * .6, y, X + w - t * .6, y], b: [X + w, y + t * .6, X + w, y + s / 2 - t * .5], c: [X + w, y + s / 2 + t * .5, X + w, y + s - t * .6],
+        d: [X + t * .6, y + s, X + w - t * .6, y + s], e: [X, y + s / 2 + t * .5, X, y + s - t * .6], f: [X, y + t * .6, X, y + s / 2 - t * .5], g: [X + t * .6, y + s / 2, X + w - t * .6, y + s / 2] };
+      const on = SEG[ch] || "";
+      for (const k in sg) { const q = sg[k], lit = on.indexOf(k) >= 0; if (!lit && !dim) continue;
+        out += `<path d="M${n1(q[0])} ${n1(q[1])}L${n1(q[2])} ${n1(q[3])}" stroke="${lit ? col : dim}" stroke-width="${n1(t)}" stroke-linecap="round"/>`; }
+      X += w + t * 2.2;
+    });
+    return out;
+  }
+  const lcd = (o, x, y, w, h, str, s, col) => `<path d="${rr(x, y, w, h, 2)}" fill="url(#${o.uid}-lcd)" stroke="#000" stroke-opacity=".5"/>` +
+    (o.on ? `<path d="${rr(x, y, w, h, 2)}" fill="${col}" fill-opacity=".08"/>` : "") +
+    digits(str, x + (w - str.replace(".", "").length * s * .82) / 2 + s * .1, y + (h - s) / 2, s, o.on ? col : "#2b3a40", o.on ? H().rgba(col, .1) : null) +
+    `<path d="M${x + 1.5} ${y + 1.5}H${x + w * .6}" stroke="#fff" stroke-opacity=".12"/>`;
+
+  const room = (o, fy, wall) => `<g class="hda-bg">${room0(o, fy, wall)}</g>`;
+  function room0(o, fy, wall) {
+    const u = o.uid;
+    let s = `<rect width="200" height="${fy}" fill="url(#${u}-wall)"/>`;
+    if (wall === "block") s += `<rect width="200" height="${fy}" fill="url(#${u}-blk)"/>`;
+    if (wall === "brick") s += `<rect width="200" height="${fy}" fill="url(#${u}-brk)"/>`;
+    if (wall === "siding") s += `<rect width="200" height="${fy}" fill="url(#${u}-sid)"/>`;
+    if (wall === "board") s += `<rect x="18" y="8" width="164" height="${fy - 28}" fill="#c9a77a" fill-opacity=".16" stroke="#000" stroke-opacity=".3"/>` + [20, 34, 52, 75, 96, 118, 136].map((y, i) => `<path d="M18 ${y}C60 ${y + (i % 2 ? 3 : -3)} 120 ${y + (i % 2 ? -2 : 3)} 182 ${y}" fill="none" stroke="#6a4a2a" stroke-opacity=".22" stroke-width=".8"/>`).join("") + [40, 80, 120, 160].map((x) => `<circle cx="${x}" cy="${fy / 2}" r=".9" fill="#000" fill-opacity=".4"/>`).join("");
+    if (wall === "grass") return s + `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-grass)"/><path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-bld)"/>`;
+    s += `<path d="M0 ${fy}H200V200H0Z" fill="url(#${u}-flr)"/><path d="M0 ${fy}H200" stroke="#000" stroke-opacity=".35"/><path d="M0 ${fy + 1}H200" stroke="#fff" stroke-opacity=".08"/>`;
+    [[30, .3], [72, .62], [128, .4], [164, .78], [100, .88], [14, .72]].forEach((p) => { s += `<circle cx="${p[0]}" cy="${n1(fy + (200 - fy) * p[1])}" r=".8" fill="#fff" fill-opacity=".14"/>`; });
+    return s;
+  }
+  const face = (o, d, g) => `<path d="${d}" fill="url(#${o.uid}-${g || "v"})"/><path d="${d}" fill="url(#${o.uid}-fx)"/><path d="${d}" fill="url(#${o.uid}-g)" opacity=".28"/>`;
+  function tank(o, x, y, w, b, g) {
+    const u = o.uid, r = w / 2, d = `M${x} ${y + 8}Q${x} ${y - 4} ${x + r} ${y - 5}Q${x + w} ${y - 4} ${x + w} ${y + 8}V${b - 4}Q${x + w} ${b} ${x + w - 4} ${b}H${x + 4}Q${x} ${b} ${x} ${b - 4}Z`;
+    return `<path d="${d}" fill="url(#${u}-${g || "c"})"/><path d="${d}" fill="url(#${u}-g)" opacity=".2"/>` +
+      `<path d="M${x} ${y + 8}Q${x + r} ${y + 13} ${x + w} ${y + 8}" fill="none" stroke="#000" stroke-opacity=".25"/>` +
+      `<path d="M${x + w * .3} ${y + 14}V${b - 8}" stroke="#fff" stroke-opacity=".22" stroke-width="${n1(w * .05)}" stroke-linecap="round"/>`;
+  }
+  function flames(o, cx, by, w, n) {
+    if (!o.on) return "";
+    const u = o.uid, s = .6 + .55 * o.level; let f = `<ellipse cx="${cx}" cy="${by - 3}" rx="${n1(w * .8)}" ry="${n1(9 * s)}" fill="url(#${u}-warm)" opacity=".55"/>`;
+    for (let i = 0; i < n; i++) {
+      const x = cx - w / 2 + (i + .5) * w / n, h = (i % 2 ? 7 : 10) * s;
+      f += `<path class="${P}flk" style="animation-delay:-${n1(i * .17)}s" d="M${n1(x - 2.6)} ${by}Q${n1(x - 2.4)} ${n1(by - h * .55)} ${n1(x)} ${n1(by - h)}Q${n1(x + 2.4)} ${n1(by - h * .55)} ${n1(x + 2.6)} ${by}Z" fill="url(#${u}-fl)"/>`;
+    }
+    return f;
+  }
+  function gauge(o, x, y, r, v) {
+    const a = (-130 + 260 * v) * Math.PI / 180, nx = x + Math.sin(a) * r * .72, ny = y - Math.cos(a) * r * .72;
+    let t = "";
+    for (let i = 0; i <= 8; i++) { const b = (-130 + 32.5 * i) * Math.PI / 180; t += `<path d="M${n1(x + Math.sin(b) * r * .62)} ${n1(y - Math.cos(b) * r * .62)}L${n1(x + Math.sin(b) * r * .8)} ${n1(y - Math.cos(b) * r * .8)}" stroke="#2a2f36" stroke-width=".6"/>`; }
+    return `<circle cx="${x}" cy="${y}" r="${r + 1.6}" fill="url(#${o.uid}-mtv)"/><circle cx="${x}" cy="${y}" r="${r}" fill="url(#${o.uid}-dial)"/>${t}` +
+      `<path d="M${x} ${y}L${n1(nx)} ${n1(ny)}" stroke="#d12f2f" stroke-width="1.1" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="1.3" fill="#222"/>` +
+      `<path d="M${n1(x - r * .7)} ${n1(y - r * .45)}A${r} ${r} 0 0 1 ${n1(x + r * .2)} ${n1(y - r * .85)}" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1"/>`;
+  }
+  const ballValve = (o, cx, cy, s) => { const u = o.uid; s = s || 1;
+    const hx = (x) => `<path d="M${n1(x - 5 * s)} ${n1(cy - 9 * s)}H${n1(x + 5 * s)}L${n1(x + 6 * s)} ${cy}L${n1(x + 5 * s)} ${n1(cy + 9 * s)}H${n1(x - 5 * s)}L${n1(x - 6 * s)} ${cy}Z" fill="url(#${u}-bsv)" stroke="#5e3f10" stroke-width=".7"/><path d="M${n1(x - 6 * s)} ${cy}H${n1(x + 6 * s)}" stroke="#5e3f10" stroke-opacity=".5" stroke-width=".6"/>`;
+    return hx(cx - 16 * s) + hx(cx + 16 * s) + `<path d="${rr(cx - 11 * s, cy - 11 * s, 22 * s, 22 * s, 7 * s)}" fill="url(#${u}-bsv)" stroke="#5e3f10" stroke-width=".7"/>` +
+      `<ellipse cx="${n1(cx - 3 * s)}" cy="${n1(cy - 5 * s)}" rx="${n1(5 * s)}" ry="${n1(2.5 * s)}" fill="#fff" opacity=".45"/>`; };
+
+  const css = `
+.hda-smoke-flow{stroke-dashoffset:0}
+.hda-anim .hda-smoke-flow{animation:hda-smoke-flow 1s linear infinite}
+@keyframes hda-smoke-flow{to{stroke-dashoffset:-18}}
+.hda-smoke-flk{transform-box:fill-box;transform-origin:50% 100%}
+.hda-anim .hda-smoke-flk{animation:hda-smoke-flk .5s ease-in-out infinite alternate}
+@keyframes hda-smoke-flk{0%{transform:scale(1,1)}50%{transform:scale(.9,.78)}100%{transform:scale(1.06,1.08)}}
+.hda-smoke-spin{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-smoke-spin{animation:hda-smoke-spin 1s linear infinite}
+@keyframes hda-smoke-spin{to{transform:rotate(360deg)}}
+.hda-anim .hda-smoke-blink{animation:hda-smoke-blink 1.2s steps(1,end) infinite}
+@keyframes hda-smoke-blink{0%,59%{opacity:1}60%,100%{opacity:.2}}
+.hda-smoke-chase{opacity:.18}
+.hda-anim .hda-smoke-chase{animation:hda-smoke-chase 4s linear infinite}
+@keyframes hda-smoke-chase{0%,100%{opacity:.18}6%{opacity:1}24%{opacity:1}30%{opacity:.18}}
+.hda-smoke-bub{opacity:0;transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-smoke-bub{animation:hda-smoke-bub 2s ease-in infinite}
+@keyframes hda-smoke-bub{0%{transform:translate(0,0);opacity:0}15%{opacity:.9}100%{transform:translate(0,-26px);opacity:0}}
+.hda-smoke-rip{transform-box:fill-box;transform-origin:center;opacity:0}
+.hda-anim .hda-smoke-rip{animation:hda-smoke-rip 2.2s ease-out infinite}
+@keyframes hda-smoke-rip{0%{transform:scale(.3);opacity:.8}100%{transform:scale(1.4);opacity:0}}
+.hda-smoke-mist{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-smoke-mist{animation:hda-smoke-mist 1.6s ease-in-out infinite}
+@keyframes hda-smoke-mist{50%{opacity:.45;transform:scale(1.08)}}
+.hda-smoke-heat{opacity:0}
+.hda-anim .hda-smoke-heat{animation:hda-smoke-heat 2.6s ease-out infinite}
+.hda-anim .hda-smoke-hum{animation:hda-smoke-hum .16s linear infinite}
+@keyframes hda-smoke-hum{0%,100%{transform:translate(0,0)}50%{transform:translate(.5px,-.3px)}}
+.hda-anim .hda-smoke-bob{animation:hda-smoke-bob 1.6s ease-in-out infinite}
+@keyframes hda-smoke-bob{50%{transform:translate(0,-2px)}}
+@keyframes hda-smoke-heat{0%{transform:translate(0,4px);opacity:0}35%{opacity:.6}100%{transform:translate(0,-16px);opacity:0}}
+.hda-smoke-heat.hda-smoke-still{opacity:.4}
+.hda-anim .hda-smoke-heat.hda-smoke-still{opacity:0}
+`;
+  const heat = (o, xs, y, col) => o.on ? xs.map((x, i) => `<path class="${P}heat${o.anim ? "" : " " + P + "still"}" style="animation-delay:-${n1(i * .8)}s" d="M${x} ${y}q-3 -5 0 -10t0 -10" fill="none" stroke="${col || "#ffc58a"}" stroke-width="1.3" stroke-linecap="round"/>`).join("") : "";
+  const bubbles = (o, pts, col) => o.on ? pts.map((p, i) => `<circle class="${P}bub" style="animation-delay:-${n1(i * .45)}s;animation-duration:${dur(o, 2.6, 1.4)}s" cx="${p[0]}" cy="${p[1]}" r="${p[2] || 1.3}" fill="none" stroke="${col || "#e6f7ff"}" stroke-width=".7"/>`).join("") : "";
+
+  const css2 = css + `
+.hda-smoke-puff{opacity:0;transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-smoke-puff{animation:hda-smoke-puff 4s ease-out infinite}
+@keyframes hda-smoke-puff{0%{transform:translate(0,20px) scale(.5);opacity:0}30%{opacity:.75}100%{transform:translate(6px,-30px) scale(1.6);opacity:0}}
+.hda-smoke-puff.hda-smoke-still{opacity:.45}
+.hda-anim .hda-smoke-puff.hda-smoke-still{opacity:0}
+.hda-smoke-wave{opacity:.7}
+.hda-anim .hda-smoke-wave{animation:hda-smoke-wave 1s ease-out infinite}
+@keyframes hda-smoke-wave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+.hda-anim .hda-smoke-strobe{animation:hda-smoke-strobe .6s steps(1,end) infinite}
+@keyframes hda-smoke-strobe{0%,49%{opacity:1}50%,100%{opacity:.05}}
+.hda-anim .hda-smoke-slow{animation:hda-smoke-strobe 2s steps(1,end) infinite}
+`;
+  const BG = (s) => `<g class="hda-bg">${s}</g>`;
+  const WH = "#f0f0ec", AL = "#e8dfc8", GY = "#c9ced4";
+  const TYPE = (list) => ({ id: "atype", name: "Alarm type", values: list.map((k) => [k, { smoke: "Smoke", co: "CO", heat: "Heat" }[k]]) });
+  const MODE = { id: "mode", name: "Mode", values: [["normal", "Normal"], ["test", "Test"], ["hush", "Hush"]] };
+
+  function sextra(o) {
+    const u = o.uid;
+    return lg(u + "-ceil", 1, [[0, "#fff", .1], [1, "#fff", .04]]) + rg(u + "-strb", [[0, "#ff4a4a", .7], [.5, "#ff2a2a", .25], [1, "#ff2a2a", 0]]) +
+      rg(u + "-co", [[0, "#d9e05a", .45], [1, "#d9e05a", 0]]) + rg(u + "-smk", [[0, "#cfd4d9", .8], [.6, "#aab0b6", .35], [1, "#9aa0a6", 0]]) +
+      rg(u + "-disc", [[0, "#fff", .5], [.7, "#fff", 0], [1, "#000", .25]], 'cx=".38" cy=".32" r=".8"') + rg(u + "-glow", [[0, "#ffe2a0", .7], [1, "#ffe2a0", 0]]) +
+      `<pattern id="${u}-pop" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".7" fill="#fff" fill-opacity=".1"/><circle cx="6" cy="5" r=".6" fill="#000" fill-opacity=".12"/></pattern>` +
+      `<pattern id="${u}-grill" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".9" fill="#000" fill-opacity=".35"/></pattern>`;
+  }
+  const svgS = (o, body) => svg(o, body, sextra(o));
+  const ceiling = (o) => BG(`<rect width="200" height="200" fill="url(#${o.uid}-ceil)"/><rect width="200" height="200" fill="url(#${o.uid}-pop)"/>`);
+  const wall = (o, fy) => BG(`<rect width="200" height="${fy}" fill="url(#${o.uid}-wall)"/><rect y="${fy - 10}" width="200" height="10" fill="#f2f0ea" opacity=".7"/><path d="M0 ${fy}H200V200H0Z" fill="url(#${o.uid}-flr)"/>`);
+  const mode = (o) => (o.opt && o.opt.mode) || "normal";
+  const atype = (o, d) => (o.opt && o.opt.atype) || d;
+
+  function effects(o, cx, cy, r, kind) {
+    const m = mode(o), alarm = o.on && m !== "hush";
+    let s = "";
+    if (alarm) {
+      s += `<circle class="${P}strobe" cx="${cx}" cy="${cy}" r="${r * 2}" fill="url(#${o.uid}-strb)"/>` +
+        [0, 1, 2].map((i) => [-1, 1].map((k) => `<path class="${P}wave" style="animation-delay:${n1(i * .2)}s" d="M${n1(cx + k * (r + 8 + i * 8))} ${n1(cy - 10 - i * 4)}q${n1(k * 6)} ${n1(10 + i * 4)} 0 ${n1(20 + i * 8)}" fill="none" stroke="#ff6a6a" stroke-width="1.8" stroke-linecap="round"/>`).join("")).join("");
+      if (kind === "co") s += `<ellipse cx="${cx}" cy="${cy + r + 40}" rx="80" ry="34" fill="url(#${o.uid}-co)"/>` + [0, 1, 2].map((i) => `<circle class="${P}puff${o.anim ? "" : " " + P + "still"}" style="animation-delay:-${n1(i * 1.3)}s" cx="${cx - 30 + i * 30}" cy="${cy + r + 44}" r="16" fill="url(#${o.uid}-co)"/>`).join("") +
+        `<text x="0" y="0" font-size="0"></text>`;
+      else if (kind === "heat") s += heat(o, [cx - 30, cx - 10, cx + 10, cx + 30], cy + r + 50, "#ff9a4a") + `<ellipse cx="${cx}" cy="${cy + r + 52}" rx="60" ry="16" fill="#ff7a2a" opacity=".12"/>`;
+      else s += [0, 1, 2, 3].map((i) => `<circle class="${P}puff${o.anim ? "" : " " + P + "still"}" style="animation-delay:-${n1(i * 1)}s" cx="${cx - 36 + i * 24}" cy="${cy + r + 40}" r="${14 + (i % 2) * 4}" fill="url(#${o.uid}-smk)"/>`).join("");
+    }
+    return s.replace(`<text x="0" y="0" font-size="0"></text>`, "");
+  }
+  function lights(o, x, y, gap) {
+    const m = mode(o), alarm = o.on && m !== "hush", test = m === "test";
+    const g = test ? `<g class="${P}strobe">${led(o, x, y, 1.6, true, GREEN, "hg")}</g>` : led(o, x, y, 1.6, !alarm, GREEN, "hg");
+    const r = alarm || test ? `<g class="${P}strobe">${led(o, x + gap, y, 1.6, true, RED, "hr")}</g>` : led(o, x + gap, y, 1.6, false);
+    const a = m === "hush" || test ? `<g class="${test ? P + "strobe" : P + "slow"}">${led(o, x + 2 * gap, y, 1.6, true, AMB, "ho")}</g>` : led(o, x + 2 * gap, y, 1.6, false);
+    return g + r + a;
+  }
+  function battery(o, x, y) {
+    const lv = o.level, col = lv < .2 ? RED : lv < .4 ? AMB : "#7ee08a";
+    return `<path d="${rr(x, y, 18, 9, 2)}" fill="#0a0d10" stroke="#e9ecef" stroke-width="1"/><rect x="${x + 18}" y="${y + 3}" width="2" height="3" fill="#e9ecef"/><rect x="${x + 2}" y="${y + 2}" width="${n1(Math.max(.6, 14 * lv))}" height="5" rx="1" fill="${col}"/>`;
+  }
+  function disc(o, cx, cy, r, sp) {
+    const u = o.uid; sp = sp || {};
+    let s = sh(o, cx + 3, cy + r * .9, r * .95, r * .2) + `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${u}-v)"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${u}-disc)"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#000" stroke-opacity=".18"/>`;
+    if (sp.slots) for (let i = 0; i < sp.slots; i++) { const a = i * 360 / sp.slots; s += `<path d="M${cx} ${n1(cy - r * .92)}V${n1(cy - r * .72)}" stroke="#000" stroke-opacity=".28" stroke-width="2.4" stroke-linecap="round" transform="rotate(${a} ${cx} ${cy})"/>`; }
+    if (sp.ring) s += `<circle cx="${cx}" cy="${cy}" r="${n1(r * sp.ring)}" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="1.2"/>`;
+    if (sp.grill) s += `<circle cx="${cx}" cy="${cy}" r="${n1(r * sp.grill)}" fill="url(#${u}-grill)"/>`;
+    if (sp.btn) s += `<circle cx="${cx}" cy="${cy}" r="${n1(r * sp.btn)}" fill="url(#${u}-v)"/><circle cx="${cx}" cy="${cy}" r="${n1(r * sp.btn)}" fill="url(#${u}-disc)"/><circle cx="${cx}" cy="${cy}" r="${n1(r * sp.btn)}" fill="none" stroke="#000" stroke-opacity=".25"/>`;
+    return s;
+  }
+  const ic = (id, name, kinds, render) => Object.assign({ id, name, colors: [WH, AL, GY], picker: true, colorLabel: "Body", render }, { options: (kinds.length > 1 ? [TYPE(kinds)] : []).concat([MODE]) });
+
+  const SENS = [["combo", "Smoke + CO"], ["smoke", "Smoke"], ["co", "CO"], ["heat", "Heat"]];
+  const lead = (v, list) => list.filter((x) => x[0] === v).concat(list.filter((x) => x[0] !== v));
+  const EVT = { id: "atype", name: "Alarm type", values: [["smoke", "Smoke"], ["co", "CO"]], when: { opt: "sensor", is: "combo" } };
+  const evKind = (o, d) => { const sn = (o.opt && o.opt.sensor) || d; return sn === "combo" ? atype(o, "smoke") : sn; };
+  const ic2 = (id, name, options, render) => ({ id, name, render });
+
+  const looks = [
+    ic2("roundfamily", "Round smoke & CO alarm", [{ id: "power", name: "Power", values: [["hardwired", "Hardwired"], ["battery", "Battery"]] }, { id: "sensor", name: "Sensor", values: SENS }, EVT,
+      { id: "voice", name: "Voice", values: [["no", "No"], ["yes", "Yes"]] }], (o) => { const u = o.uid, op = o.opt || {}, hw = (op.power || "hardwired") === "hardwired", sn = op.sensor || "combo", voice = op.voice === "yes", k = evKind(o, "combo");
+      let s = ceiling(o) + effects(o, 100, 80, 46, k) + (hw ? `<circle cx="100" cy="80" r="52" fill="url(#${u}-v)" opacity=".7"/><circle cx="100" cy="80" r="52" fill="none" stroke="#000" stroke-opacity=".2"/>` : "") +
+        disc(o, 100, 80, 46, { slots: hw ? 24 : 16, ring: .66 });
+      if (sn === "heat") s += `<circle cx="100" cy="80" r="20" fill="url(#${u}-v)" stroke="#000" stroke-opacity=".2"/>` + [0, 45, 90, 135].map((a) => `<path d="M100 62V98" stroke="#000" stroke-opacity=".15" stroke-width="2" transform="rotate(${a} 100 80)"/>`).join("") + `<circle cx="100" cy="80" r="5" fill="#2a2e34"/>`;
+      else s += `<circle cx="100" cy="80" r="17" fill="url(#${u}-v)"/><circle cx="100" cy="80" r="17" fill="url(#${u}-disc)"/><circle cx="100" cy="80" r="17" fill="none" stroke="#000" stroke-opacity=".25"/>`;
+      if (voice) s += `<circle cx="80" cy="66" r="7" fill="url(#${u}-grill)"/>`;
+      if (sn === "co" || sn === "combo") s += `<path d="${rr(114, 60, 14, 6, 2)}" fill="#000" opacity=".22"/>`;
+      if (hw) s += `<path d="M96 132h8" stroke="#e8c84a" stroke-width="2"/>`;
+      return svgS(o, s + lights(o, 86, 108, 14) + battery(o, 168, 172)); }),
+
+    ic2("sealed10", "10-year sealed alarm", [{ id: "sensor", name: "Sensor", values: SENS.slice(0, 2) }, EVT], (o) => svgS(o, ceiling(o) + effects(o, 100, 80, 44, evKind(o, "combo")) + disc(o, 100, 80, 44, { slots: 30, ring: .5 }) +
+      `<circle cx="100" cy="80" r="16" fill="#000" opacity=".12"/><circle cx="100" cy="80" r="13" fill="url(#${o.uid}-v)"/>` + lights(o, 86, 102, 14) + `<path d="M84 60h32" stroke="#e8c84a" stroke-width="2.4" opacity=".7"/>` + battery(o, 168, 172))),
+
+    ic2("photohush", "Photoelectric with hush", [], (o) => { const u = o.uid, hush = mode(o) === "hush";
+      return svgS(o, ceiling(o) + effects(o, 100, 80, 46, "smoke") + disc(o, 100, 80, 46, { slots: 12 }) +
+        `<path d="${rr(78, 66, 44, 26, 13)}" fill="${hush ? AMB : "url(#" + u + "-v)"}" opacity="${hush ? .85 : 1}"/><path d="${rr(78, 66, 44, 26, 13)}" fill="none" stroke="#000" stroke-opacity=".25"/><path d="M88 79h24" stroke="#000" stroke-opacity=".2" stroke-width="2"/>` + lights(o, 86, 104, 14) + battery(o, 168, 172)); }),
+
+    ic2("linked", "Linked alarm & base", [{ id: "sensor", name: "Sensor", values: SENS.slice(0, 3) }, EVT], (o) => { const u = o.uid;
+      return svgS(o, wall(o, 150) + effects(o, 70, 60, 38, evKind(o, "combo")) + disc(o, 70, 60, 38, { slots: 20, btn: .32 }) + lights(o, 58, 84, 12) +
+        `<path d="${rr(130, 104, 44, 44, 12)}" fill="url(#${u}-v)"/><path d="${rr(130, 104, 44, 44, 12)}" fill="url(#${u}-fx)"/><circle cx="152" cy="126" r="12" fill="none" stroke="${o.on && mode(o) !== "hush" ? RED : GREEN}" stroke-width="2.4"${o.on ? ` class="${P}strobe"` : ""}/><circle cx="152" cy="126" r="4" fill="#d9dde2"/>` +
+        (o.on ? `<path class="${P}wave" d="M180 120q6 8 0 16M186 116q10 12 0 24" fill="none" stroke="#ff6a6a" stroke-width="1.4"/>` : "") + `<path d="M110 76q14 18 20 34" fill="none" stroke="#7dd3fc" stroke-width="1" stroke-dasharray="2 3"/>` + battery(o, 168, 172)); }),
+
+    ic2("squarewl", "Square wireless alarm", [{ id: "sensor", name: "Sensor", values: SENS.slice(0, 2) }, EVT], (o) => { const u = o.uid;
+      return svgS(o, ceiling(o) + effects(o, 100, 80, 44, evKind(o, "combo")) + sh(o, 104, 122, 40, 6) + `<path d="${rr(56, 36, 88, 88, 22)}" fill="url(#${u}-v)"/><path d="${rr(56, 36, 88, 88, 22)}" fill="url(#${u}-disc)"/>` +
+        `<path d="${rr(66, 46, 68, 68, 16)}" fill="none" stroke="#000" stroke-opacity=".18"/>` + [0, 1, 2, 3, 4].map((i) => `<path d="M76 ${58 + i * 8}H124" stroke="#000" stroke-opacity=".18" stroke-width="2.4" stroke-linecap="round"/>`).join("") + lights(o, 86, 106, 14) + battery(o, 168, 172)); }),
+
+    ic2("zwavepair", "Z-Wave smoke & CO", [{ id: "atype", name: "Alarm type", values: [["smoke", "Smoke"], ["co", "CO"]] }], (o) => { const k = atype(o, "smoke"), oS = Object.assign({}, o, { on: o.on && k === "smoke" }), oC = Object.assign({}, o, { on: o.on && k === "co" });
+      return svgS(o, ceiling(o) + effects(oS, 60, 70, 32, "smoke") + effects(oC, 140, 110, 30, "co") + disc(o, 60, 70, 32, { slots: 16, btn: .3 }) + lights(oS, 48, 90, 12) +
+        disc(o, 140, 110, 30, { ring: .78, grill: .45 }) + `<rect x="128" y="88" width="24" height="5" rx="2" fill="#000" opacity=".2"/>` + lights(oC, 128, 128, 12) + battery(o, 168, 172)); }),
+
+    ic2("coppm", "Digital CO alarm", [{ id: "power", name: "Mount", values: [["wall", "Wall (battery)"], ["plug", "Plug-in"]] }], (o) => { const u = o.uid, plug = (o.opt && o.opt.power) === "plug", alarm = o.on && mode(o) !== "hush";
+      let s = wall(o, plug ? 170 : 160);
+      if (plug) s += BG(`<path d="${rr(78, 70, 44, 66, 4)}" fill="#f2f2ee"/><path d="${rr(84, 104, 32, 26, 3)}" fill="#e6e6e0"/>`) + effects(o, 100, 70, 34, "co") + sh(o, 102, 108, 28, 4) +
+        `<path d="${rr(76, 40, 48, 64, 10)}" fill="url(#${u}-v)"/><path d="${rr(76, 40, 48, 64, 10)}" fill="url(#${u}-fx)"/><path d="${rr(82, 48, 36, 18, 2)}" fill="#c9d4b4"/>` +
+        digits(o.on ? "85" : "0", 92, 52, 10, alarm ? "#7a1a1a" : "#1c2b16") + `<path d="M86 74h28M86 78h28M86 82h28" stroke="#000" stroke-opacity=".2" stroke-width="2"/>` + lights(o, 86, 94, 14);
+      else s += effects(o, 100, 86, 40, "co") + sh(o, 102, 126, 66, 5) + `<path d="${rr(36, 52, 128, 70, 12)}" fill="url(#${u}-v)"/><path d="${rr(36, 52, 128, 70, 12)}" fill="url(#${u}-fx)"/>` +
+        [0, 1, 2, 3, 4].map((i) => `<path d="M46 ${64 + i * 9}H62M138 ${64 + i * 9}H154" stroke="#000" stroke-opacity=".25" stroke-width="2.4" stroke-linecap="round"/>`).join("") +
+        `<path d="${rr(72, 60, 56, 30, 3)}" fill="#c9d4b4"/>` + digits(o.on ? "185" : "0", 82, 66, 16, alarm ? "#7a1a1a" : "#1c2b16", "rgba(0,0,0,.06)") +
+        `<path d="${rr(78, 98, 18, 8, 3)}" fill="url(#${u}-v)" stroke="#000" stroke-opacity=".25"/><path d="${rr(104, 98, 18, 8, 3)}" fill="url(#${u}-v)" stroke="#000" stroke-opacity=".25"/>` + lights(o, 86, 114, 14);
+      return svgS(o, s + battery(o, 168, 172)); }),
+
+    ic2("nightring", "Night-light alarm", [{ id: "sensor", name: "Sensor", values: SENS.slice(0, 2) }, EVT], (o) => { const u = o.uid, m = mode(o), col = o.on && m !== "hush" ? RED : m === "hush" ? AMB : m === "test" ? CYAN : "#ffe2a0";
+      return svgS(o, ceiling(o) + effects(o, 100, 80, 46, evKind(o, "combo")) + disc(o, 100, 80, 46, { grill: .5 }) +
+        `<circle cx="100" cy="80" r="38" fill="none" stroke="${col}" stroke-width="4"${o.on || m !== "normal" ? ` class="${P}strobe"` : ""} opacity="${o.on || m !== "normal" ? 1 : .7}"/>` + (o.on || m !== "normal" ? "" : `<circle cx="100" cy="80" r="60" fill="url(#${u}-glow)" opacity=".5"/>`) +
+        `<circle cx="100" cy="80" r="12" fill="url(#${u}-v)" stroke="#000" stroke-opacity=".2"/>` + battery(o, 168, 172)); }),
+  ];
+
+
+  const R = {}; looks.forEach((l) => { R[l.id] = l.render; });
+  const ALL = looks.map((l) => l.id);
+  const is = (list) => ({ opt: "style", is: list });
+  const options = [
+    { id: "style", name: "Style", values: looks.map((l) => [l.id, l.name]) },
+    { id: "power", name: "Power", values: [["hardwired", "Hardwired"], ["battery", "Battery"]], when: is("roundfamily") },
+    { id: "sensor", name: "Sensor", values: SENS, when: is("roundfamily") },
+    { id: "sensor3", name: "Sensor", values: SENS.slice(0, 3), when: is("linked") },
+    { id: "sensor2", name: "Sensor", values: SENS.slice(0, 2), when: is(["sealed10", "squarewl", "nightring"]) },
+    { id: "atype", name: "Alarm type", values: [["smoke", "Smoke"], ["co", "CO"]], when: is(["roundfamily", "sealed10", "linked", "squarewl", "zwavepair", "nightring"]) },
+    { id: "voice", name: "Voice", values: [["no", "No"], ["yes", "Yes"]], when: is("roundfamily") },
+    MODE,
+    { id: "mount", name: "Mount", values: [["wall", "Wall (battery)"], ["plug", "Plug-in"]], when: is("coppm") },
+  ];
+  function oldOpt(op) {
+    const k = op.style || "roundfamily", m = { mode: op.mode || "normal", atype: op.atype || "smoke" };
+    if (k === "roundfamily") Object.assign(m, { power: op.power || "hardwired", sensor: op.sensor || "combo", voice: op.voice || "no" });
+    else if (k === "linked") m.sensor = op.sensor3 || "combo";
+    else if (k === "sealed10" || k === "squarewl" || k === "nightring") m.sensor = op.sensor2 || "combo";
+    else if (k === "coppm") m.power = op.mount === "plug" ? "plug" : "wall";
+    return m;
+  }
+  const icons = [{ id: "alarm", name: "Smoke & CO alarm", colors: [WH, AL, GY], picker: true, colorLabel: "Body", options,
+    render(o) { const op = o.opt || {}, k = R[op.style] ? op.style : ALL[0]; return R[k](Object.assign({}, o, { opt: oldOpt(op) })); } }];
+
+  (window.HDA = window.HDA || []).push({
+    id: "smoke", tab: "Smoke & CO alarms", group: "Security", kind: "device", onWord: "Alarm", offWord: "Normal", levelLabel: "Battery",
+    intro: "One smoke & CO alarm builder: pick the Style (eight looks), then only the menus that style has: Power, Sensor (smoke + CO, smoke, CO, heat), Alarm type (which alarm a smoke + CO unit is sounding), Voice, Mode (Normal, Test, Hush) and Mount, then the body color. Alarm = flashing red strobe, sound waves and smoke (or a CO cloud, or heat). Normal = a green pilot light; Test flashes every light; Hush shows the amber light. The slider is the battery.",
+    css: css2, icons,
+  });
+})();
+
+(function () {
   const P = "hda-speakers-";
   const H = window.HDAH;
   const f = (n) => (+n).toFixed(1);
@@ -40033,13 +44205,6 @@ ${digits("10:08", X + W * .07, Y + Hh * .64, Hh * .22, "#ffffff")}
   const led = (x, cx, cy, col, cls) => x.on ? `<circle cx="${cx}" cy="${cy}" r="5" fill="${col}" opacity=".25"/><circle class="${cls || ""}" cx="${cx}" cy="${cy}" r="1.8" fill="${col}"/>` : `<circle cx="${cx}" cy="${cy}" r="1.4" fill="#000" opacity=".25"/>`;
   const base = (o) => Object.assign({ picker: true, colorLabel: "Color" }, o);
 
-  // ---------- (parts) Multi-Function: the two thermostats and the smoke & CO alarm ----------
-  // Thermostats: o.pval.mode (off / heat / cool / auto / eco), state (idle / heating / cooling / fan), fan (auto / on /
-  // circulate) as stages, temp (room) and sp (setpoint) as readings. As a Multi-Function Image the display stays awake:
-  // the setpoint big (OFF when off), the room temperature small under it, a mark for what it does (flame, snowflake, leaf,
-  // fan) and, on the round one, the ring arc from the room temperature to the setpoint in the running color.
-  // Alarm: o.pval.smoke and o.pval.co (clear / detected / tested): smoke blinks the ring red, CO amber, a test blue;
-  // all clear leaves the ring dark. Without readings (a Device Image) both are drawn as before.
   const TMODE = { id: "mode", name: "Mode", type: "stage", values: [["off", "Off"], ["heat", "Heat"], ["cool", "Cool"], ["auto", "Auto"], ["eco", "Eco"]], def: "heat" };
   const TPARTS = [TMODE,
     { id: "state", name: "Operating state", type: "stage", values: [["idle", "Idle"], ["heating", "Heating"], ["cooling", "Cooling"], ["fan", "Fan only"]], def: "heating" },
@@ -40049,7 +44214,6 @@ ${digits("10:08", X + W * .07, Y + Hh * .64, Hh * .22, "#ffffff")}
     { id: "co", name: "Carbon monoxide", type: "stage", values: [["clear", "Clear"], ["detected", "CO detected"], ["tested", "Test"]], def: "clear" }];
   const pvs = (o, ks) => { const v = o.pval || {}, r = {}; let any = false; ks.forEach((k) => { if (v[k] != null && v[k] !== "") { r[k] = String(v[k]).toLowerCase(); any = true; } }); return any ? r : null; };
   const TCOL = { heat: "#ff8a2a", cool: "#3c9cff", fan: "#3fcf9a", eco: "#5fc46e", idle: "#9aa0a8" };
-  // what the thermostat says: { main (string), room (string or null), run: heat / cool / fan / null, mark: heat / cool / eco / fan / null }
   function tRead(v) {
     const num = (k) => (v[k] != null && isFinite(+v[k]) ? Math.round(+v[k]) : null), sp = num("sp"), tp = num("temp"), m = v.mode || null, s = v.state || null;
     const run = s === "heating" ? "heat" : s === "cooling" ? "cool" : s === "fan" ? "fan" : null;
@@ -40089,15 +44253,93 @@ ${digits("10:08", X + W * .07, Y + Hh * .64, Hh * .22, "#ffffff")}
     return `<circle cx="100" cy="100" r="40" fill="#fff" opacity=".7"/>` + (R.run ? `<circle class="${P}breath" cx="100" cy="100" r="40" fill="${col}" opacity=".08"/>` : "") +
       dC(R.main, 100, 98 - h / 2, h, col) + (R.mark ? tMark(R.mark, 100, 74, 4, col) : "") + (R.room ? dC(R.room, 100, 117, 8.5, "#7d838b") : "");
   }
-  // the alarm ring: smoke red, CO amber, test blue (blinking); all clear dark
   function alarmRing(x, v) {
     const sm = v.smoke, cm = v.co, det = (s) => s === "detected", col = det(sm) ? "#ff3b30" : det(cm) ? "#ffa31a" : sm === "tested" || cm === "tested" ? "#3c8dff" : null;
     if (!col) return `<circle cx="100" cy="92" r="20" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="2"/>`;
     const cls = det(sm) || det(cm) ? "blink" : "breath";
     return `<g class="${P}${cls}"><circle cx="100" cy="92" r="46" fill="${col}" opacity=".12"/><circle cx="100" cy="92" r="20" fill="none" stroke="${col}" stroke-width="3.4" opacity=".95"/><circle cx="100" cy="92" r="26" fill="none" stroke="${col}" stroke-width="6" opacity=".25"/></g>`;
   }
+  function lockMark(ls, cx, cy, s) {
+    const AMB = "#ffb020", JAM = "#ff3b30";
+    if (ls === "jammed") return `<g class="${P}jblink"><path d="M${f(cx)} ${f(cy - s * .48)}L${f(cx + s * .52)} ${f(cy + s * .42)}H${f(cx - s * .52)}Z" fill="${JAM}" stroke="${JAM}" stroke-width="${f(s * .1)}" stroke-linejoin="round"/></g>` +
+      `<path d="M${f(cx)} ${f(cy - s * .16)}V${f(cy + s * .1)}" stroke="#fff" stroke-width="${f(s * .11)}" stroke-linecap="round"/><circle cx="${f(cx)}" cy="${f(cy + s * .26)}" r="${f(s * .065)}" fill="#fff"/>` +
+      `<circle cx="26" cy="26" r="11" fill="#000" fill-opacity=".45" transform="translate(1 1.6)"/><circle cx="26" cy="26" r="11" fill="#1c1416"/><circle cx="26" cy="26" r="10.3" fill="none" stroke="${JAM}" stroke-width="1.3"/>` +
+      `<path d="M26 19.2L32.4 30.6H19.6Z" fill="${AMB}" stroke="${AMB}" stroke-width="1.2" stroke-linejoin="round"/><path d="M26 23.2V27" stroke="#1c1416" stroke-width="1.6" stroke-linecap="round"/><circle cx="26" cy="29" r=".95" fill="#1c1416"/>`;
+    if (ls !== "locking" && ls !== "unlocking") return "";
+    const r = s * .36, cw = ls === "locking", a0 = -Math.PI / 2 + (cw ? .5 : -.5), a1 = a0 + (cw ? 1 : -1) * Math.PI * 1.45;
+    const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx = -Math.sin(a1) * (cw ? 1 : -1), ty = Math.cos(a1) * (cw ? 1 : -1), hs = s * .2;
+    return `<g class="${P}${cw ? "spin" : "spinr"}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * .5)}" fill="none"/><path d="M${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))}A${f(r)} ${f(r)} 0 1 ${cw ? 1 : 0} ${f(ex)} ${f(ey)}" fill="none" stroke="${AMB}" stroke-width="${f(s * .11)}" stroke-linecap="round"/>` +
+      `<path d="M${f(ex + tx * hs)} ${f(ey + ty * hs)}L${f(ex - ty * hs * .9)} ${f(ey + tx * hs * .9)}L${f(ex + ty * hs * .9)} ${f(ey - tx * hs * .9)}Z" fill="${AMB}"/></g>`;
+  }
   const first = (c, l) => [c].concat(l.filter((k) => k !== c));
 
+  const CK = (() => {
+    const g = (n) => (+n).toFixed(1);
+    const STATE = { id: "state", name: "State", values: [["auto", "From on/off"], ["live", "Live"], ["rec", "Recording"], ["motion", "Motion"], ["privacy", "Privacy"], ["offline", "Offline"]] };
+    const BELL = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+    const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] };
+    const IRA = { id: "ir", name: "Night IR", values: [["auto", "Auto"], ["off", "Off"], ["on", "On"]] };
+    const PAN = { id: "pan", name: "Pan", values: [["center", "Center"], ["left", "Left"], ["right", "Right"]] };
+    const cam = (o) => { const s = (o.opt || {}).state || "auto"; return s === "auto" ? (o.on ? "on" : "off") : s; };
+    const bell = (o) => o.on ? ((o.opt || {}).state || "ring") : "idle";
+    const active = (s) => s === "on" || s === "live" || s === "rec" || s === "motion";
+    const COL = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940", privacy: "#c9ced6", offline: "#8a8f98" };
+    const LED = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940" };
+    function badge(s, bx, by) {
+      const c = COL[s]; if (!c) return "";
+      bx = bx == null ? 28 : bx; by = by == null ? 28 : by;
+      let gl = "";
+      if (s === "rec") gl = `<circle cx="${bx}" cy="${by}" r="7" fill="${c}" opacity=".22"/><g class="${P}ckblink"><circle cx="${bx}" cy="${by}" r="4.4" fill="${c}"/><circle cx="${g(bx - 1.4)}" cy="${g(by - 1.4)}" r="1.3" fill="#fff" fill-opacity=".6"/></g>`;
+      else if (s === "live") gl = `<circle cx="${bx}" cy="${by}" r="2.3" fill="${c}"/><path d="M${g(bx - 3.2)} ${g(by - 3.6)}A5 5 0 0 0 ${g(bx - 3.2)} ${g(by + 3.6)}M${g(bx + 3.2)} ${g(by - 3.6)}A5 5 0 0 1 ${g(bx + 3.2)} ${g(by + 3.6)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path class="${P}ckglow" d="M${g(bx - 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 0 ${g(bx - 5.6)} ${g(by + 5.4)}M${g(bx + 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 1 ${g(bx + 5.6)} ${g(by + 5.4)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "motion") gl = `<g class="${P}ckglow" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="${g(bx + 1.2)}" cy="${g(by - 5.6)}" r="1.9" fill="${c}" stroke="none"/>` +
+        `<path d="M${g(bx + .4)} ${g(by - 2.8)}L${g(bx - 1)} ${g(by + 2)}L${g(bx - 4.4)} ${g(by + 6.2)}M${g(bx - 1)} ${g(by + 2)}L${g(bx + 2.6)} ${g(by + 3.4)}L${g(bx + 3.4)} ${g(by + 6.6)}M${g(bx - 4.6)} ${g(by - .6)}L${g(bx + .4)} ${g(by - 2.8)}L${g(bx + 4)} ${g(by)}"/></g>`;
+      else if (s === "privacy") gl = `<path d="M${g(bx - 6.4)} ${by}Q${bx} ${g(by - 6)} ${g(bx + 6.4)} ${by}Q${bx} ${g(by + 6)} ${g(bx - 6.4)} ${by}Z" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="${bx}" cy="${by}" r="2" fill="${c}"/>` +
+        `<path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "offline") gl = `<circle cx="${bx}" cy="${g(by + 4)}" r="1.2" fill="${c}"/><path d="M${g(bx - 2.8)} ${g(by + 1.2)}A4 4 0 0 1 ${g(bx + 2.8)} ${g(by + 1.2)}M${g(bx - 5.3)} ${g(by - 1.3)}A7.5 7.5 0 0 1 ${g(bx + 5.3)} ${g(by - 1.3)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#ff5a5a" stroke-width="1.5" stroke-linecap="round"/>`;
+      return `<g><circle cx="${g(bx + 1)}" cy="${g(by + 1.6)}" r="11" fill="#000" fill-opacity=".45"/><circle cx="${bx}" cy="${by}" r="11" fill="#16181e"/><circle cx="${bx}" cy="${by}" r="10.2" fill="none" stroke="${c}" stroke-width="1.3"/>` +
+        `<path d="M${g(bx - 7)} ${g(by - 6)}A9 9 0 0 1 ${g(bx + 6)} ${g(by - 7)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>${gl}</g>`;
+    }
+    const motion = (cx, cy, r) => [0, 1].map((i) => `<circle class="${P}ckring" style="animation-delay:${(-i * .8).toFixed(1)}s" cx="${g(cx)}" cy="${g(cy)}" r="${g(r * (1.3 + i * .5))}" fill="none" stroke="#ffa940" stroke-opacity="${i ? .4 : .75}" stroke-width="${i ? 1.4 : 1.8}"${i ? ` stroke-dasharray="3 3"` : ""}/>`).join("");
+    function cap(u, k, cx, cy, r, col) {
+      const id = `${u}-ckc${k}`;
+      return `<defs><radialGradient id="${id}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${H.shade(col, .55)}"/><stop offset=".6" stop-color="${col}"/><stop offset="1" stop-color="${H.shade(col, -.45)}"/></radialGradient></defs>` +
+        `<circle cx="${g(cx)}" cy="${g(cy + r * .14)}" r="${g(r)}" fill="#000" fill-opacity=".4"/><circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="url(#${id})"/>` +
+        `<path d="M${g(cx - r * .97)} ${g(cy)}H${g(cx + r * .97)}" stroke="${H.shade(col, -.5)}" stroke-width="${g(Math.max(.8, r * .09))}"/><path d="M${g(cx - r * .9)} ${g(cy + r * .1)}H${g(cx + r * .9)}" stroke="#fff" stroke-opacity=".28" stroke-width="${g(Math.max(.5, r * .05))}"/>` +
+        `<circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="none" stroke="#000" stroke-opacity=".38" stroke-width=".8"/><ellipse cx="${g(cx - r * .32)}" cy="${g(cy - r * .5)}" rx="${g(r * .36)}" ry="${g(r * .15)}" fill="#fff" fill-opacity=".4" transform="rotate(-18 ${g(cx - r * .32)} ${g(cy - r * .5)})"/>`;
+    }
+    const irDots = (cx, cy, R, n, rr) => { let s = ""; rr = rr || 1.1;
+      for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, px = g(cx + Math.cos(a) * R), py = g(cy + Math.sin(a) * R);
+        s += `<circle cx="${px}" cy="${py}" r="${g(rr * 3)}" fill="#ff3a4a" opacity=".22"/><circle cx="${px}" cy="${py}" r="${g(rr)}" fill="#ff3a4a"/>`; }
+      return s; };
+    function bellOver(s, cx, ly, lr, w) {
+      if (s === "motion") return `<g class="${P}ckglow">` + [0, 1].map((i) => { const r = lr + 5 + i * 6; return `<path d="M${g(cx - r)} ${g(ly - 2)}A${g(r)} ${g(r)} 0 0 1 ${g(cx + r)} ${g(ly - 2)}" fill="none" stroke="#ff8a6a" stroke-opacity="${(.8 - i * .3).toFixed(2)}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>`; }).join("") + `</g>`;
+      if (s === "live") return `<g class="${P}ckglow"><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.9)}" fill="#6aa8ff" opacity=".22"/><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.05)}" fill="none" stroke="#6aa8ff" stroke-opacity=".8" stroke-width="1.4"/></g>` +
+        `<circle class="${P}ckblink" cx="${g(cx + w / 2 + 7)}" cy="${g(ly - lr)}" r="3" fill="#ff3b3b"/>`;
+      if (s === "talk") return [0, 1, 2].map((i) => `<path class="${P}ckwave" style="animation-delay:${(-i * .4).toFixed(1)}s" d="M${g(cx + w / 2 + 4 + i * 6)} ${g(ly - 6 - i * 2)}q${g(5 + i)} ${g(6 + i * 2)} 0 ${g(12 + i * 4)}" fill="none" stroke="#7ee7ff" stroke-opacity="${(.9 - i * .2).toFixed(2)}" stroke-width="1.5" stroke-linecap="round"/>`).join("");
+      return "";
+    }
+    const css = `
+.${P}ckring{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}ckblink{animation:${P}ckblink 1.1s steps(1,end) infinite}
+@keyframes ${P}ckblink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .${P}ckring{animation:${P}ckring 1.6s ease-out infinite}
+@keyframes ${P}ckring{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.hda-anim .${P}ckglow{animation:${P}ckglow 1.8s ease-in-out infinite}
+@keyframes ${P}ckglow{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-anim .${P}ckwave{animation:${P}ckwave 1.3s ease-out infinite}
+@keyframes ${P}ckwave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}ckblink,.hda-anim .${P}ckring,.hda-anim .${P}ckglow,.hda-anim .${P}ckwave{animation:none!important}}`;
+    return { STATE, BELL, IR, IRA, PAN, cam, bell, active, LED, badge, motion, cap, irDots, bellOver, css };
+  })();
+
+  function camX(o) { const cs = CK.cam(o), dead = cs === "offline";
+    const x = ctx(Object.assign({}, o, { on: CK.active(cs), color: dead ? H.mix(o.color || SNOW, "#80838a", .7) : o.color }));
+    x.cs = cs; x.ir = (o.opt || {}).ir === "on" && cs !== "privacy" && !dead; x.u = o.uid; return x; }
+  const camLed = (x, cx, cy) => led(x, cx, cy, CK.LED[x.cs] || "#34d17a", x.cs === "live" ? "" : P + "blink");
+  const camOver = (x, cx, cy, lr) => (x.ir ? CK.irDots(cx, cy, lr * 1.75, 8, 1) : "") + (x.cs === "motion" ? CK.motion(cx, cy, lr * 1.3) : "") + (x.cs === "privacy" ? CK.cap(x.u, 0, cx, cy, lr * 1.25, x.c) : "") + CK.badge(x.cs);
+  const camDim = (x, s) => x.cs === "offline" ? `<g opacity=".8">${s}</g>` : s;
   const icons = [
     base({ id: "vase-speaker", name: "Vase speaker", colors: ["#6f747c", CORAL, "#b8774f", "#34363a", "#9cc3c9"], render(o) {
       const x = ctx(o), cx = 100;
@@ -40202,14 +44444,20 @@ ${x.on ? `<ellipse class="${P}ring" cx="100" cy="146" rx="52" ry="9" fill="url(#
 <path d="M70 120 C70 104 74 96 80 93" stroke="#fff" stroke-opacity=".55" stroke-width="2.4" fill="none" stroke-linecap="round"/>`));
     } }),
 
-    base({ id: "round-learning-thermostat", name: "Round learning thermostat", colors: ["#d6d9de", "#d9c08a", "#2a2b2e"], colorLabel: "Ring", parts: TPARTS, render(o) {
-      const x = ctx(o), TV = pvs(o, ["mode", "state", "fan", "temp", "sp"]);
+    base({ id: "round-learning-thermostat", name: "Round learning thermostat", colors: ["#d6d9de", "#d9c08a", "#2a2b2e"], colorLabel: "Ring", parts: TPARTS,
+      options: [{ id: "mode", name: "Mode", values: [["heat", "Heat"], ["off", "Off"], ["cool", "Cool"], ["heatcool", "Heat/Cool"], ["eco", "Eco"]] }], render(o) {
+      const x = ctx(o), TV = pvs(o, ["mode", "state", "fan", "temp", "sp"]), md = (o.opt && o.opt.mode) || "heat", off = x.on && md === "off";
+      if (off) x.on = false;
+      const mc = { heat: "#ff8a2a", cool: "#36a6ff", heatcool: "#ff8a2a", eco: "#7fcf3a" }[md] || "#ff8a2a", A = Math.PI;
+      const leafG = `<g transform="translate(100 128) scale(4.2)"><path d="M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z" fill="${mc}"/><path d="M-.8 .8 L.35 -.35" stroke="#000" stroke-opacity=".35" stroke-width=".14" stroke-linecap="round"/></g>`;
       const arc = (r, a0, a1) => { const p = (a) => `${f(100 + Math.cos(a) * r)} ${f(100 + Math.sin(a) * r)}`; return `M${p(a0)} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${p(a1)}`; };
       return svg(x, fin(x, `${wallBg(x)}<circle cx="102" cy="104" r="58" fill="#000" opacity=".3"/>
 <circle cx="100" cy="100" r="58" fill="${x.url("met")}"/><circle cx="100" cy="100" r="54" fill="#000" opacity=".25"/><circle cx="100" cy="100" r="53" fill="${x.url("blk")}"/>
 ${TV ? learningMF(x, TV) : x.on ? `<path d="${arc(44, Math.PI * .75, Math.PI * 2.25)}" stroke="#ffffff" stroke-opacity=".15" stroke-width="3" fill="none" stroke-linecap="round"/>
-<path d="${arc(44, Math.PI * .75, Math.PI * 1.55)}" stroke="#ff8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="${f(100 + Math.cos(Math.PI * 1.55) * 44)}" cy="${f(100 + Math.sin(Math.PI * 1.55) * 44)}" r="3.4" fill="#fff"/>
-${digits("71", 78, 82, 34, "#ffffff")}<rect x="86" y="126" width="28" height="3" rx="1.5" fill="#ff8a2a" opacity=".85"/>` : ""}
+${md === "heatcool" ? `<path d="${arc(44, A * .75, A * 1.3)}" stroke="#ff8a2a" stroke-width="3" fill="none" stroke-linecap="round"/><path d="${arc(44, A * 1.62, A * 2.1)}" stroke="#36a6ff" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="${f(100 + Math.cos(A * 1.3) * 44)}" cy="${f(100 + Math.sin(A * 1.3) * 44)}" r="3.4" fill="#fff"/><circle cx="${f(100 + Math.cos(A * 1.62) * 44)}" cy="${f(100 + Math.sin(A * 1.62) * 44)}" r="3.4" fill="#fff"/>`
+  : `<path d="${arc(44, A * .75, A * 1.55)}" stroke="${mc}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="${f(100 + Math.cos(A * 1.55) * 44)}" cy="${f(100 + Math.sin(A * 1.55) * 44)}" r="3.4" fill="#fff"/>`}
+${digits("71", 78, 82, 34, "#ffffff")}${md === "eco" ? leafG : md === "heatcool" ? `<rect x="86" y="126" width="13" height="3" rx="1.5" fill="#ff8a2a" opacity=".85"/><rect x="101" y="126" width="13" height="3" rx="1.5" fill="#36a6ff" opacity=".85"/>` : `<rect x="86" y="126" width="28" height="3" rx="1.5" fill="${mc}" opacity=".85"/>`}` : ""}
+${!TV && off ? digits("OFF", 76, 89, 22, "#8a8f98") : ""}
 <circle cx="100" cy="100" r="53" fill="${x.url("glass")}"/>`));
     } }),
 
@@ -40230,30 +44478,30 @@ ${AV ? alarmRing(x, AV) : x.on ? `<circle class="${P}breath" cx="100" cy="92" r=
 <circle cx="100" cy="92" r="15" fill="${x.url("pl")}"/>`));
     } }),
 
-    base({ id: "indoor-cam-wired", name: "Indoor cam, wired", colors: [SNOW, FOG, LINEN, SAND], render(o) {
-      const x = ctx(o);
+    base({ id: "indoor-cam-wired", name: "Indoor cam, wired", colors: [SNOW, FOG, LINEN, SAND], options: [CK.STATE, CK.IR], render(o) {
+      const x = camX(o);
       return svg(x, fin(x, `${shelf(x, 152)}${shadow(100, 153, 34, 4)}
-<ellipse cx="100" cy="150" rx="26" ry="5" fill="${H.shade(x.c, -.2)}"/><path d="M74 150 C74 144 126 144 126 150" fill="${x.url("plv")}"/>
+${camDim(x, `<ellipse cx="100" cy="150" rx="26" ry="5" fill="${H.shade(x.c, -.2)}"/><path d="M74 150 C74 144 126 144 126 150" fill="${x.url("plv")}"/>
 <path d="M90 112 C92 124 92 134 82 147 H118 C108 134 108 124 110 112 Z" fill="${x.url("plv")}"/>
 <circle cx="100" cy="82" r="35" fill="${x.url("pl")}"/>
 <circle cx="100" cy="84" r="25" fill="${x.url("blk")}"/><circle cx="100" cy="84" r="25" fill="${x.url("glass")}"/>
 <circle cx="100" cy="84" r="9" fill="#0a0b10"/><circle cx="100" cy="84" r="5" fill="#1d2a44"/><circle cx="98" cy="82" r="1.6" fill="#fff" opacity=".6"/>
-${led(x, 100, 66, "#34d17a", P + "blink")}`));
+${camLed(x, 100, 66)}`)}${camOver(x, 100, 84, 9)}`));
     } }),
 
-    base({ id: "battery-cam", name: "Battery cam", colors: [SNOW, FOG, ASH], render(o) {
-      const x = ctx(o); let sid = ""; for (let y = 10; y < 200; y += 12) sid += `<path d="M0 ${y} H200" stroke="#000" stroke-opacity=".15"/>`;
+    base({ id: "battery-cam", name: "Battery cam", colors: [SNOW, FOG, ASH], options: [CK.STATE, CK.IR], render(o) {
+      const x = camX(o); let sid = ""; for (let y = 10; y < 200; y += 12) sid += `<path d="M0 ${y} H200" stroke="#000" stroke-opacity=".15"/>`;
       return svg(x, fin(x, `<g class="hda-bg"><rect width="200" height="200" fill="#8c95b0" opacity=".3"/>${sid}</g>
-<rect x="118" y="70" width="34" height="44" rx="4" fill="#d9d6e0"/><circle cx="135" cy="92" r="9" fill="#bdb9c6"/><path d="M135 92 L112 96" stroke="#bdb9c6" stroke-width="6"/>
+${camDim(x, `<rect x="118" y="70" width="34" height="44" rx="4" fill="#d9d6e0"/><circle cx="135" cy="92" r="9" fill="#bdb9c6"/><path d="M135 92 L112 96" stroke="#bdb9c6" stroke-width="6"/>
 <rect x="64" y="42" width="54" height="116" rx="27" fill="#000" opacity=".25" transform="translate(3 4)"/>
 <rect x="64" y="42" width="54" height="116" rx="27" fill="${x.url("pl")}"/>
 <circle cx="91" cy="70" r="21" fill="${x.url("blk")}"/><circle cx="91" cy="70" r="21" fill="${x.url("glass")}"/>
 <circle cx="91" cy="70" r="9" fill="#0a0b10"/><circle cx="91" cy="70" r="5" fill="#1d2a44"/><circle cx="89" cy="68" r="1.6" fill="#fff" opacity=".6"/>
-${led(x, 91, 88, "#34d17a", P + "blink")}`));
+${camLed(x, 91, 88)}`)}${camOver(x, 91, 70, 9)}`));
     } }),
 
-    base({ id: "battery-video-doorbell", name: "Battery video doorbell", colors: [SNOW, IVY, LINEN, ASH], render(o) {
-      const x = ctx(o);
+    base({ id: "battery-video-doorbell", name: "Battery video doorbell", colors: [SNOW, IVY, LINEN, ASH], options: [CK.BELL, CK.IR], render(o) {
+      const st = CK.bell(o), x = ctx(Object.assign({}, o, { on: st === "ring" })), ir = (o.opt || {}).ir === "on";
       return svg(x, fin(x, `<g class="hda-bg"><rect width="200" height="200" fill="#5a4a3c" opacity=".45"/><rect x="0" y="0" width="44" height="200" fill="#e9e6df" opacity=".85"/><rect x="40" y="0" width="6" height="200" fill="#bdb9c6"/></g>
 <rect x="80" y="30" width="40" height="140" rx="20" fill="#000" opacity=".25" transform="translate(3 4)"/>
 <rect x="80" y="30" width="40" height="140" rx="20" fill="${x.url("pl")}"/>
@@ -40261,16 +44509,18 @@ ${led(x, 91, 88, "#34d17a", P + "blink")}`));
 <circle cx="100" cy="54" r="7" fill="#0a0b10"/><circle cx="100" cy="54" r="4" fill="#1d2a44"/><circle cx="98.6" cy="52.6" r="1.2" fill="#fff" opacity=".6"/>
 <circle cx="100" cy="142" r="12" fill="${H.shade(x.c, -.08)}"/>
 ${x.on ? `<circle class="${P}breath" cx="100" cy="142" r="12" fill="none" stroke="#fff" stroke-width="2.6"/><circle cx="100" cy="142" r="17" fill="none" stroke="#fff" stroke-width="5" opacity=".2"/>` : `<circle cx="100" cy="142" r="12" fill="none" stroke="#000" stroke-opacity=".15" stroke-width="1.6"/>`}
-<circle cx="100" cy="142" r="9" fill="${x.url("pl")}"/>`));
+<circle cx="100" cy="142" r="9" fill="${x.url("pl")}"/>${ir ? CK.irDots(100, 54, 12, 6, 1) : ""}${CK.bellOver(st, 100, 54, 7, 40)}`));
     } }),
 
-    base({ id: "touch-deadbolt", name: "Touch deadbolt", colors: ["#b8bcc0", "#4a3b30", "#c9a95a", "#2c2d30"], colorLabel: "Finish", render(o) {
-      const x = ctx(o); let keys = "";
+    base({ id: "touch-deadbolt", name: "Touch deadbolt", colors: ["#b8bcc0", "#4a3b30", "#c9a95a", "#2c2d30"], colorLabel: "Finish",
+      options: [{ id: "state", name: "State", values: [["auto", "From on/off"], ["locked", "Locked"], ["unlocked", "Unlocked"], ["locking", "Locking"], ["unlocking", "Unlocking"], ["jammed", "Jammed"]] }], render(o) {
+      const sv = o.opt && o.opt.state, ls = sv && sv !== "auto" ? sv : (o.on ? "locked" : "unlocked");
+      const x = ctx(Object.assign({}, o, { on: ls !== "unlocked" })); let keys = "";
       for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { if (r === 3 && c !== 1) continue; keys += x.on ? `<circle cx="${88 + c * 12}" cy="${70 + r * 18}" r="2.4" fill="#ffffff"/><circle cx="${88 + c * 12}" cy="${70 + r * 18}" r="5" fill="#bfe4ff" opacity=".18"/>` : `<circle cx="${88 + c * 12}" cy="${70 + r * 18}" r="1.4" fill="#fff" opacity=".08"/>`; }
       return svg(x, fin(x, `<g class="hda-bg"><rect width="200" height="200" fill="#6b4428" opacity=".6"/>${[30, 70, 130, 170].map((xx) => `<path d="M${xx} 0 V200" stroke="#000" stroke-opacity=".15"/>`).join("")}</g>
 <rect x="76" y="40" width="48" height="124" rx="8" fill="#000" opacity=".3" transform="translate(2 4)"/>
 <rect x="76" y="40" width="48" height="124" rx="8" fill="${x.url("met")}"/><rect x="80" y="46" width="40" height="112" rx="6" fill="${x.url("blk")}"/><rect x="80" y="46" width="40" height="112" rx="6" fill="${x.url("glass")}"/>
-${keys}`));
+${keys}${lockMark(ls, 100, 145, 12)}`));
     } }),
 
     base({ id: "plug-in-hub", name: "Plug-in hub", colors: [SNOW, "#e8e3da"], render(o) {
@@ -40290,14 +44540,20 @@ ${led(x, 100, 96, "#ffffff", P + "breath")}`));
 @keyframes ${P}dot{0%,100%{opacity:1}50%{opacity:.45}}
 @keyframes ${P}breath{0%,100%{opacity:1}50%{opacity:.5}}
 @keyframes ${P}blink{0%{opacity:1}85%{opacity:.25}}
-@media (prefers-reduced-motion:reduce){.hda-anim .${P}dot,.hda-anim .${P}breath,.hda-anim .${P}blink,.hda-anim .${P}ring{animation:none}}`;
+.${P}spin,.${P}spinr{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}spin{animation:${P}spin 1.4s linear infinite}
+.hda-anim .${P}spinr{animation:${P}spinr 1.4s linear infinite}
+.hda-anim .${P}jblink{animation:${P}jblink .5s steps(1,end) infinite}
+@keyframes ${P}spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes ${P}spinr{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
+@keyframes ${P}jblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}dot,.hda-anim .${P}breath,.hda-anim .${P}blink,.hda-anim .${P}ring,.hda-anim .${P}spin,.hda-anim .${P}spinr,.hda-anim .${P}jblink{animation:none}}`;
 
   (window.HDA = window.HDA || []).push({
     id: "speakers", tab: "Smart home speakers & displays A", group: "Home", kind: "device",
     levelLabel: "Volume", onWord: "Listening", offWord: "Off",
-    intro: "Twenty smart home devices on shelves, counters, walls and doors: speakers, smart displays, streamers, mesh Wi-Fi, thermostats, a smoke alarm, cameras, the doorbell, a deadbolt and a plug-in hub. On shows the four breathing dots, ambient screens and status lights; the slider sets volume.",
-    
-    css, icons,
+    intro: "Twenty smart home devices on shelves, counters, walls and doors: speakers, smart displays, streamers, mesh Wi-Fi, thermostats, a smoke alarm, cameras, the doorbell, a deadbolt and a plug-in hub. On shows the four breathing dots, ambient screens and status lights; the slider sets volume. The cameras show Live, Recording, Motion, Privacy or Offline with a Night IR menu, the doorbell has its own State menu, the deadbolt shows Locking, Unlocking and Jammed, and the round thermostat adds Mode.",
+    css: css + CK.css, icons,
   });
 })();
 
@@ -41477,7 +45733,7 @@ ${extra || ""}</defs>`;
   const WOODS = { "#8a5a3b": 1, "#b88a5a": 1, "#6e4a30": 1 };
   const isWood = (c) => !!WOODS[String(c).toLowerCase()];
   const AIR = "#d6ebff", LEDC = "#7dd3fc", GREEN = "#34d399";
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
@@ -41949,9 +46205,11 @@ ${extra || ""}</defs>`;
     return s;
   }
 
+  let GM = null, AUX = false;
   function scene(x, kind, body, sc) {
     sc = sc || 1.24;
     const w = WALL[kind] || WALL.plaster, c = x.c;
+    if (GM) { GM.kind = kind; GM.sc = sc; GM.defs = sceneDefs(x); GM.body = body; return ""; }
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs>
 ${lg(x.id("wallg"), [[0, w[0]], [1, w[1]]], 0, 0, 0, 1)}
 <clipPath id="${x.id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>
@@ -41967,11 +46225,20 @@ ${x.defs.join("")}</defs>
 <g clip-path="${x.url("wc")}"><g transform="translate(100 100) scale(${sc}) translate(-100 -100)">${body}</g></g></svg>`;
   }
 
+  function sceneDefs(x) {
+    const c = x.c;
+    return `${rg(x.id("halo"), [[0, c, .9], [.35, c, .34], [1, c, 0]])}
+${rg(x.id("lens"), [[0, "#ffffff"], [.38, x.hot], [1, c]], .42, .36, .66)}
+${rg(x.id("glos"), [[0, "#fff", .6], [.5, "#fff", .1], [1, "#fff", 0]], .3, .22, .85)}
+<filter id="${x.id("bl")}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2"/></filter>${x.defs.join("")}`;
+  }
+
   const hl = (d, a, w) => `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="${a}" stroke-width="${w}" stroke-linecap="round"/>`;
   const drop = (x, shape, dx, dy, a) => `<g transform="translate(${dx == null ? 3 : dx} ${dy == null ? 5 : dy})" fill="#000" opacity="${a || .5}" filter="${x.url("bl")}">${shape}</g>`;
   const rr = (X, Y, W, Hh, r) => `<rect x="${f(X)}" y="${f(Y)}" width="${f(W)}" height="${f(Hh)}" rx="${r}"/>`;
 
   function plate(x, X, Y, W, Hh, fin, o2) {
+    if (GM && !GM.plate) { GM.plate = [X, Y, W, Hh, fin, o2 || {}]; return ""; }
     o2 = o2 || {}; need(x, fin); const [l, m, d, k] = FIN[fin], r = o2.r == null ? 3.5 : o2.r, b = o2.b == null ? 3.2 : o2.b, dk = isDark(fin);
     let s = drop(x, rr(X, Y, W, Hh, r + 1), 3, 5.5, .55) +
       `<rect x="${X - .6}" y="${Y - .6}" width="${W + 1.2}" height="${Hh + 1.2}" rx="${r + .5}" fill="#000" opacity=".35"/>
@@ -41998,6 +46265,7 @@ ${x.defs.join("")}</defs>
   }
 
   function rocker(x, cx, cy, w, h, fin, up) {
+    if (AUX) return paddle(x, cx - w / 2, cy - h / 2, w, h, fin, 2.4); 
     need(x, fin); const [l, m, d, k] = FIN[fin], X = cx - w / 2, Y = cy - h / 2, gid = `rk-${fin}-${up ? 1 : 0}`, dk = isDark(fin);
     x.add(gid, lg(x.id(gid), up
       ? [[0, H.mix(m, d, .25)], [.05, l], [.46, H.mix(l, m, .45)], [.5, H.mix(m, d, .7)], [.535, H.mix(m, d, .2)], [.93, H.mix(m, d, .6)], [1, H.mix(d, k, .5)]]
@@ -42032,6 +46300,7 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
   }
   function dots(x, x0, y0, x1, y1, n, lit, r) {
     let s = "";
+    if (AUX) return led(x, x0, y0, r, { locator: 1, hr: 3.2 }); 
     for (let i = 0; i < n; i++) { const t = n === 1 ? 0 : i / (n - 1), cx = x0 + (x1 - x0) * t, cy = y0 + (y1 - y0) * t;
       if (x.on && i < lit) s += led(x, cx, cy, r, { hr: 3.2, k: .9, delay: i * .07 });
       else if (!x.on && i === 0) s += led(x, cx, cy, r, { off: 1, locator: 1 });
@@ -42040,15 +46309,10 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
   }
   const litN = (x, n) => x.on ? Math.max(1, Math.round(x.lv * n)) : 0;
 
-  // ---------- (parts) Multi-Function: 2-gang a + b, fan controller fan + light, switch + outlet load + outlet,
-  // nightlight switch load + light, blue-bar load + LED bar. A Device Image (no o.mf, no parts) is drawn as before; as a
-  // Multi-Function Image (o.mf) o.parts holds only the ticked parts (true = on), a part left out is drawn off; a dimmer
-  // part's level is o.plevel[id] (else the slider).
   const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
   const plv = (o, k, d) => (o.plevel && o.plevel[k] != null ? Math.max(0, Math.min(1, +o.plevel[k] || 0)) : d);
   const sx = (x, on, lv) => Object.assign({}, x, { on, lv: lv == null ? x.lv : lv });
   const SP = (a, b) => [{ id: a[0], name: a[1], type: "switch" }, { id: b[0], name: b[1], type: "switch" }];
-  // a small bulb mark on the fan controller's paddle (only drawn when the Light part is ticked)
   function bulb(x, on) {
     const d = "M100 78.4c-2 0-3.5 1.5-3.5 3.4 0 1.3.7 2.1 1.3 2.8.4.4.6.8.6 1.4h3.2c0-.6.2-1 .6-1.4.6-.7 1.3-1.5 1.3-2.8 0-1.9-1.5-3.4-3.5-3.4z";
     return (on ? `<g class="${P}in"><g class="${P}pulse"><circle cx="100" cy="82" r="9" fill="${x.url("halo")}" opacity=".7"/></g><path d="${d}" fill="${x.url("lens")}"/></g>`
@@ -42098,7 +46362,8 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
       `<path d="M83.6 100 H108.6" stroke="#000" stroke-opacity="${dk ? .3 : .08}" stroke-width=".7"/>` +
       `<rect x="111.4" y="68.6" width="5.6" height="6.6" rx="1.2" fill="#000" opacity=".35"/><rect x="111.8" y="68.8" width="4.8" height="5.8" rx="1" fill="${x.url("ph-" + fin)}"/>${hl("M112.4 69.4 H116", dk ? .3 : .9, .5)}` +
       `<rect x="112.6" y="${y1 - 1}" width="3.2" height="${y0 - y1 + 2}" rx="1.6" fill="#000" opacity="${dk ? .55 : .2}"/><rect x="113.1" y="${y1 - .5}" width="2.2" height="${y0 - y1 + 1}" rx="1.1" fill="#fff" opacity="${dk ? .06 : .35}"/>`;
-    if (x.on) {
+    if (AUX) s += led(x, 114.2, y0 - 1.4, 1.3, { locator: 1, hr: 3.6 });
+    else if (x.on) {
       s += `<g class="${P}in"><g class="${P}${fx === "pulse" ? "breathe" : "pulse"}"><rect x="104" y="${f(top - 6)}" width="20" height="${f(h + 12)}" rx="9" fill="${x.url("halo")}" opacity=".75"/>` +
         `<rect x="112.8" y="${f(top)}" width="2.8" height="${f(h)}" rx="1.4" fill="${x.url("ib")}"/></g><rect x="113.7" y="${f(top + .8)}" width="1" height="${f(Math.max(0, h - 1.6))}" rx=".5" fill="#fff" opacity=".8"/>`;
       if (fx === "chase") s += `<clipPath id="${x.id("ic")}"><rect x="110" y="${f(top)}" width="8" height="${f(h)}"/></clipPath><g clip-path="${x.url("ic")}"><rect class="${P}chase" x="111.6" y="${y0 - 3}" width="5.2" height="9" rx="2.6" fill="#fff" opacity="0"/></g>`;
@@ -42112,7 +46377,7 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
   const W_ = LED[0], BL = LED[1], GR = LED[2], AM = LED[3], RD = LED[4], PU = LED[5];
   const PLATE = ["#f3f2ee", "#e6d9c0", "#eee4c9", "#8f9296", "#26272a", "#a9aaa6"];
   const base = (o) => {
-    const src = String(o.render); let main = "white", best = -1;
+    const src = String(o._src || o.render); let main = "white", best = -1;
     Object.keys(FIN).forEach((k) => { const n = (src.match(new RegExp('"' + k + '"', "g")) || []).length; if (n > best) { best = n; main = k; } });
     const def = FIN[main][1], led = o.colors, orig = o.render;
     const cols = [def].concat(PLATE.filter((c) => c.toLowerCase() !== def.toLowerCase()));
@@ -42128,8 +46393,86 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
     });
   };
 
+  const GANGS = { id: "gangs", name: "Gangs", values: [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"]] };
+  const ROLE = { id: "role", name: "Role", values: [["main", "Main"], ["aux", "Aux"]] };
+  const CTRL = (first) => ({ id: "ctrl", name: "Control", values: [["paddle", first], ["rotary", "Rotary"], ["slide", "Slide"], ["touch", "Touch"]] });
+  const ACT = { id: "act", name: "Action", values: [["idle", "Idle"], ["single", "Single"], ["double", "Double"], ["long", "Long press"]] };
+  const GPARTS = [1, 2, 3, 4].map((i) => ({ id: "g" + i, name: "Gang " + i, when: { opt: "gangs", is: ["2", "3", "4"].filter((v) => +v >= i) } }));
+  function gang(o, extra, bs) {
+    const orig = o.render;
+    return Object.assign({}, o, { _src: String(orig), options: [GANGS].concat(extra || []), parts: o.parts || GPARTS, render(oo) {
+      const op = oo.opt || {}, n = Math.max(1, Math.min(4, +op.gangs || 1));
+      AUX = op.role === "aux";
+      try {
+        if (n === 1) return orig.call(this, oo);
+        const outs = [];
+        for (let i = 0; i < n; i++) {
+          const pv = oo.parts ? oo.parts["g" + (i + 1)] : null;
+          GM = {};
+          try { orig.call(this, Object.assign({}, oo, { on: pv == null ? !!oo.on : !!pv, uid: oo.uid + "g" + i })); outs.push(GM); } finally { GM = null; }
+        }
+        const [X, Y, W, Hh, fin, o2] = outs[0].plate, pitch = Math.round(W * .66), Wn = W + (n - 1) * pitch, cx = X + W / 2;
+        const dx = (i) => (i - (n - 1) / 2) * pitch, xm = ctx(oo), screws = [];
+        (o2.screws || []).forEach(([sx, sy]) => { for (let i = 0; i < n; i++) screws.push([sx + dx(i), sy]); });
+        let body = plate(xm, cx - Wn / 2, Y, Wn, Hh, fin, Object.assign({}, o2, { screws }));
+        const k = bs ? bs(op) : 1, sk = k === 1 ? "" : ` translate(100 100) scale(${k}) translate(-100 -100)`;
+        outs.forEach((g, i) => { xm.defs.push(g.defs); body += `<g transform="translate(${f(dx(i))} 0)${sk}">${g.body}</g>`; });
+        return scene(xm, outs[0].kind, body, Math.min(outs[0].sc, 170 / Wn));
+      } finally { AUX = false; }
+    } });
+  }
+  const optv = (o, k, d) => (o.opt && o.opt[k]) || d;
+
+  function ctlRotary(x, fin) {
+    need(x, fin); const [l, m, d, k] = FIN[fin], lit = AUX ? 0 : litN(x, 11), ang = -135 + 270 * x.lv;
+    x.add("knb-" + fin, rg(x.id("knb-" + fin), [[0, H.mix(l, "#ffffff", .5)], [.55, l], [.85, m], [1, d]], .4, .34, .7) +
+      lg(x.id("knbs-" + fin), [[0, d], [.3, m], [.55, l], [.8, m], [1, k]]));
+    let s = "";
+    for (let i = 0; i < 11; i++) { const a = (-135 + 27 * i) * Math.PI / 180, sn = Math.sin(a), cs = -Math.cos(a);
+      const p1 = [100 + sn * 25, 100 + cs * 25], p2 = [100 + sn * 29, 100 + cs * 29];
+      s += x.on && i < lit ? `<g class="${P}in" style="animation-delay:${(i * .05).toFixed(2)}s"><circle cx="${f((p1[0] + p2[0]) / 2)}" cy="${f((p1[1] + p2[1]) / 2)}" r="5" fill="${x.url("halo")}" opacity=".7"/><path d="M${f(p1[0])} ${f(p1[1])} L${f(p2[0])} ${f(p2[1])}" stroke="${x.hot}" stroke-width="2.1" stroke-linecap="round"/></g>`
+        : `<path d="M${f(p1[0])} ${f(p1[1])} L${f(p2[0])} ${f(p2[1])}" stroke="#000" stroke-opacity=".22" stroke-width="1.9" stroke-linecap="round"/><path d="M${f(p1[0] + .4)} ${f(p1[1] + .5)} L${f(p2[0] + .4)} ${f(p2[1] + .5)}" stroke="#fff" stroke-opacity="${isDark(fin) ? .12 : .5}" stroke-width=".7" stroke-linecap="round"/>`; }
+    let knurl = ""; for (let i = 0; i < 36; i++) { const a = i * 10 * Math.PI / 180; knurl += `<path d="M${f(100 + Math.sin(a) * 15.6)} ${f(101.5 - Math.cos(a) * 15.6)} L${f(100 + Math.sin(a) * 17.6)} ${f(101.5 - Math.cos(a) * 17.6)}" stroke="#000" stroke-opacity=".16" stroke-width="1"/>`; }
+    s += drop(x, `<circle cx="100" cy="101" r="18"/>`, 3, 6, .6) + `<circle cx="100" cy="101.5" r="18" fill="${x.url("knbs-" + fin)}"/>${knurl}<circle cx="100" cy="99.5" r="14.6" fill="${x.url("knb-" + fin)}"/>
+<path d="M89.5 92.5 A12.6 12.6 0 0 1 100 86.8" fill="none" stroke="#fff" stroke-opacity="${isDark(fin) ? .3 : .8}" stroke-width="1.3" stroke-linecap="round"/>
+<g transform="rotate(${f(AUX ? 0 : ang)} 100 99.5)"><path d="M100 87.6 V95.4" stroke="${k}" stroke-width="2.4" stroke-linecap="round"/><path d="M100.6 88 V95" stroke="#fff" stroke-opacity=".6" stroke-width=".7" stroke-linecap="round"/></g>`;
+    if (AUX) s += led(x, 100, 136, 1.6, { locator: 1 });
+    return s;
+  }
+  function ctlSlide(x, fin) {
+    need(x, fin); const top = 68, bot = 132, sy = AUX ? (top + bot) / 2 : bot - (bot - top) * x.lv;
+    let s = frame(x, 80, 60, 40, 80, fin) + rocker(x, 92, 100, 20, 76, fin, x.on) + `<rect x="110" y="${top - 2}" width="5" height="${bot - top + 4}" rx="2.5" fill="#000" opacity=".5"/>`;
+    if (x.on && !AUX) s += `<g class="${P}in"><rect x="106" y="${f(sy)}" width="13" height="${f(bot - sy + 2)}" rx="5" fill="${x.url("halo")}" opacity=".6"/><rect x="111" y="${f(sy)}" width="3" height="${f(bot - sy + 1)}" rx="1.5" fill="${x.url("lens")}"/></g>`;
+    else s += led(x, 112.5, bot, 1.3, { locator: 1 });
+    s += drop(x, rr(106, sy - 5, 13, 10, 2), 2, 3.5, .55) + `<rect x="106" y="${f(sy - 5)}" width="13" height="10" rx="2" fill="${x.url("ph-" + fin)}"/>` +
+      [-2.4, 0, 2.4].map((dd) => `<path d="M107.6 ${f(sy + dd)} H117.4" stroke="#000" stroke-opacity=".2" stroke-width=".8"/>`).join("") + hl(`M107 ${f(sy - 4.2)} H118`, isDark(fin) ? .3 : .9, .7);
+    return s;
+  }
+  function ctlTouch(x, fin) {
+    need(x, fin);
+    x.add("tch", lg(x.id("tch"), [[0, "#30313a"], [.5, "#17181e"], [1, "#0b0b10"]], 0, 0, .3, 1));
+    let s = gap(80, 58, 40, 84, 4) + `<rect x="80" y="58" width="40" height="84" rx="4" fill="${x.url("tch")}"/>`;
+    const n = 7, lit = AUX ? 0 : litN(x, n);
+    for (let i = 0; i < n; i++) { const Y = 124 - i * 8;
+      s += x.on && i < lit ? `<g class="${P}in" style="animation-delay:${(i * .05).toFixed(2)}s"><rect x="90" y="${f(Y - 3.5)}" width="20" height="7" rx="3.5" fill="${x.url("halo")}" opacity=".55"/><rect x="93" y="${f(Y - 1.2)}" width="14" height="2.4" rx="1.2" fill="${x.hot}"/></g>`
+        : `<rect x="93" y="${f(Y - 1.2)}" width="14" height="2.4" rx="1.2" fill="#fff" opacity=".1"/>`; }
+    s += `<circle cx="100" cy="134" r="4.2" fill="none" stroke="${x.on ? x.hot : "#fff"}" stroke-opacity="${x.on ? .85 : .25}" stroke-width="1"/><path d="M100 131.4 V134" stroke="${x.on ? x.hot : "#fff"}" stroke-opacity="${x.on ? .85 : .25}" stroke-width="1" stroke-linecap="round"/>` +
+      led(x, 100, 65, 1.2, { locator: 1, hr: 3.4 }) +
+      `<path d="M81 59 H106 L88 141 H81 Z" fill="#fff" opacity=".06"/><rect x="80.4" y="58.4" width="39.2" height="83.2" rx="3.8" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width=".7"/>`;
+    return s;
+  }
+  function ctlFace(x, ct, fin) { return ct === "rotary" ? ctlRotary(x, fin) : ct === "slide" ? ctlSlide(x, fin) : ctlTouch(x, fin); }
+
+  const actCls = (o, act, kind) => o.on && o.anim && act !== "idle" ? `${P}${kind}-${act}` : "";
+  function actMark(x, cx, cy, act) {
+    if (!x.on || act === "idle") return "";
+    const m = act === "single" ? `<circle cx="${f(cx)}" cy="${f(cy)}" r="1.5"/>` : act === "double" ? `<circle cx="${f(cx - 2.6)}" cy="${f(cy)}" r="1.5"/><circle cx="${f(cx + 2.6)}" cy="${f(cy)}" r="1.5"/>`
+      : `<rect x="${f(cx - 5)}" y="${f(cy - 1.3)}" width="10" height="2.6" rx="1.3"/>`;
+    return `<g class="${P}f-${act}"><circle cx="${f(cx)}" cy="${f(cy)}" r="7" fill="${x.url("halo")}" opacity=".6"/><g fill="${x.hot}">${m}</g></g>`;
+  }
+
   const icons = [
-     base({ id: "toggle", name: "Classic toggle", colors: led6(AM), glow: { x: .5, y: .36, r: .4 }, render(o) {
+     base(gang({ id: "toggle", name: "Classic toggle", colors: led6(AM), glow: { x: .5, y: .36, r: .4 }, render(o) {
       const x = ctx(o);
       const b = plate(x, 64, 40, 72, 120, "ivory", { r: 3, screws: [[100, 51], [100, 149]] }) +
         `<rect x="95" y="88" width="10" height="24" rx="2.2" fill="#2a2218"/><rect x="95.8" y="89" width="8.4" height="22" rx="1.8" fill="#000" opacity=".5"/>
@@ -42137,28 +46480,30 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
         lever(x, 100, 100, 27, "ivory", x.on, { tip: 1 }) + "";
       need(x, "steel");
       return scene(x, "wood", b);
-    } }),
+    } })),
 
-     base({ id: "paddle-rocker", name: "Paddle rocker", colors: led6(GR), glow: { x: .5, y: .63, r: .42 }, render(o) {
+     base(gang({ id: "paddle-rocker", name: "Paddle rocker", colors: led6(GR), glow: { x: .5, y: .63, r: .42 }, render(o) {
       const x = ctx(o);
-      const b = plate(x, 63, 40, 74, 120, "white", { r: 4, seam: 1 }) + rocker(x, 100, 100, 34, 66, "white", x.on) +
-        `<circle cx="100" cy="126" r="2.6" fill="#000" opacity=".2"/>` + led(x, 100, 126, 1.9, { locator: 1 });
+      const ct = optv(o, "ctrl", "paddle");
+      const b = plate(x, 63, 40, 74, 120, "white", { r: 4, seam: 1 }) + (ct !== "paddle" ? ctlFace(x, ct, "white") : rocker(x, 100, 100, 34, 66, "white", x.on) +
+        `<circle cx="100" cy="126" r="2.6" fill="#000" opacity=".2"/>` + led(x, 100, 126, 1.9, { locator: 1 }));
       return scene(x, "sage", b);
-    } }),
+    } }, [ROLE, CTRL("Rocker")], (op) => op.ctrl === "rotary" ? .8 : 1)),
 
-     base({ id: "red-bar-dimmer", name: "Red-bar dimmer", colors: led6(RD), glow: { x: .59, y: .55, r: .5 }, render(o) {
+     base(gang({ id: "red-bar-dimmer", name: "Red-bar dimmer", colors: led6(RD), glow: { x: .59, y: .55, r: .5 }, render(o) {
       const x = ctx(o);
       return scene(x, "linen", ino(x, "black", "chase"));
-    } }),
+    } }, [ROLE])),
 
-     base({ id: "dimmer", name: "LED bar dimmer", colors: led6(W_), glow: { x: .43, y: .5, r: .5 }, render(o) {
+     base(gang({ id: "dimmer", name: "LED bar dimmer", colors: led6(W_), glow: { x: .43, y: .5, r: .5 }, render(o) {
       const x = ctx(o);
-      const b = plate(x, 62, 38, 76, 124, "almond", { r: 4, seam: 1 }) + frame(x, 81, 58, 38, 84, "almond") +
-        paddle(x, 94, 60, 24, 80, "almond", 2.4) + dots(x, 87.5, 132, 87.5, 68, 7, litN(x, 7), 1.7);
+      const ct = optv(o, "ctrl", "paddle");
+      const b = plate(x, 62, 38, 76, 124, "almond", { r: 4, seam: 1 }) + (ct !== "paddle" ? ctlFace(x, ct, "almond") : frame(x, 81, 58, 38, 84, "almond") +
+        paddle(x, 94, 60, 24, 80, "almond", 2.4) + dots(x, 87.5, 132, 87.5, 68, 7, litN(x, 7), 1.7));
       return scene(x, "greige", b);
-    } }),
+    } }, [ROLE, CTRL("Paddle")], (op) => op.ctrl === "rotary" ? .8 : 1)),
 
-     base({ id: "rotary", name: "Rotary dimmer", colors: led6(AM), glow: { x: .5, y: .5, r: .5 }, render(o) {
+     base(gang({ id: "rotary", name: "Rotary dimmer", colors: led6(AM), glow: { x: .5, y: .5, r: .5 }, render(o) {
       const x = ctx(o), lit = litN(x, 11), ang = -135 + 270 * x.lv;
       x.add("knob", rg(x.id("knob"), [[0, "#fffdf6"], [.55, "#efe5cf"], [.85, "#cdbd9b"], [1, "#a08f6c"]], .4, .34, .7) +
         lg(x.id("knobs"), [[0, "#7a6a4c"], [.3, "#d9cbad"], [.55, "#fff8e8"], [.8, "#c4b48f"], [1, "#6e5f42"]]));
@@ -42174,9 +46519,9 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
 <path d="M88 92 A14 14 0 0 1 100 85.5" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="1.4" stroke-linecap="round"/>
 <g transform="rotate(${f(ang)} 100 99.5)"><path d="M100 86 V95" stroke="#6e5f42" stroke-width="2.6" stroke-linecap="round"/><path d="M100.6 86.4 V94.6" stroke="#fff" stroke-opacity=".7" stroke-width=".7" stroke-linecap="round"/></g>`;
       return scene(x, "clay", b);
-    } }),
+    } }, null, () => .78)),
 
-     base({ id: "slide", name: "Slide dimmer", colors: led6(GR), glow: { x: .565, y: .55, r: .45 }, render(o) {
+     base(gang({ id: "slide", name: "Slide dimmer", colors: led6(GR), glow: { x: .565, y: .55, r: .45 }, render(o) {
       const x = ctx(o), top = 68, bot = 132, sy = bot - (bot - top) * x.lv;
       let b = plate(x, 62, 38, 76, 124, "white", { r: 4, seam: 1 }) + frame(x, 80, 60, 40, 80, "white") + rocker(x, 92, 100, 20, 76, "white", x.on) +
         `<rect x="110" y="${top - 2}" width="5" height="${bot - top + 4}" rx="2.5" fill="#000" opacity=".5"/>`;
@@ -42185,7 +46530,7 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
       b += drop(x, rr(106, sy - 5, 13, 10, 2), 2, 3.5, .55) + `<rect x="106" y="${f(sy - 5)}" width="13" height="10" rx="2" fill="${x.url("ph-white")}"/>` +
         [-2.4, 0, 2.4].map((d) => `<path d="M107.6 ${f(sy + d)} H117.4" stroke="#000" stroke-opacity=".2" stroke-width=".8"/>`).join("") + hl(`M107 ${f(sy - 4.2)} H118`, .9, .7);
       return scene(x, "blush", b);
-    } }),
+    } })),
 
      base({ id: "twogang", name: "2-gang black", colors: led6(BL), glow: { x: .58, y: .5, r: .5 }, parts: SP(["a", "Left switch"], ["b", "Right dimmer"]), render(o) {
       const x = ctx(o), a = sx(x, pon(o, "a")), d = sx(x, pon(o, "b"), plv(o, "b", x.lv));
@@ -42195,19 +46540,21 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
       return scene(x, "linen", b, 1.3);
     } }),
 
-     base({ id: "blue-bar-2-in-1", name: "Blue-bar 2-in-1", colors: led6(BL), glow: { x: .59, y: .55, r: .5 }, parts: SP(["load", "Load"], ["led", "LED bar"]), render(o) {
-      // (parts) the LED bar part on = the whole bar lit with a chase (a notification); else the bar shows the load's level
+     base(gang({ id: "blue-bar-2-in-1", name: "Blue-bar 2-in-1", colors: led6(BL), glow: { x: .59, y: .55, r: .5 }, parts: SP(["load", "Load"], ["led", "LED bar"]), render(o) {
       const x = ctx(o), nb = !!o.mf && pon(o, "led");
       const y = !o.mf ? x : nb ? sx(x, true, 1) : sx(x, pon(o, "load"), plv(o, "load", x.lv));
       return scene(y, "slate", ino(y, "white", nb ? "chase" : "pulse"));
-    } }),
+    } }, [ROLE])),
 
-     base({ id: "fan", name: "Fan controller", colors: led6(BL), glow: { x: .5, y: .63, r: .45 }, parts: SP(["fan", "Fan"], ["light", "Light"]), render(o) {
-      const x0 = ctx(o), x = sx(x0, pon(o, "fan"), plv(o, "fan", x0.lv)), n = litN(x, 4);
+     base({ id: "fan", name: "Fan controller", colors: led6(BL), glow: { x: .5, y: .63, r: .45 }, parts: SP(["fan", "Fan"], ["light", "Light"]),
+      options: [{ id: "speed", name: "Speed", values: [["slider", "Slider"], ["off", "Off"], ["low", "Low"], ["med", "Med"], ["mhigh", "Med-high"], ["high", "High"]] }], render(o) {
+      const x0 = ctx(o), x = sx(x0, pon(o, "fan"), plv(o, "fan", x0.lv)), sp = optv(o, "speed", "slider"), STEP = { off: 0, low: 1, med: 2, mhigh: 3, high: 4 };
+      if (sp === "off") x.on = false;
+      const n = sp === "slider" ? litN(x, 4) : x.on ? STEP[sp] : 0;
       const blades = [0, 120, 240].map((a) => `<path d="M100 114 C97.6 111 98 106.6 100.6 106 C103 105.8 103 110 100 114Z" transform="rotate(${a} 100 114)"/>`).join("");
       let b = plate(x, 62, 38, 76, 124, "ivory", { r: 4, seam: 1 }) + frame(x, 80, 58, 40, 84, "ivory") + paddle(x, 82, 60, 36, 44, "ivory", 2.4) +
         chev(100, 72, 3.2, true) + chev(100, 92, 3.2, false) + (o.mf && o.parts && o.parts.light != null ? bulb(x, !!o.parts.light) : "");
-      const dur = (1.6 - 1.2 * x.lv).toFixed(2);
+      const dur = (1.6 - 1.2 * (sp === "slider" ? x.lv : n / 4)).toFixed(2);
       b += `<circle cx="100" cy="114" r="6.4" fill="#000" opacity=".08"/>` + (x.on
         ? `<g class="${P}in"><circle cx="100" cy="114" r="11" fill="${x.url("halo")}" opacity=".45"/></g><g class="${P}spin" style="animation-duration:${dur}s"><circle cx="100" cy="114" r="6" fill="none"/><g fill="${x.hot}">${blades}</g></g><circle cx="100" cy="114" r="1.2" fill="#fff"/>`
         : `<g fill="#000" fill-opacity=".28">${blades}</g><circle cx="100" cy="114" r="1.1" fill="#000" opacity=".3"/>`);
@@ -42215,14 +46562,16 @@ ${hl(`M${f(X + 1.6)} ${f(Y + 4)} V${f(Y + h - 4)}`, dk ? .12 : .4, 1)}
       return scene(x, "green", b);
     } }),
 
-     base({ id: "scene", name: "Scene keypad", colors: led6(W_), glow: { x: .43, y: .5, r: .45 }, render(o) {
-      const x = ctx(o), sel = Math.min(4, Math.floor(x.lv * 5));
+     base({ id: "scene", name: "Scene keypad", colors: led6(W_), glow: { x: .43, y: .5, r: .45 }, options: [ACT], render(o) {
+      const x = ctx(o), sel = Math.min(4, Math.floor(x.lv * 5)), act = optv(o, "act", "idle"), ac = actCls(o, act, "p");
       need(x, "black"); x.add("btn", lg(x.id("btn"), [[0, "#4a4a56"], [.5, "#2c2c35"], [1, "#16161b"]], 0, 0, 0, 1));
       let b = plate(x, 62, 36, 76, 128, "black", { r: 4, seam: 1, gloss: 1 }) + gap(80, 56, 40, 88, 2);
-      for (let i = 0; i < 5; i++) { const Y = 56 + i * 15.2, pressed = x.on && i === sel;
+      for (let i = 0; i < 5; i++) { const Y = 56 + i * 15.2, pressed = x.on && i === sel && !ac;
+        if (x.on && i === sel && ac) b += `<g class="${ac}">`;
         b += `<rect x="80" y="${f(Y)}" width="40" height="13.2" rx="2" fill="${x.url("btn")}"/>${pressed ? `<rect x="80" y="${f(Y)}" width="40" height="13.2" rx="2" fill="#000" opacity=".25"/>` : hl(`M82 ${f(Y + .8)} H118`, .2, .7)}
 ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)}`;
-        b += x.on && i === sel ? led(x, 86, Y + 6.6, 1.5, { hr: 4 }) : (!x.on && i === 4 ? led(x, 86, Y + 6.6, 1.3, { off: 1, locator: 1 }) : `<circle cx="86" cy="${f(Y + 6.6)}" r="1.4" fill="#000" opacity=".5"/><circle cx="86" cy="${f(Y + 6.6)}" r="1" fill="#fff" opacity=".1"/>`); }
+        b += x.on && i === sel ? led(x, 86, Y + 6.6, 1.5, { hr: 4 }) : (!x.on && i === 4 ? led(x, 86, Y + 6.6, 1.3, { off: 1, locator: 1 }) : `<circle cx="86" cy="${f(Y + 6.6)}" r="1.4" fill="#000" opacity=".5"/><circle cx="86" cy="${f(Y + 6.6)}" r="1" fill="#fff" opacity=".1"/>`);
+        if (x.on && i === sel) b += (ac ? `<rect x="80" y="${f(Y)}" width="40" height="13.2" rx="2" fill="#000" fill-opacity=".3" class="${P}f-${act}"/></g>` : "") + actMark(x, 113, Y + 6.6, act); }
       b += `<rect x="80" y="132" width="19.4" height="12" rx="2" fill="${x.url("btn")}"/><rect x="100.6" y="132" width="19.4" height="12" rx="2" fill="${x.url("btn")}"/>` + chev(89.7, 138, 2.6, false, 1) + chev(110.3, 138, 2.6, true, 1);
       return scene(x, "stucco", b);
     } }),
@@ -42261,20 +46610,20 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
       return scene(x, "stripe", b);
     } }),
 
-     base({ id: "remote", name: "Wall remote", colors: led6(GR), glow: { x: .5, y: .34, r: .35 }, render(o) {
-      const x = ctx(o);
+     base({ id: "remote", name: "Wall remote", colors: led6(GR), glow: { x: .5, y: .34, r: .35 }, options: [ACT], render(o) {
+      const x = ctx(o), act = optv(o, "act", "idle"), ac = actCls(o, act, "p");
       x.add("rm", lg(x.id("rm"), [[0, "#ffffff"], [.55, "#f1eff4"], [1, "#c9c5d1"]], 0, 0, .4, 1) + lg(x.id("rb"), [[0, "#fbfafc"], [1, "#d6d2dc"]], 0, 0, 0, 1));
       let b = plate(x, 63, 40, 74, 120, "white", { r: 4, seam: 1 }) + gap(81, 61, 38, 78, 3) + `<rect x="81" y="61" width="38" height="78" rx="3" fill="#000" opacity=".3"/>` +
         drop(x, rr(84, 58, 32, 84, 13), 2.5, 4, .6) + `<rect x="84" y="58" width="32" height="84" rx="13" fill="${x.url("rm")}"/>` + hl("M86.5 70 V130", .8, 1.2) +
         `<rect x="84.3" y="58.3" width="31.4" height="83.4" rx="13" fill="none" stroke="#8f8b9a" stroke-opacity=".5" stroke-width=".6"/>`;
       const key = (Y, h, pressed) => `<rect x="90" y="${Y}" width="20" height="${h}" rx="${h / 2.4}" fill="#000" opacity=".16"/><rect x="90.4" y="${Y + (pressed ? .8 : 0)}" width="19.2" height="${h - .6}" rx="${h / 2.4}" fill="${x.url("rb")}"/>${pressed ? `<rect x="90.4" y="${Y + .8}" width="19.2" height="${h - .6}" rx="${h / 2.4}" fill="#000" opacity=".1"/>` : hl(`M93 ${Y + .9} H107`, .9, .7)}`;
-      b += key(74, 13, x.on) + key(90, 9, false) + `<circle cx="100" cy="106" r="5.4" fill="#000" opacity=".16"/><circle cx="100" cy="105.6" r="5" fill="${x.url("rb")}"/>` + key(114, 9, false) + key(126, 13, !x.on && false);
+      b += (ac ? `<g class="${ac}">${key(74, 13, false)}</g>` : key(74, 13, x.on)) + actMark(x, 100, 80.5, act) + key(90, 9, false) + `<circle cx="100" cy="106" r="5.4" fill="#000" opacity=".16"/><circle cx="100" cy="105.6" r="5" fill="${x.url("rb")}"/>` + key(114, 9, false) + key(126, 13, !x.on && false);
       b += chev(100, 94.5, 2.4, true) + chev(100, 118.5, 2.4, false) + `<circle cx="100" cy="105.6" r="1.6" fill="none" stroke="#000" stroke-opacity=".25" stroke-width=".8"/>`;
       b += led(x, 100, 67, 1.4, { blink: 1, hr: 5 });
       return scene(x, "plaster", b);
     } }),
 
-     base({ id: "display", name: "Display switch", colors: led6(BL), glow: { x: .5, y: .38, r: .5 }, render(o) {
+     base(gang({ id: "display", name: "Display switch", colors: led6(BL), glow: { x: .5, y: .38, r: .5 }, render(o) {
       const x = ctx(o), pct = String(Math.round(x.lv * 100));
       x.add("lcd", lg(x.id("lcd"), [[0, "#0d0e14"], [1, "#1b1c26"]], 0, 0, 0, 1));
       let b = plate(x, 62, 36, 76, 128, "white", { r: 4, seam: 1 }) + frame(x, 80, 56, 40, 88, "white") +
@@ -42287,9 +46636,9 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
         paddle(x, 83, 89, 34, 52, "white", 2.4) + chev(100, 100, 3.6, true) + chev(100, 130, 3.6, false) +
         `<path d="M86 115 H114" stroke="#000" stroke-opacity=".1" stroke-width=".8"/>`;
       return scene(x, "dark", b);
-    } }),
+    } })),
 
-     base({ id: "timer", name: "Countdown timer", colors: led6(AM), glow: { x: .43, y: .6, r: .45 }, render(o) {
+     base(gang({ id: "timer", name: "Countdown timer", colors: led6(AM), glow: { x: .43, y: .6, r: .45 }, render(o) {
       const x = ctx(o), n = litN(x, 5);
       let b = plate(x, 62, 36, 76, 128, "white", { r: 4, seam: 1 }) + frame(x, 80, 54, 40, 92, "white") + rocker(x, 100, 72, 36, 30, "white", x.on);
       need(x, "white");
@@ -42298,7 +46647,7 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
         b += lit ? led(x, 88, Y, 1.4, { hr: 3.4, blink: last, delay: i * .08 }) : (!x.on && i === 0 ? led(x, 88, Y, 1.3, { off: 1, locator: 1 }) : `<circle cx="88" cy="${f(Y)}" r="1.4" fill="#000" opacity=".22"/>`);
         for (let t = 0; t <= i; t++) b += `<path d="M${f(97 + t * 3.4)} ${f(Y - 1.6)} V${f(Y + 1.6)}" stroke="#000" stroke-opacity=".32" stroke-width="1" stroke-linecap="round"/>`; }
       return scene(x, "plum", b);
-    } }),
+    } })),
 
      base({ id: "outlet", name: "Switch + outlet", colors: led6(GR), glow: { x: .5, y: .38, r: .42 }, parts: SP(["load", "Switch"], ["outlet", "Outlet"]), render(o) {
       const x = ctx(o), l = sx(x, pon(o, "load"));
@@ -42308,12 +46657,11 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
       b += `<rect x="84" y="103" width="32" height="34" rx="9" fill="#000" opacity=".2"/><rect x="84.4" y="102.4" width="31.2" height="33.6" rx="9" fill="${x.url("rec")}"/>${hl("M88 104 H112", .9, .7)}
 <rect x="92" y="111" width="2.8" height="9" rx=".8" fill="#1c1a22"/><rect x="105.2" y="110" width="2.8" height="11" rx=".8" fill="#1c1a22"/>
 <path d="M97.6 131 V128.4 A2.4 2.4 0 0 1 102.4 128.4 V131 Z" fill="#1c1a22"/>`;
-      // (parts) the outlet's own little LED, only as a Multi-Function Image
       if (o.mf) b += led(sx(x, pon(o, "outlet")), 100, 106.4, .9, { hr: 3.4 });
       return scene(x, "tile", b);
     } }),
 
-     base({ id: "lighted", name: "Lighted rocker", colors: led6(AM), glow: { x: .5, y: .5, r: .5 }, render(o) {
+     base(gang({ id: "lighted", name: "Lighted rocker", colors: led6(AM), glow: { x: .5, y: .5, r: .5 }, render(o) {
       const x = ctx(o), k = x.on ? 1 : .2;
       x.add("tr", lg(x.id("tr"), x.on
         ? [[0, H.mix(x.c, "#fff", .4)], [.47, H.mix(x.c, "#fff", .7)], [.5, H.mix(x.c, "#000", .1)], [1, H.mix(x.c, "#000", .2)]]
@@ -42326,7 +46674,7 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
         `<rect x="83.3" y="67.3" width="33.4" height="65.4" rx="2.2" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".6"/>` +
         `<rect x="83" y="${x.on ? 129 : 67}" width="34" height="4" rx="2" fill="#000" opacity=".22"/>`;
       return scene(x, "denim", b);
-    } }),
+    } })),
 
      base({ id: "nightlight", name: "Nightlight switch", colors: led6(AM), glow: { x: .5, y: .6, r: .55 }, parts: SP(["load", "Switch"], ["light", "Night light"]), render(o) {
       const x = ctx(o), l = sx(x, pon(o, "load")), nl = pon(o, "light");
@@ -42341,14 +46689,15 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
       return scene(x, "mint", b);
     } }),
 
-     base({ id: "button", name: "Wireless button", colors: led6(PU), glow: { x: .5, y: .5, r: .5 }, render(o) {
-      const x = ctx(o);
+     base({ id: "button", name: "Wireless button", colors: led6(PU), glow: { x: .5, y: .5, r: .5 }, options: [ACT], render(o) {
+      const x = ctx(o), act = optv(o, "act", "idle"), ac = actCls(o, act, "s"), dip = x.on && act !== "idle" && !ac;
       x.add("pk", rg(x.id("pk"), [[0, "#ffffff"], [.6, "#eceaf0"], [.92, "#c4c0cc"], [1, "#a6a2b0"]], .42, .36, .62) + lg(x.id("pks"), [[0, "#7f7b8a"], [.35, "#d6d2dc"], [.6, "#f4f2f6"], [1, "#6f6b7a"]]));
-      let b = drop(x, `<circle cx="100" cy="102" r="31"/>`, 4, 7, .6) + `<circle cx="100" cy="104" r="30" fill="${x.url("pks")}"/><circle cx="100" cy="100" r="30" fill="${x.url("pk")}"/>`;
+      let b = drop(x, `<circle cx="100" cy="102" r="31"/>`, 4, 7, .6) + `<circle cx="100" cy="104" r="30" fill="${x.url("pks")}"/>` +
+        (ac ? `<g class="${ac}">` : dip ? `<g transform="translate(100 101.5) scale(.955) translate(-100 -100)">` : "") + `<circle cx="100" cy="100" r="30" fill="${x.url("pk")}"/>`;
       if (x.on) b += `<g class="${P}in"><g class="${P}pulse"><circle cx="100" cy="100" r="34" fill="none" stroke="${x.c}" stroke-opacity=".25" stroke-width="10"/></g><circle cx="100" cy="100" r="25" fill="none" stroke="${x.c}" stroke-width="3.4" opacity=".45"/><circle cx="100" cy="100" r="25" fill="none" stroke="${x.hot}" stroke-width="1.6"/></g>`;
       else b += `<circle cx="100" cy="100" r="25" fill="none" stroke="#000" stroke-opacity=".1" stroke-width="2"/>` + led(x, 100, 125, 1.3, { off: 1, locator: 1 });
       b += `<circle cx="100" cy="100" r="20" fill="#000" opacity=".04"/><path d="M80 88 A23 23 0 0 1 104 77.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".9"/>
-<circle cx="100" cy="100" r="3" fill="none" stroke="#000" stroke-opacity=".18" stroke-width="1"/><path d="M100 96.6 V99" stroke="#000" stroke-opacity=".18" stroke-width="1" stroke-linecap="round"/>`;
+<circle cx="100" cy="100" r="3" fill="none" stroke="#000" stroke-opacity=".18" stroke-width="1"/><path d="M100 96.6 V99" stroke="#000" stroke-opacity=".18" stroke-width="1" stroke-linecap="round"/>` + (ac || dip ? "</g>" : "") + actMark(x, 100, 117, act);
       return scene(x, "sand", b, 1.6);
     } }),
 
@@ -42376,8 +46725,7 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
     tab: "Switches & dimmers",
     group: "More",
     kind: "light",
-    intro: "Twenty wall switches, dimmers and keypads on painted walls. On flips each one to its ON position and lights its status LED in the LED color; dimmers fill their LED bar to the brightness. Plates come in white, ivory, almond, black, stainless, brass and glass by model. (I· = shaped like Inovelli switches, no logos)",
-    
+    intro: "Twenty wall switches, dimmers and keypads on painted walls. On flips each one to its ON position and lights its status LED in the LED color; dimmers fill their LED bar to the brightness. Plates come in white, ivory, almond, black, stainless, brass and glass by model. Gangs makes 1 to 4 of the same switch on one plate (each gang can follow its own entity), Role picks Main or Aux, and some dimmers let you pick the Control (paddle, rotary, slide or touch).",
     css: `.hda-anim .hda-switch-in{animation:hda-switch-in .6s ease-out both}
 @keyframes hda-switch-in{from{opacity:0}}
 .hda-switch-pulse,.hda-switch-spin{transform-box:fill-box;transform-origin:center}
@@ -42391,13 +46739,28 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
 .hda-anim .hda-switch-chase{animation:hda-switch-chase 1.6s ease-in infinite}
 @keyframes hda-switch-chase{0%{opacity:0;transform:translate(0,0)}15%{opacity:.95}85%{opacity:.95}100%{opacity:0;transform:translate(0,-52px)}}
 .hda-anim .hda-switch-spin{animation:hda-switch-spin 1s linear infinite}
+.hda-switch-p-single,.hda-switch-p-double,.hda-switch-p-long,.hda-switch-s-single,.hda-switch-s-double,.hda-switch-s-long{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-switch-p-single,.hda-anim .hda-switch-s-single,.hda-anim .hda-switch-f-single{animation:hda-switch-p-single 1.6s ease-out infinite}
+.hda-anim .hda-switch-p-double,.hda-anim .hda-switch-s-double,.hda-anim .hda-switch-f-double{animation:hda-switch-p-double 1.6s ease-out infinite}
+.hda-anim .hda-switch-p-long,.hda-anim .hda-switch-s-long,.hda-anim .hda-switch-f-long{animation:hda-switch-p-long 2.2s ease-in-out infinite}
+.hda-anim .hda-switch-s-single{animation-name:hda-switch-s-single}.hda-anim .hda-switch-s-double{animation-name:hda-switch-s-double}.hda-anim .hda-switch-s-long{animation-name:hda-switch-s-long}
+.hda-anim .hda-switch-f-single{animation-name:hda-switch-f-single}.hda-anim .hda-switch-f-double{animation-name:hda-switch-f-double}.hda-anim .hda-switch-f-long{animation-name:hda-switch-f-long}
+@keyframes hda-switch-p-single{0%,30%,100%{transform:translate(0,0)}10%,18%{transform:translate(0,1.6px)}}
+@keyframes hda-switch-p-double{0%,40%,100%{transform:translate(0,0)}7%{transform:translate(0,1.6px)}14%{transform:translate(0,0)}21%{transform:translate(0,1.6px)}28%{transform:translate(0,0)}}
+@keyframes hda-switch-p-long{0%,85%,100%{transform:translate(0,0)}8%,75%{transform:translate(0,1.6px)}}
+@keyframes hda-switch-s-single{0%,30%,100%{transform:scale(1)}10%,18%{transform:scale(.95)}}
+@keyframes hda-switch-s-double{0%,40%,100%{transform:scale(1)}7%{transform:scale(.95)}14%{transform:scale(1)}21%{transform:scale(.95)}28%{transform:scale(1)}}
+@keyframes hda-switch-s-long{0%,85%,100%{transform:scale(1)}8%,75%{transform:scale(.95)}}
+@keyframes hda-switch-f-single{0%,32%,100%{opacity:.15}10%,20%{opacity:1}}
+@keyframes hda-switch-f-double{0%,42%,100%{opacity:.15}7%,11%{opacity:1}14%{opacity:.15}21%,25%{opacity:1}}
+@keyframes hda-switch-f-long{0%,88%,100%{opacity:.15}8%,78%{opacity:1}}
 @keyframes hda-switch-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.hda-anim .hda-switch-in,.hda-anim .hda-switch-pulse,.hda-anim .hda-switch-blink,.hda-switch-breathe{transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-switch-breathe{animation:hda-switch-breathe 2.4s ease-in-out infinite}
 @keyframes hda-switch-breathe{50%{opacity:.35}}
 .hda-anim .hda-switch-chase{animation:hda-switch-chase 1.6s ease-in infinite}
 @keyframes hda-switch-chase{0%{opacity:0;transform:translate(0,0)}15%{opacity:.95}85%{opacity:.95}100%{opacity:0;transform:translate(0,-52px)}}
-.hda-anim .hda-switch-spin,.hda-anim .hda-switch-breathe,.hda-anim .hda-switch-chase{animation:none}}`,
+.hda-anim .hda-switch-spin,.hda-anim .hda-switch-breathe,.hda-anim .hda-switch-chase,.hda-anim [class*="hda-switch-p-"],.hda-anim [class*="hda-switch-s-"],.hda-anim [class*="hda-switch-f-"]{animation:none}}`,
     icons,
   });
 })();
@@ -42418,11 +46781,6 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
   const METAL = [FIN.steel, FIN.brass, FIN.copper];
   const sw = (s) => s.split(" ").map((k) => FIN[k]);
 
-  // (multi-function) the thermostat's own readings as parts: o.pval.mode (off / heat / cool / auto / eco), o.pval.state
-  // (idle / heating / cooling / fan), o.pval.fan (auto / on / circulate), o.pval.temp (room) and o.pval.sp (setpoint).
-  // The display shows the setpoint and, when both are given, fades to the room temperature and back; Off reads OFF.
-  // Running (heating / cooling / fan only) lights the display; idle keeps it dim with the mode's mark. Without any of
-  // them (a Device Image) the drawing is today's: the slider is the setpoint, on = running.
   function tsMF(o) {
     const v = o.pval || {}, has = (k) => v[k] != null && v[k] !== "";
     if (!["mode", "state", "fan", "temp", "sp"].some(has)) return null;
@@ -42438,16 +46796,50 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
     r.fan = s === "fan" || fn === "on" || fn === "circulate" ? true : null;
     return r;
   }
+  const MC = { heat: "#ff8a2a", cool: "#36a6ff", auto: "#3ecf6e", dry: "#1fc8b4", fan: "#9aa3ad", eco: "#7fcf3a" };
+  const ML = { heatcool: "Heat/Cool", off: "Off", heat: "Heat", cool: "Cool", auto: "Auto", dry: "Dry", fan: "Fan", eco: "Eco" };
+  const PL = { none: "None", boost: "Boost", comfort: "Comfort", sleep: "Sleep", away: "Away", frost: "Frost" };
+  function hvOpts(modes, presets) {
+    const a = [{ id: "mode", name: "Mode", values: modes.split(" ").map((k) => [k, ML[k]]) }];
+    if (presets) a.push({ id: "preset", name: "Preset", values: ("none " + presets).split(" ").map((k) => [k, PL[k]]),
+      when: { opt: "mode", is: modes.split(" ").filter((k) => k !== "off") } });
+    return a;
+  }
+  const LEAF = "M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z";
+  function leaf(cx, cy, s, col) {
+    return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})"><path d="${LEAF}" fill="${col}"/><path d="M-.8 .8 L.35 -.35" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".14" stroke-linecap="round"/></g>`;
+  }
+  function power(cx, cy, s, col) {
+    return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="none" stroke="${col}" stroke-width=".2" stroke-linecap="round"><path d="M-.5 -.55 A.75 .75 0 1 0 .5 -.55"/><path d="M0 -.95 V-.1"/></g>`;
+  }
+  function pglyph(p, cx, cy, s, col) {
+    const g = (b, fill) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="${fill ? col : "none"}" stroke="${fill ? "none" : col}" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round">${b}</g>`;
+    if (p === "boost") return g(`<path d="M.2 -1 L-.6 .12 H-.02 L-.22 1 L.6 -.15 H.02 Z"/>`, 1);
+    if (p === "comfort") return g(`<path d="M-.5 .1 V-.55 H.5 V.1 M-.85 .55 V-.05 H-.5 V.15 H.5 V-.05 H.85 V.55 Z M-.7 .55 V.8 M.7 .55 V.8"/>`);
+    if (p === "sleep") return g(`<path d="M.3 -.9 A.92 .92 0 1 0 .9 .35 A.7 .7 0 0 1 .3 -.9 Z"/>`, 1);
+    if (p === "away") return g(`<path d="M-.85 -.02 L0 -.82 L.85 -.02 M-.6 -.25 V.82 H.6 V-.25 M-.18 .82 V.32 H.18 V.82"/>`);
+    if (p === "frost") return g(`<path d="M0 -.95 V.95 M-.82 -.47 L.82 .47 M-.82 .47 L.82 -.47 M-.25 -.75 L0 -.52 L.25 -.75 M-.25 .75 L0 .52 L.25 .75"/>`);
+    return "";
+  }
+  function fanG(cx, cy, s, col) {
+    let b = ""; for (let i = 0; i < 3; i++) b += `<path transform="rotate(${i * 120})" d="M0 0 C-.5 -.3 -.38 -.95 0 -.95 C.32 -.95 .3 -.38 0 0 Z"/>`;
+    return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="${col}">${b}<circle r=".16"/></g>`;
+  }
+  const rc = (x, a, b) => (x.mode === "heatcool" || x.mode === "heat" || x.mode === "cool" ? (x.heat ? a : b) : x.hot);
+
   function ctx(o) {
-    const R = tsMF(o), c = (o.color || FIN.white).toLowerCase(), on = R ? R.on : !!o.on, lv = R && R.lv != null ? R.lv : o.level == null ? .5 : Math.max(0, Math.min(1, o.level));
-    const t = R && R.t != null ? R.t : Math.round(60 + 24 * lv), heat = R && R.heat != null ? R.heat : t >= 70, gc = R && R.gc ? R.gc : heat ? "#ff8a2a" : "#36a6ff";
+    const R = tsMF(o), op = o.opt || {}, md = op.mode || "heatcool", pr = op.preset || "none";
+    const c = (o.color || FIN.white).toLowerCase(), on = R ? R.on : !!o.on && md !== "off", lv = R && R.lv != null ? R.lv : o.level == null ? .5 : Math.max(0, Math.min(1, o.level));
+    const t = R && R.t != null ? R.t : Math.round(60 + 24 * lv), heat = R && R.heat != null ? R.heat : md === "heat" ? true : md === "cool" ? false : t >= 70;
+    const gc = R ? (R.gc || (R.mode === "eco" ? MC.eco : heat ? "#ff8a2a" : "#36a6ff")) : MC[md] || (heat ? "#ff8a2a" : "#36a6ff");
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
-    const x = { c, on, lv, t, heat, gc, id, url, defs: [], have: {}, metal: METAL.indexOf(c) >= 0,
+    const x = { c, on, lv, t, heat, gc, id, url, defs: [], have: {}, metal: METAL.indexOf(c) >= 0, mode: md, preset: pr,
+      bi: md === "fan" ? 2 : md === "auto" || md === "eco" || md === "dry" ? -1 : heat ? 0 : 1,
       hot: H.mix(gc, "#ffffff", .5), dk: H.hx(c).reduce((a, b) => a + b, 0) < 260 };
     x.dig = on ? H.mix(gc, "#ffffff", .42) : "#9aa0ab";
     x.ink = on ? H.shade(gc, -.78) : "#3c4238";
     x.add = (k, s) => { if (!x.have[k]) { x.have[k] = 1; x.defs.push(s); } };
-    if (R) { x.str = R.str || null; x.t2 = R.t2 != null ? R.t2 : null; x.fan = R.fan; x.mode = R.mode; x.fanOnly = R.fanOnly; }
+    if (R) { x.str = R.str || null; x.t2 = R.t2 != null ? R.t2 : null; x.fan = R.fan; x.mode = R.mode || md; if (R.mode) x.preset = "none"; x.fanOnly = R.fanOnly; }
     return x;
   }
 
@@ -42563,7 +46955,6 @@ ${x.defs.join("")}</defs>
     Object.keys(S).forEach((k) => { const lit = on.indexOf(k) >= 0; if (lit || ghost) s += `<polygon points="${poly(...S[k], t)}" fill="${col}"${lit ? "" : ` opacity="${ghost}"`}/>`; });
     return s;
   }
-  // the readout; with a second reading (x.t2) it fades between the two (the first alone without animation)
   function digits(x, cx, cy, h, col, o2) {
     o2 = o2 || {};
     if (o2.str || (!x.str && x.t2 == null)) return digits0(x, cx, cy, h, col, o2);
@@ -42571,8 +46962,8 @@ ${x.defs.join("")}</defs>
     return x.t2 == null ? a : `<g class="${P}sa">${a}</g><g class="${P}sb">${digits0(x, cx, cy, h, col, Object.assign({}, o2, { str: String(x.t2) }))}</g>`;
   }
   function digits0(x, cx, cy, h, col, o2) {
-    o2 = o2 || {}; const str = o2.str || String(x.t), w = h * .5, t = Math.max(.8, h * .13), sp = h * .24, n = str.length;
-    const unit = o2.unit == null ? "deg" : o2.unit, uw = unit === "pct" ? h * .36 : unit ? h * .22 : 0;
+    o2 = o2 || {}; const off = !o2.str && x.mode === "off" && o2.unit !== "pct", str = o2.str || (off ? "OFF" : String(x.t)), w = h * .5, t = Math.max(.8, h * .13), sp = h * .24, n = str.length;
+    const unit = off ? "" : o2.unit == null ? "deg" : o2.unit, uw = unit === "pct" ? h * .36 : unit ? h * .22 : 0;
     const tot = n * w + (n - 1) * sp + (uw ? sp * .8 + uw : 0); let ox = cx - tot / 2; const oy = cy - h / 2;
     let s = "";
     for (let i = 0; i < n; i++) { s += digit(str[i], ox, oy, w, h, t, col, o2.ghost); ox += w + sp; }
@@ -42593,17 +46984,23 @@ ${x.defs.join("")}</defs>
     return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})" fill="none" stroke="${col}" stroke-width=".17" stroke-linecap="round" stroke-linejoin="round">${d}</g>`;
   }
   const DROP = "M0 -1 C.35 -.45 .7 -.05 .7 .35 C.7 .75 .38 1 0 1 C-.38 1 -.7 .75 -.7 .35 C-.7 -.05 -.35 -.45 0 -1 Z";
-  const LEAF = "M-.85 .85 C-1 -.25 -.25 -1 .95 -.95 C1 .25 .25 1 -.85 .85 Z";
-  const leaf = (cx, cy, s, col, vein) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${s})"><path d="${LEAF}" fill="${col}"/><path d="M-.7 .7 L.5 -.5" stroke="${vein}" stroke-width=".14" stroke-linecap="round"/></g>`;
+  function mglyph(x, cx, cy, s, idle, idle2) {
+    const m = x.mode;
+    if (m === "off") return power(cx, cy, s, idle || "#8e939c");
+    if (m === "auto") return flame(cx - s * .8, cy, s * .66, idle || MC.heat, idle ? idle2 || "#5b6068" : "#ffe7a6") + flake(cx + s * .8, cy, s * .66, idle || H.mix(MC.cool, "#fff", .25));
+    if (m === "dry") return `<path d="${DROP}" transform="translate(${f(cx)} ${f(cy)}) scale(${f(s * .9)})" fill="${idle || x.gc}"/>`;
+    if (m === "fan") return fanG(cx, cy, s, idle || H.shade(x.gc, -.12));
+    if (m === "eco") return leaf(cx, cy, s * .9, idle || x.gc);
+    if (idle) return x.heat ? flame(cx, cy, s, idle, idle2 || "#5b6068") : flake(cx, cy, s, idle);
+    return x.heat ? flame(cx, cy, s, x.gc, "#ffe7a6") : flake(cx, cy, s, H.mix(x.gc, "#fff", .25));
+  }
   function mode(x, cx, cy, s, o2) {
     o2 = o2 || {};
-    if (x.mode === "off") return "";
     if (x.fanOnly) return `<g${x.on ? "" : ` opacity="${o2.idleOp || .35}"`}>${fanIcon(x, cx, cy, s * 1.05, x.on ? x.hot : o2.idle || "#8e939c")}</g>`;
-    if (x.mode === "eco") return x.on ? `<g class="${P}pulse">${o2.halo === false ? "" : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * 2.2)}" fill="${x.url("halo")}" opacity=".7"/>`}${leaf(cx, cy, s, "#5fc46e", "#d9f5c8")}</g>`
-      : `<g opacity="${o2.idleOp || .35}">${leaf(cx, cy, s, o2.idle || "#8e939c", o2.idle2 || "#5b6068")}</g>`;
-    if (!x.on) return `<g opacity="${o2.idleOp || .35}">${x.heat ? flame(cx, cy, s, o2.idle || "#8e939c", o2.idle2 || "#5b6068") : flake(cx, cy, s, o2.idle || "#8e939c")}</g>`;
-    const ic = x.heat ? flame(cx, cy, s, x.gc, "#ffe7a6") : flake(cx, cy, s, H.mix(x.gc, "#fff", .25));
-    return `<g class="${P}pulse">${o2.halo === false ? "" : `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * 2.2)}" fill="${x.url("halo")}" opacity=".7"/>`}${ic}</g>`;
+    if (!x.on) return `<g opacity="${o2.idleOp || .35}">${mglyph(x, cx, cy, s, o2.idle || "#8e939c", o2.idle2)}</g>`;
+    const pg = x.preset !== "none", mx = pg ? cx - s * 1.3 : cx;
+    return `<g class="${P}pulse">${o2.halo === false ? "" : `<circle cx="${f(mx)}" cy="${f(cy)}" r="${f(s * 2.2)}" fill="${x.url("halo")}" opacity=".7"/>`}${mglyph(x, mx, cy, s)}</g>` +
+      (pg ? pglyph(x.preset, cx + s * 1.4, cy, s * .85, H.shade(x.gc, -.1)) : "");
   }
   function fanDots(x, cx, cy, gap, r, col) {
     if (!(x.fan == null ? x.on : x.fan)) return [-1, 0, 1].map((i) => `<circle cx="${f(cx + i * gap)}" cy="${cy}" r="${r}" fill="#888c94" opacity=".25"/>`).join("");
@@ -42737,7 +47134,7 @@ ${x.defs.join("")}</defs>
       let kn = ""; for (let i = 0; i < 24; i++) { const a = i * 15, p0 = pt(100, 104, 13, a), p1 = pt(100, 104, 15, a); kn += `<path d="M${f(p0[0])} ${f(p0[1])} L${f(p1[0])} ${f(p1[1])}" stroke="#000" stroke-opacity=".2" stroke-width="1"/>`; }
       const b = `<g class="hda-bg">` + drop(x, rr(8, 150, 184, 30, 2), 0, 4, .55) + `<rect x="4" y="150" width="192" height="30" rx="2" fill="${x.url("bb")}"/>` + slots +
         `<path d="M4 150.8 H196" stroke="#fff" stroke-opacity=".8"/><path d="M4 166 H196" stroke="#000" stroke-opacity=".1"/>` +
-        rise(x, [[30, 147], [62, 147], [94, 147], [126, 147], [158, 147]], x.heat ? "#ffb070" : "#9dd4ff", 26, 1.2) + `</g>` +
+        rise(x, [[30, 147], [62, 147], [94, 147], [126, 147], [158, 147]], rc(x, "#ffb070", "#9dd4ff"), 26, 1.2) + `</g>` +
         wallGlow(x, 100, 90, 58) + slab(x, 74, 44, 52, 90, 6) + screw(100, 49.5, 1.6) + screw(100, 128.5, 1.6) +
         lcd(x, 84, 55, 32, 17, 2) + digits(x, 100, 63.5, 11, x.ink, { ghost: .07 }) + tk +
         drop(x, `<circle cx="100" cy="104" r="15"/>`, 2, 4, .6) + `<circle cx="100" cy="104" r="15" fill="${x.url("knob")}"/>` + kn + `<circle cx="100" cy="103" r="12" fill="${x.url("bdr")}"/>` +
@@ -42775,8 +47172,8 @@ ${x.defs.join("")}</defs>
       const x = ctx(o); let slats = "", louv = "";
       for (let i = 0; i < 16; i++) slats += `<path d="M${33 + i * 8.6} 68 l3 10" stroke="#000" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/><path d="M${34.6 + i * 8.6} 68 l3 10" stroke="#fff" stroke-opacity="${x.dk ? .1 : .4}" stroke-width=".7"/>`;
       for (let y = 124; y < 162; y += 4.4) louv += `<path d="M30 ${y} H170" stroke="#000" stroke-opacity=".42" stroke-width="2"/><path d="M30 ${f(y + 1.4)} H170" stroke="#fff" stroke-opacity="${x.dk ? .08 : .35}" stroke-width=".6"/>`;
-      let modeB = ""; for (let i = 0; i < 3; i++) modeB += btn(x, 92 + i * 13, 103, 10, 6, 3) + `<circle cx="${92 + i * 13}" cy="96" r="1.1" fill="${x.on && i === (x.heat ? 0 : 1) ? x.hot : "#555"}"/>`;
-      const b = rise(x, [[44, 64], [70, 64], [96, 64], [122, 64], [148, 64]], x.heat ? "#ffb070" : "#a6dbff", 30, 1.5) +
+      let modeB = ""; for (let i = 0; i < 3; i++) modeB += btn(x, 92 + i * 13, 103, 10, 6, 3) + `<circle cx="${92 + i * 13}" cy="96" r="1.1" fill="${x.on && i === x.bi ? x.hot : "#555"}"/>`;
+      const b = rise(x, [[44, 64], [70, 64], [96, 64], [122, 64], [148, 64]], rc(x, "#ffb070", "#a6dbff"), 30, 1.5) +
         `<g class="hda-bg"><rect x="8" y="172" width="184" height="20" fill="#2a2420"/><path d="M8 172 H192" stroke="#000" stroke-opacity=".4" stroke-width="2"/></g>` +
         slab(x, 20, 60, 160, 114, 6, { v: 1 }) + `<rect x="28" y="66" width="144" height="14" rx="2" fill="#000" opacity=".55"/>` + slats +
         `<rect x="28" y="88" width="144" height="26" rx="3" fill="#000" opacity=".12"/>` + lcd(x, 36, 92, 36, 18, 2) + digits(x, 54, 101, 11.5, x.ink, { ghost: .07 }) + modeB +
@@ -42796,6 +47193,7 @@ ${x.defs.join("")}</defs>
         rise(x, [[30, 168], [58, 176], [142, 176], [170, 168], [44, 186], [156, 186]], x.hot, 22, 1.2) + `</g>` +
         wallGlow(x, 100, 90, 64) + slab(x, 66, 46, 68, 84, 9) + screen(x, 72, 52, 56, 58, 5) +
         digits(x, 100, 72, 19, x.dig, { glow: 1 }) + (x.on ? `<g class="${P}pulse">${waves}</g>` : waves) + `<path d="M84 107 H116" stroke="${x.on ? x.hot : "#777c86"}" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>` +
+        (x.on && x.preset !== "none" ? pglyph(x.preset, 119, 98, 3.4, x.hot) : "") +
         glossR(x, 72, 52, 56, 58, 5) + [86, 100, 114].map((cx) => `<circle cx="${cx}" cy="119" r="2.4" fill="#000" opacity=".15"/><circle cx="${cx}" cy="118.6" r="1.5" fill="${x.dk ? "#777" : "#bbb"}"/>`).join("");
       return scene(x, "tile", b);
     } }),
@@ -42894,7 +47292,7 @@ ${x.defs.join("")}</defs>
         drop(x, rr(110, 126, 24, 30, 3), 2, 4, .5) + `<rect x="110" y="126" width="24" height="30" rx="3" fill="${x.url("pump")}"/>` +
         `<rect x="128" y="130" width="22" height="22" rx="4" fill="${x.url("mot")}"/>` + [133, 138, 143].map((a) => `<path d="M${a} 133 V149" stroke="#000" stroke-opacity=".35"/>`).join("") +
         `<circle cx="146" cy="134" r="1.4" fill="${x.on ? "#69db7c" : "#333"}"${x.on ? ` class="${P}blink"` : ""}/>` +
-        rise(x, [[78, 120], [122, 104], [78, 178], [122, 186]], x.heat ? "#ffb070" : "#a6dbff", 18, 1.2) +
+        rise(x, [[78, 120], [122, 104], [78, 178], [122, 186]], rc(x, "#ffb070", "#a6dbff"), 18, 1.2) +
         wallGlow(x, 100, 62, 60) + slab(x, 52, 28, 96, 70, 4) + `<rect x="59" y="35" width="52" height="28" rx="2" fill="#000" opacity=".25"/>` +
         lcd(x, 61, 37, 48, 24, 2) + digits(x, 79, 49, 14, x.ink, { ghost: .07 }) + mode(x, 100, 47, 3.6, { halo: false, idle: x.ink, idleOp: .2 }) +
         knob(129, 46) + knob(129, 77) + [64, 72, 80].map((a, i) => ledDot(x, a, 76, 1.4).replace(/class="[^"]*"/, i === 1 ? `class="${P}pulse"` : `class="${P}pulse" style="animation-delay:.${i * 4}s"`)).join("") +
@@ -42931,9 +47329,6 @@ ${x.defs.join("")}</defs>
     } }),
   ];
 
-  // (parts) Multi-Function: mode, operating state and fan as stages, room temperature and setpoint as readings
-  // (heat-only models: mode off / heat / eco, no cooling, no fan); the zone panel's four relays z1..z4; the smart vent's
-  // damper and temperature.
   const MODE = [["off", "Off"], ["heat", "Heat"], ["cool", "Cool"], ["auto", "Auto"], ["eco", "Eco"]];
   const STATE = [["idle", "Idle"], ["heating", "Heating"], ["cooling", "Cooling"], ["fan", "Fan only"]];
   const TEMPS = [{ id: "temp", name: "Temperature", type: "value", unit: "°", min: 40, max: 95, def: 68 }, { id: "sp", name: "Setpoint", type: "value", unit: "°", min: 45, max: 90, def: 70 }];
@@ -42947,6 +47342,13 @@ ${x.defs.join("")}</defs>
     if (ic.id === "zone") ic.parts = [1, 2, 3, 4].map((i) => ({ id: "z" + i, name: "Zone " + i }));
     if (ic.id === "vent") ic.parts = [{ id: "vent", name: "Damper" }, TEMPS[0]];
   });
+  const SMART = ["heatcool off heat cool fan eco", "comfort sleep away"], SPLIT = ["heatcool off heat cool auto dry fan eco", "boost comfort sleep"],
+    HEATONLY_O = ["heat off eco", "comfort sleep away frost"];
+  const HV = { learning: SMART, square: SMART, touchscreen: SMART, pill: SMART, withsensor: SMART, colorring: SMART,
+    programmable: ["heatcool off heat cool fan", "sleep away"], dial: ["heatcool off heat cool"], mercury: ["heatcool off heat cool fan"],
+    zone: ["heatcool off heat cool fan"], splitwall: SPLIT, remote: SPLIT, ptac: ["heatcool off heat cool auto fan eco"],
+    baseboard: HEATONLY_O, radiant: HEATONLY_O, boiler: ["heat off eco", "boost comfort sleep away frost"] };
+  icons.forEach((ic) => { const h = HV[ic.id]; if (h) ic.options = hvOpts(h[0], h[1]); });
 
   (window.HDA = window.HDA || []).push({
     id: "thermostat",
@@ -42955,8 +47357,7 @@ ${x.defs.join("")}</defs>
     kind: "device",
     levelLabel: "Setpoint",
     onWord: "Running", offWord: "Idle",
-    
-    
+    intro: "Twenty thermostats and climate controls on real walls. The slider is the setpoint (60–84°F), drawn in segment digits. Running glows orange for heating (70°F and up) or blue for cooling; Idle dims the display. Mode and Preset menus (only the ones each control has) recolor the display: heat orange, cool blue, auto green, dry teal, fan gray, eco leaf green. Body (or Ring) changes the finish.",
     css: `.hda-thermostat-breathe,.hda-thermostat-pulse,.hda-thermostat-spin{transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-thermostat-breathe{animation:hda-thermostat-breathe 4.2s ease-in-out infinite}
 @keyframes hda-thermostat-breathe{50%{opacity:.35;transform:scale(.97)}}
@@ -42998,7 +47399,7 @@ ${x.defs.join("")}</defs>
   const SW = [C.black, C.white, C.silver, C.wood, C.gray];
   const sw = (first, extra) => [first].concat(SW.filter((x) => x !== first), extra || []);
   const AIR = "#d6ebff", LEDC = "#7dd3fc", GREEN = "#34d399", AMBER = "#ffbf69";
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
@@ -47136,6 +51537,217 @@ ${extra || ""}</defs>`;
 })();
 
 (function () {
+  "use strict";
+  const P = "hda-windowcfg-";
+  const H = () => window.HDAH;
+  const f = (v) => (Math.round(v * 10) / 10).toString();
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  function rnd(seed) { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+
+  function X(o) {
+    const d = []; let n = 0;
+    const st = (a) => a.map(([of, c, op]) => `<stop offset="${of}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
+    const opt = (k, def) => (o.opt && o.opt[k]) || def;
+    const fc = o.color || "#f4f3ef", tc = o.color2 || "#f4f3ef";
+    const x = { o, d, opt, fc, tc, id: (k) => `${o.uid}-${k}${n++}`,
+      lg(a, x1, y1, x2, y2) { const id = `${o.uid}-g${n++}`; d.push(`<linearGradient id="${id}" x1="${x1 == null ? 0 : x1}" y1="${y1 == null ? 0 : y1}" x2="${x2 == null ? 0 : x2}" y2="${y2 == null ? 1 : y2}">${st(a)}</linearGradient>`); return `url(#${id})`; },
+      rg(a, cx, cy, r) { const id = `${o.uid}-g${n++}`; d.push(`<radialGradient id="${id}" cx="${cx == null ? .5 : cx}" cy="${cy == null ? .5 : cy}" r="${r == null ? .5 : r}">${st(a)}</radialGradient>`); return `url(#${id})`; },
+      clip(path) { const id = `${o.uid}-c${n++}`; d.push(`<clipPath id="${id}"><path d="${path}"/></clipPath>`); return `url(#${id})`; } };
+    x.a = o.on ? cl(o.level == null ? .8 : +o.level || 0, 0, 1) : 0;
+    x.style = opt("style", "dh"); x.inside = false; x.grille = opt("grille", "none"); x.glass = opt("glass", "clear");
+    x.locked = opt("lock", "unlocked") === "locked" && x.a === 0; x.screen = opt("screen", "none"); x.tt = opt("tt", "tilt");
+    return x;
+  }
+  const rect = (x, y, w, h) => `M${f(x)} ${f(y)}H${f(x + w)}V${f(y + h)}H${f(x)}Z`;
+  const poly = (pts) => "M" + pts.map((p) => f(p[0]) + " " + f(p[1])).join("L") + "Z";
+  const bbox = (pts) => { const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]; };
+
+  function wall(x, kind) {
+    const r = rnd(kind.length * 17 + 3); let s = "";
+    if (kind === "brick") { s += `<rect width="200" height="200" fill="#6a3a2c"/>`; for (let row = 0, y = 0; y < 200; y += 9, row++) for (let bx = -(row % 2) * 13; bx < 200; bx += 26) s += `<rect x="${bx + .7}" y="${y + .7}" width="24.6" height="7.6" rx=".8" fill="${H().mix("#8e4c38", "#b56a4c", r())}"/>`; }
+    else if (kind === "siding") { s += `<rect width="200" height="200" fill="#c6ccd2"/>`; for (let y = 0; y < 200; y += 10) s += `<rect y="${y}" width="200" height="4" fill="#fff" opacity=".16"/><path d="M0 ${y + 9.5}H200" stroke="#000" stroke-opacity=".28" stroke-width="1"/>`; }
+    else if (kind === "stucco") { s += `<rect width="200" height="200" fill="#e0d2b8"/>`; for (let i = 0; i < 220; i++) s += `<circle cx="${f(r() * 200)}" cy="${f(r() * 200)}" r="${f(.4 + r() * .9)}" fill="${r() > .5 ? "#fff" : "#7a6a50"}" opacity=".12"/>`; }
+    else if (kind === "roofout") { s += `<rect width="200" height="200" fill="#4a4e56"/>`; for (let row = 0, y = 0; y < 200; y += 11, row++) for (let bx = -(row % 2) * 10; bx < 200; bx += 20) s += `<path d="M${bx + .6} ${y}H${bx + 19.4}V${y + 10}Q${bx + 10} ${y + 12} ${bx + .6} ${y + 10}Z" fill="${H().mix("#3a3d44", "#5c606a", r())}"/>`; }
+    else if (kind === "roofin") { s += `<rect width="200" height="200" fill="${x.lg([[0, "#d9d2c6"], [1, "#a8a094"]])}"/><path d="M0 170L200 150V200H0Z" fill="#8a8276" opacity=".5"/>`; }
+    else { s += `<rect width="200" height="200" fill="${x.lg([[0, "#8f8a9a"], [1, "#6a6575"]])}"/><rect y="182" width="200" height="18" fill="#6e4a33"/><rect y="176" width="200" height="6" fill="#ece8df"/>`; }
+    return s + `<rect width="200" height="200" fill="${x.lg([[0, "#fff", .06], [1, "#000", .25]])}"/>`;
+  }
+  function viewArt(x, b) {
+    const [bx, by, bw, bh] = b;
+    if (x.inside) return `<rect x="${f(bx)}" y="${f(by)}" width="${f(bw)}" height="${f(bh)}" fill="${x.lg([[0, "#3a8ad8"], [.62, "#8ac4ee"], [1, "#d6edf8"]])}"/>` +
+      `<g fill="#fff" opacity=".9"><ellipse cx="${f(bx + bw * .66)}" cy="${f(by + bh * .2)}" rx="${f(bw * .14)}" ry="${f(bh * .04)}"/><ellipse cx="${f(bx + bw * .72)}" cy="${f(by + bh * .17)}" rx="${f(bw * .08)}" ry="${f(bh * .05)}"/></g>` +
+      `<path d="M${f(bx)} ${f(by + bh * .74)}Q${f(bx + bw / 2)} ${f(by + bh * .64)} ${f(bx + bw)} ${f(by + bh * .72)}V${f(by + bh)}H${f(bx)}Z" fill="${x.lg([[0, "#84c465"], [1, "#4a883b"]])}"/>` +
+      `<rect x="${f(bx + bw * .22)}" y="${f(by + bh * .42)}" width="${f(bw * .04)}" height="${f(bh * .38)}" fill="#6a4a30"/><circle cx="${f(bx + bw * .24)}" cy="${f(by + bh * .38)}" r="${f(Math.min(bw, bh) * .2)}" fill="${x.rg([[0, "#98d870"], [.6, "#4d9c40"], [1, "#2b6328"]], .38, .3, .75)}"/>`;
+    return `<rect x="${f(bx)}" y="${f(by)}" width="${f(bw)}" height="${f(bh)}" fill="${x.lg([[0, "#1c2029"], [1, "#3a3f4a"]])}"/>` +
+      `<path d="M${f(bx)} ${f(by)}H${f(bx + bw * .6)}L${f(bx)} ${f(by + bh * .75)}Z" fill="#a8d4f2" opacity=".45"/><circle cx="${f(bx + bw * .78)}" cy="${f(by + bh * .72)}" r="${f(Math.min(bw, bh) * .18)}" fill="#6a9a5a" opacity=".22"/>` +
+      `<path d="M${f(bx + bw * .7)} ${f(by)}H${f(bx + bw * .8)}L${f(bx + bw * .25)} ${f(by + bh)}H${f(bx + bw * .15)}Z" fill="#fff" opacity=".08"/>`;
+  }
+  const view = (x, pts) => `<g class="hda-bg"><g clip-path="${x.clip(poly(pts))}">${viewArt(x, bbox(pts))}</g></g>`;
+
+  const glassFill = (x) => x.glass === "frosted" ? `<FILL fill="#f2f4f6" fill-opacity=".78"/>` : x.glass === "tinted" ? `<FILL fill="#2a2a20" fill-opacity=".45"/>` : `<FILL fill="${x.lg([[0, "#fff", .22], [.35, "#fff", .02], [.6, "#fff", .1], [.7, "#fff", .01]], 0, 0, 1, 1)}"/>`;
+  function grilles(x, pts, mode, cols, rows) {
+    if (mode === "none") return "";
+    const [bx, by, bw, bh] = bbox(pts), c = H().shade(x.fc, .08), sw = Math.max(1.2, Math.min(bw, bh) * .025); let d = "";
+    if (mode === "prairie") { const m = Math.min(bw, bh) * .16; d += `M${f(bx + m)} ${f(by)}V${f(by + bh)}M${f(bx + bw - m)} ${f(by)}V${f(by + bh)}M${f(bx)} ${f(by + m)}H${f(bx + bw)}M${f(bx)} ${f(by + bh - m)}H${f(bx + bw)}`; }
+    else { const nc = cols || (bw > bh * 1.4 ? 3 : 2), nr = rows || (bh > bw * 1.3 ? 3 : 2); for (let i = 1; i < nc; i++) d += `M${f(bx + bw * i / nc)} ${f(by)}V${f(by + bh)}`; for (let j = 1; j < nr; j++) d += `M${f(bx)} ${f(by + bh * j / nr)}H${f(bx + bw)}`; }
+    return `<g clip-path="${x.clip(poly(pts))}"><path d="${d}" stroke="#000" stroke-opacity=".25" stroke-width="${f(sw + 1)}" fill="none"/><path d="${d}" stroke="${c}" stroke-width="${f(sw)}" fill="none"/></g>`;
+  }
+  function sash(x, pts, fw, g, extra) {
+    const d = poly(pts), cc = x.lg([[0, H().shade(x.fc, .25)], [.5, x.fc], [1, H().shade(x.fc, -.25)]], 0, 0, 1, 1);
+    return glassFill(x).replace("<FILL", `<path d="${d}"`) + (g ? grilles(x, pts, g) : "") +
+      `<path d="${d}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="${f(fw + 1.6)}" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${cc}" stroke-width="${f(fw)}" stroke-linejoin="round"/>` +
+      `<path d="${d}" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width=".6" stroke-linejoin="round"/>` + (extra || "");
+  }
+  const R4 = (x0, y0, w, h) => [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]];
+  function trim(x, x0, y0, w, h, arch) {
+    const tc = x.tc, g = x.lg([[0, H().shade(tc, .2)], [.5, tc], [1, H().shade(tc, -.2)]], 0, 0, 1, 1), t = 8;
+    const hole = arch ? `M${x0} ${y0 + h}V${y0 + w / 2}A${w / 2} ${w / 2} 0 0 1 ${x0 + w} ${y0 + w / 2}V${y0 + h}Z` : `M${x0} ${y0}H${x0 + w}V${y0 + h}H${x0}Z`;
+    const outer = arch ? `M${x0 - t} ${y0 + h + t}V${y0 + w / 2}A${w / 2 + t} ${w / 2 + t} 0 0 1 ${x0 + w + t} ${y0 + w / 2}V${y0 + h + t}Z` : `M${x0 - t} ${y0 - t}H${x0 + w + t}V${y0 + h + t}H${x0 - t}Z`;
+    let s = `<path d="${outer}${hole}" fill="#000" opacity=".22" fill-rule="evenodd" transform="translate(2 2)"/><path d="${outer}${hole}" fill="${g}" fill-rule="evenodd"/>`;
+    s += `<rect x="${x0 - t - 4}" y="${y0 + h + t - 2}" width="${w + 2 * t + 8}" height="6" rx="1" fill="${H().shade(tc, .08)}"/><rect x="${x0 - t - 4}" y="${y0 + h + t + 4}" width="${w + 2 * t + 8}" height="3" fill="#000" opacity=".25"/>`;
+    return s;
+  }
+  const frameIn = (x, pts, fw) => `<path d="${poly(pts)}" fill="none" stroke="${H().shade(x.fc, -.15)}" stroke-width="${fw || 4}"/>`;
+  function lockAt(x, cx, cy, kind) {
+    const c = H().shade(x.fc, -.35), on = x.locked;
+    if (kind === "cam") return `<rect x="${f(cx - 5)}" y="${f(cy - 1.6)}" width="10" height="3.2" rx="1.2" fill="${c}"/><path d="M${f(cx)} ${f(cy)}l${on ? 7 : 5} ${on ? 0 : -4}" stroke="${c}" stroke-width="2" stroke-linecap="round"/>` + (on ? `<circle cx="${f(cx + 7)}" cy="${f(cy)}" r="1.3" fill="#34d399"/>` : "");
+    return `<rect x="${f(cx - 1.6)}" y="${f(cy - 4)}" width="3.2" height="8" rx="1" fill="${c}"/><path d="M${f(cx)} ${f(cy)}l${on ? 0 : 6} ${on ? 7 : 0}" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>` + (on ? `<circle cx="${f(cx)}" cy="${f(cy + 8)}" r="1.3" fill="#34d399"/>` : "");
+  }
+  function screenOver(x, pts, part) {
+    if (x.screen === "none" || (part === "half" && x.screen !== "half" && x.screen !== "full") || (part === "full" && x.screen !== "full")) return "";
+    const [bx, by, bw, bh] = bbox(pts); let d = ""; for (let yy = by + 1.5; yy < by + bh; yy += 1.5) d += `M${f(bx)} ${f(yy)}H${f(bx + bw)}`;
+    return `<g clip-path="${x.clip(poly(pts))}"><rect x="${f(bx)}" y="${f(by)}" width="${f(bw)}" height="${f(bh)}" fill="#5a6068" opacity=".28"/><path d="${d}" stroke="#2a2e34" stroke-opacity=".35" stroke-width=".4"/></g><path d="${poly(pts)}" fill="none" stroke="#8a9098" stroke-width="1.6"/>`;
+  }
+
+  const S = {};
+  function hung(x, single, arch) {
+    const x0 = 60, w = 80, y0 = arch ? 70 : 34, h = arch ? 84 : 116, mid = y0 + h / 2, a = x.a, lift = a * (h / 2 - 6);
+    let under = view(x, R4(x0, y0, w, h)), s = trim(x, x0, y0, w, h, arch ? false : false);
+    if (arch) { const top = `M${x0} ${y0}A${w / 2} ${w / 2} 0 0 1 ${x0 + w} ${y0}Z`;
+      s = trim(x, x0, y0 - w / 2, w, h + w / 2, true); under += `<g class="hda-bg"><g clip-path="${x.clip(top)}">${viewArt(x, [x0, y0 - w / 2, w, w / 2])}</g></g>`;
+      s += glassFill(x).replace("<FILL", `<path d="${top}"`) + (x.grille !== "none" ? `<g clip-path="${x.clip(top)}">${[30, 60, 90, 120, 150].map((dg) => `<path d="M${x0 + w / 2} ${y0}l${f(Math.cos(dg * Math.PI / 180) * -w)} ${f(-Math.sin(dg * Math.PI / 180) * w)}" stroke="${H().shade(x.fc, .08)}" stroke-width="1.6"/>`).join("")}</g>` : "") +
+        `<path d="${top}" fill="none" stroke="${x.fc}" stroke-width="4"/>`; }
+    s += frameIn(x, R4(x0, y0, w, h), 4);
+    const upperG = x.grille === "none" ? null : x.grille;
+    s += sash(x, R4(x0 + 3, y0 + 3, w - 6, h / 2 - 1), single ? 4 : 5, upperG);
+    s += screenOver(x, R4(x0 + 3, mid, w - 6, h / 2 - 3), "half");
+    const lowerG = x.grille === "top" || x.grille === "none" ? null : x.grille;
+    s += sash(x, R4(x0 + 3, mid - lift, w - 6, h / 2 - 3), 5, lowerG, `<rect x="${x0 + w / 2 - 7}" y="${f(mid - lift + h / 2 - 9)}" width="14" height="2.4" rx="1.2" fill="${H().shade(x.fc, -.35)}"/>`);
+    s += screenOver(x, R4(x0 + 3, y0 + 3, w - 6, h / 2 - 1), "full");
+    if (!a) s += lockAt(x, x0 + w / 2, mid, "cam");
+    return [under, s];
+  }
+  S.dh = (x) => hung(x, false); S.sh = (x) => hung(x, true); S.arch = (x) => hung(x, false, true);
+  S.casement = (x) => { const x0 = 64, w = 72, y0 = 34, h = 116, th = x.a * 1.25, pw = w * Math.cos(th), ext = Math.sin(th) * 12;
+    let s = trim(x, x0, y0, w, h) + frameIn(x, R4(x0, y0, w, h), 4);
+    const pts = [[x0 + 2, y0 + 2], [x0 + 2 + pw - 4, y0 + 2 - ext], [x0 + 2 + pw - 4, y0 + h - 2 + ext], [x0 + 2, y0 + h - 2]];
+    s += sash(x, pts, 5, x.grille === "top" ? null : (x.grille === "none" ? null : x.grille));
+    if (x.grille === "top") s += grilles(x, [[pts[0][0], pts[0][1]], [pts[1][0], pts[1][1]], [pts[1][0], y0 + h * .3], [pts[0][0], y0 + h * .3]], "colonial", null, 1);
+    s += screenOver(x, R4(x0 + 3, y0 + 3, w - 6, h - 6), "half") + lockAt(x, x0 + w - 5, y0 + h / 2, "lever") + `<rect x="${x0 + w / 2 - 6}" y="${y0 + h - 4}" width="12" height="4" rx="1.4" fill="${H().shade(x.fc, -.4)}"/>`;
+    if (x.a > 0) { const bx = x0 + 2 + (pw - 4) * .6, by = y0 + h - 2 + ext * .6; s += `<path d="M${x0 + 14} ${y0 + h - 2}L${f(bx)} ${f(by)}" stroke="#7a8088" stroke-width="2.2" stroke-linecap="round"/><circle cx="${x0 + 14}" cy="${y0 + h - 2}" r="2" fill="#5a6068"/>`; }
+    return [view(x, R4(x0, y0, w, h)), s]; };
+  S.awning = (x) => { const x0 = 46, w = 108, y0 = 58, h = 70, th = x.a * 1.0, ph = h * Math.cos(th), ext = Math.sin(th) * 10;
+    let s = trim(x, x0, y0, w, h) + frameIn(x, R4(x0, y0, w, h), 4);
+    s += sash(x, [[x0 + 2, y0 + 2], [x0 + w - 2, y0 + 2], [x0 + w - 2 + ext, y0 + ph - 2], [x0 + 2 - ext, y0 + ph - 2]], 5, x.grille === "none" ? null : x.grille);
+    if (x.a > 0) s += `<path d="M${x0 + 8} ${y0 + 4}L${x0 + 8} ${f(y0 + ph - 6)}M${x0 + w - 8} ${y0 + 4}L${x0 + w - 8} ${f(y0 + ph - 6)}" stroke="#8a9098" stroke-width="1.4"/>`;
+    s += screenOver(x, R4(x0 + 3, y0 + 3, w - 6, h - 6), "half") + lockAt(x, x0 + w / 2, y0 + h - 4, "cam");
+    return [view(x, R4(x0, y0, w, h)), s]; };
+  S.hopper = (x) => { const x0 = 42, w = 116, y0 = 98, h = 44, th = x.a * .9, ph = h * Math.cos(th), ext = Math.sin(th) * 8;
+    let s = trim(x, x0, y0, w, h) + frameIn(x, R4(x0, y0, w, h), 4);
+    s += sash(x, [[x0 + 2 + ext, y0 + h - ph + 2], [x0 + w - 2 - ext, y0 + h - ph + 2], [x0 + w - 2, y0 + h - 2], [x0 + 2, y0 + h - 2]], 5, x.grille === "none" ? null : x.grille);
+    s += screenOver(x, R4(x0 + 3, y0 + 3, w - 6, h - 6), "half") + lockAt(x, x0 + w / 2, y0 + 5, "cam");
+    return [view(x, R4(x0, y0, w, h)) + (x.inside ? "" : `<g class="hda-bg"><rect y="160" width="200" height="40" fill="#5a7a3a"/><rect y="158" width="200" height="4" fill="#8a8a82"/></g>`), s]; };
+  S.slider = (x) => { const x0 = 34, w = 132, y0 = 52, h = 86, hw = w / 2, mv = x.a * (hw - 8);
+    let s = trim(x, x0, y0, w, h) + frameIn(x, R4(x0, y0, w, h), 4);
+    s += sash(x, R4(x0 + 3, y0 + 3, hw, h - 6), 5, x.grille === "none" ? null : x.grille);
+    s += screenOver(x, R4(x0 + hw, y0 + 3, hw - 3, h - 6), "half");
+    s += sash(x, R4(x0 + hw - 3 - mv, y0 + 3, hw, h - 6), 5, x.grille === "none" ? null : x.grille, `<rect x="${f(x0 + hw - mv + 2)}" y="${y0 + h / 2 - 6}" width="2.4" height="12" rx="1.2" fill="${H().shade(x.fc, -.35)}"/>`);
+    if (!x.a) s += lockAt(x, x0 + hw + 1, y0 + h / 2, "lever");
+    return [view(x, R4(x0, y0, w, h)), s]; };
+  S.picture = (x) => { const x0 = 40, w = 120, y0 = 40, h = 106;
+    return [view(x, R4(x0, y0, w, h)), trim(x, x0, y0, w, h) + frameIn(x, R4(x0, y0, w, h), 4) + sash(x, R4(x0 + 3, y0 + 3, w - 6, h - 6), 6, x.grille === "none" ? null : x.grille === "top" ? null : x.grille) + (x.grille === "top" ? grilles(x, R4(x0 + 3, y0 + 3, w - 6, h * .25), "colonial", 4, 1) : "")]; };
+  S.tt = (x) => { const x0 = 62, w = 76, y0 = 36, h = 114, a = x.a, tilt = x.tt === "tilt";
+    let s = trim(x, x0, y0, w, h) + frameIn(x, R4(x0, y0, w, h), 4), pts;
+    const sgn = x.inside ? 1 : -1;
+    if (tilt) { const gap = a * 16, ext = sgn * a * 7; pts = [[x0 + 2 - ext, y0 + 2 + gap], [x0 + w - 2 + ext, y0 + 2 + gap], [x0 + w - 2, y0 + h - 2], [x0 + 2, y0 + h - 2]];
+      if (a > 0) s += `<path d="M${x0 + w - 3} ${y0 + 2}L${f(x0 + w - 2 + ext)} ${f(y0 + 2 + gap)}" stroke="#9aa1a9" stroke-width="1.4"/>`; }
+    else { const th = a * 1.3, pw = w * Math.cos(th), ext = sgn * Math.sin(th) * 12; pts = [[x0 + 2, y0 + 2], [x0 + 2 + pw - 4, y0 + 2 - ext], [x0 + 2 + pw - 4, y0 + h - 2 + ext], [x0 + 2, y0 + h - 2]]; }
+    s += sash(x, pts, 7, x.grille === "none" || x.grille === "top" ? null : x.grille);
+    const hx = tilt || a === 0 ? x0 + w - 7 : pts[1][0] - 4; s += `<rect x="${f(hx - 1.6)}" y="${y0 + h / 2 - 5}" width="3.2" height="10" rx="1" fill="${H().shade(x.fc, -.4)}"/><path d="M${f(hx)} ${y0 + h / 2}l0 ${x.locked ? 9 : 0}${x.locked ? "" : "l0 0"}" stroke="${H().shade(x.fc, -.4)}" stroke-width="2.4" stroke-linecap="round"/>` +
+      `<path d="M${f(hx)} ${y0 + h / 2}l${tilt && a > 0 ? 0 : x.locked ? 0 : 7} ${tilt && a > 0 ? -9 : x.locked ? 9 : 0}" stroke="${H().shade(x.fc, -.4)}" stroke-width="2.4" stroke-linecap="round"/>` + (x.locked ? `<circle cx="${f(hx)}" cy="${y0 + h / 2 + 11}" r="1.3" fill="#34d399"/>` : "");
+    s += screenOver(x, R4(x0 + 4, y0 + 4, w - 8, h - 8), "full");
+    return [view(x, R4(x0, y0, w, h)), s]; };
+  S.bay = (x) => { const a = x.a, top = 50, bot = 146;
+    const L = [[34, top + 10], [68, top], [68, bot], [34, bot - 10]], C = [[68, top], [132, top], [132, bot], [68, bot]], Rr = [[132, top], [166, top + 10], [166, bot - 10], [132, bot]];
+    let s = `<path d="M28 ${top + 4}L66 ${top - 8}H134L172 ${top + 4}V${top + 10}L132 ${top}H68L28 ${top + 10}Z" fill="${x.lg([[0, H().shade(x.tc, .1)], [1, H().shade(x.tc, -.2)]])}"/><path d="M28 ${bot - 4}L68 ${bot + 6}H132L172 ${bot - 4}V${bot + 4}L132 ${bot + 14}H68L28 ${bot + 4}Z" fill="${H().shade(x.tc, -.1)}"/>`;
+    s += sash(x, C, 6, x.grille === "none" ? null : x.grille);
+    [[L, 1], [Rr, -1]].forEach(([q, sd]) => { const mid = (q[0][1] + q[3][1]) / 2, lift = a * 30, yl = (t) => q[0][1] + (q[3][1] - q[0][1]) * t, yr = (t) => q[1][1] + (q[2][1] - q[1][1]) * t;
+      s += sash(x, [[q[0][0], q[0][1]], [q[1][0], q[1][1]], [q[1][0], yr(.5)], [q[0][0], yl(.5)]], 4, x.grille === "none" ? null : x.grille);
+      s += sash(x, [[q[0][0], yl(.5) - lift], [q[1][0], yr(.5) - lift], [q[1][0], yr(1)], [q[0][0], yl(1)]], 4, x.grille === "none" || x.grille === "top" ? null : x.grille); });
+    return [view(x, L) + view(x, C) + view(x, Rr), s]; };
+  S.bow = (x) => { const a = x.a, P4 = [[30, 52, 146], [65, 46, 150], [100, 46, 150], [135, 52, 146]], wd = 35;
+    let s = `<path d="M24 50Q100 30 176 50V56Q100 38 24 56Z" fill="${H().shade(x.tc, .05)}"/><path d="M24 148Q100 160 176 148V156Q100 168 24 156Z" fill="${H().shade(x.tc, -.1)}"/>`, under = "";
+    P4.forEach((p, i) => { const pts = R4(p[0], p[1], wd, p[2] - p[1]); under += view(x, pts);
+      const outer = i === 0 || i === 3;
+      if (outer && a > 0) { const th = a * 1.1, pw = wd * Math.cos(th), ext = Math.sin(th) * 8, hx = i === 0 ? p[0] : p[0] + wd, dir = i === 0 ? 1 : -1;
+        s += sash(x, [[hx, p[1]], [hx + dir * pw, p[1] - ext], [hx + dir * pw, p[2] + ext], [hx, p[2]]], 4, x.grille === "none" ? null : x.grille); }
+      else s += sash(x, pts, 4, x.grille === "none" ? null : x.grille); });
+    return [under, s]; };
+  S.garden = (x) => { const a = x.a;
+    const front = [[56, 78], [144, 78], [144, 140], [56, 140]], topG = [[64, 60], [136, 60], [144, 78], [56, 78]], sideL = [[44, 66], [56, 78], [56, 140], [44, 132]], sideR = [[156, 66], [144, 78], [144, 140], [156, 132]];
+    let s = `<path d="M36 52H164V148H36ZM44 66L64 60H136L156 66V132L144 140H56L44 132Z" fill-rule="evenodd" fill="${x.lg([[0, H().shade(x.tc, .2)], [1, H().shade(x.tc, -.2)]])}"/>` + `<path d="M38 140H162L168 150H32Z" fill="${H().shade(x.tc, .05)}"/><path d="M60 136H140" stroke="${H().shade(x.fc, -.2)}" stroke-width="3"/>`;
+    s += sash(x, topG, 4, null) + sash(x, front, 5, x.grille === "none" ? null : x.grille) + sash(x, sideL, 4, null);
+    if (a > 0) { const th = a * 1.1, pw = 12 * Math.cos(th); s += sash(x, [[144, 78], [144 + pw, 70 - a * 6], [144 + pw, 136 + a * 6], [144, 140]], 3, null); } else s += sash(x, sideR, 4, null);
+    s += `<g><path d="M88 136h10l-1 -6h-8Z" fill="#b8643f"/><circle cx="91" cy="126" r="4" fill="#4d9c40"/><circle cx="95" cy="124" r="4" fill="#5aa84a"/><path d="M112 136h9l-1 -5h-7Z" fill="#c8b8a0"/><circle cx="116" cy="127" r="4" fill="#d84a7a"/></g>`;
+    return [view(x, front) + view(x, topG) + view(x, sideL) + view(x, sideR), s]; };
+  S.roof = (x) => { const a = x.a, pts = [[62, 44], [138, 44], [142, 150], [58, 150]];
+    const clad = x.inside ? x.tc : "#4a4e56", cg = x.lg([[0, H().shade(clad, .25)], [1, H().shade(clad, -.25)]]);
+    let s = `<path d="M50 34H150L156 162H44Z${poly(pts)}" fill-rule="evenodd" fill="${cg}"/>` + (x.inside ? "" : `<path d="M44 162H156L160 170H40Z" fill="#3a3d44"/><path d="M50 34H150" stroke="#fff" stroke-opacity=".25"/>`) + `<path d="${poly(pts)}" fill="none" stroke="${H().shade(x.fc, -.2)}" stroke-width="4"/>`;
+    const e = a * 7, g = a * 18, sp = [[62 + e, 44 + g], [138 - e, 44 + g], [142 + e, 150 - g * .55], [58 - e, 150 - g * .55]];
+    s += sash(x, sp, 7, x.grille === "none" ? null : x.grille);
+    if (a > 0) s += `<path d="M60 97L${f(60 - e * .2)} 97M140 97L${f(140 + e * .2)} 97" stroke="#2a2e34" stroke-width="3"/>`;
+    s += `<rect x="84" y="${f(46 + g)}" width="32" height="3.4" rx="1.7" fill="${H().shade(x.fc, -.4)}"/>` + lockAt(x, 100, 54 + g, "cam");
+    return [view(x, pts), s]; };
+
+  const STYLES = [["dh", "Double-hung"], ["sh", "Single-hung"], ["casement", "Casement (crank out)"], ["awning", "Awning"], ["slider", "Sliding"], ["picture", "Picture (fixed)"], ["bay", "Bay"], ["bow", "Bow"], ["garden", "Garden window"], ["tt", "Tilt-and-turn"], ["roof", "Skylight / roof window"], ["hopper", "Basement hopper"], ["arch", "Arched top"]];
+  const OPTS = [
+    { id: "style", name: "Style", values: STYLES },
+    { id: "grille", name: "Grilles", values: [["none", "None"], ["colonial", "Colonial grid"], ["prairie", "Prairie"], ["top", "Top only"]] },
+    { id: "glass", name: "Glass", values: [["clear", "Clear"], ["frosted", "Frosted"], ["tinted", "Tinted"]] },
+    { id: "tt", name: "Opens as", values: [["tilt", "Tilt in"], ["turn", "Swing in"]], when: { opt: "style", is: ["tt"] } },
+    { id: "screen", name: "Screen", values: [["none", "None"], ["half", "Half"], ["full", "Full"]], when: { opt: "style", is: ["dh", "sh", "arch", "slider", "casement", "awning", "hopper", "tt"] } },
+    { id: "lock", name: "Lock", values: [["unlocked", "Unlocked"], ["locked", "Locked"]], when: { opt: "style", is: ["dh", "sh", "arch", "slider", "casement", "awning", "hopper", "tt", "roof"] } },
+  ];
+  const FRAME = ["#f4f3ef", "#e6dcc6", "#2a2a2c", "#5a4636", "#a8743c", "#6a3e2a"], TRIM = ["#f4f3ef", "#ece4cf", "#2a2a2c", "#8d939a", "#a8743c"];
+  function render(o, wallKind, inside) {
+    const x = X(o); x.inside = inside;
+    const fn = S[x.style] || S.dh, parts = fn(x);
+    const wk = x.style === "roof" ? (inside ? "roofin" : "roofout") : wallKind;
+    const vig = x.rg([[0, "#000", 0], [.65, "#000", .06], [1, "#000", .45]], .5, .46, .75), c = `${o.uid}-card`;
+    const wl = wall(x, wk);
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="${c}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>${x.d.join("")}</defs>` +
+      `<g clip-path="url(#${c})"><g class="hda-bg">${wl}<rect width="200" height="200" fill="${vig}"/></g>${parts[0]}${parts[1]}</g>` +
+      `<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g></svg>`;
+  }
+  const card = (id, name, wallKind, inside, def) => ({ id, name, colors: FRAME, picker: true, colorLabel: "Frame", colors2: TRIM, picker2: true, colorLabel2: "Trim",
+    options: OPTS.map((op) => op.id === "style" ? Object.assign({}, op, { values: [STYLES.find((v) => v[0] === def)].concat(STYLES.filter((v) => v[0] !== def)) }) : op),
+    render: (o) => render(o, wallKind, inside) });
+  const icons = [
+    card("winsiding", "Window on siding", "siding", false, "dh"),
+    card("winbrick", "Window in brick", "brick", false, "casement"),
+    card("winstucco", "Window in stucco", "stucco", false, "slider"),
+    card("wininside", "Window, inside view", "inside", true, "tt"),
+  ];
+
+  const css = `@media (prefers-reduced-motion:reduce){.hda-windowcfg-x{animation:none}}`;
+  (window.HDA = window.HDA || []).push({
+    id: "windowcfg", tab: "Window builder", group: "Security", kind: "device", onWord: "Open", offWord: "Closed", levelLabel: "Open",
+    intro: "Windows for contact sensors: pick the style, grilles, glass, screen and lock, plus the frame and trim colors. On = open as far as the slider: sashes slide up, casements swing out, awnings tilt out, sliders slide and tilt-and-turn tilts in.",
+    css, icons,
+  });
+})();
+
+(function () {
   const H = window.HDAH, sh = H.shade, rgba = H.rgba, mix = H.mix;
   const P = "hda-windowfan-";
   const f = (n) => Math.round(n * 100) / 100;
@@ -47144,7 +51756,7 @@ ${extra || ""}</defs>`;
   const sw = (a) => [a].concat(SW.filter((c) => c !== a));
   const lum = (c) => { const x = H.hx(c); return (x[0] * 0.3 + x[1] * 0.59 + x[2] * 0.11) / 255; };
   const TR = "#f2efe8", AIR = "#d6ecff", WARM = "#ffd9b0";
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
+  // (multi-function) parts: o.parts holds only the parts the user ticked; a part left out follows the one device as a
   // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
   // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
@@ -48195,8 +52807,8 @@ ${extra || ""}</defs>`;
   });
 })();
 
-window.HDA_CATALOG = [{"id":"lighting","name":"Lighting","subs":[{"id":"ceiling","name":"Ceiling lights","items":["ceilinglight/dome","ceilinglight/drum","ceilinglight/bowl","ceilinglight/school","ceilinglight/wafer","ceilinglight/can","ceilinglight/cans","ceilinglight/gimbal","ceilinglight/track","ceilinglight/monorail","ceilinglight/panel","ceilinglight/shop","ceilinglight/ring","ceilinglight/stars","ceilinglight/cove","ceilinglight/crystal","ceilinglight/cage","ceilinglight/moroccan","ceilinglight/vent","ceilinglight/skylight"]},{"id":"pendants","name":"Pendants","items":["pendant/globe","pendant/seeded","pendant/dome","pendant/bell","pendant/mushroom","pendant/rattan","pendant/drum","pendant/cage","pendant/prism","pendant/rings","pendant/lantern","pendant/trio","pendant/linear","pendant/concrete","pendant/smoked","pendant/ceramic","pendant/beehive","pendant/box","pendant/island","pendant/artichoke","lights2/globe3","lights2/edison5","bulbs/cord"]},{"id":"chandeliers","name":"Chandeliers","items":["chandelier/crystal","chandelier/candle","chandelier/wagon","chandelier/farmhouse","chandelier/sputnik","chandelier/linear","chandelier/empire","chandelier/halo","chandelier/rings","chandelier/drum","chandelier/beads","chandelier/branch","chandelier/orb","chandelier/bubble","chandelier/raindrop","chandelier/spanish","chandelier/midcentury","chandelier/edison","chandelier/capiz","chandelier/venetian"]},{"id":"wall","name":"Wall lights & sconces","items":["wall/updown","wall/halfmoon","wall/candle","wall/swingarm","wall/picture","wall/globe","wall/edison","wall/shell","wall/alabaster","wall/rattan","wall/gooseneck","wall/coach","wall/cube","wall/jar","wall/flood","wall/step","wall/reading","wall/deco","wall/candelabra","wall/hexagon"]},{"id":"spots","name":"Spot & picture lights","items":["spotlights/track","spotlights/monorail","spotlights/runner","spotlights/plugin","spotlights/cylinder","spotlights/gimbal","spotlights/washer","spotlights/wafer","spotlights/colorspot","spotlights/brasspic","spotlights/ledbar","spotlights/battery","spotlights/museum","spotlights/mirror","spotlights/shelfpuck","spotlights/upcan","spotlights/sconcepair","spotlights/spotbar","spotlights/tripod"]},{"id":"bulbs","name":"Bulbs","items":["bulbs/a19","bulbs/a21","bulbs/br30","bulbs/par38","bulbs/gu10","bulbs/mr16","bulbs/st64","bulbs/g25","bulbs/g40","bulbs/b11","bulbs/t30","lights2/g40","lights2/t45","lights2/candlefil"]},{"id":"mirror","name":"Mirror & vanity lights","items":["mirror/hollywood","mirror/halo","mirror/rect","mirror/band","mirror/capsule","mirror/arch","mirror/bar3","mirror/edison","mirror/linear","mirror/flank","mirror/swing","mirror/trifold","mirror/tabletop","mirror/cabinet","mirror/picture","mirror/ring","mirror/globebar","mirror/pendants","mirror/antifog","mirror/floor"]}]},{"id":"lamps","name":"Lamps & accent lights","subs":[{"id":"floor","name":"Floor lamps","items":["floor/arc","floor/torchiere","floor/tripod-drum","floor/wood-tripod","floor/tree","floor/paper","floor/corner-bar","floor/mid-century","floor/gooseneck","floor/globe","floor/pharmacy","floor/shelf","floor/mushroom","floor/linen-drum","floor/pipe","floor/rattan","floor/ring","floor/spotlight","floor/orbs","floor/pleated"]},{"id":"desk","name":"Desk lamps","items":["desk/architect","desk/banker","desk/monitor-bar","desk/gooseneck","desk/clamp-task","desk/charger","desk/copper-pipe","desk/piano","desk/ring-light","desk/magnifier","desk/arc-slab","desk/mushroom","desk/lantern","desk/robot","desk/clip-on","desk/bauhaus","desk/daylight","desk/shelf-bar","desk/rgb-bars","desk/cube"]},{"id":"nightstand","name":"Nightstand lamps","items":["nightstand/gourd","nightstand/candlestick","nightstand/glass-jug","nightstand/mushroom","nightstand/crystal","nightstand/edison","nightstand/tripod","nightstand/rattan","nightstand/paper","nightstand/tulip","nightstand/tiffany","nightstand/salt","nightstand/sunrise","nightstand/smart-globe","nightstand/moon","nightstand/usb","nightstand/swing-arm","nightstand/cordless","nightstand/lava","nightstand/clamp","speakers2/kids-glow-lamp"]},{"id":"strips","name":"LED strips & panels","items":["ledstrips/toekick","ledstrips/abovecab","ledstrips/tray","ledstrips/crown","ledstrips/stairs","ledstrips/handrail","ledstrips/underbed","ledstrips/headboard","ledstrips/deskedge","ledstrips/mirror","ledstrips/closet","ledstrips/bookcase","ledstrips/panel","ledstrips/garage","ledstrips/eave","ledstrips/deck","ledstrips/pergola","ledstrips/rgbic","ledstrips/cob","ledstrips/smd","bulbs/undercab","bulbs/tvback","bulbs/neon","bulbs/bars","bulbs/hex","bulbs/tri","bulbs/shelf","bulbs/orb"]},{"id":"neon","name":"Neon signs","items":["neon/open","neon/bar","neon/gameroom","neon/gameon","neon/coffee","neon/home","neon/vibes","neon/hello","neon/party","neon/mancave","neon/player","neon/heart","neon/bolt","neon/palm","neon/cactus","neon/beer","neon/cocktail","neon/pizza","neon/rainbow","neon/pixel"]},{"id":"holiday","name":"Holiday trees","items":["lights2/flocked","lights2/tabletop","lights2/pencil","extras/xmastree"]}]},{"id":"fans","name":"Fans","subs":[{"id":"ceiling","name":"Ceiling fans","items":["ceilingfan/classic","ceilingfan/nickel","ceilingfan/ledblack","ceilingfan/hugger","ceilingfan/industrial","ceilingfan/palm","ceilingfan/rattan","ceilingfan/windmill","ceilingfan/propeller","ceilingfan/retract","ceilingfan/orb","ceilingfan/bowl","ceilingfan/twin","ceilingfan/outdoor","ceilingfan/drum","ceilingfan/minimal","ceilingfan/crystal","ceilingfan/airplane","ceilingfan/vintage"]},{"id":"box","name":"Box & table fans","items":["boxfan/classic","boxfan/handle","boxfan/drum","boxfan/tilt","boxfan/circulator","boxfan/desk","boxfan/clip","boxfan/usb","boxfan/deco","boxfan/brass","boxfan/table","boxfan/slim","boxfan/shop","boxfan/bladeless","boxfan/remote","boxfan/wood","boxfan/cube","boxfan/mist","boxfan/camping","boxfan/pullcord"]},{"id":"stand","name":"Stand fans","items":["standfan/classic","standfan/remote","standfan/cross","standfan/chrome","standfan/vintage","standfan/dc7","standfan/bladeless","standfan/misting","standfan/industrial","standfan/circulator","standfan/double","standfan/telescope","standfan/smart","standfan/minimal","standfan/kids","standfan/swivel","standfan/deco","standfan/cordless","standfan/hidden"]},{"id":"tower","name":"Tower fans","items":["towerfan/classic","towerfan/display","towerfan/slim","towerfan/woodgrain","towerfan/pedestal","towerfan/handle","towerfan/wave","towerfan/cylinder","towerfan/slot","towerfan/mini","towerfan/mist","towerfan/smart","towerfan/ceramic","towerfan/twin","towerfan/tall","towerfan/kids","towerfan/aqring","towerfan/retro","towerfan/budget","towerfan/nightlight"]},{"id":"window","name":"Window & wall fans","items":["windowfan/twin","windowfan/slim","windowfan/triple","windowfan/casement","windowfan/boxsash","windowfan/rainguard","windowfan/smart","windowfan/basement","windowfan/autolock","windowfan/wallosc"]},{"id":"exhaust","name":"Exhaust, attic & whole-house fans","items":["windowfan/bath","windowfan/kitchen","windowfan/roundvent","windowfan/shutter","windowfan/shop","windowfan/greenhouse","windowfan/rvvent","windowfan/gable","windowfan/solar","windowfan/wholehouse","evap/gable","evap/solargable","evap/powervent","evap/solar","evap/turbine","evap/wholehouse","evap/ducted","evap/controller"]}]},{"id":"climate","name":"Heating & cooling","subs":[{"id":"thermostats","name":"Thermostats & controls","items":["thermostat/learning","thermostat/square","thermostat/dial","thermostat/programmable","thermostat/touchscreen","thermostat/pill","thermostat/withsensor","thermostat/baseboard","thermostat/splitwall","thermostat/remote","thermostat/ptac","thermostat/radiant","thermostat/humidistat","thermostat/vent","thermostat/puck","thermostat/zone","thermostat/mercury","thermostat/boiler","thermostat/atticfan","thermostat/colorring","speakers/round-learning-thermostat","speakers/frosted-thermostat"]},{"id":"ac","name":"Air conditioners","items":["ac/window","ac/ushape","ac/saddle","ac/portable","ac/dualhose","ac/minisplit","ac/condenser","ac/cassette","ac/console","ac/ptac","ac/wall","ac/central","ac/remote","ac/rv","ac/desk","ac/heatpump","ac/smart","ac/attic","air2/boxy-wall-split","air2/faceted-wall-split","air2/mirror-glass-wall-split"]},{"id":"evap","name":"Evaporative coolers","items":["evap/window","evap/thruwall","evap/downdraft","evap/sidedraft","evap/grille","evap/tower","evap/shop","evap/desk","evap/blower","ac/swamp"]},{"id":"heaters","name":"Space & diesel heaters","items":["heater/oil","heater/cube","heater/tower","heater/dish","heater/quartz","heater/utility","heater/mica","heater/vintage","heater/panel","heater/baseboard","heater/loop","heater/smart","heating/diesel","air2/capsule-diesel-heater","air2/ribbed-top-diesel-heater","air2/portable-box-diesel-heater"]},{"id":"fireplaces","name":"Fireplaces, stoves & fire pits","items":["fireplace/wall","fireplace/insert","fireplace/linear","fireplace/tvstand","fireplace/estove","fireplace/gasstove","fireplace/pittable","fireplace/firebowl","fireplace/woodhearth","heater/insert","heater/linear","heater/stove","heater/bowl","heater/patio","home2/black-pellet-stove","home2/compact-pellet-stove","home2/budget-pellet-stove","home2/cast-iron-wood-stove","home2/steel-wood-stove","heating/pelletstove","heating/woodstove"]},{"id":"radiators","name":"Radiators & towel warmers","items":["heating/panelrad","heating/columnrad","air2/castiron","air2/vertical","heating/towelrail","heater/towel","air2/curved-bar-towel-ladder","air2/freestand"]},{"id":"boilers","name":"Boilers & heat pumps","items":["heating/combi","heating/floorboiler","utility2/wall-combi-boiler","utility2/compact-condensing-boiler","heating/pelletboiler","utility2/hopper-pellet-boiler","utility2/tall-pellet-boiler","utility2/compact-pellet-boiler","heating/gshp","utility2/geothermal-heat-pump","utility2/ground-loop-heat-pump","utility2/slim-geothermal-unit"]},{"id":"hydronic","name":"Underfloor, pumps & tanks","items":["heating/ufh","air2/pumpstation","air2/elecmat","air2/pexloops","heating/circ","utility2/smart-circulator","utility2/classic-circulator","utility2/large-smart-circulator","heating/buffer","utility2/buffer50","utility2/wallbuffer","utility2/stratified","heating/freshwater","utility2/fwswall","utility2/fwscompact","utility2/fwscabinet"]}]},{"id":"air","name":"Air quality","subs":[{"id":"purifiers","name":"Air purifiers","items":["purifier/cylinder","purifier/sleeve","purifier/loop","purifier/ringpanel","purifier/woodcube","purifier/wallpanel","purifier/room","purifier/desk","purifier/planter","purifier/sidetable","purifier/carmini","purifier/lightbar","purifier/pet","purifier/egg","purifier/display","purifier/retro","purifier/ceiling","purifier/column","purifier/window","purifier/cone","air2/loop-purifier-heater","air2/big-dome-purifier"]},{"id":"humidifiers","name":"Humidifiers","items":["humidifier/cleartank","humidifier/teardrop","humidifier/woodbase","humidifier/evaporative","humidifier/warmmist","humidifier/tower","humidifier/turnnozzle","humidifier/usbcup","humidifier/flame","humidifier/cloud","humidifier/ledring","humidifier/console","humidifier/plantpot","humidifier/cordless","humidifier/dual","humidifier/smartring","humidifier/vaporizer","humidifier/glasstank","humidifier/fabricband","humidifier/desksquare"]},{"id":"dehumidifiers","name":"Dehumidifiers","items":["dehumidifier/upright","dehumidifier/compact","dehumidifier/small","dehumidifier/basement","dehumidifier/crawl","dehumidifier/whole","dehumidifier/desiccant","dehumidifier/cube","dehumidifier/pod","dehumidifier/bag","dehumidifier/pump","dehumidifier/ring","dehumidifier/tower","dehumidifier/combo","dehumidifier/rugged","dehumidifier/wall","dehumidifier/laundry","dehumidifier/rv","dehumidifier/drum","dehumidifier/retro"]},{"id":"diffusers","name":"Aroma diffusers","items":["diffuser/woodcone","diffuser/speckled","diffuser/glassdome","diffuser/marble","diffuser/nebulizer","diffuser/reed","diffuser/plugin","diffuser/autospray","diffuser/scentpod","diffuser/candlewarmer","diffuser/waxmelt","diffuser/carvent","diffuser/usbmini","diffuser/saltlamp","diffuser/flame","diffuser/backflow","diffuser/incense","diffuser/bamboo","diffuser/cloud","diffuser/cabinet"]},{"id":"sensors","name":"Air-quality sensors","items":["airsensors/light-bar-box-sensor","airsensors/upright-lcd-air-monitor","airsensors/oval-led-dot-co2-clock","airsensors/round-dot-display-sensor","airsensors/radonpuck","airsensors/radonbar","airsensors/woodface","airsensors/roundedmonitor","airsensors/roomcube","airsensors/einkco2","airsensors/minisquare","airsensors/lcdmeter","airsensors/hygrometer","airsensors/walleink","airsensors/weatherstation","airsensors/round-egg","sensor/air"]},{"id":"ventilation","name":"Ventilation & HRV","items":["air2/upright-hrv-dark-panel","air2/hanging-gray-hrv","air2/ceiling-erv-two-ducts","air2/registers"]}]},{"id":"kitchen","name":"Kitchen","subs":[{"id":"fridges","name":"Fridges","items":["fridgecfg/steel","fridgecfg/glasspanel","fridgecfg/probuilt","fridgecfg/classic","fridge/4-door-flex-with-screen","fridge/4-door-flex-panels","fridge/3-door-panel-fridge","fridge/side-by-side-with-screen","fridge/panel-bottom-freezer","fridge/panel-column-pair","fridge/knock-glass-french-door","fridge/round-ice-4-door","fridge/door-within-door-side-by","fridge/color-glow-french-door","fridge/steel-top-freezer","fridge/gefrench","fridge/classictop","fridge/bottomfr","fridge/basicsbs","fridge/counterdepth","fridge/compact","fridge/builtincol","fridge/builtinfd","fridge/color-panel-glass-door"]},{"id":"freezers","name":"Freezers","items":["kitchen2/7-cu-ft-chest-freezer","kitchen2/5-cu-ft-chest-freezer","kitchen2/3-5-cu-ft-chest-freezer","extras/chestfreezer","kitchen2/13-cu-ft-upright-freezer","kitchen2/garage-ready-upright","kitchen2/compact-upright-freezer","extras/uprightfreezer"]},{"id":"minifridge","name":"Mini fridges, wine & kegs","items":["minifridge/white-cube-fridge","minifridge/3-1-cu-ft-mini","minifridge/retro-mini-fridge","minifridge/2-door-dorm-fridge","minifridge/panel-cube-fridge","minifridge/15-inch-under-counter","minifridge/beverage-center","minifridge/countertop-cooler","minifridge/dual-zone-beverage","minifridge/outdoor-fridge","minifridge/12-bottle-wine-cooler","minifridge/18-bottle-wine-cooler","minifridge/46-bottle-dual-zone","minifridge/wine-column","minifridge/skincare","minifridge/gamer","kitchen2/single-tap-kegerator","kitchen2/dual-tap-kegerator","kitchen2/keg-backbar","extras/kegerator"]},{"id":"ranges","name":"Ranges & cooktops","items":["rangecfg/cfg-classic","rangecfg/cfg-otrglass","range/pro48","range/retro","range/gastop","range/woodstove","range/pizza","range/dome"]},{"id":"ovens","name":"Ovens & microwaves","items":["range/wall","range/wall2","range/combo","range/steam","ovens/classic-otr","ovens/black-glass-otr","ovens/flush-wall-oven","ovens/pro-double-oven","ovens/combo-wall-pro","ovens/speed-oven","ovens/steam-oven","ovens/microwave-drawer","microwave/counter","microwave/drawer","microwave/compact","microwave/combo","microwave/smart","countertop/flip-up-air-fry-oven","countertop/large-air-fry-oven","countertop/stacked-double-oven","countertop/brushed-steel-air-fry-oven","countertop/smart-steel-oven","countertop/steel-air-fry-toaster-oven","countertop/budget-4-slice-oven","countertop/steam-combi-oven","countertop/french-door-oven","countertop/black-air-fry-oven","smallkitchen/toasteroven"]},{"id":"hoods","name":"Range hoods","items":["microwave/pyramid","microwave/glass","microwave/island","microwave/undercab","microwave/mantel","microwave/plaster","microwave/downdraft","microwave/ceiling","microwave/angled","microwave/copper"]},{"id":"dishwashers","name":"Dishwashers","items":["dishwasher/front","dishwasher/hidden","dishwasher/projection","dishwasher/panel","dishwasher/drawer1","dishwasher/drawer2","dishwasher/slim","dishwasher/countertop","dishwasher/portable","dishwasher/glass","dishwasher/retro","dishwasher/smart","dishwasher/third","dishwasher/quiet","dishwasher/autoopen","dishwasher/opendrawer","dishwasher/dial","dishwasher/commercial"]},{"id":"coffee","name":"Coffee & kettles","items":["smallkitchen/drip","kitchen2/12-cup-drip-maker","kitchen2/steel-drip-maker","kitchen2/copper-element-drip-brewer","smallkitchen/pod","kitchen2/classic-pod-brewer","kitchen2/mini-pod-brewer","kitchen2/capsule-coffee-machine","smallkitchen/espresso","smallkitchen/bean","kitchen3/espresso-with-grinder","kitchen3/slim-espresso-machine","smallkitchen/goose","smallkitchen/glasskettle","smallkitchen/retrokettle"]},{"id":"small","name":"Small appliances","items":["smallkitchen/toaster2","smallkitchen/toaster4","kitchen3/steel-2-slice-toaster","smallkitchen/airfryer","smallkitchen/dualfryer","kitchen3/square-basket-air-fryer","kitchen3/round-basket-air-fryer","smallkitchen/multicooker","kitchen3/electric-pressure-cooker","kitchen3/pressure-crisp-cooker","smallkitchen/slowcooker","smallkitchen/rice","kitchen3/pressure-rice-cooker","smallkitchen/mixer","smallkitchen/blender","smallkitchen/bullet","smallkitchen/bread","smallkitchen/waffle"]},{"id":"popcorn","name":"Popcorn & food warmers","items":["popcorn/theater","popcorn/tabletop","popcorn/carnival","popcorn/hotair","popcorn/stovetop","popcorn/electric","popcorn/silicone","popcorn/retro","popcorn/lobby","popcorn/snackcart","countertop/vevor4","countertop/warmer2","countertop/buffet","countertop/drawer","countertop/heatlamp"]}]},{"id":"cleaning","name":"Laundry & cleaning","subs":[{"id":"laundry","name":"Washers & dryers","items":["laundrycfg/cfgscreen","laundrycfg/cfgtop","laundrycfg/cfgcombo"]},{"id":"robots","name":"Robot vacuums","items":["vacuum/lidar","vacuum/topcam","vacuum/dshape","vacuum/square","vacuum/slim","vacuum/selfempty","vacuum/allinone","vacuum/spinmop","vacuum/combo","vacuum/obstacle","vacuum/pethair","vacuum/mini","vacuum/dock","vacuum/stuck","vacuum/window"]},{"id":"vacuums","name":"Stick & upright vacuums","items":["vacuum/stick","vacuum/handheld","floorcare/laser-stick-vacuum","floorcare/cordless-handheld","floorcare/mini-handheld","floorcare/ball-upright-vacuum","floorcare/bagless-upright","floorcare/powered-lift-away","floorcare/classic-upright-vacuum","floorcare/bagged-canister","floorcare/shop-vac-5-gal"]},{"id":"washers","name":"Floor washers & carpet cleaners","items":["vacuum/washer","floorcare/stick-wet-cleaner","floorcare/wet-dry-stick","floorcare/smart-floor-washer","floorcare/multi-surface-washer","floorcare/upright-carpet-cleaner","floorcare/spot-carpet-cleaner","floorcare/rental-carpet-cleaner"]},{"id":"irons","name":"Irons","items":["extras/iron","home3/steam-iron","home3/iron_station","home3/iron_travel"]}]},{"id":"entertainment","name":"Entertainment","subs":[{"id":"tv","name":"TVs & projectors","items":["media/wall-tv","media/console-tv","media/art-tv","media/curved-tv","media/outdoor-tv","media/projector","media/ust"]},{"id":"speakers","name":"Smart speakers","items":["speakers2/tall-cylinder-speaker","speakers2/fabric-puck-speaker","speakers2/small-ball-speaker","speakers2/ball-speaker-with-clock","speakers2/large-ball-speaker","speakers2/half-ball-speaker","speakers2/studio-speaker-drum","speakers2/plug-in-mini-speaker","speakers2/car-voice-puck","speakers2/earbuds-case","speakers/vase-speaker","speakers/fabric-mini-speaker","speakers/mini-speaker-wall-hook","speakers/fabric-smart-speaker","speakers/large-fabric-speaker","speakers/round-smart-speaker","media/cylinder","media/sphere","media/puck"]},{"id":"displays","name":"Smart displays","items":["speakers2/round-alarm-display","speakers2/5-inch-smart-display","speakers2/8-inch-smart-display","speakers2/8-inch-photo-display","speakers2/swivel-smart-display","speakers2/15-inch-wall-display","speakers2/21-inch-wall-display","speakers2/wall-control-panel","speakers/7-inch-smart-display","speakers/10-inch-smart-display","media/display"]},{"id":"audio","name":"Audio & streaming","items":["media/soundbar-tv","media/soundbar-sub","media/bookshelf","media/tower","media/turntable","media/receiver","avr/black-receiver-wide-display","avr/porthole-display-receiver","avr/big-dial-receiver","avr/two-knob-receiver","avr/gloss-black-receiver","avr/slim-silver-receiver","avr/minimal-black-amp","avr/compact","avr/bluemeter","avr/vintage","avr/streamer","avr/separates","media/box","media/stick","speakers2/streaming-stick-remote","speakers/pebble-tv-streamer","speakers/streaming-dongle-remote"]},{"id":"consoles","name":"Game consoles","items":["consoles/big-black-box-console","consoles/glossy-curved-console","consoles/white-slim-console","consoles/black-slim-console","consoles/small-white-console","consoles/black-tower-console","consoles/16-bit-black-console","consoles/white-128-bit-console","consoles2/gray-disc-console","consoles2/mini-round-console","consoles2/black-ridged-console","consoles2/slim-black-console","consoles2/curved-gloss-console","consoles2/top-loader-console","consoles2/wedge-console","consoles2/three-layer-wedge","consoles2/tower-console-white-wings","consoles2/striped-wing-console","consoles3/8-bit-gray-console","consoles3/16-bit-gray-console","consoles3/64-bit-console","consoles3/cube-console","consoles3/slim-white-motion-console","consoles3/tablet-controller-console","consoles3/handheld-hybrid-console","consoles3/hybrid-console-oled","consoles3/handheld-only-console","consoles3/hybrid-console-2nd-gen","media/console"]},{"id":"arcade","name":"Arcade & pinball","items":["arcade/racing","arcade/deluxe","arcade/gun","arcade/fighter","arcade/golf","arcade/maze","arcade/space","arcade/brawler","arcade/tall","arcade/retro","arcade/party","arcade/countertop-cabinet","arcade/wall","arcade/cocktail","arcade/pinem","arcade/pindmd","arcade/pinwide","arcade/pindigital","arcade/pinmini"]}]},{"id":"computers","name":"Computers & network","subs":[{"id":"pcs","name":"Computers & laptops","items":["office/gaming","office/office","office/sff","office/mini","office/square","office/aio","office/ultra-thin-laptop","office/business","office/gaminglap","office/tent","office/budget-laptop"]},{"id":"monitors","name":"Monitors","items":["home4/27-inch-office-monitor","home4/34-inch-curved-monitor","home4/49-inch-super-wide","home4/aluminum-27-inch-display","home4/portable","extras/monitor"]},{"id":"printers","name":"Printers","items":["printers/aio","printers/slim","printers/tank","printers/photo6","printers/dyesub","printers/a3","printers/mono-ink","printers/mono-laser","printers/laser-aio","printers/color-laser","printers/color-mfp","printers/label","printers/receipt"]},{"id":"printers3d","name":"3D printers","items":["printers/enclosed-3d-printer","printers/boxy-enclosed-printer","printers/bed-slinger-3d-printer","printers/mini-3d-printer","printers3d/box-lidar","printers3d/box-solid","printers3d/pro-two","printers3d/large-two","printers3d/large-rack","printers3d/changer9","printers3d/slinger-side","printers3d/slinger-mini","printers3d/slinger-orange","printers3d/corexy-orange","printers3d/toolchanger","printers3d/bigbox-hub","printers3d/slinger-gray","printers3d/box-dark","printers3d/resin-smoke","printers3d/resin-orange","printers3d/kit-corexy","printers/resin","printers/delta","printers/largeformat"]},{"id":"network","name":"Racks, NAS & network","items":["home4/8u-open-frame","home4/open25u","home4/wall12u","home4/cab42u","home4/desktop-mini-rack","extras/rack","home4/nas4","home4/nas8","home4/gw1u","home4/nvr2u","home4/desksw8","extras/router","extras/mesh","speakers/mesh-router","speakers/mesh-point-speaker","speakers/plug-in-hub"]},{"id":"ups","name":"UPS & shredders","items":["office/upssmall","office/upslcd","office/upsrack","office/upsbrick","office/binshred","office/personal"]}]},{"id":"security","name":"Security & access","subs":[{"id":"cameras","name":"Cameras","items":["security/bullet","security/dome","security/turret","security/cube","security/pantilt","security/flood","security/spot","security/battery","security/solar","security/baby","security/ptz","security/dual","speakers/indoor-cam-wired","speakers/battery-cam"]},{"id":"doorbells","name":"Doorbells & chimes","items":["doorbell/tall","doorbell/square","doorbell/wedge","doorbell/package","doorbell/brass","doorbell/lighted","doorbell/intercom","doorbell/gatepost","doorbell/peephole","doorbell/plugin","doorbell/tubes","doorbell/smartchime","doorbell/school","doorbell/twist","doorbell/shopbell","doorbell/knocker","doorbell/monitor","speakers/battery-video-doorbell"]},{"id":"locks","name":"Smart locks","items":["lock/keypad","lock/touch","lock/retrofit","lock/fingerprint","lock/handleset","lock/mortise","lock/video","lock/btpadlock","lock/garage","lock/gate","lock/sliding","lock/office","lock/cylinder","lock/euro","lock/cabinet","lock/safe","lock/shed","lock/strike","lock/card","speakers/touch-deadbolt"]},{"id":"deadbolts","name":"Smart deadbolts","items":["deadbolts/arched-push-button","deadbolts/round-push-button","deadbolts/arched-wi-fi-touch","deadbolts/slim-wi-fi-touch","deadbolts/arched-keypad-lever","deadbolts/arched-touch-lever","deadbolts/slim-touch-lever","lock2/glass-touchscreen","lock2/push-button-keypad","lock2/a2kftouch","lock2/slim-touchscreen","lock2/levertouch","lock2/leverkeypad","lock2/smart-lock-black","lock2/entrance-handle-lock"]},{"id":"alarms","name":"Alarm panels & sirens","items":["safety/slim-white-keypad","safety/round-edge-keypad","safety/classic-alpha-keypad","safety/7-inch-touch-panel","safety/large-touch-panel","safety/camera-hub-panel","safety/command-touchscreen","safety/smart-alarm-panel","safety/wireless-keypad","safety/classic-lcd-keypad","security/keypad","security/touch","security/hub","security/panic","security/fob","security/indoorsiren","security/outsiren","security/garagesiren"]},{"id":"smoke","name":"Smoke & CO alarms","items":["safety/round-smoke-alarm","safety/combo-smoke-and-co","safety/hardwired-smoke-alarm","safety/smart-smoke-co","safety/smoke-listener","safety/nighthawk","safety/heat","speakers/smoke-and-co-alarm","sensor/smoke","sensor/co"]}]},{"id":"controls","name":"Sensors & switches","subs":[{"id":"sensors","name":"Sensors","items":["sensor/pir","sensor/ceiling","sensor/radar","sensor/door","sensor/window","sensor/garage","sensor/glass","sensor/leak","sensor/freezer","sensor/temp","sensor/outdoor","sensor/lux","sensor/washer","sensor/bed","sensor/soil","sensor/button"]},{"id":"switches","name":"Switches & dimmers","items":["switch/toggle","switch/paddle-rocker","switch/red-bar-dimmer","switch/dimmer","switch/rotary","switch/slide","switch/twogang","switch/blue-bar-2-in-1","switch/fan","switch/scene","switch/glass","switch/vintage","switch/remote","switch/display","switch/timer","switch/outlet","switch/lighted","switch/nightlight","switch/button","switch/industrial"]},{"id":"outlets","name":"Outlets","items":["outlets/hidden-plug-outlet","outlets/hidden-plug-light-ring","outlets/hidden-plug-usb-c","outlets/hidden-plug-usb-c-ring","outlets/duplex","outlets/rocker-style-outlet","outlets/usb","outlets/gfci","outlets/smart","outlets/tamper","outlets/tslot","outlets/night","outlets/dryer","outlets/weather","outlets/popup","outlets/floor","outlets/tvbox"]},{"id":"plugs","name":"Smart plugs & strips","items":["plug/mini","plug/round","plug/side","plug/energy","plug/outdoor","plug/inwall","plug/usbc","plug/dimmer","plug/night","plug/lamp","plug/string","plug/heavy","plug/strip","plug/surge","plug/tower","plug/reel","plug/floorbox","plug/popup","plug/undercab"]}]},{"id":"energy","name":"Power & energy","subs":[{"id":"ev","name":"EV chargers","items":["energy/round","energy/slim","energy/pedestal","energy/cord","energy/car","plug/ev"]},{"id":"solar","name":"Solar","items":["energy/roof","energy/ground","utility3/tracker","utility3/carport","utility3/balcony","energy/inverter"]},{"id":"batteries","name":"Home batteries & backup","items":["energy/slab","energy/stack","utility3/flat-wall-battery","utility3/modular-battery","utility3/tall-battery-cabinet","energy/station","energy/generator"]},{"id":"meters","name":"Energy meters","items":["utility3/smartmeter","utility3/in-panel-monitor","utility3/clip-on-energy-monitor","heating/ctmeter"]},{"id":"chargers","name":"Battery chargers","items":["chargers/aa4","chargers/aalcd","chargers/wall2","chargers/univ","chargers/li","chargers/usbc","chargers/camera","chargers/drone","chargers/ebike","chargers/p12","chargers/p18","chargers/rapid","chargers/dual","chargers/six","chargers/rack","chargers/stem","chargers/radio"]}]},{"id":"water","name":"Water & plumbing","subs":[{"id":"heaters","name":"Water heaters","items":["water/gastank","water/elec","water/tankless","water/heatpump","heating/solarthermal","utility3/flatplate","utility3/tubeground","utility3/thermosiphon"]},{"id":"valves","name":"Valves, filters & leak alarms","items":["water/ball","water/main","water/gas","water/softener","water/filter","water/alarm"]},{"id":"sump","name":"Sump pumps","items":["water/sump","water/pedestal","water/sealed","water/backup","water/waterpow"]},{"id":"pumps","name":"Well & utility pumps","items":["water/well","heating/jetpump","yard2/jetpump","yard2/booster","heating/centrifugal","yard2/endsuction","yard2/inline","yard2/diaphragm"]}]},{"id":"outdoor","name":"Outdoor, pool & yard","subs":[{"id":"lights","name":"Outdoor lights","items":["outdoor/coach","outdoor/gooseneck","outdoor/flush","outdoor/post","outdoor/pagoda","outdoor/mushroom","outdoor/treespot","outdoor/flood","outdoor/bistro","outdoor/deckstep","outdoor/bollard","outdoor/solar","outdoor/updown","outdoor/globe","outdoor/pillar","outdoor/well","outdoor/slot","outdoor/hanging","outdoor/eave","outdoor/icicle","outdoor2/brassspike","outdoor2/floodstake"]},{"id":"garage","name":"Garage doors & openers","items":["garage/raised","garage/double","garage/carriage","garage/glass","garage/flush","garage/longpanel","garage/plank","garage/rollup","garage/tiltup","garage/pair","garage/opener","garage/keypad","garage/button"]},{"id":"gates","name":"Gates & barriers","items":["garage/swing","garage/garden","garage/ranch","garage/privacy","garage/iron","garage/slat","garage/slide","outdoor2/slatgate","outdoor2/chainlink","outdoor2/irongate","outdoor2/foldarm","outdoor2/ledarm","outdoor2/skirtarm","extras/boom"]},{"id":"mailboxes","name":"Mailboxes & parcel boxes","items":["doorbell/mailbox","outdoor2/postbox","outdoor2/castbox","outdoor2/parcel","lock/parcel","sensor/mailbox","outdoor2/brassslot","outdoor2/chute","outdoor2/steelplate","extras/mailbox"]},{"id":"sprinklers","name":"Sprinklers & irrigation","items":["sprinklers/controller","sprinklers/hose","sprinklers/popup","sprinklers/smart","sprinklers/dial","sprinklers/touch","sprinklers/outdoor","sprinklers/modular","sprinklers/basic4","sprinklers/hdial","sprinklers/hdual","sprinklers/hhub","sprinklers/valve","sprinklers/rotor","sprinklers/impact","sprinklers/osc","sprinklers/drip","sprinklers/vbox","sprinklers/rain","sprinklers/flowsens"]},{"id":"mowers","name":"Robot mowers","items":["vacuum/mower","yard2/robot-mower-gray","yard2/robot-mower-orange","yard2/wire-free-robot-mower"]},{"id":"grills","name":"Grills & smokers","items":["grill/gas3","grill/gas4","grill/island","grill/kettle","grill/kamado","grill/portable","grill/griddle36","grill/griddle22","grill/builtgrid","grill/pellet","grill/vpellet","grill/offset","grill/bullet","grill/electric","grill/drum","grill/gravity","grill/infrared","grill/rotisserie","grill/santamaria","grill/hibachi"]},{"id":"pool","name":"Pools & pool equipment","items":["pool/inground","pool/above","pool/falls","pool/cover","pool/panel","pool/heater","pool/salt","yard2/variable-speed-pool-pump","yard2/above-ground-filter-pump"]},{"id":"poolrobots","name":"Pool robots","items":["pool/robot","vacuum/pool","yard2/brushed-pool-robot","yard2/pressure-side-pool-cleaner"]},{"id":"spa","name":"Hot tubs & saunas","items":["pool/hottub","yard2/square-acrylic-spa","yard2/inflatable-spa","yard2/cedartub","home2/finnish","home2/cube","heating/barrel","heating/cabin"]},{"id":"coops","name":"Chicken coops","items":["coops/backyard","coops/walkin","coops/tractor","coops/raised","coops/plastic","coops/fenced","coops/quail","coops/duckhouse","coops/autodoor","coops/heatwaterer","coops/nipple","coops/feeder","coops/heatpanel","coops/sensor"]}]},{"id":"plants","name":"Plants","subs":[{"id":"houseplants","name":"Houseplants","items":["builder:plantbuilder","plants/monstera","plants/snake","plants/pothos","plants/zz","plants/lily","plants/rubber","plants/pearls","plants/aloe","plants/jade","plants/succulents","plants/cactus","plants/calathea","plants/fern","plants/spider","plants/philodendron","plants/bird","plants/pilea","plants/herbs","plants/airplant","plants/hoya"]},{"id":"flowers","name":"Flowering plants","items":["flowers/orchid","flowers/poinsettia","flowers/violet","flowers/anthurium","flowers/hibiscus","flowers/geranium","flowers/begonia","flowers/kalanchoe","flowers/bromeliad","flowers/tulips","flowers/hydrangea","flowers/rose","flowers/gerbera","flowers/cyclamen","flowers/lavender","flowers/petunia","flowers/mum","flowers/azalea","flowers/amaryllis","flowers/bougainvillea"]},{"id":"trees","name":"Trees","items":["builder:treebuilder","trees/fiddle","trees/olive","trees/kentia","trees/ficus","trees/money","trees/lemon","trees/bonsai","trees/dracaena","trees/norfolk","trees/jmaple","trees/oak","trees/fallmaple","trees/birch","trees/spruce","trees/cherry","trees/palm","trees/willow","trees/apple","trees/aspen","trees/magnolia"]},{"id":"garden","name":"Garden beds & soil","items":["yard2/cedarbed","yard2/galvbed","yard2/elevated","extras/gardenbed"]}]},{"id":"home","name":"Home, pets & fitness","subs":[{"id":"blinds","name":"Blinds & curtains","items":["shades/roller","shades/blackout","shades/cellular","shades/tdbu","shades/roman","shades/wood","shades/mini","shades/vertical","shades/zebra","shades/drapes","shades/sheer","shades/layered","shades/cafe","shades/shutters","shades/skylight","shades/solar","shades/awning","shades/panels","shades/arched","shades/bay","home2/fauxwood","home2/smart-faux-wood-blinds"]},{"id":"shutters","name":"Exterior shutters","items":["extras/rollershutter","home2/alubox","home2/motorized-roller","home2/hurricane","extras/swingshutters","home2/boardbatten","home2/louvered","home2/raisedpanel"]},{"id":"bath","name":"Hair dryers & scales","items":["extras/hairdryer","home3/round-head-hair-dryer","home3/hot-air-brush","home3/hotel_dryer","extras/scale","home3/smart-glass-scale","home3/slim-smart-scale","home3/dial_scale"]},{"id":"pests","name":"Mouse traps","items":["extras/mousetrap","extras/snapsensor","extras/multicatch","extras/clamptrap","home3/electronic-mouse-trap","home3/live_trap"]},{"id":"petfood","name":"Pet feeders & fountains","items":["pets/feeder","home3/tall-pet-feeder","home3/wide-pet-feeder","home3/gravity_feeder","pets/fountain","home3/flower-pet-fountain","home3/tiered-pet-fountain","home3/clear-tank-pet-fountain"]},{"id":"aquariums","name":"Aquariums","items":["pets/aquarium","home3/rimless20","home3/curved-nano-aquarium","home3/tank55"]},{"id":"petcare","name":"Pet care & tech","items":["pets/litter","pets/door","pets/treatcam","pets/birdcam","pets/launcher","pets/bed","pets/collar"]},{"id":"cardio","name":"Cardio machines","items":["fitness/folding-treadmill","fitness/walkpad","fitness/curve","fitness/swivel-screen-bike","fitness/recumbent","fitness/screen-rower","fitness/air-rower","fitness/elliptical","fitness/stair-climber"]},{"id":"strength","name":"Strength & recovery","items":["fitness/wall-strength-trainer","fitness/cable-gym-station","fitness/mirror","fitness/vibe"]}]},{"id":"people","name":"People & pets","subs":[{"id":"people","name":"People","items":["people/man","people/woman","people/oldman","people/oldwoman","people/teenboy","people/teengirl","people/boy","people/girl","people/toddler","people/baby"]},{"id":"dogscats","name":"Dogs & cats","items":["petsfig/labrador","petsfig/golden","petsfig/shepherd","petsfig/frenchie","petsfig/beagle","petsfig/dachshund","petsfig/husky","petsfig/corgi","petsfig/collie","petsfig/poodle","petsfig/tabby","petsfig/blackcat","petsfig/siamese","petsfig/orangecat"]},{"id":"habitats","name":"Reptile & pet habitats","items":["habitats/frontglass","habitats/tallviv","habitats/meshcham","habitats/pvcpython","habitats/pvcdragon","habitats/bioactive","habitats/paludarium","habitats/tortoise","habitats/rack","habitats/pvcstack","habitats/leotank","habitats/turtle","habitats/hermit","habitats/tarantula","habitats/axolotl","habitats/birdcage","habitats/hamster","habitats/rabbitpen","habitats/incubator","habitats/brooder"]}]}];
-window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles: wing & slab","consoles3":"Consoles: handheld & family","speakers":"Smart home speakers & displays A","speakers2":"Smart home speakers & displays B","deadbolts":"Smart deadbolts: arched & slim","lock2":"Smart deadbolts: keypad & glass","airsensors:intro":"Sixteen air-quality and climate sensors, from simple light-bar boxes to e-ink and LED-dot monitors, on desks, shelves and walls. The slider is air quality: high is good (green), middle is fair (yellow), low is poor (orange, red). Each one shows it its own way: a light bar, a color ring, segment numbers, LED dots or a comfort face.","consoles:intro":"Block-style consoles from the original big black box to the newest black tower, plus two classic 90s consoles, drawn at real proportions with their controllers. When playing, the power light comes on, the jewel and the tower's top vent glow green, the memory card screen lights up, and the TV washes the wall.","consoles2:intro":"Every console in this family from the first gray disc box to the newest striped tower, drawn from press photos at real proportions with that era's controller. When playing, the real light comes on: green power lights on the first three, the white light bar on the wedge models and the edge strips on the wing towers, plus controller lights, while the TV washes the wall.","consoles3:intro":"Every home console in this family from the 8-bit gray box to the newest hybrid, in release order, drawn from photos at real proportions with their controllers. When playing, the power light comes on, the disc slot glows, handheld and tablet screens show original game scenery, and the TV washes the wall.","speakers2:intro":"Twenty voice-assistant devices drawn from real shapes, from the first tall speaker to the wall control panel. Listening lights the cyan-on-blue ring or light bar and the screens show a clock, weather, photo or home card; the slider is volume, shown as the ring filling white. The color is the device's real finish.","speakers:intro":"Twenty smart home devices on shelves, counters, walls and doors: speakers, smart displays, streamers, mesh Wi-Fi, thermostats, a smoke alarm, cameras, the doorbell, a deadbolt and a plug-in hub. On shows the four breathing dots, ambient screens and status lights; the slider sets volume.","deadbolts:intro":"Electronic deadbolts and levers by model and trim (arched, slim, round and square), redrawn from product photos (outside face only, no logos). On means LOCKED: bolt out, check or padlock lit green, keypad backlit; off means UNLOCKED: bolt in, status dim red. The color is that model's real finishes.","lock2:intro":"Smart deadbolts with glass touchscreens and keypads, redrawn from product photos (outside face only, no logos): keyed and key-free, slim and lever versions, a retrofit, a smart-standard lock, an entrance handle lock and a handleset. On means LOCKED: bolt out, check lit green, digits backlit; off means UNLOCKED: bolt in, red status. The color is that model's real finishes.","countertop:intro":"Real countertop ovens and food warmers. When cooking, the elements glow orange behind the glass, air-fry fans swirl, the rotisserie turns, steam rises and warmer lamps glow; the display shows the temperature (the slider sets it). Warmers let you pick the food; the stacked double oven runs each oven on its own and the flip-up oven can be flipped up.","floorcare:intro":"Twenty vacuums and carpet cleaners: stick vacuums with laser heads, uprights, lift-aways, wet-dry floor washers, carpet cleaners, a rental-style deep cleaner, canisters, a handheld and a shop vac. Cleaning spins the brush roll, swirls the bin, lights the head and shows the battery; the slider sets power.","fridge:intro":"Twenty fridge styles: 4-door flex panels and a screen fridge, knock-glass and color-glow French doors, plus classic top and bottom freezers, side-by-sides, a counter-depth French door and built-in columns. Running shows the dispenser light, displays, the door screen and lit glass panels; the slider sets display brightness.","home4:intro":"Server racks for the home lab (8U open frame, 12U glass wall cabinet, 42U mesh cabinet, 25U 4-post rack, 10-inch mini rack, 4-bay NAS) and desk monitors (27-inch office, 34-inch curved, 49-inch super-wide, aluminum 27-inch, a portable screen). On racks the slider is activity: more port and drive lights blink, faster. On monitors it is screen brightness.","outlets:intro":"In-wall outlets: hidden-plug outlets (plain, light ring, USB-C, USB-C with ring) plus common outlets from a plain duplex to GFCI, smart, floor and pop-up types. On means power on: LEDs and night-lights glow, a plug is in and its lamp is lit. The color is the plate or finish (the light on light-ring models).","printers:intro":"Thirteen home and office printers plus seven 3D printers on a desk (the four filament printers follow the approved lineup drawing). While printing, a page slides out (color pages from color printers, text from mono ones), the inkjet carriage runs back and forth and the status light blinks. The slider is the ink or toner level: on the gauges and the ink-tank windows, and below 25% everything turns amber. On 3D printers the slider is print progress: the part grows, the head moves, the bed glows and the resin plate lifts.","switch:intro":"Twenty wall switches, dimmers and keypads on painted walls. On flips each one to its ON position and lights its status LED in the LED color; dimmers fill their LED bar to the brightness. Plates come in white, ivory, almond, black, stainless, brass and glass by model.","utility2:intro":"Seventeen real boilers, heat pumps, circulators, buffer tanks and fresh-water stations in basements and utility rooms. On means running: displays light, flow moves in the pipes, pumps spin and flues shimmer. The slider is the output: temperatures, gauges and readouts follow it. The wall combi boiler has separate Heating and Hot water switches.","air2/boxy-wall-split":"Boxy wall split","air2/faceted-wall-split":"Faceted wall split","air2/mirror-glass-wall-split":"Mirror-glass wall split","air2/curved-bar-towel-ladder":"Curved-bar towel ladder","air2/capsule-diesel-heater":"Capsule diesel heater","air2/ribbed-top-diesel-heater":"Ribbed-top diesel heater","air2/portable-box-diesel-heater":"Portable box diesel heater","air2/upright-hrv-dark-panel":"Upright HRV, dark panel","air2/hanging-gray-hrv":"Hanging gray HRV","air2/ceiling-erv-two-ducts":"Ceiling ERV, two ducts","air2/loop-purifier-heater":"Loop purifier heater","air2/big-dome-purifier":"Big dome purifier","airsensors/light-bar-box-sensor":"Light-bar box sensor","airsensors/upright-lcd-air-monitor":"Upright LCD air monitor","airsensors/oval-led-dot-co2-clock":"Oval LED-dot CO2 clock","airsensors/round-dot-display-sensor":"Round dot-display sensor","arcade/countertop-cabinet":"Countertop cabinet","avr/black-receiver-wide-display":"Black receiver, wide display","avr/porthole-display-receiver":"Porthole-display receiver","avr/big-dial-receiver":"Big-dial receiver","avr/two-knob-receiver":"Two-knob receiver","avr/gloss-black-receiver":"Gloss-black receiver","avr/slim-silver-receiver":"Slim silver receiver","avr/minimal-black-amp":"Minimal black amp","consoles/big-black-box-console":"Big black box console","consoles/glossy-curved-console":"Glossy curved console","consoles/white-slim-console":"White slim console","consoles/black-slim-console":"Black slim console","consoles/small-white-console":"Small white console","consoles/black-tower-console":"Black tower console","consoles/16-bit-black-console":"16-bit black console","consoles/white-128-bit-console":"White 128-bit console","countertop/flip-up-air-fry-oven":"Flip-up air fry oven","countertop/large-air-fry-oven":"Large air fry oven","countertop/stacked-double-oven":"Stacked double oven","countertop/brushed-steel-air-fry-oven":"Brushed steel air fry oven","countertop/smart-steel-oven":"Smart steel oven","countertop/steel-air-fry-toaster-oven":"Steel air fry toaster oven","countertop/budget-4-slice-oven":"Budget 4-slice oven","countertop/steam-combi-oven":"Steam combi oven","countertop/french-door-oven":"French-door oven","countertop/black-air-fry-oven":"Black air fry oven","speakers2/tall-cylinder-speaker":"Tall cylinder speaker","speakers2/fabric-puck-speaker":"Fabric puck speaker","speakers2/small-ball-speaker":"Small ball speaker","speakers2/ball-speaker-with-clock":"Ball speaker with clock","speakers2/large-ball-speaker":"Large ball speaker","speakers2/half-ball-speaker":"Half-ball speaker","speakers2/studio-speaker-drum":"Studio speaker drum","speakers2/round-alarm-display":"Round alarm display","speakers2/plug-in-mini-speaker":"Plug-in mini speaker","speakers2/car-voice-puck":"Car voice puck","speakers2/5-inch-smart-display":"5-inch smart display","speakers2/8-inch-smart-display":"8-inch smart display","speakers2/8-inch-photo-display":"8-inch photo display","speakers2/swivel-smart-display":"Swivel smart display","speakers2/15-inch-wall-display":"15-inch wall display","speakers2/21-inch-wall-display":"21-inch wall display","speakers2/wall-control-panel":"Wall control panel","speakers2/kids-glow-lamp":"Kids glow lamp","speakers2/streaming-stick-remote":"Streaming stick + remote","speakers2/earbuds-case":"Earbuds case","fitness/connected-treadmill-big":"Connected treadmill, big screen","fitness/folding-treadmill":"Folding treadmill","fitness/heavy-duty-treadmill":"Heavy-duty treadmill","fitness/swivel-screen-bike":"Swivel-screen bike","fitness/studio-bike":"Studio bike","fitness/screen-rower":"Screen rower","fitness/wood-water-rower":"Wood water rower","fitness/air-rower":"Air rower","fitness/stair-climber":"Stair climber","fitness/wall-strength-trainer":"Wall strength trainer","fitness/cable-gym-station":"Cable gym station","floorcare/laser-stick-vacuum":"Laser stick vacuum","floorcare/long-run-stick-vacuum":"Long-run stick vacuum","floorcare/classic-stick-vacuum":"Classic stick vacuum","floorcare/ball-upright-vacuum":"Ball upright vacuum","floorcare/cordless-handheld":"Cordless handheld","floorcare/stick-wet-cleaner":"Stick wet cleaner","floorcare/bagless-upright":"Bagless upright","floorcare/lift-away-upright":"Lift-away upright","floorcare/powered-lift-away":"Powered lift-away","floorcare/wet-dry-stick":"Wet-dry stick","floorcare/smart-floor-washer":"Smart floor washer","floorcare/multi-surface-washer":"Multi-surface washer","floorcare/upright-carpet-cleaner":"Upright carpet cleaner","floorcare/spot-carpet-cleaner":"Spot carpet cleaner","floorcare/rental-carpet-cleaner":"Rental carpet cleaner","floorcare/classic-upright-vacuum":"Classic upright vacuum","floorcare/bagged-canister":"Bagged canister","floorcare/bagless-canister":"Bagless canister","floorcare/mini-handheld":"Mini handheld","floorcare/shop-vac-5-gal":"Shop vac 5 gal","fridge/4-door-flex-with-screen":"4-door flex with screen","fridge/4-door-flex-panels":"4-door flex panels","fridge/3-door-panel-fridge":"3-door panel fridge","fridge/side-by-side-with-screen":"Side-by-side with screen","fridge/panel-bottom-freezer":"Panel bottom freezer","fridge/panel-column-pair":"Panel column pair","fridge/knock-glass-french-door":"Knock-glass French door","fridge/round-ice-4-door":"Round-ice 4-door","fridge/door-within-door-side-by":"Door-within-door side-by-side","fridge/color-glow-french-door":"Color-glow French door","fridge/steel-top-freezer":"Steel top freezer","fridge/color-panel-glass-door":"Color-panel glass door","home2/black-pellet-stove":"Black pellet stove","home2/compact-pellet-stove":"Compact pellet stove","home2/budget-pellet-stove":"Budget pellet stove","home2/cast-iron-wood-stove":"Cast-iron wood stove","home2/steel-wood-stove":"Steel wood stove","home2/motorized-roller":"Motorized roller","home2/smart-faux-wood-blinds":"Smart faux-wood blinds","home3/steam-iron":"Steam iron","home3/round-head-hair-dryer":"Round-head hair dryer","home3/hot-air-brush":"Hot-air brush","home3/smart-glass-scale":"Smart glass scale","home3/slim-smart-scale":"Slim smart scale","home3/tall-pet-feeder":"Tall pet feeder","home3/wide-pet-feeder":"Wide pet feeder","home3/flower-pet-fountain":"Flower pet fountain","home3/tiered-pet-fountain":"Tiered pet fountain","home3/clear-tank-pet-fountain":"Clear-tank pet fountain","home3/curved-nano-aquarium":"Curved nano aquarium","home3/electronic-mouse-trap":"Electronic mouse trap","home4/8u-open-frame":"8U open frame","home4/desktop-mini-rack":"Desktop mini rack","home4/27-inch-office-monitor":"27-inch office monitor","home4/34-inch-curved-monitor":"34-inch curved monitor","home4/49-inch-super-wide":"49-inch super-wide","home4/aluminum-27-inch-display":"Aluminum 27-inch display","kitchen2/7-cu-ft-chest-freezer":"7 cu ft chest freezer","kitchen2/5-cu-ft-chest-freezer":"5 cu ft chest freezer","kitchen2/3-5-cu-ft-chest-freezer":"3.5 cu ft chest freezer","kitchen2/13-cu-ft-upright-freezer":"13 cu ft upright freezer","kitchen2/garage-ready-upright":"Garage-ready upright","kitchen2/compact-upright-freezer":"Compact upright freezer","kitchen2/single-tap-kegerator":"Single-tap kegerator","kitchen2/dual-tap-kegerator":"Dual-tap kegerator","kitchen2/12-cup-drip-maker":"12-cup drip maker","kitchen2/steel-drip-maker":"Steel drip maker","kitchen2/copper-element-drip-brewer":"Copper-element drip brewer","kitchen2/classic-pod-brewer":"Classic pod brewer","kitchen2/mini-pod-brewer":"Mini pod brewer","kitchen2/capsule-coffee-machine":"Capsule coffee machine","kitchen3/espresso-with-grinder":"Espresso with grinder","kitchen3/slim-espresso-machine":"Slim espresso machine","kitchen3/square-basket-air-fryer":"Square basket air fryer","kitchen3/round-basket-air-fryer":"Round basket air fryer","kitchen3/electric-pressure-cooker":"Electric pressure cooker","kitchen3/pressure-crisp-cooker":"Pressure-crisp cooker","kitchen3/express-multicooker":"Express multicooker","kitchen3/fuzzy-logic-rice-cooker":"Fuzzy-logic rice cooker","kitchen3/8-cup-digital-rice-cooker":"8-cup digital rice cooker","kitchen3/pressure-rice-cooker":"Pressure rice cooker","kitchen3/steel-2-slice-toaster":"Steel 2-slice toaster","kitchen3/retro-2-slice-toaster":"Retro 2-slice toaster","lock2/glass-touchscreen":"Glass touchscreen","lock2/push-button-keypad":"Push-button keypad","lock2/touchscreen-plus":"Touchscreen plus","lock2/slim-touchscreen":"Slim touchscreen","lock2/slim-touchscreen-brass":"Slim touchscreen, brass","lock2/retrofit-lock":"Retrofit lock","lock2/smart-lock-white":"Smart lock, white","lock2/smart-lock-black":"Smart lock, black","lock2/entrance-handle-lock":"Entrance handle lock","lock2/slim-handleset":"Slim handleset","minifridge/white-cube-fridge":"White cube fridge","minifridge/3-1-cu-ft-mini":"3.1 cu ft mini","minifridge/retro-mini-fridge":"Retro mini fridge","minifridge/2-door-dorm-fridge":"2-door dorm fridge","minifridge/panel-cube-fridge":"Panel cube fridge","minifridge/15-inch-under-counter":"15-inch under-counter","minifridge/beverage-center":"Beverage center","minifridge/countertop-cooler":"Countertop cooler","minifridge/dual-zone-beverage":"Dual-zone beverage","minifridge/outdoor-fridge":"Outdoor fridge","minifridge/12-bottle-wine-cooler":"12-bottle wine cooler","minifridge/18-bottle-wine-cooler":"18-bottle wine cooler","minifridge/46-bottle-dual-zone":"46-bottle dual-zone","minifridge/wine-column":"Wine column","speakers/vase-speaker":"Vase speaker","speakers/fabric-mini-speaker":"Fabric mini speaker","speakers/mini-speaker-wall-hook":"Mini speaker, wall hook","speakers/fabric-smart-speaker":"Fabric smart speaker","speakers/large-fabric-speaker":"Large fabric speaker","speakers/7-inch-smart-display":"7-inch smart display","speakers/10-inch-smart-display":"10-inch smart display","speakers/pebble-tv-streamer":"Pebble TV streamer","speakers/streaming-dongle-remote":"Streaming dongle + remote","speakers/round-smart-speaker":"Round smart speaker","speakers/mesh-router":"Mesh router","speakers/mesh-point-speaker":"Mesh point speaker","speakers/round-learning-thermostat":"Round learning thermostat","speakers/frosted-thermostat":"Frosted thermostat","speakers/smoke-and-co-alarm":"Smoke & CO alarm","speakers/indoor-cam-wired":"Indoor cam, wired","speakers/battery-cam":"Battery cam","speakers/battery-video-doorbell":"Battery video doorbell","speakers/touch-deadbolt":"Touch deadbolt","speakers/plug-in-hub":"Plug-in hub","consoles3/8-bit-gray-console":"8-bit gray console","consoles3/16-bit-gray-console":"16-bit gray console","consoles3/64-bit-console":"64-bit console","consoles3/cube-console":"Cube console","consoles3/slim-white-motion-console":"Slim white motion console","consoles3/tablet-controller-console":"Tablet-controller console","consoles3/handheld-hybrid-console":"Handheld hybrid console","consoles3/hybrid-console-oled":"Hybrid console, OLED","consoles3/handheld-only-console":"Handheld-only console","consoles3/hybrid-console-2nd-gen":"Hybrid console, 2nd gen","office/ultra-thin-laptop":"Ultra-thin laptop","office/budget-laptop":"Budget laptop","outlets/hidden-plug-outlet":"Hidden plug outlet","outlets/hidden-plug-light-ring":"Hidden plug, light ring","outlets/hidden-plug-usb-c":"Hidden plug, USB-C","outlets/hidden-plug-usb-c-ring":"Hidden plug, USB-C ring","outlets/rocker-style-outlet":"Rocker-style outlet","ovens/steel-otr-glass-touch":"Steel OTR, glass touch","ovens/classic-otr":"Classic OTR","ovens/black-glass-otr":"Black-glass OTR","ovens/low-profile-otr":"Low-profile OTR","ovens/pro-handle-otr":"Pro-handle OTR","ovens/bronze-handle-otr":"Bronze-handle OTR","ovens/single-wall-oven":"Single wall oven","ovens/flush-wall-oven":"Flush wall oven","ovens/pro-double-oven":"Pro double oven","ovens/classic-double-oven":"Classic double oven","ovens/glass-double-oven":"Glass double oven","ovens/combo-wall-glass":"Combo wall, glass","ovens/combo-wall-pro":"Combo wall, pro","ovens/speed-oven":"Speed oven","ovens/steam-oven":"Steam oven","ovens/microwave-drawer":"Microwave drawer","consoles2/gray-disc-console":"Gray disc console","consoles2/mini-round-console":"Mini round console","consoles2/black-ridged-console":"Black ridged console","consoles2/slim-black-console":"Slim black console","consoles2/curved-gloss-console":"Curved gloss console","consoles2/matte-slim-console":"Matte slim console","consoles2/top-loader-console":"Top-loader console","consoles2/wedge-console":"Wedge console","consoles2/rounded-wedge-console":"Rounded wedge console","consoles2/three-layer-wedge":"Three-layer wedge","consoles2/tower-console-white-wings":"Tower console, white wings","consoles2/discless-wing-console":"Discless wing console","consoles2/slim-wing-console":"Slim wing console","consoles2/striped-wing-console":"Striped wing console","printers/enclosed-3d-printer":"Enclosed 3D printer","printers/boxy-enclosed-printer":"Boxy enclosed printer","printers/bed-slinger-3d-printer":"Bed-slinger 3D printer","printers/mini-3d-printer":"Mini 3D printer","safety/slim-white-keypad":"Slim white keypad","safety/round-edge-keypad":"Round-edge keypad","safety/classic-alpha-keypad":"Classic alpha keypad","safety/7-inch-touch-panel":"7-inch touch panel","safety/large-touch-panel":"Large touch panel","safety/camera-hub-panel":"Camera hub panel","safety/command-touchscreen":"Command touchscreen","safety/smart-alarm-panel":"Smart alarm panel","safety/wireless-keypad":"Wireless keypad","safety/classic-lcd-keypad":"Classic LCD keypad","safety/round-smoke-alarm":"Round smoke alarm","safety/speaker-smoke-alarm":"Speaker smoke alarm","safety/combo-smoke-and-co":"Combo smoke & CO","safety/hardwired-smoke-alarm":"Hardwired smoke alarm","safety/smart-smoke-co":"Smart smoke + CO","safety/compact-smoke-alarm":"Compact smoke alarm","safety/alarm-listener-disc":"Alarm listener disc","safety/smoke-listener":"Smoke listener","deadbolts/arched-push-button":"Arched push-button","deadbolts/round-push-button":"Round push-button","deadbolts/arched-touch-alarm":"Arched touch, alarm","deadbolts/arched-touch-deadbolt":"Arched touch deadbolt","deadbolts/slim-touch-deadbolt":"Slim touch deadbolt","deadbolts/arched-wi-fi-touch":"Arched Wi-Fi touch","deadbolts/slim-wi-fi-touch":"Slim Wi-Fi touch","deadbolts/arched-touchscreen":"Arched touchscreen","deadbolts/slim-touchscreen":"Slim touchscreen","deadbolts/square-touchscreen":"Square touchscreen","deadbolts/arched-fingerprint":"Arched fingerprint","deadbolts/slim-fingerprint":"Slim fingerprint","deadbolts/slim-keypad-deadbolt":"Slim keypad deadbolt","deadbolts/arched-keypad-deadbolt":"Arched keypad deadbolt","deadbolts/round-keypad-deadbolt":"Round keypad deadbolt","deadbolts/round-keypad-lever":"Round keypad lever","deadbolts/arched-keypad-lever":"Arched keypad lever","deadbolts/arched-touch-lever":"Arched touch lever","deadbolts/slim-touch-lever":"Slim touch lever","deadbolts/arched-smart-lever":"Arched smart lever","switch/paddle-rocker":"Paddle rocker","switch/red-bar-dimmer":"Red-bar dimmer","switch/blue-bar-2-in-1":"Blue-bar 2-in-1","utility2/wall-combi-boiler":"Wall combi boiler","utility2/compact-condensing-boiler":"Compact condensing boiler","utility2/hopper-pellet-boiler":"Hopper pellet boiler","utility2/tall-pellet-boiler":"Tall pellet boiler","utility2/compact-pellet-boiler":"Compact pellet boiler","utility2/geothermal-heat-pump":"Geothermal heat pump","utility2/ground-loop-heat-pump":"Ground-loop heat pump","utility2/slim-geothermal-unit":"Slim geothermal unit","utility2/smart-circulator":"Smart circulator","utility2/classic-circulator":"Classic circulator","utility2/large-smart-circulator":"Large smart circulator","utility3/flat-wall-battery":"Flat wall battery","utility3/modular-battery":"Modular battery","utility3/tall-battery-cabinet":"Tall battery cabinet","utility3/in-panel-monitor":"In-panel monitor","utility3/clip-on-energy-monitor":"Clip-on energy monitor","yard2/variable-speed-pool-pump":"Variable-speed pool pump","yard2/classic-pool-pump":"Classic pool pump","yard2/above-ground-filter-pump":"Above-ground filter pump","yard2/square-acrylic-spa":"Square acrylic spa","yard2/inflatable-spa":"Inflatable spa","yard2/brushed-pool-robot":"Brushed pool robot","yard2/pressure-side-pool-cleaner":"Pressure-side pool cleaner","yard2/robot-mower-gray":"Robot mower, gray","yard2/robot-mower-orange":"Robot mower, orange","yard2/wire-free-robot-mower":"Wire-free robot mower"};
+window.HDA_CATALOG = [{"id":"lighting","name":"Lighting","subs":[{"id":"ceiling","name":"Ceiling lights","items":["ceilinglight/dome","ceilinglight/drum","ceilinglight/bowl","ceilinglight/school","ceilinglight/wafer","ceilinglight/can","ceilinglight/cans","ceilinglight/gimbal","ceilinglight/track","ceilinglight/monorail","ceilinglight/panel","ceilinglight/shop","ceilinglight/ring","ceilinglight/stars","ceilinglight/cove","ceilinglight/crystal","ceilinglight/cage","ceilinglight/moroccan","ceilinglight/vent","ceilinglight/skylight"]},{"id":"pendants","name":"Pendants","items":["pendant/globe","pendant/seeded","pendant/dome","pendant/bell","pendant/mushroom","pendant/rattan","pendant/drum","pendant/cage","pendant/prism","pendant/rings","pendant/lantern","pendant/trio","pendant/linear","pendant/concrete","pendant/smoked","pendant/ceramic","pendant/beehive","pendant/box","pendant/island","pendant/artichoke","lights2/globe3","lights2/edison5","bulbs/cord","lights9/pendantgroup"]},{"id":"chandeliers","name":"Chandeliers","items":["chandelier/crystal","chandelier/candle","chandelier/wagon","chandelier/farmhouse","chandelier/sputnik","chandelier/linear","chandelier/empire","chandelier/halo","chandelier/rings","chandelier/drum","chandelier/beads","chandelier/branch","chandelier/orb","chandelier/bubble","chandelier/raindrop","chandelier/spanish","chandelier/midcentury","chandelier/edison","chandelier/capiz","chandelier/venetian"]},{"id":"wall","name":"Wall lights & sconces","items":["wall/updown","wall/halfmoon","wall/candle","wall/swingarm","wall/picture","wall/globe","wall/edison","wall/shell","wall/alabaster","wall/rattan","wall/gooseneck","wall/coach","wall/cube","wall/jar","wall/flood","wall/step","wall/reading","wall/deco","wall/candelabra","wall/hexagon"]},{"id":"spots","name":"Spot & picture lights","items":["spotlights/track","spotlights/monorail","spotlights/runner","spotlights/plugin","spotlights/cylinder","spotlights/gimbal","spotlights/washer","spotlights/wafer","spotlights/colorspot","spotlights/brasspic","spotlights/ledbar","spotlights/battery","spotlights/museum","spotlights/mirror","spotlights/shelfpuck","spotlights/upcan","spotlights/sconcepair","spotlights/spotbar","spotlights/tripod"]},{"id":"bulbs","name":"Bulbs","items":["bulbs/a19","bulbs/a21","bulbs/br30","bulbs/par38","bulbs/gu10","bulbs/mr16","bulbs/st64","bulbs/g25","bulbs/g40","bulbs/b11","bulbs/t30","lights2/g40","lights2/t45","lights2/candlefil","lights9/bulbgroup"]},{"id":"mirror","name":"Mirror & vanity lights","items":["mirror/hollywood","mirror/halo","mirror/rect","mirror/band","mirror/capsule","mirror/arch","mirror/bar3","mirror/edison","mirror/linear","mirror/flank","mirror/swing","mirror/trifold","mirror/tabletop","mirror/cabinet","mirror/picture","mirror/ring","mirror/globebar","mirror/pendants","mirror/antifog","mirror/floor"]},{"id":"special","name":"Grow, UV & emergency lights","items":["lights9/growbar","lights9/clipgrow","lights9/growstrip","lights9/blacklight","lights9/uvsanitizer","lights9/twinhead","lights9/exitsign"]}]},{"id":"lamps","name":"Lamps & accent lights","subs":[{"id":"floor","name":"Floor lamps","items":["floor/arc","floor/torchiere","floor/tripod-drum","floor/wood-tripod","floor/tree","floor/paper","floor/corner-bar","floor/mid-century","floor/gooseneck","floor/globe","floor/pharmacy","floor/shelf","floor/mushroom","floor/linen-drum","floor/pipe","floor/rattan","floor/ring","floor/spotlight","floor/orbs","floor/pleated"]},{"id":"desk","name":"Desk lamps","items":["desk/architect","desk/banker","desk/monitor-bar","desk/gooseneck","desk/clamp-task","desk/charger","desk/copper-pipe","desk/piano","desk/ring-light","desk/magnifier","desk/arc-slab","desk/mushroom","desk/lantern","desk/robot","desk/clip-on","desk/bauhaus","desk/daylight","desk/shelf-bar","desk/rgb-bars","desk/cube"]},{"id":"nightstand","name":"Nightstand lamps","items":["nightstand/gourd","nightstand/candlestick","nightstand/glass-jug","nightstand/mushroom","nightstand/crystal","nightstand/edison","nightstand/tripod","nightstand/rattan","nightstand/paper","nightstand/tulip","nightstand/tiffany","nightstand/salt","nightstand/sunrise","nightstand/smart-globe","nightstand/moon","nightstand/usb","nightstand/swing-arm","nightstand/cordless","nightstand/lava","nightstand/clamp","speakers2/kids-glow-lamp"]},{"id":"strips","name":"LED strips & panels","items":["ledstrips/toekick","ledstrips/abovecab","ledstrips/tray","ledstrips/crown","ledstrips/stairs","ledstrips/handrail","ledstrips/underbed","ledstrips/headboard","ledstrips/deskedge","ledstrips/mirror","ledstrips/closet","ledstrips/bookcase","ledstrips/panel","ledstrips/garage","ledstrips/eave","ledstrips/deck","ledstrips/pergola","ledstrips/rgbic","ledstrips/cob","ledstrips/smd","bulbs/undercab","bulbs/tvback","bulbs/neon","bulbs/bars","bulbs/hex","bulbs/tri","bulbs/shelf","bulbs/orb"]},{"id":"neon","name":"Neon signs","items":["neon/open","neon/bar","neon/gameroom","neon/gameon","neon/coffee","neon/home","neon/vibes","neon/hello","neon/party","neon/mancave","neon/player","neon/heart","neon/bolt","neon/palm","neon/cactus","neon/beer","neon/cocktail","neon/pizza","neon/rainbow","neon/pixel"]},{"id":"holiday","name":"Holiday trees","items":["lights2/flocked","lights2/tabletop","lights2/pencil","extras/xmastree"]}]},{"id":"fans","name":"Fans","subs":[{"id":"ceiling","name":"Ceiling fans","items":["ceilingfan/classic","ceilingfan/nickel","ceilingfan/ledblack","ceilingfan/hugger","ceilingfan/industrial","ceilingfan/palm","ceilingfan/rattan","ceilingfan/windmill","ceilingfan/propeller","ceilingfan/retract","ceilingfan/orb","ceilingfan/bowl","ceilingfan/twin","ceilingfan/outdoor","ceilingfan/drum","ceilingfan/minimal","ceilingfan/crystal","ceilingfan/airplane","ceilingfan/vintage"]},{"id":"box","name":"Box & table fans","items":["boxfan/classic","boxfan/handle","boxfan/drum","boxfan/tilt","boxfan/circulator","boxfan/desk","boxfan/clip","boxfan/usb","boxfan/deco","boxfan/brass","boxfan/table","boxfan/slim","boxfan/shop","boxfan/bladeless","boxfan/remote","boxfan/wood","boxfan/cube","boxfan/mist","boxfan/camping","boxfan/pullcord"]},{"id":"stand","name":"Stand fans","items":["standfan/classic","standfan/remote","standfan/cross","standfan/chrome","standfan/vintage","standfan/dc7","standfan/bladeless","standfan/misting","standfan/industrial","standfan/circulator","standfan/double","standfan/telescope","standfan/smart","standfan/minimal","standfan/kids","standfan/swivel","standfan/deco","standfan/cordless","standfan/hidden"]},{"id":"tower","name":"Tower fans","items":["towerfan/classic","towerfan/display","towerfan/slim","towerfan/woodgrain","towerfan/pedestal","towerfan/handle","towerfan/wave","towerfan/cylinder","towerfan/slot","towerfan/mini","towerfan/mist","towerfan/smart","towerfan/ceramic","towerfan/twin","towerfan/tall","towerfan/kids","towerfan/aqring","towerfan/retro","towerfan/budget","towerfan/nightlight"]},{"id":"window","name":"Window & wall fans","items":["windowfan/twin","windowfan/slim","windowfan/triple","windowfan/casement","windowfan/boxsash","windowfan/rainguard","windowfan/smart","windowfan/basement","windowfan/autolock","windowfan/wallosc"]},{"id":"exhaust","name":"Exhaust, attic & whole-house fans","items":["windowfan/bath","windowfan/kitchen","windowfan/roundvent","windowfan/shutter","windowfan/shop","windowfan/greenhouse","windowfan/rvvent","windowfan/gable","windowfan/solar","windowfan/wholehouse","evap/gable","evap/solargable","evap/powervent","evap/solar","evap/turbine","evap/wholehouse","evap/ducted","evap/controller"]}]},{"id":"climate","name":"Heating & cooling","subs":[{"id":"thermostats","name":"Thermostats & controls","items":["thermostat/learning","thermostat/square","thermostat/dial","thermostat/programmable","thermostat/touchscreen","thermostat/pill","thermostat/withsensor","thermostat/baseboard","thermostat/splitwall","thermostat/remote","thermostat/ptac","thermostat/radiant","thermostat/humidistat","thermostat/vent","thermostat/puck","thermostat/zone","thermostat/mercury","thermostat/boiler","thermostat/atticfan","thermostat/colorring","speakers/round-learning-thermostat","speakers/frosted-thermostat"]},{"id":"ac","name":"Air conditioners","items":["ac/window","ac/ushape","ac/saddle","ac/portable","ac/dualhose","ac/minisplit","ac/condenser","ac/cassette","ac/console","ac/ptac","ac/wall","ac/central","ac/remote","ac/rv","ac/desk","ac/heatpump","ac/smart","ac/attic","air2/boxy-wall-split","air2/faceted-wall-split","air2/mirror-glass-wall-split"]},{"id":"evap","name":"Evaporative coolers","items":["evap/window","evap/thruwall","evap/downdraft","evap/sidedraft","evap/grille","evap/tower","evap/shop","evap/desk","evap/blower","ac/swamp"]},{"id":"heaters","name":"Space & diesel heaters","items":["heater/oil","heater/cube","heater/tower","heater/dish","heater/quartz","heater/utility","heater/mica","heater/vintage","heater/panel","heater/baseboard","heater/loop","heater/smart","heating/diesel","air2/capsule-diesel-heater","air2/ribbed-top-diesel-heater","air2/portable-box-diesel-heater"]},{"id":"fireplaces","name":"Fireplaces, stoves & fire pits","items":["fireplace/wall","fireplace/insert","fireplace/linear","fireplace/tvstand","fireplace/estove","fireplace/gasstove","fireplace/pittable","fireplace/firebowl","fireplace/woodhearth","heater/insert","heater/linear","heater/stove","heater/bowl","heater/patio","home2/black-pellet-stove","home2/compact-pellet-stove","home2/budget-pellet-stove","home2/cast-iron-wood-stove","home2/steel-wood-stove","heating/pelletstove","heating/woodstove"]},{"id":"radiators","name":"Radiators, valves & towel warmers","items":["heating/panelrad","heating/columnrad","air2/castiron","air2/vertical","heating/towelrail","heater/towel","air2/curved-bar-towel-ladder","air2/freestand","covers2/trvround","covers2/trvsquare","covers2/trvdisplay"]},{"id":"boilers","name":"Boilers & heat pumps","items":["heating/combi","heating/floorboiler","utility2/wall-combi-boiler","utility2/compact-condensing-boiler","heating/pelletboiler","utility2/hopper-pellet-boiler","utility2/tall-pellet-boiler","utility2/compact-pellet-boiler","heating/gshp","utility2/geothermal-heat-pump","utility2/ground-loop-heat-pump","utility2/slim-geothermal-unit"]},{"id":"hydronic","name":"Underfloor, pumps & tanks","items":["heating/ufh","air2/pumpstation","air2/elecmat","air2/pexloops","heating/circ","utility2/smart-circulator","utility2/classic-circulator","utility2/large-smart-circulator","heating/buffer","utility2/buffer50","utility2/wallbuffer","utility2/stratified","heating/freshwater","utility2/fwswall","utility2/fwscompact","utility2/fwscabinet"]}]},{"id":"air","name":"Air quality","subs":[{"id":"purifiers","name":"Air purifiers","items":["purifier/cylinder","purifier/sleeve","purifier/loop","purifier/ringpanel","purifier/woodcube","purifier/wallpanel","purifier/room","purifier/desk","purifier/planter","purifier/sidetable","purifier/carmini","purifier/lightbar","purifier/pet","purifier/egg","purifier/display","purifier/retro","purifier/ceiling","purifier/column","purifier/window","purifier/cone","air2/loop-purifier-heater","air2/big-dome-purifier"]},{"id":"humidifiers","name":"Humidifiers","items":["humidifier/cleartank","humidifier/teardrop","humidifier/woodbase","humidifier/evaporative","humidifier/warmmist","humidifier/tower","humidifier/turnnozzle","humidifier/usbcup","humidifier/flame","humidifier/cloud","humidifier/ledring","humidifier/console","humidifier/plantpot","humidifier/cordless","humidifier/dual","humidifier/smartring","humidifier/vaporizer","humidifier/glasstank","humidifier/fabricband","humidifier/desksquare"]},{"id":"dehumidifiers","name":"Dehumidifiers","items":["dehumidifier/upright","dehumidifier/compact","dehumidifier/small","dehumidifier/basement","dehumidifier/crawl","dehumidifier/whole","dehumidifier/desiccant","dehumidifier/cube","dehumidifier/pod","dehumidifier/bag","dehumidifier/pump","dehumidifier/ring","dehumidifier/tower","dehumidifier/combo","dehumidifier/rugged","dehumidifier/wall","dehumidifier/laundry","dehumidifier/rv","dehumidifier/drum","dehumidifier/retro"]},{"id":"diffusers","name":"Aroma diffusers","items":["diffuser/woodcone","diffuser/speckled","diffuser/glassdome","diffuser/marble","diffuser/nebulizer","diffuser/reed","diffuser/plugin","diffuser/autospray","diffuser/scentpod","diffuser/candlewarmer","diffuser/waxmelt","diffuser/carvent","diffuser/usbmini","diffuser/saltlamp","diffuser/flame","diffuser/backflow","diffuser/incense","diffuser/bamboo","diffuser/cloud","diffuser/cabinet"]},{"id":"sensors","name":"Air-quality sensors","items":["airsensors/light-bar-box-sensor","airsensors/upright-lcd-air-monitor","airsensors/oval-led-dot-co2-clock","airsensors/round-dot-display-sensor","airsensors/radonpuck","airsensors/radonbar","airsensors/woodface","airsensors/roundedmonitor","airsensors/roomcube","airsensors/einkco2","airsensors/minisquare","airsensors/lcdmeter","airsensors/hygrometer","airsensors/walleink","airsensors/weatherstation","airsensors/round-egg","sensor/air"]},{"id":"ventilation","name":"Ventilation & HRV","items":["air2/upright-hrv-dark-panel","air2/hanging-gray-hrv","air2/ceiling-erv-two-ducts","air2/registers"]}]},{"id":"kitchen","name":"Kitchen","subs":[{"id":"fridges","name":"Fridges","items":["fridgecfg/steel","fridgecfg/glasspanel","fridgecfg/probuilt","fridgecfg/classic","fridge/4-door-flex-with-screen","fridge/4-door-flex-panels","fridge/3-door-panel-fridge","fridge/side-by-side-with-screen","fridge/panel-bottom-freezer","fridge/panel-column-pair","fridge/knock-glass-french-door","fridge/round-ice-4-door","fridge/door-within-door-side-by","fridge/color-glow-french-door","fridge/steel-top-freezer","fridge/gefrench","fridge/classictop","fridge/bottomfr","fridge/basicsbs","fridge/counterdepth","fridge/compact","fridge/builtincol","fridge/builtinfd","fridge/color-panel-glass-door"]},{"id":"freezers","name":"Freezers","items":["kitchen2/7-cu-ft-chest-freezer","kitchen2/5-cu-ft-chest-freezer","kitchen2/3-5-cu-ft-chest-freezer","extras/chestfreezer","kitchen2/13-cu-ft-upright-freezer","kitchen2/garage-ready-upright","kitchen2/compact-upright-freezer","extras/uprightfreezer"]},{"id":"minifridge","name":"Mini fridges, wine & kegs","items":["minifridge/white-cube-fridge","minifridge/3-1-cu-ft-mini","minifridge/retro-mini-fridge","minifridge/2-door-dorm-fridge","minifridge/panel-cube-fridge","minifridge/15-inch-under-counter","minifridge/beverage-center","minifridge/countertop-cooler","minifridge/dual-zone-beverage","minifridge/outdoor-fridge","minifridge/12-bottle-wine-cooler","minifridge/18-bottle-wine-cooler","minifridge/46-bottle-dual-zone","minifridge/wine-column","minifridge/skincare","minifridge/gamer","kitchen2/single-tap-kegerator","kitchen2/dual-tap-kegerator","kitchen2/keg-backbar","extras/kegerator"]},{"id":"ranges","name":"Ranges & cooktops","items":["rangecfg/cfg-classic","rangecfg/cfg-otrglass","range/pro48","range/retro","range/gastop","range/woodstove","range/pizza","range/dome"]},{"id":"ovens","name":"Ovens & microwaves","items":["range/wall","range/wall2","range/combo","range/steam","ovens/classic-otr","ovens/black-glass-otr","ovens/flush-wall-oven","ovens/pro-double-oven","ovens/combo-wall-pro","ovens/speed-oven","ovens/steam-oven","ovens/microwave-drawer","microwave/counter","microwave/drawer","microwave/compact","microwave/combo","microwave/smart","countertop/flip-up-air-fry-oven","countertop/large-air-fry-oven","countertop/stacked-double-oven","countertop/brushed-steel-air-fry-oven","countertop/smart-steel-oven","countertop/steel-air-fry-toaster-oven","countertop/budget-4-slice-oven","countertop/steam-combi-oven","countertop/french-door-oven","countertop/black-air-fry-oven","smallkitchen/toasteroven"]},{"id":"hoods","name":"Range hoods","items":["microwave/pyramid","microwave/glass","microwave/island","microwave/undercab","microwave/mantel","microwave/plaster","microwave/downdraft","microwave/ceiling","microwave/angled","microwave/copper"]},{"id":"dishwashers","name":"Dishwashers","items":["dishwasher/front","dishwasher/hidden","dishwasher/projection","dishwasher/panel","dishwasher/drawer1","dishwasher/drawer2","dishwasher/slim","dishwasher/countertop","dishwasher/portable","dishwasher/glass","dishwasher/retro","dishwasher/smart","dishwasher/third","dishwasher/quiet","dishwasher/autoopen","dishwasher/opendrawer","dishwasher/dial","dishwasher/commercial"]},{"id":"coffee","name":"Coffee & kettles","items":["smallkitchen/drip","kitchen2/12-cup-drip-maker","kitchen2/steel-drip-maker","kitchen2/copper-element-drip-brewer","smallkitchen/pod","kitchen2/classic-pod-brewer","kitchen2/mini-pod-brewer","kitchen2/capsule-coffee-machine","smallkitchen/espresso","smallkitchen/bean","kitchen3/espresso-with-grinder","kitchen3/slim-espresso-machine","smallkitchen/goose","smallkitchen/glasskettle","smallkitchen/retrokettle"]},{"id":"small","name":"Small appliances","items":["smallkitchen/toaster2","smallkitchen/toaster4","kitchen3/steel-2-slice-toaster","smallkitchen/airfryer","smallkitchen/dualfryer","kitchen3/square-basket-air-fryer","kitchen3/round-basket-air-fryer","smallkitchen/multicooker","kitchen3/electric-pressure-cooker","kitchen3/pressure-crisp-cooker","smallkitchen/slowcooker","smallkitchen/rice","kitchen3/pressure-rice-cooker","smallkitchen/mixer","smallkitchen/blender","smallkitchen/bullet","smallkitchen/bread","smallkitchen/waffle"]},{"id":"popcorn","name":"Popcorn & food warmers","items":["popcorn/theater","popcorn/tabletop","popcorn/carnival","popcorn/hotair","popcorn/stovetop","popcorn/electric","popcorn/silicone","popcorn/retro","popcorn/lobby","popcorn/snackcart","countertop/vevor4","countertop/warmer2","countertop/buffet","countertop/drawer","countertop/heatlamp"]}]},{"id":"cleaning","name":"Laundry & cleaning","subs":[{"id":"laundry","name":"Washers & dryers","items":["laundrycfg/cfgscreen","laundrycfg/cfgtop","laundrycfg/cfgcombo"]},{"id":"robots","name":"Robot vacuums","items":["vacuum/lidar","vacuum/topcam","vacuum/dshape","vacuum/square","vacuum/slim","vacuum/selfempty","vacuum/allinone","vacuum/spinmop","vacuum/combo","vacuum/obstacle","vacuum/pethair","vacuum/mini","vacuum/dock","vacuum/stuck","vacuum/window"]},{"id":"vacuums","name":"Stick & upright vacuums","items":["vacuum/stick","vacuum/handheld","floorcare/laser-stick-vacuum","floorcare/cordless-handheld","floorcare/mini-handheld","floorcare/ball-upright-vacuum","floorcare/bagless-upright","floorcare/powered-lift-away","floorcare/classic-upright-vacuum","floorcare/bagged-canister","floorcare/shop-vac-5-gal"]},{"id":"washers","name":"Floor washers & carpet cleaners","items":["vacuum/washer","floorcare/stick-wet-cleaner","floorcare/wet-dry-stick","floorcare/smart-floor-washer","floorcare/multi-surface-washer","floorcare/upright-carpet-cleaner","floorcare/spot-carpet-cleaner","floorcare/rental-carpet-cleaner"]},{"id":"irons","name":"Irons","items":["extras/iron","home3/steam-iron","home3/iron_station","home3/iron_travel"]}]},{"id":"entertainment","name":"Entertainment","subs":[{"id":"tv","name":"TVs & projectors","items":["media/wall-tv","media/console-tv","media/art-tv","media/curved-tv","media/outdoor-tv","media/projector","media/ust","covers2/projscreen"]},{"id":"speakers","name":"Smart speakers","items":["speakers2/tall-cylinder-speaker","speakers2/fabric-puck-speaker","speakers2/small-ball-speaker","speakers2/ball-speaker-with-clock","speakers2/large-ball-speaker","speakers2/half-ball-speaker","speakers2/studio-speaker-drum","speakers2/plug-in-mini-speaker","speakers2/car-voice-puck","speakers2/earbuds-case","speakers/vase-speaker","speakers/fabric-mini-speaker","speakers/mini-speaker-wall-hook","speakers/fabric-smart-speaker","speakers/large-fabric-speaker","speakers/round-smart-speaker","media/cylinder","media/sphere","media/puck"]},{"id":"displays","name":"Smart displays","items":["speakers2/round-alarm-display","speakers2/5-inch-smart-display","speakers2/8-inch-smart-display","speakers2/8-inch-photo-display","speakers2/swivel-smart-display","speakers2/15-inch-wall-display","speakers2/21-inch-wall-display","speakers2/wall-control-panel","speakers/7-inch-smart-display","speakers/10-inch-smart-display","media/display"]},{"id":"audio","name":"Audio & streaming","items":["media/soundbar-tv","media/soundbar-sub","media/bookshelf","media/tower","media/turntable","media/receiver","avr/black-receiver-wide-display","avr/porthole-display-receiver","avr/big-dial-receiver","avr/two-knob-receiver","avr/gloss-black-receiver","avr/slim-silver-receiver","avr/minimal-black-amp","avr/compact","avr/bluemeter","avr/vintage","avr/streamer","avr/separates","media/box","media/stick","speakers2/streaming-stick-remote","speakers/pebble-tv-streamer","speakers/streaming-dongle-remote"]},{"id":"consoles","name":"Game consoles","items":["consoles/big-black-box-console","consoles/glossy-curved-console","consoles/white-slim-console","consoles/black-slim-console","consoles/small-white-console","consoles/black-tower-console","consoles/16-bit-black-console","consoles/white-128-bit-console","consoles2/gray-disc-console","consoles2/mini-round-console","consoles2/black-ridged-console","consoles2/slim-black-console","consoles2/curved-gloss-console","consoles2/top-loader-console","consoles2/wedge-console","consoles2/three-layer-wedge","consoles2/tower-console-white-wings","consoles2/striped-wing-console","consoles3/8-bit-gray-console","consoles3/16-bit-gray-console","consoles3/64-bit-console","consoles3/cube-console","consoles3/slim-white-motion-console","consoles3/tablet-controller-console","consoles3/handheld-hybrid-console","consoles3/hybrid-console-oled","consoles3/handheld-only-console","consoles3/hybrid-console-2nd-gen","media/console"]},{"id":"arcade","name":"Arcade & pinball","items":["arcade/racing","arcade/deluxe","arcade/gun","arcade/fighter","arcade/golf","arcade/maze","arcade/space","arcade/brawler","arcade/tall","arcade/retro","arcade/party","arcade/countertop-cabinet","arcade/wall","arcade/cocktail","arcade/pinem","arcade/pindmd","arcade/pinwide","arcade/pindigital","arcade/pinmini"]}]},{"id":"computers","name":"Computers & network","subs":[{"id":"pcs","name":"Computers & laptops","items":["office/gaming","office/office","office/sff","office/mini","office/square","office/aio","office/ultra-thin-laptop","office/business","office/gaminglap","office/tent","office/budget-laptop"]},{"id":"monitors","name":"Monitors","items":["home4/27-inch-office-monitor","home4/34-inch-curved-monitor","home4/49-inch-super-wide","home4/aluminum-27-inch-display","home4/portable","extras/monitor"]},{"id":"printers","name":"Printers","items":["printers/aio","printers/slim","printers/tank","printers/photo6","printers/dyesub","printers/a3","printers/mono-ink","printers/mono-laser","printers/laser-aio","printers/color-laser","printers/color-mfp","printers/label","printers/receipt"]},{"id":"printers3d","name":"3D printers","items":["printers/enclosed-3d-printer","printers/boxy-enclosed-printer","printers/bed-slinger-3d-printer","printers/mini-3d-printer","printers3d/box-lidar","printers3d/box-solid","printers3d/pro-two","printers3d/large-two","printers3d/large-rack","printers3d/changer9","printers3d/slinger-side","printers3d/slinger-mini","printers3d/slinger-orange","printers3d/corexy-orange","printers3d/toolchanger","printers3d/bigbox-hub","printers3d/slinger-gray","printers3d/box-dark","printers3d/resin-smoke","printers3d/resin-orange","printers3d/kit-corexy","printers/resin","printers/delta","printers/largeformat"]},{"id":"network","name":"Racks, NAS & network","items":["home4/8u-open-frame","home4/open25u","home4/wall12u","home4/cab42u","home4/desktop-mini-rack","extras/rack","home4/nas4","home4/nas8","home4/gw1u","home4/nvr2u","home4/desksw8","extras/router","extras/mesh","speakers/mesh-router","speakers/mesh-point-speaker","speakers/plug-in-hub"]},{"id":"ups","name":"UPS & shredders","items":["office/upssmall","office/upslcd","office/upsrack","office/upsbrick","office/binshred","office/personal"]}]},{"id":"security","name":"Security & access","subs":[{"id":"cameras","name":"Cameras","items":["security/bullet","security/dome","security/turret","security/cube","security/pantilt","security/flood","security/spot","security/battery","security/solar","security/baby","security/ptz","security/dual","speakers/indoor-cam-wired","speakers/battery-cam"]},{"id":"doorbells","name":"Doorbells & chimes","items":["camdoorbells/bell","doorbell/brass","doorbell/lighted","doorbell/plugin","doorbell/tubes","doorbell/smartchime","doorbell/school","doorbell/twist","doorbell/shopbell","doorbell/knocker","doorbell/monitor","speakers/battery-video-doorbell"]},{"id":"locks","name":"Smart locks","items":["lock/keypad","lock/touch","lock/retrofit","lock/fingerprint","lock/handleset","lock/mortise","lock/video","lock/btpadlock","lock/garage","lock/gate","lock/sliding","lock/office","lock/cylinder","lock/euro","lock/cabinet","lock/safe","lock/shed","lock/strike","lock/card","speakers/touch-deadbolt"]},{"id":"doors","name":"Doors & windows","items":["doorcfg/front","doorcfg/back","doorcfg/patio","doorcfg/interior","windowcfg/winsiding","windowcfg/winbrick","windowcfg/winstucco","windowcfg/wininside"]},{"id":"deadbolts","name":"Smart deadbolts","items":["deadbolts/arched-push-button","deadbolts/round-push-button","deadbolts/arched-wi-fi-touch","deadbolts/slim-wi-fi-touch","deadbolts/arched-keypad-lever","deadbolts/arched-touch-lever","deadbolts/slim-touch-lever","lock2/glass-touchscreen","lock2/push-button-keypad","lock2/a2kftouch","lock2/slim-touchscreen","lock2/levertouch","lock2/leverkeypad","lock2/smart-lock-black","lock2/entrance-handle-lock"]},{"id":"alarms","name":"Alarm panels & sirens","items":["safety/slim-white-keypad","safety/round-edge-keypad","safety/classic-alpha-keypad","safety/7-inch-touch-panel","safety/large-touch-panel","safety/camera-hub-panel","safety/command-touchscreen","safety/smart-alarm-panel","safety/wireless-keypad","safety/classic-lcd-keypad","security/keypad","security/touch","security/hub","security/panic","security/fob","security/indoorsiren","security/outsiren","security/garagesiren"]},{"id":"smoke","name":"Smoke & CO alarms","items":["smoke/alarm","safety/round-smoke-alarm","safety/combo-smoke-and-co","safety/hardwired-smoke-alarm","safety/smart-smoke-co","safety/smoke-listener","safety/nighthawk","safety/heat","speakers/smoke-and-co-alarm","sensor/smoke","sensor/co"]}]},{"id":"controls","name":"Sensors & switches","subs":[{"id":"sensors","name":"Sensors","items":["sensor/pir","sensor/ceiling","sensor/radar","sensor/door","sensor/window","sensor/garage","sensor/glass","sensor/leak","sensor/freezer","sensor/temp","sensor/outdoor","sensor/lux","sensor/washer","sensor/bed","sensor/soil","sensor/button","covers2/pirdome","covers2/pirbox","covers2/curtainpir","covers2/handle"]},{"id":"switches","name":"Switches & dimmers","items":["switch/toggle","switch/paddle-rocker","switch/red-bar-dimmer","switch/dimmer","switch/rotary","switch/slide","switch/twogang","switch/blue-bar-2-in-1","switch/fan","switch/scene","switch/glass","switch/vintage","switch/remote","switch/display","switch/timer","switch/outlet","switch/lighted","switch/nightlight","switch/button","switch/industrial"]},{"id":"buttons","name":"Buttons & remotes","items":["buttons/dial","buttons/knob","buttons/cube","buttons/puck","buttons/ring","buttons/remote","buttons/ir","buttons/rf","buttons/eink","buttons/touch","buttons/gesture","buttons/keytag","buttons/beacon"]},{"id":"outlets","name":"Outlets","items":["outlets/hidden-plug-outlet","outlets/hidden-plug-light-ring","outlets/hidden-plug-usb-c","outlets/hidden-plug-usb-c-ring","outlets/duplex","outlets/rocker-style-outlet","outlets/usb","outlets/gfci","outlets/smart","outlets/tamper","outlets/tslot","outlets/night","outlets/dryer","outlets/weather","outlets/popup","outlets/floor","outlets/tvbox"]},{"id":"plugs","name":"Smart plugs & strips","items":["plug/mini","plug/round","plug/side","plug/energy","plug/outdoor","plug/inwall","plug/usbc","plug/dimmer","plug/night","plug/lamp","plug/string","plug/heavy","plug/strip","plug/surge","plug/tower","plug/reel","plug/floorbox","plug/popup","plug/undercab"]},{"id":"relays","name":"Relays & modules","items":["relays/inwall","relays/leads","relays/minibox","relays/board","relays/din","relays/cunit","relays/loadc","relays/ledctl","relays/plugrep","relays/extender","relays/generic","relays/sensor"]}]},{"id":"energy","name":"Power & energy","subs":[{"id":"ev","name":"EV chargers","items":["energy/round","energy/slim","energy/pedestal","energy/cord","energy/car","plug/ev"]},{"id":"solar","name":"Solar","items":["energy/roof","energy/ground","utility3/tracker","utility3/carport","utility3/balcony","energy/inverter"]},{"id":"batteries","name":"Home batteries & backup","items":["energy/slab","energy/stack","utility3/flat-wall-battery","utility3/modular-battery","utility3/tall-battery-cabinet","energy/station","energy/generator"]},{"id":"meters","name":"Energy meters","items":["utility3/smartmeter","utility3/in-panel-monitor","utility3/clip-on-energy-monitor","heating/ctmeter"]},{"id":"chargers","name":"Battery chargers","items":["chargers/aa4","chargers/aalcd","chargers/wall2","chargers/univ","chargers/li","chargers/usbc","chargers/camera","chargers/drone","chargers/ebike","chargers/p12","chargers/p18","chargers/rapid","chargers/dual","chargers/six","chargers/rack","chargers/stem","chargers/radio"]}]},{"id":"water","name":"Water & plumbing","subs":[{"id":"heaters","name":"Water heaters","items":["water/gastank","water/elec","water/tankless","water/heatpump","heating/solarthermal","utility3/flatplate","utility3/tubeground","utility3/thermosiphon"]},{"id":"valves","name":"Valves, filters & leak alarms","items":["water/ball","water/main","water/gas","water/softener","water/filter","water/alarm"]},{"id":"leaks","name":"Leak sensors","items":["leaks/squarepuck","leaks/teardrop","leaks/slim","leaks/roundmini","leaks/dropdetector","leaks/floodfreeze","leaks/zprobe","leaks/gateway"]},{"id":"sump","name":"Sump pumps","items":["water/sump","water/pedestal","water/sealed","water/backup","water/waterpow"]},{"id":"pumps","name":"Well & utility pumps","items":["water/well","heating/jetpump","yard2/jetpump","yard2/booster","heating/centrifugal","yard2/endsuction","yard2/inline","yard2/diaphragm"]}]},{"id":"outdoor","name":"Outdoor, pool & yard","subs":[{"id":"lights","name":"Outdoor lights","items":["outdoor/coach","outdoor/gooseneck","outdoor/flush","outdoor/post","outdoor/pagoda","outdoor/mushroom","outdoor/treespot","outdoor/flood","outdoor/bistro","outdoor/deckstep","outdoor/bollard","outdoor/solar","outdoor/updown","outdoor/globe","outdoor/pillar","outdoor/well","outdoor/slot","outdoor/hanging","outdoor/eave","outdoor/icicle","outdoor2/brassspike","outdoor2/floodstake"]},{"id":"pergolas","name":"Pergolas, awnings & sails","items":["covers2/pergola","covers2/pergolaup","covers2/sail","covers2/awning"]},{"id":"garage","name":"Garage doors & openers","items":["garagecfg/siding","garagecfg/brick","garagecfg/stucco","garagecfg/stone","garagecfg/batten","garagecfg/modern","garage/raised","garage/double","garage/carriage","garage/glass","garage/flush","garage/longpanel","garage/plank","garage/rollup","garage/tiltup","garage/pair","garage/opener","garage/keypad","garage/button"]},{"id":"gates","name":"Gates & barriers","items":["garage/swing","garage/garden","garage/ranch","garage/privacy","garage/iron","garage/slat","garage/slide","outdoor2/slatgate","outdoor2/chainlink","outdoor2/irongate","outdoor2/foldarm","outdoor2/ledarm","outdoor2/skirtarm","extras/boom"]},{"id":"mailboxes","name":"Mailboxes & parcel boxes","items":["doorbell/mailbox","outdoor2/postbox","outdoor2/castbox","outdoor2/parcel","lock/parcel","sensor/mailbox","outdoor2/brassslot","outdoor2/chute","outdoor2/steelplate","extras/mailbox"]},{"id":"sprinklers","name":"Sprinklers & irrigation","items":["sprinklers/controller","sprinklers/hose","sprinklers/popup","sprinklers/smart","sprinklers/dial","sprinklers/touch","sprinklers/outdoor","sprinklers/modular","sprinklers/basic4","sprinklers/hdial","sprinklers/hdual","sprinklers/hhub","sprinklers/valve","sprinklers/rotor","sprinklers/impact","sprinklers/osc","sprinklers/drip","sprinklers/vbox","sprinklers/rain","sprinklers/flowsens"]},{"id":"mowers","name":"Robot mowers","items":["vacuum/mower","yard2/robot-mower-gray","yard2/robot-mower-orange","yard2/wire-free-robot-mower"]},{"id":"grills","name":"Grills & smokers","items":["grill/gas3","grill/gas4","grill/island","grill/kettle","grill/kamado","grill/portable","grill/griddle36","grill/griddle22","grill/builtgrid","grill/pellet","grill/vpellet","grill/offset","grill/bullet","grill/electric","grill/drum","grill/gravity","grill/infrared","grill/rotisserie","grill/santamaria","grill/hibachi"]},{"id":"pool","name":"Pools & pool equipment","items":["pool/inground","pool/above","pool/falls","pool/cover","pool/panel","pool/heater","pool/salt","yard2/variable-speed-pool-pump","yard2/above-ground-filter-pump","lights9/poollight"]},{"id":"poolrobots","name":"Pool robots","items":["pool/robot","vacuum/pool","yard2/brushed-pool-robot","yard2/pressure-side-pool-cleaner"]},{"id":"spa","name":"Hot tubs & saunas","items":["pool/hottub","yard2/square-acrylic-spa","yard2/inflatable-spa","yard2/cedartub","home2/finnish","home2/cube","heating/barrel","heating/cabin","lights9/spalight"]},{"id":"coops","name":"Chicken coops","items":["coops/backyard","coops/walkin","coops/tractor","coops/raised","coops/plastic","coops/fenced","coops/quail","coops/duckhouse","coops/autodoor","coops/heatwaterer","coops/nipple","coops/feeder","coops/heatpanel","coops/sensor"]}]},{"id":"plants","name":"Plants","subs":[{"id":"houseplants","name":"Houseplants","items":["builder:plantbuilder","plants/monstera","plants/snake","plants/pothos","plants/zz","plants/lily","plants/rubber","plants/pearls","plants/aloe","plants/jade","plants/succulents","plants/cactus","plants/calathea","plants/fern","plants/spider","plants/philodendron","plants/bird","plants/pilea","plants/herbs","plants/airplant","plants/hoya"]},{"id":"flowers","name":"Flowering plants","items":["flowers/orchid","flowers/poinsettia","flowers/violet","flowers/anthurium","flowers/hibiscus","flowers/geranium","flowers/begonia","flowers/kalanchoe","flowers/bromeliad","flowers/tulips","flowers/hydrangea","flowers/rose","flowers/gerbera","flowers/cyclamen","flowers/lavender","flowers/petunia","flowers/mum","flowers/azalea","flowers/amaryllis","flowers/bougainvillea"]},{"id":"trees","name":"Trees","items":["builder:treebuilder","trees/fiddle","trees/olive","trees/kentia","trees/ficus","trees/money","trees/lemon","trees/bonsai","trees/dracaena","trees/norfolk","trees/jmaple","trees/oak","trees/fallmaple","trees/birch","trees/spruce","trees/cherry","trees/palm","trees/willow","trees/apple","trees/aspen","trees/magnolia"]},{"id":"garden","name":"Garden beds & soil","items":["yard2/cedarbed","yard2/galvbed","yard2/elevated","extras/gardenbed"]}]},{"id":"home","name":"Home, pets & fitness","subs":[{"id":"blinds","name":"Blinds & curtains","items":["shades/roller","shades/blackout","shades/cellular","shades/tdbu","shades/roman","shades/wood","shades/mini","shades/vertical","shades/zebra","shades/drapes","shades/sheer","shades/layered","shades/cafe","shades/shutters","shades/skylight","shades/solar","shades/awning","shades/panels","shades/arched","shades/bay","home2/fauxwood","home2/smart-faux-wood-blinds"]},{"id":"shutters","name":"Exterior shutters","items":["extras/rollershutter","home2/alubox","home2/motorized-roller","home2/hurricane","extras/swingshutters","home2/boardbatten","home2/louvered","home2/raisedpanel"]},{"id":"bath","name":"Hair dryers & scales","items":["extras/hairdryer","home3/round-head-hair-dryer","home3/hot-air-brush","home3/hotel_dryer","extras/scale","home3/smart-glass-scale","home3/slim-smart-scale","home3/dial_scale"]},{"id":"pests","name":"Mouse traps","items":["extras/mousetrap","extras/snapsensor","extras/multicatch","extras/clamptrap","home3/electronic-mouse-trap","home3/live_trap"]},{"id":"petfood","name":"Pet feeders & fountains","items":["pets/feeder","home3/tall-pet-feeder","home3/wide-pet-feeder","home3/gravity_feeder","pets/fountain","home3/flower-pet-fountain","home3/tiered-pet-fountain","home3/clear-tank-pet-fountain"]},{"id":"aquariums","name":"Aquariums","items":["pets/aquarium","home3/rimless20","home3/curved-nano-aquarium","home3/tank55"]},{"id":"petcare","name":"Pet care & tech","items":["pets/litter","pets/door","pets/treatcam","pets/birdcam","pets/launcher","pets/bed","pets/collar"]},{"id":"cardio","name":"Cardio machines","items":["fitness/folding-treadmill","fitness/walkpad","fitness/curve","fitness/swivel-screen-bike","fitness/recumbent","fitness/screen-rower","fitness/air-rower","fitness/elliptical","fitness/stair-climber"]},{"id":"strength","name":"Strength & recovery","items":["fitness/wall-strength-trainer","fitness/cable-gym-station","fitness/mirror","fitness/vibe"]}]},{"id":"people","name":"People & pets","subs":[{"id":"people","name":"People","items":["people/man","people/woman","people/oldman","people/oldwoman","people/teenboy","people/teengirl","people/boy","people/girl","people/toddler","people/baby"]},{"id":"dogscats","name":"Dogs & cats","items":["petsfig/labrador","petsfig/golden","petsfig/shepherd","petsfig/frenchie","petsfig/beagle","petsfig/dachshund","petsfig/husky","petsfig/corgi","petsfig/collie","petsfig/poodle","petsfig/tabby","petsfig/blackcat","petsfig/siamese","petsfig/orangecat"]},{"id":"habitats","name":"Reptile & pet habitats","items":["habitats/frontglass","habitats/tallviv","habitats/meshcham","habitats/pvcpython","habitats/pvcdragon","habitats/bioactive","habitats/paludarium","habitats/tortoise","habitats/rack","habitats/pvcstack","habitats/leotank","habitats/turtle","habitats/hermit","habitats/tarantula","habitats/axolotl","habitats/birdcage","habitats/hamster","habitats/rabbitpen","habitats/incubator","habitats/brooder"]}]}];
+window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles: wing & slab","consoles3":"Consoles: handheld & family","speakers":"Smart home speakers & displays A","speakers2":"Smart home speakers & displays B","deadbolts":"Smart deadbolts: arched & slim","lock2":"Smart deadbolts: keypad & glass","airsensors:intro":"Sixteen air-quality and climate sensors, from simple light-bar boxes to e-ink and LED-dot monitors, on desks, shelves and walls. The slider is air quality: high is good (green), middle is fair (yellow), low is poor (orange, red). Each one shows it its own way: a light bar, a color ring, segment numbers, LED dots or a comfort face.","consoles:intro":"Block-style consoles from the original big black box to the newest black tower, plus two classic 90s consoles, drawn at real proportions with their controllers. When playing, the power light comes on, the jewel and the tower's top vent glow green, the memory card screen lights up, and the TV washes the wall.","consoles2:intro":"Every console in this family from the first gray disc box to the newest striped tower, drawn from press photos at real proportions with that era's controller. When playing, the real light comes on: green power lights on the first three, the white light bar on the wedge models and the edge strips on the wing towers, plus controller lights, while the TV washes the wall.","consoles3:intro":"Every home console in this family from the 8-bit gray box to the newest hybrid, in release order, drawn from photos at real proportions with their controllers. When playing, the power light comes on, the disc slot glows, handheld and tablet screens show original game scenery, and the TV washes the wall.","speakers2:intro":"Twenty voice-assistant devices drawn from real shapes, from the first tall speaker to the wall control panel. Listening lights the cyan-on-blue ring or light bar and the screens show a clock, weather, photo or home card; the slider is volume, shown as the ring filling white. The color is the device's real finish.","speakers:intro":"Twenty smart home devices on shelves, counters, walls and doors: speakers, smart displays, streamers, mesh Wi-Fi, thermostats, a smoke alarm, cameras, the doorbell, a deadbolt and a plug-in hub. On shows the four breathing dots, ambient screens and status lights; the slider sets volume. The cameras show Live, Recording, Motion, Privacy or Offline with a Night IR menu, the doorbell has its own State menu, the deadbolt shows Locking, Unlocking and Jammed, and the round thermostat adds Mode.","deadbolts:intro":"Electronic deadbolts and levers by model and trim (arched, slim, round and square), redrawn from product photos (outside face only, no logos). On means LOCKED: bolt out, check or padlock lit green, keypad backlit; off means UNLOCKED: bolt in, status dim red. The color is that model's real finishes. The State menu also shows Locking and Unlocking (bolt part-way, amber light, arrows) and Jammed (red warning light and badge).","lock2:intro":"Smart deadbolts with glass touchscreens and keypads, redrawn from product photos (outside face only, no logos): keyed and key-free, slim and lever versions, a retrofit, a smart-standard lock, an entrance handle lock and a handleset. On means LOCKED: bolt out, check lit green, digits backlit; off means UNLOCKED: bolt in, red status. The color is that model's real finishes. The State menu also shows Locking and Unlocking (bolt part-way, amber light, arrows) and Jammed (red warning light and badge).","countertop:intro":"Real countertop ovens and food warmers. When cooking, the elements glow orange behind the glass, air-fry fans swirl, the rotisserie turns, steam rises and warmer lamps glow; the display shows the temperature (the slider sets it). Warmers let you pick the food; the stacked double oven runs each oven on its own and the flip-up oven can be flipped up.","floorcare:intro":"Twenty vacuums and carpet cleaners: stick vacuums with laser heads, uprights, lift-aways, wet-dry floor washers, carpet cleaners, a rental-style deep cleaner, canisters, a handheld and a shop vac. Cleaning spins the brush roll, swirls the bin, lights the head and shows the battery; the slider sets power.","fridge:intro":"Twenty fridge styles: 4-door flex panels and a screen fridge, knock-glass and color-glow French doors, plus classic top and bottom freezers, side-by-sides, a counter-depth French door and built-in columns. Running shows the dispenser light, displays, the door screen and lit glass panels; the slider sets display brightness.","home4:intro":"Server racks for the home lab (8U open frame, 12U glass wall cabinet, 42U mesh cabinet, 25U 4-post rack, 10-inch mini rack, 4-bay NAS) and desk monitors (27-inch office, 34-inch curved, 49-inch super-wide, aluminum 27-inch, a portable screen). On racks the slider is activity: more port and drive lights blink, faster. On monitors it is screen brightness.","outlets:intro":"In-wall outlets: hidden-plug outlets (plain, light ring, USB-C, USB-C with ring) plus common outlets from a plain duplex to GFCI, smart, floor and pop-up types. On means power on: LEDs and night-lights glow, a plug is in and its lamp is lit. The color is the plate or finish (the light on light-ring models). Split outlets show each plug with its cord, so you can see which half is on.","printers:intro":"Thirteen home and office printers plus seven 3D printers on a desk (the four filament printers follow the approved lineup drawing). While printing, a page slides out (color pages from color printers, text from mono ones), the inkjet carriage runs back and forth and the status light blinks. The slider is the ink or toner level: on the gauges and the ink-tank windows, and below 25% everything turns amber. On 3D printers the slider is print progress: the part grows, the head moves, the bed glows and the resin plate lifts.","switch:intro":"Twenty wall switches, dimmers and keypads on painted walls. On flips each one to its ON position and lights its status LED in the LED color; dimmers fill their LED bar to the brightness. Plates come in white, ivory, almond, black, stainless, brass and glass by model. Gangs makes 1 to 4 of the same switch on one plate (each gang can follow its own entity), Role picks Main or Aux, and some dimmers let you pick the Control (paddle, rotary, slide or touch).","utility2:intro":"Seventeen real boilers, heat pumps, circulators, buffer tanks and fresh-water stations in basements and utility rooms. On means running: displays light, flow moves in the pipes, pumps spin and flues shimmer. The slider is the output: temperatures, gauges and readouts follow it. The wall combi boiler has separate Heating and Hot water switches.","air2/boxy-wall-split":"Boxy wall split","air2/faceted-wall-split":"Faceted wall split","air2/mirror-glass-wall-split":"Mirror-glass wall split","air2/curved-bar-towel-ladder":"Curved-bar towel ladder","air2/capsule-diesel-heater":"Capsule diesel heater","air2/ribbed-top-diesel-heater":"Ribbed-top diesel heater","air2/portable-box-diesel-heater":"Portable box diesel heater","air2/upright-hrv-dark-panel":"Upright HRV, dark panel","air2/hanging-gray-hrv":"Hanging gray HRV","air2/ceiling-erv-two-ducts":"Ceiling ERV, two ducts","air2/loop-purifier-heater":"Loop purifier heater","air2/big-dome-purifier":"Big dome purifier","airsensors/light-bar-box-sensor":"Light-bar box sensor","airsensors/upright-lcd-air-monitor":"Upright LCD air monitor","airsensors/oval-led-dot-co2-clock":"Oval LED-dot CO2 clock","airsensors/round-dot-display-sensor":"Round dot-display sensor","arcade/countertop-cabinet":"Countertop cabinet","avr/black-receiver-wide-display":"Black receiver, wide display","avr/porthole-display-receiver":"Porthole-display receiver","avr/big-dial-receiver":"Big-dial receiver","avr/two-knob-receiver":"Two-knob receiver","avr/gloss-black-receiver":"Gloss-black receiver","avr/slim-silver-receiver":"Slim silver receiver","avr/minimal-black-amp":"Minimal black amp","consoles/big-black-box-console":"Big black box console","consoles/glossy-curved-console":"Glossy curved console","consoles/white-slim-console":"White slim console","consoles/black-slim-console":"Black slim console","consoles/small-white-console":"Small white console","consoles/black-tower-console":"Black tower console","consoles/16-bit-black-console":"16-bit black console","consoles/white-128-bit-console":"White 128-bit console","countertop/flip-up-air-fry-oven":"Flip-up air fry oven","countertop/large-air-fry-oven":"Large air fry oven","countertop/stacked-double-oven":"Stacked double oven","countertop/brushed-steel-air-fry-oven":"Brushed steel air fry oven","countertop/smart-steel-oven":"Smart steel oven","countertop/steel-air-fry-toaster-oven":"Steel air fry toaster oven","countertop/budget-4-slice-oven":"Budget 4-slice oven","countertop/steam-combi-oven":"Steam combi oven","countertop/french-door-oven":"French-door oven","countertop/black-air-fry-oven":"Black air fry oven","speakers2/tall-cylinder-speaker":"Tall cylinder speaker","speakers2/fabric-puck-speaker":"Fabric puck speaker","speakers2/small-ball-speaker":"Small ball speaker","speakers2/ball-speaker-with-clock":"Ball speaker with clock","speakers2/large-ball-speaker":"Large ball speaker","speakers2/half-ball-speaker":"Half-ball speaker","speakers2/studio-speaker-drum":"Studio speaker drum","speakers2/round-alarm-display":"Round alarm display","speakers2/plug-in-mini-speaker":"Plug-in mini speaker","speakers2/car-voice-puck":"Car voice puck","speakers2/5-inch-smart-display":"5-inch smart display","speakers2/8-inch-smart-display":"8-inch smart display","speakers2/8-inch-photo-display":"8-inch photo display","speakers2/swivel-smart-display":"Swivel smart display","speakers2/15-inch-wall-display":"15-inch wall display","speakers2/21-inch-wall-display":"21-inch wall display","speakers2/wall-control-panel":"Wall control panel","speakers2/kids-glow-lamp":"Kids glow lamp","speakers2/streaming-stick-remote":"Streaming stick + remote","speakers2/earbuds-case":"Earbuds case","fitness/connected-treadmill-big":"Connected treadmill, big screen","fitness/folding-treadmill":"Folding treadmill","fitness/heavy-duty-treadmill":"Heavy-duty treadmill","fitness/swivel-screen-bike":"Swivel-screen bike","fitness/studio-bike":"Studio bike","fitness/screen-rower":"Screen rower","fitness/wood-water-rower":"Wood water rower","fitness/air-rower":"Air rower","fitness/stair-climber":"Stair climber","fitness/wall-strength-trainer":"Wall strength trainer","fitness/cable-gym-station":"Cable gym station","floorcare/laser-stick-vacuum":"Laser stick vacuum","floorcare/long-run-stick-vacuum":"Long-run stick vacuum","floorcare/classic-stick-vacuum":"Classic stick vacuum","floorcare/ball-upright-vacuum":"Ball upright vacuum","floorcare/cordless-handheld":"Cordless handheld","floorcare/stick-wet-cleaner":"Stick wet cleaner","floorcare/bagless-upright":"Bagless upright","floorcare/lift-away-upright":"Lift-away upright","floorcare/powered-lift-away":"Powered lift-away","floorcare/wet-dry-stick":"Wet-dry stick","floorcare/smart-floor-washer":"Smart floor washer","floorcare/multi-surface-washer":"Multi-surface washer","floorcare/upright-carpet-cleaner":"Upright carpet cleaner","floorcare/spot-carpet-cleaner":"Spot carpet cleaner","floorcare/rental-carpet-cleaner":"Rental carpet cleaner","floorcare/classic-upright-vacuum":"Classic upright vacuum","floorcare/bagged-canister":"Bagged canister","floorcare/bagless-canister":"Bagless canister","floorcare/mini-handheld":"Mini handheld","floorcare/shop-vac-5-gal":"Shop vac 5 gal","fridge/4-door-flex-with-screen":"4-door flex with screen","fridge/4-door-flex-panels":"4-door flex panels","fridge/3-door-panel-fridge":"3-door panel fridge","fridge/side-by-side-with-screen":"Side-by-side with screen","fridge/panel-bottom-freezer":"Panel bottom freezer","fridge/panel-column-pair":"Panel column pair","fridge/knock-glass-french-door":"Knock-glass French door","fridge/round-ice-4-door":"Round-ice 4-door","fridge/door-within-door-side-by":"Door-within-door side-by-side","fridge/color-glow-french-door":"Color-glow French door","fridge/steel-top-freezer":"Steel top freezer","fridge/color-panel-glass-door":"Color-panel glass door","home2/black-pellet-stove":"Black pellet stove","home2/compact-pellet-stove":"Compact pellet stove","home2/budget-pellet-stove":"Budget pellet stove","home2/cast-iron-wood-stove":"Cast-iron wood stove","home2/steel-wood-stove":"Steel wood stove","home2/motorized-roller":"Motorized roller","home2/smart-faux-wood-blinds":"Smart faux-wood blinds","home3/steam-iron":"Steam iron","home3/round-head-hair-dryer":"Round-head hair dryer","home3/hot-air-brush":"Hot-air brush","home3/smart-glass-scale":"Smart glass scale","home3/slim-smart-scale":"Slim smart scale","home3/tall-pet-feeder":"Tall pet feeder","home3/wide-pet-feeder":"Wide pet feeder","home3/flower-pet-fountain":"Flower pet fountain","home3/tiered-pet-fountain":"Tiered pet fountain","home3/clear-tank-pet-fountain":"Clear-tank pet fountain","home3/curved-nano-aquarium":"Curved nano aquarium","home3/electronic-mouse-trap":"Electronic mouse trap","home4/8u-open-frame":"8U open frame","home4/desktop-mini-rack":"Desktop mini rack","home4/27-inch-office-monitor":"27-inch office monitor","home4/34-inch-curved-monitor":"34-inch curved monitor","home4/49-inch-super-wide":"49-inch super-wide","home4/aluminum-27-inch-display":"Aluminum 27-inch display","kitchen2/7-cu-ft-chest-freezer":"7 cu ft chest freezer","kitchen2/5-cu-ft-chest-freezer":"5 cu ft chest freezer","kitchen2/3-5-cu-ft-chest-freezer":"3.5 cu ft chest freezer","kitchen2/13-cu-ft-upright-freezer":"13 cu ft upright freezer","kitchen2/garage-ready-upright":"Garage-ready upright","kitchen2/compact-upright-freezer":"Compact upright freezer","kitchen2/single-tap-kegerator":"Single-tap kegerator","kitchen2/dual-tap-kegerator":"Dual-tap kegerator","kitchen2/12-cup-drip-maker":"12-cup drip maker","kitchen2/steel-drip-maker":"Steel drip maker","kitchen2/copper-element-drip-brewer":"Copper-element drip brewer","kitchen2/classic-pod-brewer":"Classic pod brewer","kitchen2/mini-pod-brewer":"Mini pod brewer","kitchen2/capsule-coffee-machine":"Capsule coffee machine","kitchen3/espresso-with-grinder":"Espresso with grinder","kitchen3/slim-espresso-machine":"Slim espresso machine","kitchen3/square-basket-air-fryer":"Square basket air fryer","kitchen3/round-basket-air-fryer":"Round basket air fryer","kitchen3/electric-pressure-cooker":"Electric pressure cooker","kitchen3/pressure-crisp-cooker":"Pressure-crisp cooker","kitchen3/express-multicooker":"Express multicooker","kitchen3/fuzzy-logic-rice-cooker":"Fuzzy-logic rice cooker","kitchen3/8-cup-digital-rice-cooker":"8-cup digital rice cooker","kitchen3/pressure-rice-cooker":"Pressure rice cooker","kitchen3/steel-2-slice-toaster":"Steel 2-slice toaster","kitchen3/retro-2-slice-toaster":"Retro 2-slice toaster","lock2/glass-touchscreen":"Glass touchscreen","lock2/push-button-keypad":"Push-button keypad","lock2/touchscreen-plus":"Touchscreen plus","lock2/slim-touchscreen":"Slim touchscreen","lock2/slim-touchscreen-brass":"Slim touchscreen, brass","lock2/retrofit-lock":"Retrofit lock","lock2/smart-lock-white":"Smart lock, white","lock2/smart-lock-black":"Smart lock, black","lock2/entrance-handle-lock":"Entrance handle lock","lock2/slim-handleset":"Slim handleset","minifridge/white-cube-fridge":"White cube fridge","minifridge/3-1-cu-ft-mini":"3.1 cu ft mini","minifridge/retro-mini-fridge":"Retro mini fridge","minifridge/2-door-dorm-fridge":"2-door dorm fridge","minifridge/panel-cube-fridge":"Panel cube fridge","minifridge/15-inch-under-counter":"15-inch under-counter","minifridge/beverage-center":"Beverage center","minifridge/countertop-cooler":"Countertop cooler","minifridge/dual-zone-beverage":"Dual-zone beverage","minifridge/outdoor-fridge":"Outdoor fridge","minifridge/12-bottle-wine-cooler":"12-bottle wine cooler","minifridge/18-bottle-wine-cooler":"18-bottle wine cooler","minifridge/46-bottle-dual-zone":"46-bottle dual-zone","minifridge/wine-column":"Wine column","speakers/vase-speaker":"Vase speaker","speakers/fabric-mini-speaker":"Fabric mini speaker","speakers/mini-speaker-wall-hook":"Mini speaker, wall hook","speakers/fabric-smart-speaker":"Fabric smart speaker","speakers/large-fabric-speaker":"Large fabric speaker","speakers/7-inch-smart-display":"7-inch smart display","speakers/10-inch-smart-display":"10-inch smart display","speakers/pebble-tv-streamer":"Pebble TV streamer","speakers/streaming-dongle-remote":"Streaming dongle + remote","speakers/round-smart-speaker":"Round smart speaker","speakers/mesh-router":"Mesh router","speakers/mesh-point-speaker":"Mesh point speaker","speakers/round-learning-thermostat":"Round learning thermostat","speakers/frosted-thermostat":"Frosted thermostat","speakers/smoke-and-co-alarm":"Smoke & CO alarm","speakers/indoor-cam-wired":"Indoor cam, wired","speakers/battery-cam":"Battery cam","speakers/battery-video-doorbell":"Battery video doorbell","speakers/touch-deadbolt":"Touch deadbolt","speakers/plug-in-hub":"Plug-in hub","consoles3/8-bit-gray-console":"8-bit gray console","consoles3/16-bit-gray-console":"16-bit gray console","consoles3/64-bit-console":"64-bit console","consoles3/cube-console":"Cube console","consoles3/slim-white-motion-console":"Slim white motion console","consoles3/tablet-controller-console":"Tablet-controller console","consoles3/handheld-hybrid-console":"Handheld hybrid console","consoles3/hybrid-console-oled":"Hybrid console, OLED","consoles3/handheld-only-console":"Handheld-only console","consoles3/hybrid-console-2nd-gen":"Hybrid console, 2nd gen","office/ultra-thin-laptop":"Ultra-thin laptop","office/budget-laptop":"Budget laptop","outlets/hidden-plug-outlet":"Hidden plug outlet","outlets/hidden-plug-light-ring":"Hidden plug, light ring","outlets/hidden-plug-usb-c":"Hidden plug, USB-C","outlets/hidden-plug-usb-c-ring":"Hidden plug, USB-C ring","outlets/rocker-style-outlet":"Rocker-style outlet","ovens/steel-otr-glass-touch":"Steel OTR, glass touch","ovens/classic-otr":"Classic OTR","ovens/black-glass-otr":"Black-glass OTR","ovens/low-profile-otr":"Low-profile OTR","ovens/pro-handle-otr":"Pro-handle OTR","ovens/bronze-handle-otr":"Bronze-handle OTR","ovens/single-wall-oven":"Single wall oven","ovens/flush-wall-oven":"Flush wall oven","ovens/pro-double-oven":"Pro double oven","ovens/classic-double-oven":"Classic double oven","ovens/glass-double-oven":"Glass double oven","ovens/combo-wall-glass":"Combo wall, glass","ovens/combo-wall-pro":"Combo wall, pro","ovens/speed-oven":"Speed oven","ovens/steam-oven":"Steam oven","ovens/microwave-drawer":"Microwave drawer","consoles2/gray-disc-console":"Gray disc console","consoles2/mini-round-console":"Mini round console","consoles2/black-ridged-console":"Black ridged console","consoles2/slim-black-console":"Slim black console","consoles2/curved-gloss-console":"Curved gloss console","consoles2/matte-slim-console":"Matte slim console","consoles2/top-loader-console":"Top-loader console","consoles2/wedge-console":"Wedge console","consoles2/rounded-wedge-console":"Rounded wedge console","consoles2/three-layer-wedge":"Three-layer wedge","consoles2/tower-console-white-wings":"Tower console, white wings","consoles2/discless-wing-console":"Discless wing console","consoles2/slim-wing-console":"Slim wing console","consoles2/striped-wing-console":"Striped wing console","printers/enclosed-3d-printer":"Enclosed 3D printer","printers/boxy-enclosed-printer":"Boxy enclosed printer","printers/bed-slinger-3d-printer":"Bed-slinger 3D printer","printers/mini-3d-printer":"Mini 3D printer","safety/slim-white-keypad":"Slim white keypad","safety/round-edge-keypad":"Round-edge keypad","safety/classic-alpha-keypad":"Classic alpha keypad","safety/7-inch-touch-panel":"7-inch touch panel","safety/large-touch-panel":"Large touch panel","safety/camera-hub-panel":"Camera hub panel","safety/command-touchscreen":"Command touchscreen","safety/smart-alarm-panel":"Smart alarm panel","safety/wireless-keypad":"Wireless keypad","safety/classic-lcd-keypad":"Classic LCD keypad","safety/round-smoke-alarm":"Round smoke alarm","safety/speaker-smoke-alarm":"Speaker smoke alarm","safety/combo-smoke-and-co":"Combo smoke & CO","safety/hardwired-smoke-alarm":"Hardwired smoke alarm","safety/smart-smoke-co":"Smart smoke + CO","safety/compact-smoke-alarm":"Compact smoke alarm","safety/alarm-listener-disc":"Alarm listener disc","safety/smoke-listener":"Smoke listener","deadbolts/arched-push-button":"Arched push-button","deadbolts/round-push-button":"Round push-button","deadbolts/arched-touch-alarm":"Arched touch, alarm","deadbolts/arched-touch-deadbolt":"Arched touch deadbolt","deadbolts/slim-touch-deadbolt":"Slim touch deadbolt","deadbolts/arched-wi-fi-touch":"Arched Wi-Fi touch","deadbolts/slim-wi-fi-touch":"Slim Wi-Fi touch","deadbolts/arched-touchscreen":"Arched touchscreen","deadbolts/slim-touchscreen":"Slim touchscreen","deadbolts/square-touchscreen":"Square touchscreen","deadbolts/arched-fingerprint":"Arched fingerprint","deadbolts/slim-fingerprint":"Slim fingerprint","deadbolts/slim-keypad-deadbolt":"Slim keypad deadbolt","deadbolts/arched-keypad-deadbolt":"Arched keypad deadbolt","deadbolts/round-keypad-deadbolt":"Round keypad deadbolt","deadbolts/round-keypad-lever":"Round keypad lever","deadbolts/arched-keypad-lever":"Arched keypad lever","deadbolts/arched-touch-lever":"Arched touch lever","deadbolts/slim-touch-lever":"Slim touch lever","deadbolts/arched-smart-lever":"Arched smart lever","switch/paddle-rocker":"Paddle rocker","switch/red-bar-dimmer":"Red-bar dimmer","switch/blue-bar-2-in-1":"Blue-bar 2-in-1","utility2/wall-combi-boiler":"Wall combi boiler","utility2/compact-condensing-boiler":"Compact condensing boiler","utility2/hopper-pellet-boiler":"Hopper pellet boiler","utility2/tall-pellet-boiler":"Tall pellet boiler","utility2/compact-pellet-boiler":"Compact pellet boiler","utility2/geothermal-heat-pump":"Geothermal heat pump","utility2/ground-loop-heat-pump":"Ground-loop heat pump","utility2/slim-geothermal-unit":"Slim geothermal unit","utility2/smart-circulator":"Smart circulator","utility2/classic-circulator":"Classic circulator","utility2/large-smart-circulator":"Large smart circulator","utility3/flat-wall-battery":"Flat wall battery","utility3/modular-battery":"Modular battery","utility3/tall-battery-cabinet":"Tall battery cabinet","utility3/in-panel-monitor":"In-panel monitor","utility3/clip-on-energy-monitor":"Clip-on energy monitor","yard2/variable-speed-pool-pump":"Variable-speed pool pump","yard2/classic-pool-pump":"Classic pool pump","yard2/above-ground-filter-pump":"Above-ground filter pump","yard2/square-acrylic-spa":"Square acrylic spa","yard2/inflatable-spa":"Inflatable spa","yard2/brushed-pool-robot":"Brushed pool robot","yard2/pressure-side-pool-cleaner":"Pressure-side pool cleaner","yard2/robot-mower-gray":"Robot mower, gray","yard2/robot-mower-orange":"Robot mower, orange","yard2/wire-free-robot-mower":"Wire-free robot mower"};
 /* Device Art Card: a Lovelace card that shows a drawing which follows an entity's state. No external dependencies. */
 (function () {
   "use strict";
@@ -48221,16 +52833,23 @@ window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles
 
   const BASE_CSS = `.hda-nobg .hda-bg{display:none}
 @media (prefers-reduced-motion:reduce){.hda-anim *{animation:none!important;transition:none!important}}`;
+  /* builders that draw another set's drawing inside their own (a lock on the door, an older doorbell style) */
+  const CSS_DEPS = { doorcfg: ["lock", "lock2", "deadbolts"], camdoorbells: ["doorbell"] };
   const cssCache = {};
   function cssFor(key) {
     const it = ITEMS[key]; if (!it) return BASE_CSS;
     if (cssCache[key]) return cssCache[key];
     const parts = [BASE_CSS];
     if (it.builder) (it.builder.id === "treebuilder" ? ["trees"] : ["plants", "flowers"]).forEach((id) => { if (SETS[id] && SETS[id].css) parts.push(SETS[id].css); });
+    (CSS_DEPS[it.set && it.set.id] || []).forEach((id) => { if (SETS[id] && SETS[id].css) parts.push(SETS[id].css); });
     if (it.set && it.set.css) parts.push(it.set.css);
     return (cssCache[key] = parts.join("\n"));
   }
   /* resolve "set/icon", "cat/sub/set/icon" or "builder:id" */
+  /* drawings that became styles of a builder card: old art key -> [new key, options] (old dashboards keep working) */
+  const MOVED = { "doorbell/tall": "dbtall", "doorbell/square": "dbsquare", "doorbell/wedge": "dbwedge", "doorbell/package": "dbpackage",
+    "doorbell/intercom": "dbintercom", "doorbell/gatepost": "dbgate", "doorbell/peephole": "dbpeep" };
+  const moved = (art) => { const k = String(art || "").trim().split("/").slice(-2).join("/"); return MOVED[k] && ITEMS["camdoorbells/bell"] ? ["camdoorbells/bell", { style: MOVED[k] }] : null; };
   function resolve(art) {
     if (!art) return null;
     art = String(art).trim();
@@ -48323,6 +52942,8 @@ window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles
     }
     setConfig(config) {
       if (!config || !config.art) throw new Error("Set 'art' to a drawing, for example art: pendant/globe");
+      const mv = !ITEMS[String(config.art).trim()] && moved(config.art);
+      if (mv) config = Object.assign({}, config, { art: mv[0], options: Object.assign({}, mv[1], config.options || {}) });
       const key = resolve(config.art);
       if (!key) throw new Error("Unknown art: " + config.art);
       this._config = Object.assign({ show_name: true, show_state: true, animate: true, scenery: true }, config);
@@ -48485,7 +53106,7 @@ window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles
   if (!customElements.get("device-art-card-editor")) customElements.define("device-art-card-editor", DeviceArtCardEditor);
 
   /* version line in the browser console, so anyone can check which release they are running */
-  const VERSION = "1.2.0";
+  const VERSION = "1.3.0";
   console.info("%c DEVICE-ART-CARD %c v" + VERSION + " · " + Object.keys(ITEMS).length + " drawings ", "background:#7c5cff;color:#fff;font-weight:700;border-radius:3px 0 0 3px", "background:#2a1f5c;color:#fff;border-radius:0 3px 3px 0");
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === "device-art-card"))

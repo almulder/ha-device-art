@@ -182,7 +182,7 @@ ${extra || ""}</defs>`;
 `;
   const BG = (s) => `<g class="hda-bg">${s}</g>`;
   const RED_B = "#a8322c", WHT = "#ecebe6", GRY = "#8a9096", WOOD = "#b07a4a", GRN = "#5a7a4a";
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // (multi-function) o.parts holds only the parts the user ticked. A part left out follows the one device as a Device
   // Image (no o.mf, as today: the auto door, light and heaters follow o.on) and stays off / closed, never animated, as a
   // Multi-Function Image (o.mf). The readings come from o.pval when o.mf (temp = the coop temperature, water = the
   // waterer level in %), else from the Temperature menu and the slider (as today); a reading left out is blank.

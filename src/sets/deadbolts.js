@@ -20,9 +20,35 @@
     if (m === "bronze") return { m, c, k: "#1a110b", d: s(c, -.38), l: s(c, .14), hi: "#c98d57", rim: "#b8794a", ink: "#120b07" };
     return { m, c, k: s(c, -.6), d: s(c, -.32), l: s(c, .42), hi: s(c, .72), rim: s(c, .6), ink: s(c, -.7) };
   }
+  const AMB = "#ffb020", JAM = "#ff3b30";
+  const LSTATE = [["auto", "From on/off"], ["locked", "Locked"], ["unlocked", "Unlocked"], ["locking", "Locking"], ["unlocking", "Unlocking"], ["jammed", "Jammed"]];
+  function lockState(o) {
+    const s = o.opt && o.opt.state, ls = s && s !== "auto" ? s : (o.on ? "locked" : "unlocked");
+    const mv = ls === "locking" ? 1 : ls === "unlocking" ? -1 : 0, jam = ls === "jammed", on = ls !== "unlocked";
+    return { ls, on, mv, jam, mid: !!mv || jam, fr: ls === "locked" ? 1 : ls === "unlocked" ? 0 : .5,
+      st: jam ? JAM : mv ? AMB : on ? GRN : RED, hk: jam ? "hj" : mv ? "ha" : on ? "hg" : "hr", cls: P + (jam ? "jblink" : mv ? "mblink" : on ? "breath" : "blink") };
+  }
+  const stDefs = (x) => x.mid ? rg(x.id("ha"), [[0, AMB, .85], [.45, AMB, .28], [1, AMB, 0]]) + rg(x.id("hj"), [[0, JAM, .9], [.45, JAM, .32], [1, JAM, 0]]) : "";
+  function arrows(x, cx, cy, dir) {
+    if (!x.mv) return "";
+    let s = ""; for (let i = 0; i < 3; i++) s += `<path class="${P}chev${i}" d="M${f(-4.6 + i * 3.4)} -2.8L${f(-1.8 + i * 3.4)} 0L${f(-4.6 + i * 3.4)} 2.8"/>`;
+    const t = `translate(${f(cx)} ${f(cy)}) rotate(${dir === "l" ? 180 : 0})`;
+    return `<g transform="${t}" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${s.replace(/ class="[^"]*"/g, "")}</g><g transform="${t}" fill="none" stroke="${AMB}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${s}</g>`;
+  }
+  function mark(x, cx, cy, s) {
+    if (x.jam) return `<g class="${P}jblink"><path d="M${f(cx)} ${f(cy - s * .48)}L${f(cx + s * .52)} ${f(cy + s * .42)}H${f(cx - s * .52)}Z" fill="${JAM}" stroke="${JAM}" stroke-width="${f(s * .1)}" stroke-linejoin="round"/></g>` +
+      `<path d="M${f(cx)} ${f(cy - s * .16)}V${f(cy + s * .1)}" stroke="#fff" stroke-width="${f(s * .11)}" stroke-linecap="round"/><circle cx="${f(cx)}" cy="${f(cy + s * .26)}" r="${f(s * .065)}" fill="#fff"/>`;
+    const r = s * .36, cw = x.mv > 0, a0 = -Math.PI / 2 + (cw ? .5 : -.5), a1 = a0 + (cw ? 1 : -1) * Math.PI * 1.45;
+    const ex = cx + r * Math.cos(a1), ey = cy + r * Math.sin(a1), tx2 = -Math.sin(a1) * (cw ? 1 : -1), ty2 = Math.cos(a1) * (cw ? 1 : -1), hs = s * .2;
+    const head = `M${f(ex + tx2 * hs)} ${f(ey + ty2 * hs)}L${f(ex - ty2 * hs * .9)} ${f(ey + tx2 * hs * .9)}L${f(ex + ty2 * hs * .9)} ${f(ey - tx2 * hs * .9)}Z`;
+    return `<g class="${P}${cw ? "spin" : "spinr"}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s * .5)}" fill="none"/><path d="M${f(cx + r * Math.cos(a0))} ${f(cy + r * Math.sin(a0))}A${f(r)} ${f(r)} 0 1 ${cw ? 1 : 0} ${f(ex)} ${f(ey)}" fill="none" stroke="${AMB}" stroke-width="${f(s * .11)}" stroke-linecap="round"/><path d="${head}" fill="${AMB}"/></g>`;
+  }
+  const markDisc = (x, cx, cy, r) => x.mid ? `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="#141418"/>${mark(x, cx, cy, r * 1.7)}` : "";
+  const badge = (x) => x.jam ? `<g class="${P}badge"><circle cx="26" cy="26" r="11" fill="#000" fill-opacity=".45" transform="translate(1 1.6)"/><circle cx="26" cy="26" r="11" fill="#1c1416"/><circle cx="26" cy="26" r="10.3" fill="none" stroke="${JAM}" stroke-width="1.3"/>` +
+    `<path d="M26 19.2L32.4 30.6H19.6Z" fill="${AMB}" stroke="${AMB}" stroke-width="1.2" stroke-linejoin="round"/><path d="M26 23.2V27" stroke="#1c1416" stroke-width="1.6" stroke-linecap="round"/><circle cx="26" cy="29" r=".95" fill="#1c1416"/></g>` : "";
   function ctx(o) {
-    const u = o.uid, on = !!o.on, lv = o.level == null ? 1 : o.level;
-    return { o, u, on, B: .4 + .6 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p: metal(o.color || SN), st: on ? GRN : RED, n: 0 };
+    const u = o.uid, S = lockState(o), on = S.on, lv = o.level == null ? 1 : o.level;
+    return Object.assign({ o, u, on, B: .4 + .6 * lv, id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, p: metal(o.color || SN), n: 0 }, S);
   }
 
   function defs(x, extra) {
@@ -45,7 +71,7 @@ ${lg(id("bolt"), [[0, "#f3f5f7"], [.42, "#aeb5bd"], [.56, "#cfd5db"], [1, "#565d
 ${lg(id("stv"), [[0, "#e2e6ea"], [.5, "#9aa1a9"], [1, "#5a6067"]], 0, 0, 0, 1)}
 ${lg(id("gap"), [[0, "#000", .9], [1, "#14121c", .9]])}
 ${rg(id("hg"), [[0, GRN, .9], [.45, GRN, .3], [1, GRN, 0]])}
-${rg(id("hr"), [[0, RED, .8], [.45, RED, .25], [1, RED, 0]])}
+${rg(id("hr"), [[0, RED, .8], [.45, RED, .25], [1, RED, 0]])}${stDefs(x)}
 ${rg(id("vig"), [[0, "#000", 0], [.62, "#000", .06], [1, "#000", .5]], .5, .48, .74)}
 ${brush ? `<pattern id="${id("br")}" width="2.6" height="40" patternUnits="userSpaceOnUse"><path d="M.6 0V40" stroke="#fff" stroke-opacity=".07" stroke-width=".5"/><path d="M1.9 0V40" stroke="#000" stroke-opacity=".07" stroke-width=".4"/></pattern>` : ""}
 <clipPath id="${id("wc")}"><rect x="8" y="8" width="184" height="184" rx="16"/></clipPath>
@@ -78,7 +104,7 @@ ${extra || ""}</defs>`;
     const c = DOOR[kind];
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x, lg(x.id("dg"), [[0, c[0]], [1, c[1]]], 0, 0, .3, 1))}
 <g clip-path="${x.url("wc")}"><g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("dg")}"/>${tex || ""}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g>${hw}</g>
-<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g></svg>`;
+<g class="hda-bg"><rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></g>${badge(x)}</svg>`;
   }
   const E = 164;
   function jamb(x) {
@@ -93,13 +119,13 @@ ${extra || ""}</defs>`;
 <circle cx="${E + 11}" cy="${y - h / 2 + 3.5}" r="1.4" fill="#4b5158"/><circle cx="${E + 11}" cy="${y + h / 2 - 3.5}" r="1.4" fill="#4b5158"/><rect x="${E + 5}" y="${f(y - 6)}" width="9" height="12" rx="1" fill="#050508"/>`;
   }
   function bolt(x, y, latch) {
-    const k = x.id("bc" + (x.n++)), out = latch || x.on, L = latch ? 12 : 15, h = latch ? 9 : 10, y0 = y - h / 2;
+    const k = x.id("bc" + (x.n++)), fr = latch ? 1 : x.fr, out = fr >= 1, L = latch ? 12 : 15, h = latch ? 9 : 10, y0 = y - h / 2;
     const body = latch
       ? `<path d="M${E - 2} ${f(y0)}H${E + L - 5}L${E + L} ${f(y + h / 2)}H${E - 2}Z" fill="${x.url("bolt")}"/>`
       : `<path d="${rr(E - 2, y0, L + 2, h, 1.6)}" fill="${x.url("bolt")}"/><path d="M${E} ${f(y0 + .9)}H${E + L - 1.5}" stroke="#fff" stroke-opacity=".7" stroke-width=".9"/>`;
-    const cls = latch ? "" : ` class="${P}${out ? "bo" : "bi"}"`;
+    const cls = latch ? "" : ` class="${P}${x.mid ? (x.jam ? "jx" : x.mv > 0 ? "mxo" : "mxi") : out ? "bo" : "bi"}"`;
     return `<clipPath id="${k}"><rect x="${E}" y="0" width="${200 - E}" height="200"/></clipPath>
-<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${-L - 3} 0)"`}><g${cls}>${body}</g></g></g>`;
+<g clip-path="url(#${k})"><g${out ? "" : ` transform="translate(${fr ? f(-(L + 3) * (1 - fr)) : -L - 3} 0)"`}><g${cls}>${body}</g></g></g>` + (latch ? "" : arrows(x, E + 11, y - h / 2 - 8, x.mv > 0 ? "r" : "l"));
   }
   const doorEdge = (x, y, latch) => `<g class="hda-bg">${jamb(x) + strike(x, y, latch ? 26 : 30)}</g>${bolt(x, y, latch)}`;
 
@@ -190,7 +216,10 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
     const [zx, zy] = cell(1, 3); s1 += dig(0, zx, zy, s, col, op, opt);
     if (style === "plus") { s1 +=`<path d="M${f(cx - s * .55)} ${f(y0 + gy - s * .55)}a${f(s * .9)} ${f(s * .9)} 0 0 0 0 ${f(s * 1.1)}M${f(cx + s * .55)} ${f(y0 + gy - s * .55)}a${f(s * .9)} ${f(s * .9)} 0 0 1 0 ${f(s * 1.1)}" fill="none" stroke="${col}" stroke-opacity="${op}" stroke-width=".7" stroke-linecap="round"/>`; }
     const [lx, ly] = cell(0, 3), [rx, ry] = cell(2, 3);
-    if (bottom === "connect") {
+    if (x.mid && bottom === "connect") s1 += ico.check(lx, ly + s * .1, s * .95, "#fff", .2) + mark(x, rx, ry, s * 1.15);
+    else if (x.mid && bottom === "encode") s1 += ico.house(lx, ly, s * .95, col, op) + mark(x, rx, ry, s * 1.15);
+    else if (x.mid) s1 += mark(x, rx, ry, s * 1.1);
+    else if (bottom === "connect") {
       s1 += (on ? halo(x, lx, ly, s * 1.05, 1) : "") + ico.check(lx, ly + s * .1, s * .95, on ? GRN : "#fff", on ? 1 : .2);
       s1 += (!on ? halo(x, rx, ry, s * .9, 0) : "") + ico.x(rx, ry, s * .75, on ? "#fff" : RED, on ? .2 : .85);
       s1 += `<circle cx="${f((zx + rx) / 2)}" cy="${f(ry + s * .25)}" r=".8" fill="#fff" fill-opacity="${on ? .7 : .25}"/>`;
@@ -226,6 +255,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
       if (n < 9) s += dig(n + 1, mx, my, bh * .52, digC, dOp, { w: .9 });
       else if (n === 10) s += dig(0, mx, my, bh * .52, digC, dOp, { w: .9 });
       else if (n === 9) s += ico.house(mx, my, bh * .55, digC, dOp);
+      else if (x.mid) s += markDisc(x, mx, my, bh * .42);
       else s += `<g class="${on ? P + "breath" : P + "blink"}">${halo(x, mx, my, bh * .75, on)}</g>` + ico.lock(mx, my, bh * .55, on ? GRN : RED, 1, !on);
     }
     return (on ? `<g opacity="${f(.5 * B)}"><g class="${P}pulse" filter="${x.url("gw")}">${glow}</g></g>` : "") + s;
@@ -243,7 +273,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
   }
   function logoBtn(x, cx, cy, w, h) {
     const c = x.st;
-    return `<g class="${x.on ? P + "breath" : P + "blink"}"><ellipse cx="${cx}" cy="${cy}" rx="${f(w / 2 + 4)}" ry="${f(h / 2 + 4)}" fill="${x.url(x.on ? "hg" : "hr")}"/></g>
+    return `<g class="${x.cls}"><ellipse cx="${cx}" cy="${cy}" rx="${f(w / 2 + 4)}" ry="${f(h / 2 + 4)}" fill="${x.url(x.hk)}"/></g>
 <ellipse cx="${cx}" cy="${f(cy + .7)}" rx="${f(w / 2 + .8)}" ry="${f(h / 2 + .8)}" fill="#000" fill-opacity=".45"/><ellipse cx="${cx}" cy="${cy}" rx="${f(w / 2 + .8)}" ry="${f(h / 2 + .8)}" fill="${c}"/>
 <ellipse cx="${cx}" cy="${cy}" rx="${f(w / 2)}" ry="${f(h / 2)}" fill="${x.url("ms")}"/><path d="M${f(cx - w * .3)} ${f(cy - h * .2)}H${f(cx + w * .3)}" stroke="#fff" stroke-opacity=".5" stroke-width=".5"/>`;
   }
@@ -270,7 +300,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
     const sx0 = x0 + 8 * k, sx1 = x1 - 8 * k, sy0 = y0 + (trim === "cam" ? 9 : 9) * k, sy1 = y0 + Hh * .66;
     const sd = trim === "cam" ? camScr(sx0, sy0, sx1, sy1, 12 * k, 6 * k) : rr(sx0, sy0, sx1 - sx0, sy1 - sy0, 2);
     s += screen(x, sd) + plate(x, cx, sy0 + 8 * k, 26 * k, 5.5 * k, true);
-    if (sense) s += `<path d="M${f(cx - 9 * k)} ${f(sy0 + 13 * k)}H${f(cx + 9 * k)}" stroke="${x.st}" stroke-width="${f(1.1 * k)}" stroke-linecap="round" stroke-opacity="${x.on ? 1 : .75}" class="${x.on ? P + "breath" : P + "blink"}"/>`;
+    if (sense) s += `<path d="M${f(cx - 9 * k)} ${f(sy0 + 13 * k)}H${f(cx + 9 * k)}" stroke="${x.st}" stroke-width="${f(1.1 * k)}" stroke-linecap="round" stroke-opacity="${x.on ? 1 : .75}" class="${x.cls}"/>`;
     const gy = (sy1 - sy0 - 22 * k) / 4, gTop = sy0 + 20 * k;
     if (sense) {
       s += grid(x, cx, gTop + gy * .1, 20 * k, gy, 9 * k, "sense", "none");
@@ -319,7 +349,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
   }
 
   const icons = [];
-  const add = (id, name, colors, fn) => icons.push({ id, name, colors, picker: true, colorLabel: "Finish", render: (o) => fn(ctx(o)) });
+  const add = (id, name, colors, fn) => icons.push({ id, name, colors, picker: true, colorLabel: "Finish", options: [{ id: "state", name: "State", values: LSTATE }], render: (o) => fn(ctx(o)) });
   const dead = (x, kind, tex, lock) => scene(x, kind, tex, doorEdge(x, lock.by) + lock.s);
 
   add("arched-push-button", "Arched push-button", [SN, AB, MB, BB, ANB, SC], (x) => dead(x, "red", PANELS(11), be365(x, "cam", 94, 30, 82, 140)));
@@ -390,6 +420,24 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
 @keyframes hda-deadbolts-blink{0%,60%{opacity:1}61%,100%{opacity:.15}}
 .hda-anim .hda-deadbolts-press{animation:hda-deadbolts-press 4s ease-out infinite}
 @keyframes hda-deadbolts-press{0%,70%{fill-opacity:0}74%{fill-opacity:.55}100%{fill-opacity:0}}
+.hda-deadbolts-mxo,.hda-deadbolts-mxi,.hda-deadbolts-jx,.hda-deadbolts-spin,.hda-deadbolts-spinr{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-deadbolts-mxo{animation:hda-deadbolts-mxo 1.8s ease-in-out infinite}
+@keyframes hda-deadbolts-mxo{0%{transform:translateX(-50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-deadbolts-mxi{animation:hda-deadbolts-mxi 1.8s ease-in-out infinite}
+@keyframes hda-deadbolts-mxi{0%{transform:translateX(50%)}65%,100%{transform:translateX(0)}}
+.hda-anim .hda-deadbolts-jx{animation:hda-deadbolts-jx 2.2s linear infinite}
+@keyframes hda-deadbolts-jx{0%,40%,100%{transform:translateX(0)}8%,24%{transform:translateX(1.2px)}16%,32%{transform:translateX(-1.2px)}}
+.hda-anim .hda-deadbolts-mblink{animation:hda-deadbolts-mblink .9s steps(1,end) infinite}
+@keyframes hda-deadbolts-mblink{0%,55%{opacity:1}56%,100%{opacity:.2}}
+.hda-anim .hda-deadbolts-jblink{animation:hda-deadbolts-jblink .5s steps(1,end) infinite}
+@keyframes hda-deadbolts-jblink{0%,50%{opacity:1}51%,100%{opacity:.25}}
+.hda-anim .hda-deadbolts-chev0,.hda-anim .hda-deadbolts-chev1,.hda-anim .hda-deadbolts-chev2{animation:hda-deadbolts-chev 1.2s ease-in-out infinite}
+.hda-anim .hda-deadbolts-chev1{animation-delay:.2s}.hda-anim .hda-deadbolts-chev2{animation-delay:.4s}
+@keyframes hda-deadbolts-chev{0%,100%{opacity:.25}35%{opacity:1}}
+.hda-anim .hda-deadbolts-spin{animation:hda-deadbolts-spin 1.4s linear infinite}
+@keyframes hda-deadbolts-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.hda-anim .hda-deadbolts-spinr{animation:hda-deadbolts-spinr 1.4s linear infinite}
+@keyframes hda-deadbolts-spinr{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
 @media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-deadbolts-"]{animation:none!important}}`;
 
   (window.HDA = window.HDA || []).push({
@@ -397,8 +445,7 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
     tab: "Smart deadbolts: arched & slim",
     group: "More",
     kind: "device",
-    intro: "Electronic deadbolts and levers by model and trim (arched, slim, round and square), redrawn from product photos (outside face only, no logos). On means LOCKED: bolt out, check or padlock lit green, keypad backlit; off means UNLOCKED: bolt in, status dim red. The color is that model's real finishes.",
-    
+    intro: "Electronic deadbolts and levers by model and trim (arched, slim, round and square), redrawn from product photos (outside face only, no logos). On means LOCKED: bolt out, check or padlock lit green, keypad backlit; off means UNLOCKED: bolt in, status dim red. The color is that model's real finishes. The State menu also shows Locking and Unlocking (bolt part-way, amber light, arrows) and Jammed (red warning light and badge).",
     onWord: "Locked", offWord: "Unlocked",
     css,
     icons,

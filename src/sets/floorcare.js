@@ -75,7 +75,7 @@ ${x.on ? `<g class="${P}swirl" style="animation-duration:${(1.6 - x.lv).toFixed(
   const led = (x, cx, cy, col) => `<circle cx="${cx}" cy="${cy}" r="${x.on ? 1.6 : 1.2}" fill="${x.on ? col : "#2c3038"}"/>${x.on ? `<circle cx="${cx}" cy="${cy}" r="4" fill="${col}" opacity=".3"/>` : ""}`;
   const mount = (x, X, Y) => `<rect x="${X - 10}" y="${Y - 6}" width="20" height="26" rx="3" fill="#d9d6e0"/><rect x="${X - 10}" y="${Y - 6}" width="20" height="26" rx="3" fill="none" stroke="#8a86a0"/><path d="M${X} ${Y + 20} V176" stroke="#16141c" stroke-width="1.6"/>`;
 
-  function dysonStick(x, o2) {
+  function laserStick(x, o2) {
     o2 = o2 || {};
     const bodyG = o2.body || "nk";
     let head = "";
@@ -104,7 +104,7 @@ ${lcdS}${hl("M106 25 H128", .5, 1)}`];
   const icons = [
     base({ id: "laser-stick-vacuum", name: "Laser stick vacuum", colorLabel: "Accents", colors: ["#e8b923", "#6b3fa0", "#2f5aa8", "#c9a24a", "#c87a3a"], render(o) {
       const x = ctx(o);
-      return svg(x, room(x, "wood") + pose(x, dysonStick(x, { head: "laser", lcd: true }), laser(x, 68, 179, 60)));
+      return svg(x, room(x, "wood") + pose(x, laserStick(x, { head: "laser", lcd: true }), laser(x, 68, 179, 60)));
     } }),
     base({ id: "ball-upright-vacuum", name: "Ball upright vacuum", colors: ["#b8774f", "#7a4fd0", "#b8343a"], render(o) {
       const x = ctx(o);

@@ -31,6 +31,12 @@
 @keyframes hda-shades-led{0%,100%{opacity:1}50%{opacity:.35}}
 .hda-anim .hda-shades-flap{transform-box:fill-box;transform-origin:50% 0;animation:hda-shades-flap 2.2s ease-in-out infinite alternate}
 @keyframes hda-shades-flap{from{transform:skewX(-2deg) scaleY(1)}to{transform:skewX(2deg) scaleY(.94)}}
+.hda-anim .hda-shades-mvl{animation:hda-shades-mvl 1.8s ease-in-out infinite}
+.hda-anim .hda-shades-mvr{animation:hda-shades-mvr 1.8s ease-in-out infinite}
+@keyframes hda-shades-mvl{0%,100%{transform:translateX(0)}50%{transform:translateX(-2.6px)}}
+@keyframes hda-shades-mvr{0%,100%{transform:translateX(0)}50%{transform:translateX(2.6px)}}
+.hda-anim .hda-shades-chev{animation:hda-shades-chev 1.1s ease-in-out infinite}
+@keyframes hda-shades-chev{0%,100%{opacity:1}50%{opacity:.3}}
 `;
 
   function defs(o, extra) {
@@ -175,10 +181,8 @@ ${extra || ""}</defs>`;
     }
     return s;
   }
-  // (parts) PV = the Multi-Function readings (0..1, null = part not ticked) while a Multi-Function Image renders, else null
   let PV = null;
   const pv = (k, d) => (PV ? (PV[k] == null ? 0 : PV[k]) : d);
-  // raised blinds: the slats left below the open ones pile up flat on the bottom rail
   function pile(o, x, y, w, k, kind) {
     const fill = kind === "alu" ? `url(#${o.uid}-alu)` : `url(#${o.uid}-slat)`; let s = "";
     for (let i = 0; i < k; i++) { const yy = y + i * 2.2; s += `<rect x="${f1(x)}" y="${f1(yy)}" width="${f1(w)}" height="2.2" rx=".5" fill="${fill}"/><rect x="${f1(x)}" y="${f1(yy + 1.8)}" width="${f1(w)}" height=".4" fill="#000" opacity=".4"/>`; }
@@ -202,7 +206,38 @@ ${extra || ""}</defs>`;
   const pinch = (x0, x1, top, n) => { let s = ""; const fw = (x1 - x0) / n; for (let j = 1; j < n; j++) s += `<path d="M${f1(x0 + j * fw)} ${top + 1}v6" stroke="#000" stroke-opacity=".3" stroke-width="1.2"/>`; return s; };
 
   const icons = [];
-  const add = (id, name, colors, label, render) => icons.push({ id, name, colors, picker: true, colorLabel: label, render });
+  const add = (id, name, colors, label, render, extra) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {}));
+
+  const TILTV = [["open", "Open"], ["half", "Half"], ["closed", "Closed"]];
+  const SLATS = { options: [{ id: "tilt", name: "Slats", values: TILTV }] };
+  const VANES = { options: [{ id: "tilt", name: "Vanes", values: TILTV }] };
+  const TILTF = { open: 1, half: .5, closed: 0 };
+  const tiltO = (o) => { const t = TILTF[(o.opt && o.opt.tilt) || "open"]; return t === 1 || t == null ? o : Object.assign({}, o, { level: (+o.level || 0) * t }); };
+  const OPENV = [["center", "Center split"], ["left", "Left"], ["right", "Right"]];
+  const OPENS = { id: "opens", name: "Opens", values: OPENV };
+  const STATE = { id: "state", name: "State", values: [["stopped", "Stopped"], ["opening", "Opening"], ["closing", "Closing"], ["partial", "Partial"]] };
+  const sideOf = (o, def) => (o.opt && o.opt.opens) || def || "center";
+  function spans(o, x0, x1, lw, def) {
+    const s = sideOf(o, def);
+    if (s === "left") return [[x0, x0 + lw], [x0 + lw, x0 + 2 * lw]];
+    if (s === "right") return [[x1 - 2 * lw, x1 - lw], [x1 - lw, x1]];
+    return [[x0, x0 + lw], [x1 - lw, x1]];
+  }
+  const openDir = (o, def) => { const s = sideOf(o, def); return s === "left" ? [-1, -1] : s === "right" ? [1, 1] : [-1, 1]; };
+  const stOf = (o) => (o.opt && o.opt.state) || "stopped";
+  function mv(o, d, inner) {
+    const st = stOf(o); if (st !== "opening" && st !== "closing") return inner;
+    const k = st === "closing" ? -d : d;
+    return `<g class="${P}${k < 0 ? "mvl" : "mvr"}">${inner}</g>`;
+  }
+  function stateBadge(o, cx, cy, dirs) {
+    const st = stOf(o); if (st === "stopped") return "";
+    let s = `<rect x="${cx - 13}" y="${cy - 5.5}" width="26" height="11" rx="5.5" fill="#101418" opacity=".72"/><rect x="${cx - 13}" y="${cy - 5.5}" width="26" height="11" rx="5.5" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width=".6"/>`;
+    if (st === "partial") return s + `<rect x="${cx - 3.2}" y="${cy - 3}" width="2.2" height="6" rx=".8" fill="#ffc46b"/><rect x="${cx + 1}" y="${cy - 3}" width="2.2" height="6" rx=".8" fill="#ffc46b"/>`;
+    const ch = (x, d) => `<path d="M${f1(x - d * 1.6)} ${cy - 3}L${f1(x + d * 1.6)} ${cy}L${f1(x - d * 1.6)} ${cy + 3}" fill="none" stroke="#5ef0b4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const k = st === "closing" ? -1 : 1, a = dirs[0] * k, b = dirs[1] * k;
+    return s + `<g class="${P}chev">${ch(cx - 6, a)}${ch(cx - 2, a)}${ch(cx + 2, b)}${ch(cx + 6, b)}</g>`;
+  }
 
   add("roller", "Roller shade", sw(FAB), "Fabric", (o) => {
     const a = amt(o), g = G.roller, { x, y, w, h } = g, u = o.uid;
@@ -268,6 +303,7 @@ ${extra || ""}</defs>`;
   });
 
   add("wood", "Wood blinds", sw(WOOD), "Slats", (o) => {
+    o = tiltO(o);
     const g = G.wood, { x, y, w } = g, u = o.uid, a = amt(o), nO = Math.round(12 * (1 - pv("lift", 0))), ho = (g.h - 2) * nO / 12, h = PV ? ho + (12 - nO) * 2.2 + 2 : g.h;
     const tape = H().shade(o.color, -.12);
     return svg(o, stdWindow(o, g) +
@@ -276,9 +312,10 @@ ${extra || ""}</defs>`;
       `<rect x="${x - 5}" y="${y + h - 1}" width="${w + 10}" height="6" rx="1.2" fill="url(#${u}-slat)"/><rect x="${x - 5}" y="${y + h - 1}" width="${w + 10}" height="6" fill="url(#${u}-grain)"/>` +
       `<rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="11" rx="1.5" fill="url(#${u}-slat)"/><rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="11" fill="url(#${u}-grain)"/><rect x="${x - 7}" y="${y - 9}" width="${w + 14}" height="1.4" fill="#fff" opacity=".35"/>` +
       `<path d="M${x - 1} ${y + 2}V${y + 58}" stroke="#eef3f6" stroke-opacity=".75" stroke-width="1.8" stroke-linecap="round" transform="rotate(${f1(a * 6)} ${x - 1} ${y + 2})"/>` + stdSill(o, g));
-  });
+  }, SLATS);
 
   add("mini", "Mini blinds", sw(ALU), "Slats", (o) => {
+    o = tiltO(o);
     const g = G.mini, { x, y, w } = g, u = o.uid, nO = Math.round(22 * (1 - pv("lift", 0))), ho = (g.h - 9) * nO / 22, h = PV ? ho + (22 - nO) * 2.2 + 9 : g.h;
     return svg(o, stdWindow(o, g) +
       (PV ? slats(o, x + 1, y + 6, w - 2, ho, nO, "alu") + pile(o, x + 1, y + 6 + ho, w - 2, 22 - nO, "alu") : slats(o, x + 1, y + 6, w - 2, h - 9, 22, "alu")) +
@@ -286,9 +323,10 @@ ${extra || ""}</defs>`;
       `<rect x="${x + 1}" y="${y + h - 4}" width="${w - 2}" height="3.4" rx="1" fill="url(#${u}-alu)"/>` +
       `<rect x="${x}" y="${y}" width="${w}" height="6" rx="1" fill="url(#${u}-alu)"/><rect x="${x}" y="${y}" width="${w}" height="1" fill="#fff" opacity=".5"/>` +
       `<path d="M${x + 7} ${y + 6}V${y + 66}" stroke="#e7f2f8" stroke-opacity=".8" stroke-width="1.6" stroke-linecap="round"/><path d="M${x + 6.4} ${y + 8}V${y + 64}" stroke="#fff" stroke-opacity=".7" stroke-width=".4"/>` + stdSill(o, g));
-  });
+  }, SLATS);
 
   add("vertical", "Vertical blinds", sw(FAB, "#f6f4ef"), "Fabric", (o) => {
+    o = tiltO(o);
     const a = amt(o), x = 36, y = 26, w = 128, h = 150, u = o.uid, n = 12, p = w / n, ta = pv("tilt", a), sp = PV ? p * (1 - .8 * pv("lift", 0)) : p, vw = p * (1.1 - .86 * ta);
     let v = "", chain = [];
     for (let i = 0; i < n; i++) {
@@ -301,7 +339,7 @@ ${extra || ""}</defs>`;
       `<rect x="${x + w / 2 + 3}" y="${y + 70}" width="2.4" height="16" rx="1.2" fill="#9aa0a6"/>` +
       `<g${an(o, "soft")}>${v}</g><path d="M${chain[0]} ${y + h - 6}H${chain[n - 1]}" stroke="#d8d8d8" stroke-opacity=".6" stroke-width=".7" stroke-dasharray="1.4 1"/>` +
       `<rect x="${x - 2}" y="${y}" width="${w + 4}" height="6" rx="1" fill="url(#${u}-metal)"/>`);
-  });
+  }, VANES);
 
   add("zebra", "Zebra shade", sw(FAB, "#a3a7aa"), "Fabric", (o) => {
     const a = amt(o), g = G.zebra, { x, y, w, h } = g, u = o.uid;
@@ -318,24 +356,23 @@ ${extra || ""}</defs>`;
 
   add("drapes", "Motorized drapes", sw(FAB, "#3a5577"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, top = 28, bot = 176, half = 76;
-    const lw = half * (1 - .8 * a), lx1 = 24 + lw, rx0 = 176 - lw;
+    const lw = half * (1 - .8 * a), [[p0, p1], [q0, q1]] = spans(o, 24, 176, lw), dr = openDir(o);
     return svg(o, room(o, { wall: "#5c5468", x: 60, y: 42, w: 80, h: 94 }) + trim(o, 60, 42, 80, 94) + view(o, 60, 42, 80, 94) + sash(60, 42, 80, 94, "cross") + sill(o, 50, 142, 100) +
-      `<rect x="26" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".22"/><rect x="${f1(rx0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".22"/>` +
-      `<g${an(o, "soft")}>${drape(o, 24, lx1, top, bot, 5)}${pinch(24, lx1, top, 5)}</g><g${an(o, "soft")}>${drape(o, rx0, 176, top, bot, 5)}${pinch(rx0, 176, top, 5)}</g>` +
-      `<rect x="20" y="22" width="160" height="6" rx="1.5" fill="url(#${u}-dmetal)"/><rect x="170" y="19" width="16" height="12" rx="3" fill="url(#${u}-dmetal)"/>` + led(o, 181, 25));
-  });
+      mv(o, dr[0], `<rect x="${f1(p0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".22"/>`) + mv(o, dr[1], `<rect x="${f1(q0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".22"/>`) +
+      mv(o, dr[0], `<g${an(o, "soft")}>${drape(o, p0, p1, top, bot, 5)}${pinch(p0, p1, top, 5)}</g>`) + mv(o, dr[1], `<g${an(o, "soft")}>${drape(o, q0, q1, top, bot, 5)}${pinch(q0, q1, top, 5)}</g>`) +
+      `<rect x="20" y="22" width="160" height="6" rx="1.5" fill="url(#${u}-dmetal)"/><rect x="170" y="19" width="16" height="12" rx="3" fill="url(#${u}-dmetal)"/>` + led(o, 181, 25) + stateBadge(o, 100, 13, dr));
+  }, { options: [OPENS, STATE] });
 
   add("sheer", "Sheer curtains", sw(SHEER), "Fabric", (o) => {
     const a = amt(o), u = o.uid, top = 31, bot = 177, half = 68;
-    const lw = half * (1 - .74 * a), lx1 = 32 + lw, rx0 = 168 - lw;
+    const lw = half * (1 - .74 * a), [[p0, p1], [q0, q1]] = spans(o, 32, 168, lw);
     const panel = (x0, x1, cl2) => `<g${an(o, cl2)}><rect x="${f1(x0)}" y="${top}" width="${f1(x1 - x0)}" height="${bot - top}" fill="${o.color}" opacity=".3"/>${drape(o, x0, x1, top, bot, 9, "sfold")}</g>`;
-    let rings = ""; for (let i = 0; i < 6; i++) { rings += `<ellipse cx="${f1(34 + i * (lw - 4) / 5)}" cy="30" rx="2.2" ry="3" fill="none" stroke="url(#${u}-brass)" stroke-width="1"/><ellipse cx="${f1(166 - i * (lw - 4) / 5)}" cy="30" rx="2.2" ry="3" fill="none" stroke="url(#${u}-brass)" stroke-width="1"/>`; }
+    let rings = ""; for (let i = 0; i < 6; i++) { rings += `<ellipse cx="${f1(p0 + 2 + i * (lw - 4) / 5)}" cy="30" rx="2.2" ry="3" fill="none" stroke="url(#${u}-brass)" stroke-width="1"/><ellipse cx="${f1(q1 - 2 - i * (lw - 4) / 5)}" cy="30" rx="2.2" ry="3" fill="none" stroke="url(#${u}-brass)" stroke-width="1"/>`; }
     return svg(o, room(o, { wall: "#7a676c", x: 58, y: 44, w: 84, h: 92 }) + trim(o, 58, 44, 84, 92) + view(o, 58, 44, 84, 92) + sash(58, 44, 84, 92, "cross") + sill(o, 48, 142, 104) +
-      panel(32, lx1, "sway") + panel(rx0, 168, "sway2") +
+      panel(p0, p1, "sway") + panel(q0, q1, "sway2") +
       `<rect x="26" y="28.5" width="148" height="3" rx="1.5" fill="url(#${u}-brass)"/><circle cx="25" cy="30" r="4" fill="url(#${u}-brass)"/><circle cx="175" cy="30" r="4" fill="url(#${u}-brass)"/>` + rings);
-  });
+  }, { options: [OPENS] });
 
-  // the sheers parted (Multi-Function, sheer part open): two panels gathered toward the sides, their pleats bunched closer
   function sheers(o, top, bot, sw2) {
     let t = "";
     [[36, 36 + sw2], [164 - sw2, 164]].forEach(([a0, a1]) => { t += `<rect x="${f1(a0)}" y="${top}" width="${f1(a1 - a0)}" height="${bot - top}" fill="#f5f2ea" opacity=".5"/>`; for (let i = 0; i < 8; i++) t += `<rect x="${f1(a0 + (i + .2) * (a1 - a0) / 8)}" y="${top}" width="${f1(Math.max(1, 3.5 * (a1 - a0) / 64))}" height="${bot - top}" fill="#fff" opacity=".26"/>`; });
@@ -343,14 +380,14 @@ ${extra || ""}</defs>`;
   }
   add("layered", "Drapes over sheers", sw(FAB, "#b9805f"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, top = 30, bot = 177, half = 64;
-    const lw = half * (1 - .78 * a), lx1 = 28 + lw, rx0 = 172 - lw;
+    const lw = half * (1 - .78 * a), [[p0, p1], [q0, q1]] = spans(o, 28, 172, lw);
     let sv = ""; for (let i = 0; i < 16; i++) sv += `<rect x="${36 + i * 8}" y="${top}" width="3.5" height="${bot - top}" fill="#fff" opacity=".22"/>`;
     return svg(o, room(o, { wall: "#3d485b", x: 60, y: 44, w: 80, h: 92 }) + trim(o, 60, 44, 80, 92) + view(o, 60, 44, 80, 92) + sash(60, 44, 80, 92, "cross") + sill(o, 50, 142, 100) +
       (PV && pv("sheer", 0) > 0 ? sheers(o, top, bot, 64 * (1 - .8 * pv("sheer", 0))) : `<g${an(o, "sway2")}><rect x="36" y="${top}" width="128" height="${bot - top}" fill="#f5f2ea" opacity=".42"/>${sv}</g>`) +
-      `<rect x="30" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/><rect x="${f1(rx0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/>` +
-      `<g${an(o, "soft")}>${drape(o, 28, lx1, top, bot, 6)}</g><g${an(o, "soft")}>${drape(o, rx0, 172, top, bot, 6)}</g>` +
+      `<rect x="${f1(p0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/><rect x="${f1(q0 + 2)}" y="${top}" width="${f1(lw)}" height="${bot - top}" fill="#000" opacity=".25"/>` +
+      `<g${an(o, "soft")}>${drape(o, p0, p1, top, bot, 6)}</g><g${an(o, "soft")}>${drape(o, q0, q1, top, bot, 6)}</g>` +
       `<rect x="22" y="25.5" width="156" height="4.4" rx="2.2" fill="url(#${u}-trunk)"/><circle cx="20" cy="27.7" r="4.6" fill="url(#${u}-trunk)"/><circle cx="180" cy="27.7" r="4.6" fill="url(#${u}-trunk)"/><circle cx="18.6" cy="26.3" r="1.4" fill="#fff" opacity=".3"/><circle cx="178.6" cy="26.3" r="1.4" fill="#fff" opacity=".3"/>`);
-  });
+  }, { options: [OPENS] });
 
   add("cafe", "Cafe curtains", sw(["#c0463c", "#3a5577", "#5d8a55", "#d9a441", "#333333"]), "Fabric", (o) => {
     const a = amt(o), u = o.uid, x = 50, y = 32, w = 100, h = 96;
@@ -365,10 +402,10 @@ ${extra || ""}</defs>`;
       `<g class="hda-bg"><rect y="134" width="200" height="40" fill="url(#${u}-tile)"/><rect y="172" width="200" height="8" fill="#9a958d"/><rect y="172" width="200" height="1.5" fill="#fff" opacity=".6"/><rect y="180" width="200" height="20" fill="#3e4c50"/><path d="M66 180V200M134 180V200" stroke="#000" stroke-opacity=".35"/><rect x="58" y="186" width="5" height="1.6" rx=".8" fill="#c9ccd0"/><rect x="137" y="186" width="5" height="1.6" rx=".8" fill="#c9ccd0"/></g>` +
       trim(o, x, y, w, h) + view(o, x, y, w, h) + sash(x, y, w, h, "h") + sill(o, 40, 134, 120) +
       `<g class="hda-bg"><path d="M128 120L130 134H140L142 120Z" fill="#b8643f"/><rect x="127" y="118" width="16" height="3" rx="1" fill="#c97750"/><g fill="url(#${u}-leaf)"><ellipse cx="132" cy="113" rx="4" ry="6" transform="rotate(-20 132 113)"/><ellipse cx="138" cy="112" rx="4" ry="6.5" transform="rotate(18 138 112)"/><ellipse cx="135" cy="109" rx="3.4" ry="6"/></g></g>` +
-      panel(44, 44 + lw, "sway") + panel(156 - lw, 156, "sway2") +
+      spans(o, 44, 156, lw).map((sp, i) => panel(sp[0], sp[1], i ? "sway2" : "sway")).join("") +
       `<rect x="44" y="${rod - 2}" width="112" height="2" rx="1" fill="url(#${u}-brass)"/>` +
       `<g${an(o, "soft")}><path d="${val}" fill="url(#${u}-ging)"/><g clip-path="url(#${u}-vc)">${vf}</g><path d="${val}" fill="none" stroke="#000" stroke-opacity=".15"/></g><clipPath id="${u}-vc"><path d="${val}"/></clipPath>`, tile);
-  });
+  }, { options: [OPENS] });
 
   add("shutters", "Plantation shutters", sw(PAINT), "Finish", (o) => {
     const g = G.shutters, { x, y, w, h } = g, u = o.uid, a = amt(o);
@@ -447,18 +484,19 @@ ${extra || ""}</defs>`;
 
   add("panels", "Sliding panels", sw(FAB, "#e7dfcf"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, x = 26, y = 26, w = 148, h = 150, top = 26, bot = 174;
-    let s = "";
-    for (let i = 0; i < 4; i++) {
-      const px = 22 + i * (38.7 - 34.7 * a), pw = 40;
-      s += `<rect x="${f1(px - 3)}" y="${top}" width="3" height="${bot - top}" fill="#000" opacity=".25"/>` +
+    const side = sideOf(o, "left");
+    const pane = (px, i, mir) => { const pw = 40, ex = mir ? px + pw : px - 3, hx = mir ? px + pw - 1 : px;
+      return `<rect x="${f1(ex)}" y="${top}" width="3" height="${bot - top}" fill="#000" opacity=".25"/>` +
         `<g${an(o, i % 2 ? "sway2" : "soft")}><rect x="${f1(px)}" y="${top}" width="${pw}" height="${bot - top}" fill="url(#${u}-fv)"/><rect x="${f1(px)}" y="${top}" width="${pw}" height="${bot - top}" fill="url(#${u}-wv)"/>` +
         `<rect x="${f1(px)}" y="${top}" width="${pw}" height="${bot - top}" fill="#000" opacity="${f2(.14 - i * .04)}"/>` +
         `<path d="M${f1(px + 9)} ${top}V${bot}M${f1(px + 23)} ${top}V${bot}M${f1(px + 31)} ${top}V${bot}" stroke="#fff" stroke-opacity=".08" stroke-width="1.2"/>` +
-        `<rect x="${f1(px)}" y="${bot - 3}" width="${pw}" height="3" fill="url(#${u}-dmetal)"/><rect x="${f1(px)}" y="${top}" width="1" height="${bot - top}" fill="#fff" opacity=".25"/></g>`;
-    }
+        `<rect x="${f1(px)}" y="${bot - 3}" width="${pw}" height="3" fill="url(#${u}-dmetal)"/><rect x="${f1(hx)}" y="${top}" width="1" height="${bot - top}" fill="#fff" opacity=".25"/></g>`; };
+    let s = "";
+    if (side === "center") for (let i = 0; i < 2; i++) { const px = 22 + i * (39 - 35 * a); s += pane(px, i, false) + pane(200 - px - 40, i, true); }
+    else for (let i = 0; i < 4; i++) { const px = 22 + i * (38.7 - 34.7 * a); s += side === "right" ? pane(200 - px - 40, i, true) : pane(px, i, false); }
     return svg(o, room(o, { wall: "#686260", x, y, w, h, floor: 182 }) + trim(o, x, y, w, h, 5, `url(#${u}-dmetal)`) + view(o, x, y, w, h) + sash(x, y, w, h, "v", "#3c3936") + s +
       `<rect x="18" y="18" width="164" height="8" rx="1.5" fill="url(#${u}-metal)"/><path d="M18 21H182M18 23.5H182" stroke="#000" stroke-opacity=".18" stroke-width=".5"/>`);
-  });
+  }, { options: [{ id: "opens", name: "Opens", values: [["left", "Left"], ["right", "Right"], ["center", "Center split"]] }] });
 
   add("arched", "Arched window", sw(FAB, "#f6f4ef"), "Fabric", (o) => {
     const a = amt(o), u = o.uid, cx = 100, cy = 72, r = 46;
@@ -501,11 +539,6 @@ ${extra || ""}</defs>`;
       `<rect x="44" y="136" width="30" height="16" rx="6" fill="url(#${u}-cg)" transform="rotate(-6 59 144)"/><rect x="126" y="136" width="30" height="16" rx="6" fill="url(#${u}-cg)" transform="rotate(6 141 144)"/><path d="M50 140Q59 138 68 137M132 137Q141 138 150 140" stroke="#fff" stroke-opacity=".35" fill="none"/></g>`);
   });
 
-  // ---------- (parts) Multi-Function: position readings as value parts (0-100 %) ----------
-  // Blinds: Tilt (slats / vanes / zebra bands open) + Lift (raised; vertical blinds: drawn aside); shutters: Tilt only.
-  // Top-down/bottom-up: Top rail (lowered %) + Bottom rail (raised %). Dual layers: Sheer + Blackout (open %).
-  // o.mf: o.pval holds the ticked readings. A reading left out: tilt closed, lift down, rails home; in a dual layer the other
-  // layer stays out of the way (no sheer layer on the blackout roller, the drapes pulled aside). Device Images: today's look.
   const pc = (id, name, def) => ({ id, name, type: "value", unit: "%", min: 0, max: 100, def });
   const TILT = pc("tilt", "Tilt (open)", 50), LIFT = pc("lift", "Lift (raised)", 40);
   const SP = {
@@ -530,8 +563,7 @@ ${extra || ""}</defs>`;
   (window.HDA = window.HDA || []).push({
     id: "shades", tab: "Blinds & curtains", group: "Home", kind: "device",
     levelLabel: "Open", onWord: "Open", offWord: "Closed",
-    intro: "Twenty window coverings on a real window with a sunny yard behind it. The slider sets how far open (blinds and shutters tilt their slats, shades lift, drapes part); Closed shuts them. Open ones let daylight onto the wall, and fabric sways while the clouds drift.",
-    
+    intro: "Twenty window coverings on a real window with a sunny yard behind it. The slider sets how far open (blinds and shutters tilt their slats, shades lift, drapes part); Closed shuts them. The Slats (or Vanes) menu sets how far blinds can turn open, and Opens picks which way curtains draw. Open ones let daylight onto the wall, and fabric sways while the clouds drift.",
     css, icons,
   });
 })();

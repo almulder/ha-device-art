@@ -6,10 +6,6 @@
   const rot = (px, py, cx, cy, d) => { const a = d * R, c = Math.cos(a), s = Math.sin(a), dx = px - cx, dy = py - cy; return [cx + dx * c - dy * s, cy + dx * s + dy * c]; };
   const RED = "#ff3b3b", BLUE = "#4da3ff", GREEN = "#34d399", WARM = "#fff1d1", IRC = "#ff3a52", FOV = "#bfe3ff";
 
-  // ---------- (parts) Multi-Function: floodlight / spotlight cameras = Light + Siren (switches) + Motion (stage);
-  // sirens = an Alarm stage (off / siren / strobe / both, Hubitat's alarm attribute); alarm keypads / panels = an Arm
-  // state stage (disarmed / home / away / night / alarm). Stage values come in o.pval[id] and are used only as a
-  // Multi-Function Image (o.mf); a Device Image (no o.mf, no parts) is drawn exactly as before.
   const SV = (o, k) => (o.mf && o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null);
   const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
   const ARM = { id: "arm", name: "Arm state", type: "stage", values: [["disarmed", "Disarmed"], ["home", "Armed home"], ["away", "Armed away"], ["night", "Armed night"], ["alarm", "Alarm"]], def: "disarmed" };
@@ -17,17 +13,18 @@
   const CAM = [{ id: "light", name: "Light", type: "switch" }, { id: "siren", name: "Siren", type: "switch" },
     { id: "motion", name: "Motion", type: "stage", values: [["inactive", "No motion"], ["active", "Motion"]], def: "inactive" }];
   function ctx(o) {
-    const c = o.color || "#eceef1", lv = o.level == null ? 1 : o.level, arm = SV(o, "arm"), al = SV(o, "alarm");
-    const on = arm ? arm !== "disarmed" : al ? al !== "off" : !!o.on;
-    const L = on ? .4 + .6 * lv : 0;
-    return { c, on, lv, L, id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, op: (k) => (k * L).toFixed(2), sp: 1.7 - .9 * lv,
+    const opt = o.opt || {}, cs = o.cam ? CK.cam(o) : (o.on ? "on" : "off"), dead = cs === "offline", arm = SV(o, "arm"), al = SV(o, "alarm");
+    const c0 = o.color || "#eceef1", c = dead ? H.mix(c0, "#80838a", .7) : c0, lv = o.level == null ? 1 : o.level;
+    const on = arm ? arm !== "disarmed" : al ? al !== "off" : o.cam ? CK.active(cs) : !!o.on;
+    const L = on ? .4 + .6 * lv : 0, irv = opt.ir || "auto";
+    const ir = cs !== "privacy" && !dead && (irv === "on" || (irv === "auto" && on));
+    return { c, on, lv, L, cs, cam: o.cam, pan: opt.pan || "center", u: o.uid, ir, irk: on ? L : .85,
+      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, op: (k) => (k * L).toFixed(2), sp: 1.7 - .9 * lv,
       mf: !!o.mf, st: arm || (on ? "away" : "disarmed"), alarm: arm === "alarm",
       siren: al ? al === "siren" || al === "both" : on, strobe: al ? al === "strobe" || al === "both" : on };
   }
-  // the same drawing context with another on (a part's own on)
   const xo = (x, on) => { if (on === x.on) return x; const L = on ? .4 + .6 * x.lv : 0; return Object.assign({}, x, { on, L, op: (k) => (k * L).toFixed(2) }); };
   const homeish = (x) => x.mf && (x.st === "home" || x.st === "night");
-  // armed home = a house in place of the lock, armed night = a crescent moon
   const modeG = (x, cx, cy, s, col, lockFn) => !homeish(x) ? lockFn() : x.st === "home"
     ? `<path d="M${f(cx - 6 * s)} ${f(cy + 7 * s)}V${f(cy + 1 * s)}L${cx} ${f(cy - 5 * s)}L${f(cx + 6 * s)} ${f(cy + 1 * s)}V${f(cy + 7 * s)}Z" fill="${col}"/><rect x="${f(cx - 1.6 * s)}" y="${f(cy + 3 * s)}" width="${f(3.2 * s)}" height="${f(4 * s)}" fill="#000" fill-opacity=".35"/>`
     : `<path d="M${f(cx + 1 * s)} ${f(cy - 5 * s)}A${f(6.5 * s)} ${f(6.5 * s)} 0 1 0 ${f(cx + 6 * s)} ${f(cy + 5 * s)}A${f(5 * s)} ${f(5 * s)} 0 1 1 ${f(cx + 1 * s)} ${f(cy - 5 * s)}Z" fill="${col}"/>`;
@@ -155,7 +152,31 @@ ${m === "wood" ? `<path d="M8 ${y + 9}C60 ${y + 7} 120 ${y + 11} 192 ${y + 8}M8 
 <g clip-path="${x.url("wc")}">${texture(kind, x)}${o2.shelf ? shelf(x, o2.shelf, o2.mat) : ""}${o2.under || ""}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/>
 ${o2.clip || ""}</g>
 <rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g>
-<g clip-path="${x.url("wc")}">${body}</g></svg>`;
+<g clip-path="${x.url("wc")}">${x.cs === "offline" ? `<g opacity=".8">${body}</g>` : body}${camTop(x)}</g></svg>`;
+  }
+  const LENS = {
+    bullet: { caps: [[52, 99, 11, "rotate(-14 108 96) translate(52 99) scale(.62 1) translate(-52 -99)"]], m: [rot(52, 99, 108, 96, -14), 9] },
+    dome: { caps: [[100, 76, 17.5, "translate(100 76) scale(1 .82) translate(-100 -76)"]], m: [[100, 76], 15] },
+    turret: { caps: [[100, 116, 17.5]], m: [[100, 116], 16] },
+    cube: { caps: [[100, 92, 16]], m: [[100, 92], 15] },
+    pantilt: { caps: [], m: [[100, 92], 16] },
+    flood: { caps: [[100, 110, 12.5]], m: [[100, 110], 12] },
+    spot: { caps: [[100, 104, 18.5]], m: [[100, 104], 17] },
+    battery: { caps: [[104, 82, 17, "rotate(-8 104 94)"]], m: [rot(104, 82, 104, 94, -8), 15] },
+    solar: { caps: [[100, 129, 14]], m: [[100, 129], 13] },
+    baby: { caps: [[100, 89, 16.5]], m: [[100, 89], 15] },
+    ptz: { caps: [[110, 110, 13.5, "translate(110 110) scale(1 .78) translate(-110 -110)"]], m: [[110, 108], 12], bx: 172 },
+    dual: { caps: [[100, 82, 15], [100, 126, 15]], m: [[100, 104], 26] },
+  };
+  const panDx = (x) => x.cam === "ptz" || x.cam === "pantilt" ? (x.pan === "left" ? (x.cam === "ptz" ? -12 : -9) : x.pan === "right" ? (x.cam === "ptz" ? 12 : 9) : 0) : 0;
+  function camTop(x) {
+    const Q = x.cam && LENS[x.cam]; if (!Q) return "";
+    const dx = panDx(x); let s = "";
+    if (x.cs === "motion") s += CK.motion(Q.m[0][0] + dx, Q.m[0][1], Q.m[1]);
+    if (x.cs === "privacy") s += Q.caps.map((p, i) => { const k = CK.cap(x.u, i, p[0], p[1], p[2], x.c);
+      if (x.cam === "ptz") return `<g transform="translate(${p[0] + dx} 110) scale(${dx ? .82 : 1} .78) translate(-110 -110)">${k}</g>`;
+      return p[3] ? `<g transform="${p[3]}">${k}</g>` : k; }).join("");
+    return s + CK.badge(x.cs, Q.bx, Q.by);
   }
 
   const drop = (x, shape, dx, dy, a) => `<g transform="translate(${dx == null ? 3.5 : dx} ${dy == null ? 5 : dy})" fill="#000" stroke="none" opacity="${a || .5}" filter="${x.url("bl")}">${shape}</g>`;
@@ -163,7 +184,8 @@ ${o2.clip || ""}</g>
   const edge = (d, a) => `<path d="${d}" fill="none" stroke="#000" stroke-opacity="${a || .35}" stroke-width=".8"/>`;
   const gl = (x, d, a) => `<path d="${d}" fill="${x.url("gloss")}" opacity="${a || .35}"/>`;
   const anim = (cls, dur, delay) => `class="${P}${cls}" style="animation-duration:${f(dur)}s;animation-delay:${(delay || 0).toFixed(2)}s"`;
-  const glowE = (x, cx, cy, rx, ry, k, g) => x.on ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url(g)}" opacity="${x.op(k)}"/>` : "";
+  const glowE = (x, cx, cy, rx, ry, k, g) => g === "hI" ? (x.ir ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url(g)}" opacity="${(k * x.irk).toFixed(2)}"/>` : "")
+    : x.on ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url(g)}" opacity="${x.op(k)}"/>` : "";
   const contact = (x, cx, cy, rx, ry) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${x.url("sh")}"/>`;
   const screw = (x, cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${x.url("silr")}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".6"/><path d="M${f(cx - r * .6)} ${f(cy + r * .3)}L${f(cx + r * .6)} ${f(cy - r * .3)}" stroke="#2a2d33" stroke-width="${f(r * .35)}" stroke-linecap="round"/>`;
 
@@ -178,15 +200,16 @@ ${o2.clip || ""}</g>
     let s = "", g = "";
     for (let i = 0; i < n; i++) {
       const a = (i / n) * 2 * Math.PI - Math.PI / 2, px = f(cx + Rr * Math.cos(a)), py = f(cy + Rr * Math.sin(a));
-      s += `<circle cx="${px}" cy="${py}" r="${r}" fill="#120c10"/><circle cx="${px}" cy="${py}" r="${f(r * .6)}" fill="${x.on ? "#ff4a5e" : "#3a2a36"}" opacity="${x.on ? x.op(1) : .9}"/>`;
-      if (x.on) g += `<circle cx="${px}" cy="${py}" r="${f(r * 3.4)}" fill="${x.url("hI")}"/>`;
+      s += `<circle cx="${px}" cy="${py}" r="${r}" fill="#120c10"/><circle cx="${px}" cy="${py}" r="${f(r * .6)}" fill="${x.ir ? "#ff4a5e" : "#3a2a36"}" opacity="${x.ir ? (x.irk).toFixed(2) : .9}"/>`;
+      if (x.ir) g += `<circle cx="${px}" cy="${py}" r="${f(r * 3.4)}" fill="${x.url("hI")}"/>`;
     }
-    if (!x.on) return s;
-    return `<circle cx="${cx}" cy="${cy}" r="${f(Rr * 2)}" fill="${x.url("hI")}" opacity="${x.op(.55)}" ${anim("ir", 2.6, 0)}/>${s}<g opacity="${x.op(.9)}" ${anim("ir", 2.6, 0)}>${g}</g>`;
+    if (!x.ir) return s;
+    return `<circle cx="${cx}" cy="${cy}" r="${f(Rr * 2)}" fill="${x.url("hI")}" opacity="${(.55 * x.irk).toFixed(2)}" ${anim("ir", 2.6, 0)}/>${s}<g opacity="${(.9 * x.irk).toFixed(2)}" ${anim("ir", 2.6, 0)}>${g}</g>`;
   }
   function sled(x, cx, cy, r, col, offGreen) {
-    const h = col === BLUE ? "hB" : "hR";
-    if (x.on) return `<g ${anim("blink", 1.2, 0)}><circle cx="${cx}" cy="${cy}" r="${f(r * 4.5)}" fill="${x.url(h)}" opacity="${x.op(1)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col || RED}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .45)}" fill="#fff" fill-opacity=".85"/></g>`;
+    if (x.on && CK.LED[x.cs]) col = CK.LED[x.cs]; 
+    const h = col === BLUE ? "hB" : col === GREEN || col === CK.LED.live ? "hG" : "hR";
+    if (x.on) return `<g ${x.cs === "live" ? "" : anim("blink", 1.2, 0)}><circle cx="${cx}" cy="${cy}" r="${f(r * 4.5)}" fill="${x.url(h)}" opacity="${x.op(1)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col || RED}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .45)}" fill="#fff" fill-opacity=".85"/></g>`;
     if (offGreen) return `<circle cx="${cx}" cy="${cy}" r="${f(r * 2.6)}" fill="${x.url("hG")}" opacity=".35"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${GREEN}"/><circle cx="${f(cx - r * .3)}" cy="${f(cy - r * .3)}" r="${f(r * .4)}" fill="#fff" fill-opacity=".7"/>`;
     return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#1b1e28"/><circle cx="${cx}" cy="${cy}" r="${f(r * .5)}" fill="${H.shade(col || RED, -.5)}" opacity=".6"/>`;
   }
@@ -228,6 +251,67 @@ ${o2.clip || ""}</g>
   const SW = ["#eceef1", "#2a2c31", "#8d939b", "#6b4e36", "#4a4e55", "#cbbd9f"];
   const sw = (first, n) => [first].concat(SW.filter((c) => c !== first)).slice(0, n || 5);
   const body = (d) => Object.assign({ picker: true, colorLabel: "Body" }, d);
+
+  const CK = (() => {
+    const g = (n) => (+n).toFixed(1);
+    const STATE = { id: "state", name: "State", values: [["auto", "From on/off"], ["live", "Live"], ["rec", "Recording"], ["motion", "Motion"], ["privacy", "Privacy"], ["offline", "Offline"]] };
+    const BELL = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+    const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] };
+    const IRA = { id: "ir", name: "Night IR", values: [["auto", "Auto"], ["off", "Off"], ["on", "On"]] };
+    const PAN = { id: "pan", name: "Pan", values: [["center", "Center"], ["left", "Left"], ["right", "Right"]] };
+    const cam = (o) => { const s = (o.opt || {}).state || "auto"; return s === "auto" ? (o.on ? "on" : "off") : s; };
+    const bell = (o) => o.on ? ((o.opt || {}).state || "ring") : "idle";
+    const active = (s) => s === "on" || s === "live" || s === "rec" || s === "motion";
+    const COL = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940", privacy: "#c9ced6", offline: "#8a8f98" };
+    const LED = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940" };
+    function badge(s, bx, by) {
+      const c = COL[s]; if (!c) return "";
+      bx = bx == null ? 28 : bx; by = by == null ? 28 : by;
+      let gl = "";
+      if (s === "rec") gl = `<circle cx="${bx}" cy="${by}" r="7" fill="${c}" opacity=".22"/><g class="${P}ckblink"><circle cx="${bx}" cy="${by}" r="4.4" fill="${c}"/><circle cx="${g(bx - 1.4)}" cy="${g(by - 1.4)}" r="1.3" fill="#fff" fill-opacity=".6"/></g>`;
+      else if (s === "live") gl = `<circle cx="${bx}" cy="${by}" r="2.3" fill="${c}"/><path d="M${g(bx - 3.2)} ${g(by - 3.6)}A5 5 0 0 0 ${g(bx - 3.2)} ${g(by + 3.6)}M${g(bx + 3.2)} ${g(by - 3.6)}A5 5 0 0 1 ${g(bx + 3.2)} ${g(by + 3.6)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path class="${P}ckglow" d="M${g(bx - 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 0 ${g(bx - 5.6)} ${g(by + 5.4)}M${g(bx + 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 1 ${g(bx + 5.6)} ${g(by + 5.4)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "motion") gl = `<g class="${P}ckglow" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="${g(bx + 1.2)}" cy="${g(by - 5.6)}" r="1.9" fill="${c}" stroke="none"/>` +
+        `<path d="M${g(bx + .4)} ${g(by - 2.8)}L${g(bx - 1)} ${g(by + 2)}L${g(bx - 4.4)} ${g(by + 6.2)}M${g(bx - 1)} ${g(by + 2)}L${g(bx + 2.6)} ${g(by + 3.4)}L${g(bx + 3.4)} ${g(by + 6.6)}M${g(bx - 4.6)} ${g(by - .6)}L${g(bx + .4)} ${g(by - 2.8)}L${g(bx + 4)} ${g(by)}"/></g>`;
+      else if (s === "privacy") gl = `<path d="M${g(bx - 6.4)} ${by}Q${bx} ${g(by - 6)} ${g(bx + 6.4)} ${by}Q${bx} ${g(by + 6)} ${g(bx - 6.4)} ${by}Z" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="${bx}" cy="${by}" r="2" fill="${c}"/>` +
+        `<path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "offline") gl = `<circle cx="${bx}" cy="${g(by + 4)}" r="1.2" fill="${c}"/><path d="M${g(bx - 2.8)} ${g(by + 1.2)}A4 4 0 0 1 ${g(bx + 2.8)} ${g(by + 1.2)}M${g(bx - 5.3)} ${g(by - 1.3)}A7.5 7.5 0 0 1 ${g(bx + 5.3)} ${g(by - 1.3)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#ff5a5a" stroke-width="1.5" stroke-linecap="round"/>`;
+      return `<g><circle cx="${g(bx + 1)}" cy="${g(by + 1.6)}" r="11" fill="#000" fill-opacity=".45"/><circle cx="${bx}" cy="${by}" r="11" fill="#16181e"/><circle cx="${bx}" cy="${by}" r="10.2" fill="none" stroke="${c}" stroke-width="1.3"/>` +
+        `<path d="M${g(bx - 7)} ${g(by - 6)}A9 9 0 0 1 ${g(bx + 6)} ${g(by - 7)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>${gl}</g>`;
+    }
+    const motion = (cx, cy, r) => [0, 1].map((i) => `<circle class="${P}ckring" style="animation-delay:${(-i * .8).toFixed(1)}s" cx="${g(cx)}" cy="${g(cy)}" r="${g(r * (1.3 + i * .5))}" fill="none" stroke="#ffa940" stroke-opacity="${i ? .4 : .75}" stroke-width="${i ? 1.4 : 1.8}"${i ? ` stroke-dasharray="3 3"` : ""}/>`).join("");
+    function cap(u, k, cx, cy, r, col) {
+      const id = `${u}-ckc${k}`;
+      return `<defs><radialGradient id="${id}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${H.shade(col, .55)}"/><stop offset=".6" stop-color="${col}"/><stop offset="1" stop-color="${H.shade(col, -.45)}"/></radialGradient></defs>` +
+        `<circle cx="${g(cx)}" cy="${g(cy + r * .14)}" r="${g(r)}" fill="#000" fill-opacity=".4"/><circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="url(#${id})"/>` +
+        `<path d="M${g(cx - r * .97)} ${g(cy)}H${g(cx + r * .97)}" stroke="${H.shade(col, -.5)}" stroke-width="${g(Math.max(.8, r * .09))}"/><path d="M${g(cx - r * .9)} ${g(cy + r * .1)}H${g(cx + r * .9)}" stroke="#fff" stroke-opacity=".28" stroke-width="${g(Math.max(.5, r * .05))}"/>` +
+        `<circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="none" stroke="#000" stroke-opacity=".38" stroke-width=".8"/><ellipse cx="${g(cx - r * .32)}" cy="${g(cy - r * .5)}" rx="${g(r * .36)}" ry="${g(r * .15)}" fill="#fff" fill-opacity=".4" transform="rotate(-18 ${g(cx - r * .32)} ${g(cy - r * .5)})"/>`;
+    }
+    const irDots = (cx, cy, R, n, rr) => { let s = ""; rr = rr || 1.1;
+      for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, px = g(cx + Math.cos(a) * R), py = g(cy + Math.sin(a) * R);
+        s += `<circle cx="${px}" cy="${py}" r="${g(rr * 3)}" fill="#ff3a4a" opacity=".22"/><circle cx="${px}" cy="${py}" r="${g(rr)}" fill="#ff3a4a"/>`; }
+      return s; };
+    function bellOver(s, cx, ly, lr, w) {
+      if (s === "motion") return `<g class="${P}ckglow">` + [0, 1].map((i) => { const r = lr + 5 + i * 6; return `<path d="M${g(cx - r)} ${g(ly - 2)}A${g(r)} ${g(r)} 0 0 1 ${g(cx + r)} ${g(ly - 2)}" fill="none" stroke="#ff8a6a" stroke-opacity="${(.8 - i * .3).toFixed(2)}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>`; }).join("") + `</g>`;
+      if (s === "live") return `<g class="${P}ckglow"><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.9)}" fill="#6aa8ff" opacity=".22"/><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.05)}" fill="none" stroke="#6aa8ff" stroke-opacity=".8" stroke-width="1.4"/></g>` +
+        `<circle class="${P}ckblink" cx="${g(cx + w / 2 + 7)}" cy="${g(ly - lr)}" r="3" fill="#ff3b3b"/>`;
+      if (s === "talk") return [0, 1, 2].map((i) => `<path class="${P}ckwave" style="animation-delay:${(-i * .4).toFixed(1)}s" d="M${g(cx + w / 2 + 4 + i * 6)} ${g(ly - 6 - i * 2)}q${g(5 + i)} ${g(6 + i * 2)} 0 ${g(12 + i * 4)}" fill="none" stroke="#7ee7ff" stroke-opacity="${(.9 - i * .2).toFixed(2)}" stroke-width="1.5" stroke-linecap="round"/>`).join("");
+      return "";
+    }
+    const css = `
+.${P}ckring{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}ckblink{animation:${P}ckblink 1.1s steps(1,end) infinite}
+@keyframes ${P}ckblink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .${P}ckring{animation:${P}ckring 1.6s ease-out infinite}
+@keyframes ${P}ckring{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.hda-anim .${P}ckglow{animation:${P}ckglow 1.8s ease-in-out infinite}
+@keyframes ${P}ckglow{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-anim .${P}ckwave{animation:${P}ckwave 1.3s ease-out infinite}
+@keyframes ${P}ckwave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}ckblink,.hda-anim .${P}ckring,.hda-anim .${P}ckglow,.hda-anim .${P}ckwave{animation:none!important}}`;
+    return { STATE, BELL, IR, IRA, PAN, cam, bell, active, LED, badge, motion, cap, irDots, bellOver, css };
+  })();
 
   const icons = [
      body({ id: "bullet", name: "Bullet camera", colors: sw("#eceef1"), render(o) {
@@ -302,14 +386,16 @@ ${gl(x, rrp(73, 69, 54, 24, 10), .25)}<path d="${rrp(64, 60, 72, 72, 18)}" fill=
 ${drop(x, `<circle cx="100" cy="88" r="34"/>`, 3, 5, .5)}<circle cx="100" cy="88" r="34" fill="${x.url("br")}"/>
 <clipPath id="${u}"><circle cx="100" cy="88" r="33"/></clipPath>
 ${glowE(x, 100, 92, 34, 30, .3, "hI")}
-<g clip-path="url(#${u})"><g ${x.on ? anim("pan", 6, 0) : ""}>${face}</g></g>
+<g clip-path="url(#${u})">${(() => { const dx = panDx(x);
+        const tf = x.cs === "privacy" ? `translate(0 46)` : dx ? `translate(${100 + dx} 92) scale(.8 1) translate(-100 -92)` : "";
+        return tf ? `<g transform="${tf}">${face}</g>` : `<g ${x.on ? anim("pan", 6, 0) : ""}>${face}</g>`; })()}</g>
 <path d="M68 82A34 10 0 0 0 132 82" fill="none" stroke="#000" stroke-opacity=".14" stroke-width="1.2"/><ellipse cx="88" cy="66" rx="10" ry="5" fill="#fff" fill-opacity=".35" transform="rotate(-25 88 66)"/>`;
       return scene(x, "sage", F, { shelf: 156 });
     } }),
 
      body({ id: "flood", name: "Floodlight camera", colors: sw("#eceef1"), parts: CAM, render(o) {
       const x = ctx(o), Lc = rot(58, 75, 82, 54, -24), Rc = rot(142, 75, 118, 54, 24);
-      const lt = xo(x, pon(o, "light")), xm = o.mf ? xo(x, SV(o, "motion") === "active") : x, sir = o.mf && pon(o, "siren");
+      const lt = o.mf ? xo(x, pon(o, "light")) : x, xm = o.mf ? xo(x, SV(o, "motion") === "active") : x, sir = o.mf && pon(o, "siren");
       const lamp = (x0, face) => `<path d="${rrp(x0, 46, 56, 32, 10)}" fill="${x.url("bh")}"/><path d="${rrp(x0, 46, 56, 32, 10)}" fill="${x.url("bv")}" opacity=".45"/>${hl(`M${x0 + 8} 47.5H${x0 + 48}`, .55, 1.2)}
 <path d="${rrp(x0 + 4, 58, 48, 17, 6)}" fill="${face}"/>${lt.on ? "" : `<path d="M${x0 + 10} 62H${x0 + 46}M${x0 + 10} 66.5H${x0 + 46}M${x0 + 10} 71H${x0 + 46}" stroke="#000" stroke-opacity=".2" stroke-width=".8"/>`}
 <path d="${rrp(x0 + 4, 58, 48, 17, 6)}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width=".8"/>`;
@@ -328,7 +414,7 @@ ${sled(xm, 100, 90, 1.5)}<circle cx="100" cy="125" r="2.4" fill="${x.url("frost"
     } }),
 
      body({ id: "spot", name: "Spotlight camera", colors: sw("#2a2c31"), parts: CAM, render(o) {
-      const x = ctx(o), lt = xo(x, pon(o, "light")), xm = o.mf ? xo(x, SV(o, "motion") === "active") : x, sir = o.mf && pon(o, "siren");
+      const x = ctx(o), lt = o.mf ? xo(x, pon(o, "light")) : x, xm = o.mf ? xo(x, SV(o, "motion") === "active") : x, sir = o.mf && pon(o, "siren");
       const strip = lt.on ? `<path d="${rrp(76, 66, 48, 11, 5.5)}" fill="${x.url("lampOn")}"/><path d="${rrp(76, 66, 48, 11, 5.5)}" fill="#fff" opacity="${lt.op(.5)}"/>`
         : `<path d="${rrp(76, 66, 48, 11, 5.5)}" fill="#2c3038"/>${[84, 92, 100, 108, 116].map((cx) => `<circle cx="${cx}" cy="71.5" r="2.2" fill="#4a505c"/><circle cx="${cx - .6}" cy="70.9" r=".7" fill="#fff" fill-opacity=".4"/>`).join("")}`;
       const F = (lt.on ? `<ellipse cx="100" cy="190" rx="90" ry="40" fill="${x.url("hW")}" opacity="${lt.op(.6)}"/>` : "") +
@@ -394,8 +480,8 @@ ${x.on ? note(142, 70, 0) + note(52, 64, -1.6) : ""}`;
     } }),
 
      body({ id: "ptz", name: "PTZ camera", colors: sw("#eceef1"), render(o) {
-      const x = ctx(o), D = "M78 98A32 32 0 0 0 142 98Z";
-      const F = cone(x, 110, 124, 90, 70, 18, FOV, 1.1, 7) +
+      const x = ctx(o), D = "M78 98A32 32 0 0 0 142 98Z", dx = panDx(x);
+      const F = cone(x, 110 + dx, 124, 90 - dx * 2.5, 70, 18, FOV, 1.1, dx ? 0 : 7) +
         drop(x, `<path d="${rrp(20, 34, 18, 48, 5)}"/><rect x="30" y="44" width="84" height="12"/><path d="${rrp(76, 70, 68, 30, 8)}"/><path d="${D}"/>`, 4, 7, .55) +
         `<path d="${rrp(20, 34, 18, 48, 5)}" fill="${x.url("bv")}"/>${screw(x, 29, 42, 1.8)}${screw(x, 29, 74, 1.8)}
 <path d="M34 44H104Q114 44 114 54V64H102V56H34Z" fill="${x.url("bv")}"/>${hl("M36 45.5H104", .55, 1)}${edge("M34 56H102V64")}
@@ -403,7 +489,7 @@ ${x.on ? note(142, 70, 0) + note(52, 64, -1.6) : ""}`;
 <path d="${rrp(76, 70, 68, 30, 8)}" fill="${x.url("bh")}"/><ellipse cx="110" cy="71" rx="33" ry="4" fill="${x.url("bv")}"/>${hl("M80 76V94", .3, 1.2)}
 <path d="M78 98H142" stroke="#000" stroke-opacity=".4" stroke-width="1.4"/>
 <path d="${D}" fill="#0a0c12"/>
-<g transform="translate(110 110) scale(1 .78) translate(-110 -110)"><circle cx="110" cy="110" r="15" fill="${x.url("blk")}"/>${irRing(x, 110, 110, 12, 8, 1.1)}${lens(x, 110, 110, 8)}</g>
+<g transform="translate(${110 + dx} 110) scale(${dx ? .82 : 1} .78) translate(-110 -110)"><circle cx="110" cy="110" r="15" fill="${x.url("blk")}"/>${irRing(x, 110, 110, 12, 8, 1.1)}${lens(x, 110, 110, 8)}</g>
 <path d="${D}" fill="${x.url("dome")}" opacity=".5"/><path d="M84 102A26 26 0 0 0 98 124" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2.6" stroke-linecap="round"/>
 ${sled(x, 134, 86, 1.6)}${edge(rrp(76, 70, 68, 30, 8))}`;
       return scene(x, "corner", F);
@@ -419,7 +505,7 @@ ${sled(x, 134, 86, 1.6)}${edge(rrp(76, 70, 68, 30, 8))}`;
 <path d="${rrp(72, 60, 56, 94, 18)}" fill="${x.url("blk")}"/><path d="${rrp(72, 60, 56, 94, 18)}" fill="${x.url("blkv")}" opacity=".5"/>
 ${glowE(x, 100, 104, 40, 56, .35, "hI")}
 <circle cx="100" cy="82" r="17" fill="#05060a"/>${lens(x, 100, 82, 13)}<circle cx="100" cy="126" r="17" fill="#05060a"/>${lens(x, 100, 126, 13)}
-${[84, 92, 108, 116].map((cx) => `<circle cx="${cx}" cy="104" r="1.8" fill="#120c10"/><circle cx="${cx}" cy="104" r="1.1" fill="${x.on ? "#ff4a5e" : "#3a2a36"}"/>${x.on ? `<circle cx="${cx}" cy="104" r="5" fill="${x.url("hI")}" ${anim("ir", 2.6, 0)}/>` : ""}`).join("")}
+${[84, 92, 108, 116].map((cx) => `<circle cx="${cx}" cy="104" r="1.8" fill="#120c10"/><circle cx="${cx}" cy="104" r="1.1" fill="${x.ir ? "#ff4a5e" : "#3a2a36"}"/>${x.ir ? `<circle cx="${cx}" cy="104" r="5" fill="${x.url("hI")}" ${anim("ir", 2.6, 0)}/>` : ""}`).join("")}
 ${sled(x, 100, 146, 1.6)}${gl(x, rrp(74, 62, 52, 30, 16), .2)}${edge(rrp(66, 46, 68, 114, 22))}`;
       return scene(x, "stone", F);
     } }),
@@ -544,14 +630,17 @@ ${sled(x, 124, 52, 1.5, RED, true)}${edge(rrp(64, 44, 72, 70, 12))}${waves(xo(x,
       return scene(x, "garage", F);
     } }),
   ];
+  const CAMS = { bullet: 1, dome: 1, turret: 1, cube: 1, pantilt: 1, flood: 1, spot: 1, battery: 1, solar: 1, baby: 1, ptz: 1, dual: 1 };
+  icons.forEach((ic) => { if (!CAMS[ic.id]) return; const orig = ic.render;
+    ic.options = [CK.STATE].concat(ic.id === "pantilt" ? [] : [CK.IRA], ic.id === "ptz" || ic.id === "pantilt" ? [CK.PAN] : []);
+    ic.render = function (o) { return orig.call(this, Object.assign({}, o, { cam: ic.id })); }; });
 
   (window.HDA = window.HDA || []).push({
     id: "security",
     tab: "Cameras & alarms",
     group: "Security",
     kind: "device",
-    intro: "Twenty cameras and alarm parts, each on its own eave, wall, shelf or soffit. Cameras: Active means recording (status LED blinks, IR ring glows, view cone shows, pan-tilt heads pan). Alarms: Active means armed (red LEDs, strobes flash, sirens sound, panels turn red). The slider sets how strong the glow, light and sound look.",
-    
+    intro: "Twenty cameras and alarm parts, each on its own eave, wall, shelf or soffit. Cameras: Active means recording (status LED blinks, IR ring glows, view cone shows, pan-tilt heads pan). Alarms: Active means armed (red LEDs, strobes flash, sirens sound, panels turn red). The slider sets how strong the glow, light and sound look. Cameras also have a State menu (Live, Recording, Motion, Privacy, Offline), Night IR, and Pan on the pan-tilt and PTZ heads.",
     levelLabel: "Intensity",
     onWord: "Active", offWord: "Off",
     css: `.hda-security-blink,.hda-security-strobe,.hda-security-ir,.hda-security-wave,.hda-security-pulse,.hda-security-pan,.hda-security-sweep,.hda-security-float{animation-iteration-count:infinite}
@@ -572,7 +661,7 @@ ${sled(x, 124, 52, 1.5, RED, true)}${edge(rrp(64, 44, 72, 70, 12))}${waves(xo(x,
 @keyframes hda-security-pan{0%,100%{transform:translate(-9px,0) scale(.8,1)}25%,75%{transform:translate(0,0) scale(1,1)}50%{transform:translate(9px,0) scale(.8,1)}}
 @keyframes hda-security-sweep{0%,100%{transform:rotate(-32deg)}50%{transform:rotate(32deg)}}
 @keyframes hda-security-float{0%{transform:translate(0,6px);opacity:0}25%{opacity:1}100%{transform:translate(4px,-14px);opacity:0}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-security-blink,.hda-anim .hda-security-strobe,.hda-anim .hda-security-ir,.hda-anim .hda-security-pulse,.hda-anim .hda-security-wave,.hda-anim .hda-security-pan,.hda-anim .hda-security-sweep,.hda-anim .hda-security-float{animation:none}}`,
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-security-blink,.hda-anim .hda-security-strobe,.hda-anim .hda-security-ir,.hda-anim .hda-security-pulse,.hda-anim .hda-security-wave,.hda-anim .hda-security-pan,.hda-anim .hda-security-sweep,.hda-anim .hda-security-float{animation:none}}` + CK.css,
     icons,
   });
 })();

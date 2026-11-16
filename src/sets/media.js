@@ -292,7 +292,7 @@ ${DEF.join("")}</defs>`;
     return s;
   }
   const pillow = (o, x, y, a, c) => `<g transform="rotate(${a} ${x} ${y})"><path d="M${x - 13} ${y - 11}Q${x} ${y - 14} ${x + 13} ${y - 11}Q${x + 15} ${y} ${x + 13} ${y + 11}Q${x} ${y + 14} ${x - 13} ${y + 11}Q${x - 15} ${y} ${x - 13} ${y - 11}Z" fill="${mat(o, c, "v")}"/><path d="M${x - 13} ${y - 11}Q${x} ${y - 14} ${x + 13} ${y - 11}Q${x + 15} ${y} ${x + 13} ${y + 11}Q${x} ${y + 14} ${x - 13} ${y + 11}Q${x - 15} ${y} ${x - 13} ${y - 11}Z" fill="url(#${o.uid}-fab)"/><path d="M${x - 9} ${y - 7}Q${x} ${y - 1} ${x + 9} ${y - 7}" fill="none" stroke="#000" stroke-opacity=".18"/></g>`;
-  // (multi-function) o.parts holds only the parts the owner ticked. A part left out follows the one device as a Device
+  // (multi-function) o.parts holds only the parts the user ticked. A part left out follows the one device as a Device
   // Image (no o.mf: every part follows o.on and the slider is the volume, exactly as today) and stays off, never
   // animated, as a Multi-Function Image (o.mf). A reading (volume, %) is o.pval.volume when o.mf (left out = no bar).
   const MF = {

@@ -129,16 +129,31 @@
 .hda-home2-haze{opacity:.4}
 .hda-anim .hda-home2-haze{animation:hda-home2-haze 2.2s ease-in-out infinite}
 @keyframes hda-home2-haze{0%{transform:translateY(4px);opacity:0}40%{opacity:.6}100%{transform:translateY(-10px);opacity:0}}
+.hda-anim .hda-home2-mvu{animation:hda-home2-mvu 1.8s ease-in-out infinite}
+.hda-anim .hda-home2-mvd{animation:hda-home2-mvd 1.8s ease-in-out infinite}
+@keyframes hda-home2-mvu{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.4px)}}
+@keyframes hda-home2-mvd{0%,100%{transform:translateY(0)}50%{transform:translateY(2.4px)}}
+.hda-anim .hda-home2-chev{animation:hda-home2-chev 1.1s ease-in-out infinite}
+@keyframes hda-home2-chev{0%,100%{opacity:1}50%{opacity:.3}}
 .hda-home2-puff{opacity:.45;transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-home2-puff{opacity:0;animation:hda-home2-puff 3.4s ease-out infinite}
 @keyframes hda-home2-puff{0%{transform:translateY(6px) scale(.5);opacity:0}30%{opacity:.8}100%{transform:translateY(-22px) scale(1.6);opacity:0}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-home2-pulse,.hda-anim .hda-home2-flick,.hda-anim .hda-home2-haze,.hda-anim .hda-home2-puff{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-home2-pulse,.hda-anim .hda-home2-flick,.hda-anim .hda-home2-haze,.hda-anim .hda-home2-puff,.hda-anim .hda-home2-mvu,.hda-anim .hda-home2-mvd,.hda-anim .hda-home2-chev{animation:none!important}}
 `;
   const steam = (o, x, pts) => o.on ? pts.map((p, i) => `<circle class="${P}puff" cx="${p[0]}" cy="${p[1]}" r="${p[2] || 7}" fill="${x.rg([[0, "#fff", .6], [.6, "#fff", .18], [1, "#fff", 0]])}" style="animation-delay:-${(i * .9).toFixed(1)}s"/>`).join("") : "";
   const tempF = (o, lo, hi) => Math.round((lo + (hi - lo) * lvl(o)) / 5) * 5;
-  // (parts) Multi-Function: Tilt (slats open, %) and Lift (raised, %) as readings, like the shades set's blinds
   const TILT = { options: [{ id: "tilt", name: "Slats", values: [["open", "Tilted open"], ["half", "Half open"], ["closed", "Tilted shut"]] }],
     parts: [{ id: "tilt", name: "Tilt (open)", type: "value", unit: "%", min: 0, max: 100, def: 50 }, { id: "lift", name: "Lift (raised)", type: "value", unit: "%", min: 0, max: 100, def: 40 }] };
+  const STATE = { id: "state", name: "State", values: [["stopped", "Stopped"], ["opening", "Opening"], ["closing", "Closing"], ["partial", "Partial"]] };
+  const TILT_STATE = { options: TILT.options.concat([STATE]), parts: TILT.parts };
+  const stOf = (o) => (o.opt && o.opt.state) || "stopped";
+  function stateBadge(o, cx, cy) {
+    const st = stOf(o); if (st === "stopped") return "";
+    let s = `<rect x="${cx - 9}" y="${cy - 5.5}" width="18" height="11" rx="5.5" fill="#101418" opacity=".72"/><rect x="${cx - 9}" y="${cy - 5.5}" width="18" height="11" rx="5.5" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width=".6"/>`;
+    if (st === "partial") return s + `<rect x="${cx - 3.2}" y="${cy - 3}" width="2.2" height="6" rx=".8" fill="#ffc46b"/><rect x="${cx + 1}" y="${cy - 3}" width="2.2" height="6" rx=".8" fill="#ffc46b"/>`;
+    const d = st === "opening" ? -1 : 1, ch = (y) => `<path d="M${cx - 3.2} ${f(y - d * 1.4)}L${cx} ${f(y + d * 1.4)}L${cx + 3.2} ${f(y - d * 1.4)}" fill="none" stroke="#5ef0b4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    return s + `<g class="${P}chev">${ch(cy - 1.8)}${ch(cy + 1.8)}</g>`;
+  }
   const tiltOf = (o) => ({ open: 0, half: .5, closed: 1 })[(o.opt && o.opt.tilt) || "open"];
   const icons = [];
   const add = (id, name, colors, label, render, extra) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label, render }, extra || {}));
@@ -235,7 +250,6 @@
     return scene(x, back, ROLL(o, x, wx, wy, ww, wh, c, { box: 22, pitch: 7, bar: 6 }) + `<rect x="${wx + ww / 2 - 6}" y="${f(wy + (wh - 2) * (1 - amt(o)) + 2)}" width="12" height="3" rx="1.5" fill="#6a6f76"/>`); });
 
   function venetian(o, x, c, alu) {
-    // (multi-function) Tilt (slats open %) and Lift (raised %) readings in o.pval; a reading left out: slats shut, blind down
     const rd = (k) => { const v = o.pval && o.pval[k]; return v != null && v !== "" && isFinite(+v) ? Math.max(0, Math.min(1, +v / 100)) : 0; };
     const wx = 50, wy = 40, ww = 100, wh = 100, a = o.mf ? rd("lift") : amt(o), t = o.mf ? 1 - rd("tilt") : o.on ? tiltOf(o) : 1;
     const back = room(x, 180, "#5f6a72") + `<rect x="${wx - 7}" y="${wy - 7}" width="${ww + 14}" height="${wh + 14}" fill="#f1efe9"/>` + view(x, wx, wy, ww, wh) + `<path d="M${wx + ww / 2} ${wy}V${wy + wh}" stroke="#f1efe9" stroke-width="3"/><rect x="${wx - 11}" y="${wy + wh + 6}" width="${ww + 22}" height="6" fill="#ece9e2"/>`;
@@ -244,16 +258,19 @@
     let s = `<rect x="${wx - 3}" y="${wy - 2}" width="${ww + 6}" height="${alu ? 6 : 9}" rx="1.2" fill="${vmetal(x, c)}"/>`;
     const liftTop = wy + (alu ? 4 : 7), stackEnd = liftTop + (a > 0 ? stackH - 3 : 0);
     if (a > 0) s += vSlats(x, c, wx - 2, liftTop, ww + 4, stackEnd, alu ? 1.6 : 2.6, 1, alu);
-    s += vSlats(x, c, wx - 2, stackEnd, ww + 4, bot, pitch, t, alu);
-    s += `<rect x="${wx - 3}" y="${f(bot)}" width="${ww + 6}" height="${alu ? 3.4 : 5}" rx="1" fill="${vmetal(x, H().shade(c, -.08))}"/>`;
+    const st = stOf(o), mvc = st === "opening" ? "mvu" : st === "closing" ? "mvd" : "";
+    s += (mvc ? `<g class="${P}${mvc}">` : "") + vSlats(x, c, wx - 2, stackEnd, ww + 4, bot, pitch, t, alu);
+    s += `<rect x="${wx - 3}" y="${f(bot)}" width="${ww + 6}" height="${alu ? 3.4 : 5}" rx="1" fill="${vmetal(x, H().shade(c, -.08))}"/>` + (mvc ? "</g>" : "");
     if (!alu) [wx + 18, wx + ww - 18].forEach((tx) => { s += `<rect x="${tx - 3}" y="${wy + 6}" width="6" height="${f(bot - wy - 6)}" fill="${H().shade(c, -.06)}" opacity=".92"/>`; });
     else [wx + 22, wx + ww - 22].forEach((tx) => { s += `<path d="M${tx} ${wy + 4}V${f(bot)}" stroke="#eee" stroke-opacity=".55" stroke-width=".5"/>`; });
     if (alu) s += `<rect x="${wx + ww - 10}" y="${wy - 1}" width="10" height="4" rx="1" fill="#1d2025"/>` + led(o, wx + ww - 6, wy + 1);
     else s += `<path d="M${wx + 4} ${wy + 6}V${wy + 62}" stroke="#f4f4f2" stroke-opacity=".8" stroke-width="1.6" stroke-linecap="round"/>`;
-    return scene(x, back, s);
+    s += stateBadge(o, wx + ww / 2, wy - 14);
+    const dim = o.on ? (1 - a) * t * .3 : 0;
+    return scene(x, back + (dim > .005 ? `<rect x="8" y="8" width="184" height="184" fill="#07060c" opacity="${f(dim * 100) / 100}"/>` : ""), s);
   }
   add("fauxwood", "Faux wood 2-inch", ["#f6f4ef", "#ece4d4", "#a7a9a8", "#4a3326", "#c39563"], "Slats", (o) => venetian(o, X(o), o.color, false), TILT);
-  add("smart-faux-wood-blinds", "Smart faux-wood blinds", ["#c9ced3", "#2c2f33", "#f4f4f1", "#b8a27a"], "Slats", (o) => venetian(o, X(o), o.color, true), TILT);
+  add("smart-faux-wood-blinds", "Smart faux-wood blinds", ["#c9ced3", "#2c2f33", "#f4f4f1", "#b8a27a"], "Slats", (o) => venetian(o, X(o), o.color, true), TILT_STATE);
 
   function swing(o, x, c, style, wall) {
     const wx = 62, wy = 46, ww = 76, wh = 104, a = amt(o), ang = Math.PI * a * .97;
@@ -269,8 +286,7 @@
 
   (window.HDA = window.HDA || []).push({
     id: "home2", tab: "Stoves, saunas & shutters", group: "Home", kind: "device", levelLabel: "Open / heat",
-    intro: "Real pellet and wood stoves, saunas, exterior roller shutters, venetian blinds and swing shutters. Stoves and saunas: on = burning or heating, the slider sets the heat. Shutters and blinds: off = closed, on = open as far as the slider (venetian blinds also tilt with the Slats menu).",
-    
+    intro: "Real pellet and wood stoves, saunas, exterior roller shutters, venetian blinds and swing shutters. Stoves and saunas: on = burning or heating, the slider sets the heat. Shutters and blinds: off = closed, on = open as far as the slider (venetian blinds also tilt with the Slats menu; the motorized one shows its State).",
     css, icons,
   });
 })();

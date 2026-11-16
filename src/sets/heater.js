@@ -8,7 +8,22 @@
   const fsw = (first) => [first].concat(FL.filter((c) => c !== first));
   const HOT = "#ff9a4a";
   const n1 = (v) => (+v).toFixed(1);
-  const G = (o) => (o.on ? .3 + .7 * o.level : 0);
+  const G = (o) => (o.on && o.hvm !== "fan" ? (.3 + .7 * o.level) * (o.hvm === "eco" ? .6 : 1) : 0);
+  const mcol = (o) => (o.hvm === "eco" ? "#8bd450" : o.hvm === "fan" ? "#c9d2dc" : HOT);
+  const n2 = (v) => (+v).toFixed(2);
+  const G1 = (cx, cy, s, b, col, fill) => `<g transform="translate(${n2(cx)} ${n2(cy)}) scale(${s})" fill="${fill ? col : "none"}" stroke="${fill ? "none" : col}" stroke-width=".22" stroke-linecap="round" stroke-linejoin="round">${b}</g>`;
+  function hvGlyph(o, cx, cy, s) {
+    if (!o.on) return ""; let out = "", x = cx; const col = mcol(o);
+    if (o.hvm === "eco") { out += G1(x, cy, s, `<path d="M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z"/>`, col, 1); x += s * 2.6; }
+    if (o.hvm === "fan") { let b = ""; for (let i = 0; i < 3; i++) b += `<path transform="rotate(${i * 120})" d="M0 0 C-.5 -.3 -.38 -.95 0 -.95 C.32 -.95 .3 -.38 0 0 Z"/>`; out += G1(x, cy, s, b, col, 1); x += s * 2.6; }
+    const p = o.hvp, pc = o.hvm === "heat" || !o.hvm ? "#ffd2a6" : col;
+    if (p === "boost") out += G1(x, cy, s, `<path d="M.2 -1 L-.6 .12 H-.02 L-.22 1 L.6 -.15 H.02 Z"/>`, pc, 1);
+    if (p === "comfort") out += G1(x, cy, s, `<path d="M-.5 .1 V-.55 H.5 V.1 M-.85 .55 V-.05 H-.5 V.15 H.5 V-.05 H.85 V.55 Z M-.7 .55 V.8 M.7 .55 V.8"/>`, pc);
+    if (p === "sleep") out += G1(x, cy, s, `<path d="M.3 -.9 A.92 .92 0 1 0 .9 .35 A.7 .7 0 0 1 .3 -.9 Z"/>`, pc, 1);
+    if (p === "away") out += G1(x, cy, s, `<path d="M-.85 -.02 L0 -.82 L.85 -.02 M-.6 -.25 V.82 H.6 V-.25 M-.18 .82 V.32 H.18 V.82"/>`, pc);
+    if (p === "frost") out += G1(x, cy, s, `<path d="M0 -.95 V.95 M-.82 -.47 L.82 .47 M-.82 .47 L.82 -.47 M-.25 -.75 L0 -.52 L.25 -.75 M-.25 .75 L0 .52 L.25 .75"/>`, "#9fdcff");
+    return out;
+  }
   const g2 = (o, k) => (G(o) * (k == null ? 1 : k)).toFixed(2);
   const tmp = (o) => Math.round(62 + 16 * o.level);
   const dur = (o, a, b) => (a - b * o.level).toFixed(2);
@@ -73,8 +88,8 @@
   const knob = (o, x, y, r, a) => { const t = (a == null ? -40 + 80 * o.level : a) * Math.PI / 180;
     return `<circle cx="${x}" cy="${y + .8}" r="${r + .8}" fill="#000" fill-opacity=".35"/><circle cx="${x}" cy="${y}" r="${r}" fill="url(#${o.uid}-kn)"/><circle cx="${x}" cy="${y}" r="${n1(r * .62)}" fill="none" stroke="#000" stroke-opacity=".18" stroke-width=".7"/>` +
       `<path d="M${x} ${y}L${n1(x + Math.sin(t) * r * .8)} ${n1(y - Math.cos(t) * r * .8)}" stroke="#2a2e35" stroke-width="1.2" stroke-linecap="round"/>`; };
-  const led = (o, x, y, c) => o.on ? `<circle class="${P}pulse" cx="${x}" cy="${y}" r="6" fill="url(#${o.uid}-hh)"/><circle cx="${x}" cy="${y}" r="1.7" fill="${c || "#ffb347"}"/><circle cx="${x - .5}" cy="${y - .5}" r=".6" fill="#fff"/>` : `<circle cx="${x}" cy="${y}" r="1.7" fill="#4a3a36"/>`;
-  const digits = (o, x, y, s) => o.on ? `<text x="${x}" y="${y}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${s}" fill="${HOT}">${tmp(o)}°</text>` : "";
+  const led = (o, x, y, c) => o.on ? `<circle class="${P}pulse" cx="${x}" cy="${y}" r="6" fill="url(#${o.uid}-hh)"/><circle cx="${x}" cy="${y}" r="1.7" fill="${o.hvm === "eco" || o.hvm === "fan" ? mcol(o) : c || "#ffb347"}"/><circle cx="${x - .5}" cy="${y - .5}" r=".6" fill="#fff"/>` + hvGlyph(o, x + 6.5, y, 2.1) : `<circle cx="${x}" cy="${y}" r="1.7" fill="#4a3a36"/>`;
+  const digits = (o, x, y, s) => o.on ? `<text x="${x}" y="${y}" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${s}" fill="${mcol(o)}">${tmp(o)}°</text>` + hvGlyph(o, x + s * 1.35, y - s * .36, s * .3) : "";
   const wall = (y) => `<g class="hda-bg"><rect x="4" y="4" width="192" height="${y - 4}" rx="6" fill="#fff" fill-opacity=".035"/><path d="M4 ${y}H196" stroke="#fff" stroke-opacity=".12"/></g>`;
   const floorGlow = (o, cx, cy, rx, ry, fire) => o.on ? `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry || 10}" fill="url(#${o.uid}-${fire ? "fg" : "fl"})" opacity="${g2(o)}"/>` : "";
   const wallGlow = (o, x, y, w, h, fire) => o.on ? `<ellipse class="hda-bg" cx="${x + w / 2}" cy="${y + h}" rx="${w / 2 + 10}" ry="${h}" fill="url(#${o.uid}-${fire ? "fg" : "fl"})" opacity="${g2(o, .8)}"/>` : "";
@@ -91,11 +106,11 @@
   }
   function shimmer(o, x, y, w, h, n) {
     if (!o.on) return ""; n = n || 4; const d = +dur(o, 3.6, 1.6), q = h / 4;
-    let s = `<g opacity="${(.45 + .55 * o.level).toFixed(2)}">`;
+    let s = `<g opacity="${(.45 + .55 * o.level).toFixed(2)}">`; const fan = o.hvm === "fan";
     for (let i = 0; i < n; i++) {
       const xi = x - w / 2 + w * (i + .5) / n, sg = i % 2 ? 1 : -1, del = ((i * .37 * d) % d).toFixed(2);
       const pd = `d="M${n1(xi)} ${y}c${2.4 * sg} ${n1(-q * .5)} ${-2.4 * sg} ${n1(-q * .5)} 0 ${n1(-q)}s${-2.4 * sg} ${n1(-q * .5)} 0 ${n1(-q)}s${2.4 * sg} ${n1(-q * .5)} 0 ${n1(-q)}s${-2.4 * sg} ${n1(-q * .5)} 0 ${n1(-q)}" fill="none" stroke-linecap="round"`;
-      s += `<g class="${P}shim" style="animation-duration:${d}s;animation-delay:-${del}s"><path ${pd} stroke="#ffb878" stroke-opacity=".12" stroke-width="4"/><path ${pd} stroke="#ffe2c2" stroke-opacity=".55" stroke-width="1.1" stroke-dasharray="${n1(h * .45)} ${n1(h * .3)}"/></g>`;
+      s += `<g class="${P}shim" style="animation-duration:${d}s;animation-delay:-${del}s"><path ${pd} stroke="${fan ? "#c9d2dc" : "#ffb878"}" stroke-opacity=".12" stroke-width="4"/><path ${pd} stroke="${fan ? "#eef2f6" : "#ffe2c2"}" stroke-opacity=".55" stroke-width="1.1" stroke-dasharray="${n1(h * .45)} ${n1(h * .3)}"/></g>`;
     }
     return s + `</g>`;
   }
@@ -160,21 +175,14 @@
 
   const ic = (id, name, first, render, list) => ({ id, name, colors: sw(first, list), picker: true, colorLabel: "Body", render });
   const fi = (id, name, first, render) => ({ id, name, colors: fsw(first), picker: true, colorLabel: "Flame", render });
-  // (multi-function) parts: o.parts holds only the parts the owner ticked; a part left out follows the one device as a
-  // Device Image (no o.mf, as today) and stays off, never animated, as a Multi-Function Image (o.mf). A part's level is
-  // o.plevel[id], a light's color o.pcolor[id], a stage part's value o.pval[id] (one of its stage ids; left out = none).
   const MF = {
     has: (o, k) => !!(o.parts && o.parts[k] != null),
     on: (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on),
     lv: (o, k) => (o.plevel && o.plevel[k] != null && isFinite(+o.plevel[k]) ? +o.plevel[k] : o.level),
     col: (o, k, d) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor[k] || "") ? o.pcolor[k] : d),
     st: (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null),
-    // the drawing as one part: on = that part, level = its level
     as: (o, k) => Object.assign({}, o, { on: MF.on(o, k), level: MF.lv(o, k) }),
   };
-  // (parts) an electric fireplace: Flame (the flame effect: on, level = brightness, color = o.pcolor.flame, else the
-  // drawing's flame color) and Heat (the fan heater: its vent glows, heat shimmer rises). A Device Image (no o.mf, no
-  // parts) is drawn exactly as before; as a Multi-Function Image the vent is drawn and each part follows its own state.
   const FH = [{ id: "flame", name: "Flame" }, { id: "heat", name: "Heat" }];
   const vent = (o, x, y, w, h, n) => { const on = o.on, u = o.uid; let sl = "";
     for (let i = 1; i < n; i++) sl += `M${n1(x + w * i / n)} ${n1(y + .8)}V${n1(y + h - .8)}`;
@@ -272,7 +280,7 @@
       bx(o, 22, 128, 156, 36, 3) + `<rect x="28" y="131" width="144" height="7" fill="url(#${u}-dk)"/>` +
       (o.on ? `<g opacity="${g2(o, .8)}"><rect class="${P}pulse" x="28" y="131" width="144" height="7" fill="url(#${u}-hr)"/></g>` : "") +
       `<rect x="28" y="131" width="144" height="7" fill="url(#${u}-sl)"/><rect x="28" y="156" width="144" height="4" fill="url(#${u}-sl)"/>` +
-      hl(26, 142, 172, 142, 1.2, .3) + knob(o, 181, 140, 3.6) + `<path d="M174 150H188" stroke="#000" stroke-opacity=".2"/>` +
+      hl(26, 142, 172, 142, 1.2, .3) + knob(o, 181, 140, 3.6) + hvGlyph(o, 141, 108, 2.2) + `<path d="M174 150H188" stroke="#000" stroke-opacity=".2"/>` +
       shimmer(o, 100, 126, 148, 48, 7)); }),
 
     ic("panel", "Wall panel", WH, (o) => { const u = o.uid, d = rr(34, 44, 132, 94, 8); return svg(o, wall(176) + wallGlow(o, 34, 6, 132, 40) +
@@ -386,7 +394,7 @@
     ic("smart", "Smart display", WH, (o) => { const u = o.uid, gd = rr(70, 122, 60, 34, 10), C = 2 * Math.PI * 21; return svg(o, sh(o, 100, 178, 46, 5) + floorGlow(o, 100, 180, 72, 12) +
       `<path d="${rr(64, 168, 72, 8, 4)}" fill="#15171b"/>` + bx(o, 56, 38, 88, 132, 24) + `<path d="${rr(56, 38, 88, 48, 24)}" fill="url(#${u}-g)" opacity=".3"/>` +
       `<circle cx="100" cy="82" r="28" fill="#000" fill-opacity=".3"/><circle cx="100" cy="81" r="27" fill="#0d0f12"/><circle cx="100" cy="81" r="21" fill="none" stroke="#252a31" stroke-width="3"/>` +
-      (o.on ? `<g opacity="${(.6 + .4 * o.level).toFixed(2)}"><circle class="${P}pulse" cx="100" cy="81" r="30" fill="url(#${u}-hh)"/><circle cx="100" cy="81" r="21" fill="none" stroke="${HOT}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${n1(C * (.15 + .8 * o.level))} ${n1(C)}" transform="rotate(-90 100 81)"/></g>` : "") +
+      (o.on ? `<g opacity="${(.6 + .4 * o.level).toFixed(2)}">${o.hvm === "fan" ? "" : `<circle class="${P}pulse" cx="100" cy="81" r="30" fill="url(#${u}-hh)"/>`}<circle cx="100" cy="81" r="21" fill="none" stroke="${mcol(o)}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${n1(C * (.15 + .8 * o.level))} ${n1(C)}" transform="rotate(-90 100 81)"/></g>` : "") +
       digits(o, 100, 86, 14) + (o.on ? `<path d="M96 96Q100 92 104 96M97.6 98.4Q100 96.4 102.4 98.4" fill="none" stroke="#7dd3fc" stroke-width=".9" stroke-linecap="round"/>` : "") +
       `<path d="M78 66A27 27 0 0 1 104 54" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="2" stroke-linecap="round"/>` +
       `<circle cx="86" cy="114" r="1.8" fill="#000" fill-opacity=".3"/><circle cx="100" cy="114" r="1.8" fill="#000" fill-opacity=".3"/><circle cx="114" cy="114" r="1.8" fill="#000" fill-opacity=".3"/>` +
@@ -394,10 +402,21 @@
       hl(60, 64, 60, 150, 2, .25) + shimmer(o, 100, 36, 60, 26, 4)); }),
   ];
 
+  const ML = { heat: "Heat", off: "Off", fan: "Fan", eco: "Eco" }, PL = { none: "None", boost: "Boost", comfort: "Comfort", sleep: "Sleep", away: "Away", frost: "Frost" };
+  const HV = { oil: ["heat off eco", "comfort frost"], cube: ["heat off fan eco", "boost frost"], tower: ["heat off fan eco"], utility: ["heat off fan"],
+    baseboard: ["heat off eco", "comfort away frost"], panel: ["heat off eco", "boost comfort sleep away frost"], mica: ["heat off eco", "frost"],
+    loop: ["heat off fan"], smart: ["heat off fan eco", "boost comfort sleep away frost"] };
+  icons.forEach((ic) => { const h = HV[ic.id]; if (!h) return;
+    const modes = h[0].split(" ");
+    ic.options = [{ id: "mode", name: "Mode", values: modes.map((m) => [m, ML[m]]) }];
+    if (h[1]) ic.options.push({ id: "preset", name: "Preset", values: ("none " + h[1]).split(" ").map((p) => [p, PL[p]]), when: { opt: "mode", is: modes.filter((m) => m !== "off") } });
+    const r0 = ic.render;
+    ic.render = (o) => { const op = o.opt || {}, md = op.mode || "heat"; return r0(Object.assign({}, o, { on: !!o.on && md !== "off", hvm: md, hvp: op.preset || "none" })); };
+  });
+
   (window.HDA = window.HDA || []).push({
     id: "heater", tab: "Space heaters", group: "Air", kind: "device",
-    intro: "Eighteen space heaters and electric fireplaces. When on, coils, tubes and ceramic grilles glow orange and pulse, heat shimmer rises, the floor picks up a warm glow, and fireplaces dance with layered flames in the picked flame color; the slider sets the heat output.",
-    
+    intro: "Eighteen space heaters and electric fireplaces. When on, coils, tubes and ceramic grilles glow orange and pulse, heat shimmer rises, the floor picks up a warm glow, and fireplaces dance with layered flames in the picked flame color; the slider sets the heat output. Electric heaters add Mode (Fan blows unheated air, Eco glows softer) and Preset menus where they have them.",
     css, icons,
   });
 })();

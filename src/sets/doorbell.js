@@ -4,11 +4,11 @@
   const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
 
   function ctx(o) {
-    const c = o.color || "#4da3ff", on = !!o.on, lv = o.level == null ? 1 : o.level;
-    const L = on ? .45 + .55 * lv : 0;
+    const c = o.color || "#4da3ff", on = !!o.on, lv = o.level == null ? 1 : o.level, act = o.act == null ? on : o.act; 
+    const L = act ? .45 + .55 * lv : 0;
     const id = (s) => `${o.uid}-${s}`, url = (s) => `url(#${o.uid}-${s})`;
     const body = o.body && o.bodyDef && String(o.body).toLowerCase() !== o.bodyDef ? o.body : null;
-    return { c, on, lv, L, id, url, hot: H.mix(c, "#ffffff", .62), op: (k) => (k * L).toFixed(2), sp: (1.7 - .9 * lv), wave: o.color2 || null, body, bodyMain: o.bodyMain };
+    return { c, on, act, bst: o.bst, cam: o.cam, ir: !!o.ir, lv, L, id, url, hot: H.mix(c, "#ffffff", .62), op: (k) => (k * L).toFixed(2), sp: (1.7 - .9 * lv), wave: o.color2 || null, body, bodyMain: o.bodyMain };
   }
   const stops = (a) => a.map(([o, c, op]) => `<stop offset="${o}" stop-color="${c}"${op == null ? "" : ` stop-opacity="${op}"`}/>`).join("");
   const lg = (id, a, x1, y1, x2, y2) => `<linearGradient id="${id}" x1="${x1 || 0}" y1="${y1 || 0}" x2="${x2 == null ? 1 : x2}" y2="${y2 || 0}">${stops(a)}</linearGradient>`;
@@ -131,8 +131,10 @@ ${extra || ""}</defs>`;
 <g clip-path="${x.url("wc")}">${texture(kind, x)}<rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g>
 <rect x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".07"/></g>
 <g clip-path="${x.url("wc")}">${under || ""}</g>
-${body}</svg>`;
+${body}${camOv(x)}</svg>`;
   }
+  const camOv = (x) => { const q = x.cam; if (!q) return "";
+    return (x.ir ? CK.irDots(q[0], q[1], q[2] + 3.5, 6, 1) : "") + CK.bellOver(x.bst, q[0], q[1], q[2], q[3]); };
 
   const drop = (x, shape, dx, dy, a) => `<g transform="translate(${dx == null ? 3.5 : dx} ${dy == null ? 5 : dy})" fill="#000" stroke="none" opacity="${a || .5}" filter="${x.url("bl")}">${shape}</g>`;
   const hl = (d, a, w) => `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="${a}" stroke-width="${w}" stroke-linecap="round"/>`;
@@ -185,7 +187,7 @@ ${body}</svg>`;
     return `<g opacity="${(.55 + .45 * x.L).toFixed(2)}">${s}</g>`;
   }
   const gl = (x, d, a) => `<path d="${d}" fill="${x.url("gloss")}" opacity="${a || .35}"/>`;
-  const led = (x, cx, cy, r, col, blink) => x.on
+  const led = (x, cx, cy, r, col, blink) => x.act
     ? `<circle cx="${cx}" cy="${cy}" r="${f(r * 3)}" fill="${x.url("halo")}" opacity="${x.op(.7)}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="${col || x.hot}" ${blink ? anim(x, "blink", x.sp * .8, 0) : ""}/>`
     : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#1b1e28"/><circle cx="${cx}" cy="${cy}" r="${f(r * .5)}" fill="${col || x.c}" opacity=".35"/>`;
 
@@ -201,12 +203,75 @@ ${body}</svg>`;
     const def = BODY[main], lit = d.colors[0], orig = d.render;
     const cols = [def].concat(["#22252e", "#eeecf1", "#b9bec7", "#c9a04e", "#6b4f3a", "#2f5e3c", "#8a2b2b"].filter((c) => c !== def));
     return Object.assign({}, d, { colors: cols, picker: true, colorLabel: "Body", colors2: [lit].concat(WAVES.filter((c) => c !== lit)), picker2: true, colorLabel2: "Waves",
-      render(o) { return orig.call(this, Object.assign({}, o, { color: o.color2 || lit, color2: o.color2 || null, body: o.color || def, bodyDef: def, bodyMain: main })); } });
+      options: d.cam ? [CK.BELL, CK.IR] : d.options,
+      render(o) { const st = d.cam ? CK.bell(o) : null, m3 = st ? { on: st === "ring", act: st !== "idle", bst: st, cam: d.cam, ir: (o.opt || {}).ir === "on" } : {};
+        return orig.call(this, Object.assign({}, o, { color: o.color2 || lit, color2: o.color2 || null, body: o.color || def, bodyDef: def, bodyMain: main }, m3)); } });
   };
   const fin = (d) => Object.assign({ picker: true, colorLabel: "Body", colors2: WAVES, picker2: true, colorLabel2: "Waves" }, d);
 
+  const CK = (() => {
+    const g = (n) => (+n).toFixed(1);
+    const STATE = { id: "state", name: "State", values: [["auto", "From on/off"], ["live", "Live"], ["rec", "Recording"], ["motion", "Motion"], ["privacy", "Privacy"], ["offline", "Offline"]] };
+    const BELL = { id: "state", name: "State", values: [["ring", "Ringing"], ["motion", "Motion"], ["live", "Live view"], ["talk", "Talking"], ["idle", "Idle"]] };
+    const IR = { id: "ir", name: "Night IR", values: [["off", "Off"], ["on", "On"]] };
+    const IRA = { id: "ir", name: "Night IR", values: [["auto", "Auto"], ["off", "Off"], ["on", "On"]] };
+    const PAN = { id: "pan", name: "Pan", values: [["center", "Center"], ["left", "Left"], ["right", "Right"]] };
+    const cam = (o) => { const s = (o.opt || {}).state || "auto"; return s === "auto" ? (o.on ? "on" : "off") : s; };
+    const bell = (o) => o.on ? ((o.opt || {}).state || "ring") : "idle";
+    const active = (s) => s === "on" || s === "live" || s === "rec" || s === "motion";
+    const COL = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940", privacy: "#c9ced6", offline: "#8a8f98" };
+    const LED = { rec: "#ff3b3b", live: "#3ee08f", motion: "#ffa940" };
+    function badge(s, bx, by) {
+      const c = COL[s]; if (!c) return "";
+      bx = bx == null ? 28 : bx; by = by == null ? 28 : by;
+      let gl = "";
+      if (s === "rec") gl = `<circle cx="${bx}" cy="${by}" r="7" fill="${c}" opacity=".22"/><g class="${P}ckblink"><circle cx="${bx}" cy="${by}" r="4.4" fill="${c}"/><circle cx="${g(bx - 1.4)}" cy="${g(by - 1.4)}" r="1.3" fill="#fff" fill-opacity=".6"/></g>`;
+      else if (s === "live") gl = `<circle cx="${bx}" cy="${by}" r="2.3" fill="${c}"/><path d="M${g(bx - 3.2)} ${g(by - 3.6)}A5 5 0 0 0 ${g(bx - 3.2)} ${g(by + 3.6)}M${g(bx + 3.2)} ${g(by - 3.6)}A5 5 0 0 1 ${g(bx + 3.2)} ${g(by + 3.6)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path class="${P}ckglow" d="M${g(bx - 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 0 ${g(bx - 5.6)} ${g(by + 5.4)}M${g(bx + 5.6)} ${g(by - 5.4)}A7.8 7.8 0 0 1 ${g(bx + 5.6)} ${g(by + 5.4)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "motion") gl = `<g class="${P}ckglow" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="${g(bx + 1.2)}" cy="${g(by - 5.6)}" r="1.9" fill="${c}" stroke="none"/>` +
+        `<path d="M${g(bx + .4)} ${g(by - 2.8)}L${g(bx - 1)} ${g(by + 2)}L${g(bx - 4.4)} ${g(by + 6.2)}M${g(bx - 1)} ${g(by + 2)}L${g(bx + 2.6)} ${g(by + 3.4)}L${g(bx + 3.4)} ${g(by + 6.6)}M${g(bx - 4.6)} ${g(by - .6)}L${g(bx + .4)} ${g(by - 2.8)}L${g(bx + 4)} ${g(by)}"/></g>`;
+      else if (s === "privacy") gl = `<path d="M${g(bx - 6.4)} ${by}Q${bx} ${g(by - 6)} ${g(bx + 6.4)} ${by}Q${bx} ${g(by + 6)} ${g(bx - 6.4)} ${by}Z" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="${bx}" cy="${by}" r="2" fill="${c}"/>` +
+        `<path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.6)} ${g(by + 5.6)}L${g(bx + 5.6)} ${g(by - 5.6)}" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>`;
+      else if (s === "offline") gl = `<circle cx="${bx}" cy="${g(by + 4)}" r="1.2" fill="${c}"/><path d="M${g(bx - 2.8)} ${g(by + 1.2)}A4 4 0 0 1 ${g(bx + 2.8)} ${g(by + 1.2)}M${g(bx - 5.3)} ${g(by - 1.3)}A7.5 7.5 0 0 1 ${g(bx + 5.3)} ${g(by - 1.3)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linecap="round"/>` +
+        `<path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#16181e" stroke-width="3.4"/><path d="M${g(bx - 5.8)} ${g(by - 5.8)}L${g(bx + 5.8)} ${g(by + 5.8)}" stroke="#ff5a5a" stroke-width="1.5" stroke-linecap="round"/>`;
+      return `<g><circle cx="${g(bx + 1)}" cy="${g(by + 1.6)}" r="11" fill="#000" fill-opacity=".45"/><circle cx="${bx}" cy="${by}" r="11" fill="#16181e"/><circle cx="${bx}" cy="${by}" r="10.2" fill="none" stroke="${c}" stroke-width="1.3"/>` +
+        `<path d="M${g(bx - 7)} ${g(by - 6)}A9 9 0 0 1 ${g(bx + 6)} ${g(by - 7)}" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1"/>${gl}</g>`;
+    }
+    const motion = (cx, cy, r) => [0, 1].map((i) => `<circle class="${P}ckring" style="animation-delay:${(-i * .8).toFixed(1)}s" cx="${g(cx)}" cy="${g(cy)}" r="${g(r * (1.3 + i * .5))}" fill="none" stroke="#ffa940" stroke-opacity="${i ? .4 : .75}" stroke-width="${i ? 1.4 : 1.8}"${i ? ` stroke-dasharray="3 3"` : ""}/>`).join("");
+    function cap(u, k, cx, cy, r, col) {
+      const id = `${u}-ckc${k}`;
+      return `<defs><radialGradient id="${id}" cx=".36" cy=".3" r=".8"><stop offset="0" stop-color="${H.shade(col, .55)}"/><stop offset=".6" stop-color="${col}"/><stop offset="1" stop-color="${H.shade(col, -.45)}"/></radialGradient></defs>` +
+        `<circle cx="${g(cx)}" cy="${g(cy + r * .14)}" r="${g(r)}" fill="#000" fill-opacity=".4"/><circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="url(#${id})"/>` +
+        `<path d="M${g(cx - r * .97)} ${g(cy)}H${g(cx + r * .97)}" stroke="${H.shade(col, -.5)}" stroke-width="${g(Math.max(.8, r * .09))}"/><path d="M${g(cx - r * .9)} ${g(cy + r * .1)}H${g(cx + r * .9)}" stroke="#fff" stroke-opacity=".28" stroke-width="${g(Math.max(.5, r * .05))}"/>` +
+        `<circle cx="${g(cx)}" cy="${g(cy)}" r="${g(r)}" fill="none" stroke="#000" stroke-opacity=".38" stroke-width=".8"/><ellipse cx="${g(cx - r * .32)}" cy="${g(cy - r * .5)}" rx="${g(r * .36)}" ry="${g(r * .15)}" fill="#fff" fill-opacity=".4" transform="rotate(-18 ${g(cx - r * .32)} ${g(cy - r * .5)})"/>`;
+    }
+    const irDots = (cx, cy, R, n, rr) => { let s = ""; rr = rr || 1.1;
+      for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, px = g(cx + Math.cos(a) * R), py = g(cy + Math.sin(a) * R);
+        s += `<circle cx="${px}" cy="${py}" r="${g(rr * 3)}" fill="#ff3a4a" opacity=".22"/><circle cx="${px}" cy="${py}" r="${g(rr)}" fill="#ff3a4a"/>`; }
+      return s; };
+    function bellOver(s, cx, ly, lr, w) {
+      if (s === "motion") return `<g class="${P}ckglow">` + [0, 1].map((i) => { const r = lr + 5 + i * 6; return `<path d="M${g(cx - r)} ${g(ly - 2)}A${g(r)} ${g(r)} 0 0 1 ${g(cx + r)} ${g(ly - 2)}" fill="none" stroke="#ff8a6a" stroke-opacity="${(.8 - i * .3).toFixed(2)}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 3"/>`; }).join("") + `</g>`;
+      if (s === "live") return `<g class="${P}ckglow"><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.9)}" fill="#6aa8ff" opacity=".22"/><circle cx="${g(cx)}" cy="${g(ly)}" r="${g(lr * 1.05)}" fill="none" stroke="#6aa8ff" stroke-opacity=".8" stroke-width="1.4"/></g>` +
+        `<circle class="${P}ckblink" cx="${g(cx + w / 2 + 7)}" cy="${g(ly - lr)}" r="3" fill="#ff3b3b"/>`;
+      if (s === "talk") return [0, 1, 2].map((i) => `<path class="${P}ckwave" style="animation-delay:${(-i * .4).toFixed(1)}s" d="M${g(cx + w / 2 + 4 + i * 6)} ${g(ly - 6 - i * 2)}q${g(5 + i)} ${g(6 + i * 2)} 0 ${g(12 + i * 4)}" fill="none" stroke="#7ee7ff" stroke-opacity="${(.9 - i * .2).toFixed(2)}" stroke-width="1.5" stroke-linecap="round"/>`).join("");
+      return "";
+    }
+    const css = `
+.${P}ckring{transform-box:fill-box;transform-origin:center}
+.hda-anim .${P}ckblink{animation:${P}ckblink 1.1s steps(1,end) infinite}
+@keyframes ${P}ckblink{0%{opacity:1}50%{opacity:.15}}
+.hda-anim .${P}ckring{animation:${P}ckring 1.6s ease-out infinite}
+@keyframes ${P}ckring{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.35);opacity:0}}
+.hda-anim .${P}ckglow{animation:${P}ckglow 1.8s ease-in-out infinite}
+@keyframes ${P}ckglow{0%,100%{opacity:1}50%{opacity:.4}}
+.hda-anim .${P}ckwave{animation:${P}ckwave 1.3s ease-out infinite}
+@keyframes ${P}ckwave{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.hda-anim .${P}ckblink,.hda-anim .${P}ckring,.hda-anim .${P}ckglow,.hda-anim .${P}ckwave{animation:none!important}}`;
+    return { STATE, BELL, IR, IRA, PAN, cam, bell, active, LED, badge, motion, cap, irDots, bellOver, css };
+  })();
+
   const icons = [
-     ring({ id: "tall", name: "Video doorbell", colors: rs("#4da3ff"), render(o) {
+     ring({ id: "tall", name: "Video doorbell", colors: rs("#4da3ff"), cam: [100, 56, 14, 48], render(o) {
       const x = ctx(o), B = rrp(76, 20, 48, 160, 24);
       const F = drop(x, `<path d="${B}"/>`, 4, 6, .55) +
         `<path d="${rrp(73, 17, 54, 166, 27)}" fill="${x.url("sil")}" opacity=".85"/>
@@ -223,7 +288,7 @@ ${gl(x, rrp(80, 24, 18, 140, 9), .28)}${hl("M81 46V156", .2, 1.6)}
       return scene(x, "siding", F + waves(x, 100, 144, 36, "lr"), "", glowE(x, 100, 144, 70, 70, .35));
     } }),
 
-     ring({ id: "square", name: "Square-head video", colors: rs("#f2f6ff"), render(o) {
+     ring({ id: "square", name: "Square-head video", colors: rs("#f2f6ff"), cam: [100, 64, 16, 76], render(o) {
       const x = ctx(o), B = rrp(62, 26, 76, 150, 14);
       const F = drop(x, `<path d="${B}"/>`, 4, 6, .55) +
         `<path d="${B}" fill="${x.url("sil")}"/><path d="${B}" fill="${x.url("silv")}" opacity=".35"/>
@@ -240,7 +305,7 @@ ${hl("M66 44V160", .45, 1.4)}<path d="${B}" fill="none" stroke="#000" stroke-opa
       return scene(x, "brick", F + waves(x, 100, 146, 48, "lr"), "", glowE(x, 100, 146, 74, 70, .35));
     } }),
 
-     ring({ id: "wedge", name: "Battery doorbell", colors: rs("#34d399"), render(o) {
+     ring({ id: "wedge", name: "Battery doorbell", colors: rs("#34d399"), cam: [95, 58, 12, 58], render(o) {
       const x = ctx(o), B = rrp(66, 22, 58, 156, 22);
       const F = drop(x, `<path d="${rrp(66, 22, 70, 156, 22)}"/>`, 5, 6, .55) +
         `<path d="${rrp(76, 26, 60, 150, 20)}" fill="#8f8b97"/><path d="${rrp(76, 26, 60, 150, 20)}" fill="${x.url("whtv")}" opacity=".35"/>
@@ -258,7 +323,7 @@ ${hl("M70 42V160", .7, 1.6)}<path d="${B}" fill="none" stroke="#000" stroke-opac
       return scene(x, "stucco", F + waves(x, 100, 134, 42, "lr"), "", glowE(x, 95, 134, 66, 66, .32));
     } }),
 
-     ring({ id: "package", name: "Package camera", colors: rs("#a78bfa"), render(o) {
+     ring({ id: "package", name: "Package camera", colors: rs("#a78bfa"), cam: [100, 47, 13, 60], render(o) {
       const x = ctx(o), B = rrp(70, 14, 60, 172, 14);
       const F = drop(x, `<path d="${B}"/>`, 4, 6, .55) +
         `<path d="${B}" fill="${x.url("sil")}"/><path d="${rrp(75, 19, 50, 162, 10)}" fill="${x.url("blkv")}"/>
@@ -301,7 +366,7 @@ ${hl("M85 58V142", .5, 1.2)}`;
       return scene(x, "trim", F + waves(x, 100, 100, 32, "lr"), "", glowE(x, 100, 100, 52, 52, .35));
     } }),
 
-     ring({ id: "intercom", name: "Apartment intercom", colors: rs("#4da3ff"), render(o) {
+     ring({ id: "intercom", name: "Apartment intercom", colors: rs("#4da3ff"), cam: [100, 32, 6.5, 92], render(o) {
       const x = ctx(o), B = rrp(54, 16, 92, 170, 6), rows = [96, 114, 132, 150, 168];
       let R = "";
       rows.forEach((ry, i) => { const lit = x.on && i === 1;
@@ -321,7 +386,7 @@ ${R}${hl("M58 30V176", .4, 1.2)}`;
       return scene(x, "stone", F + waves(x, 100, 62, 52, "lr", null, 7, 26), "", glowE(x, 132, 114, 44, 44, .3));
     } }),
 
-     ring({ id: "gatepost", name: "Gate keypad", colors: rs("#34d399"), render(o) {
+     ring({ id: "gatepost", name: "Gate keypad", colors: rs("#34d399"), cam: [100, 69, 5.6, 44], render(o) {
       const x = ctx(o);
       let gate = "";
       for (let gx = 146; gx < 194; gx += 10) gate += `<rect x="${gx}" y="58" width="3.4" height="112" fill="#15161b"/><path d="M${gx + .8} 58V170" stroke="#5b5f6b" stroke-opacity=".5" stroke-width=".8"/><path d="M${gx - 1} 60 L${gx + 1.7} 52 L${gx + 4.4} 60Z" fill="#15161b"/>`;
@@ -345,7 +410,7 @@ ${hl("M80 64V160", .45, 1.2)}`;
       return scene(x, "yard", F + waves(x, 100, 104, 32, "lr", null, 8, 30), post, `<g class="hda-bg">${gate}</g>` + glowE(x, 100, 118, 60, 60, .3));
     } }),
 
-     ring({ id: "peephole", name: "Peephole camera", colors: rs("#f2f6ff"), render(o) {
+     ring({ id: "peephole", name: "Peephole camera", colors: rs("#f2f6ff"), cam: [100, 64, 8.5, 32], render(o) {
       const x = ctx(o), B = rrp(84, 40, 32, 112, 16);
       const F = drop(x, `<path d="${B}"/>`, 3, 5, .6) +
         `<path d="${B}" fill="${x.url("blk")}"/><path d="${B}" fill="none" stroke="#fff" stroke-opacity=".12"/>
@@ -546,8 +611,7 @@ ${ringLight(xr, 100, 148, 7.5, 2.4, .18)}<circle cx="100" cy="148" r="5" fill="$
     tab: "Doorbells",
     group: "More",
     kind: "device",
-    intro: "Eighteen doorbells and chimes, each on its own door, frame or wall. On means it is ringing (someone is at the door): rings chase, sound ripples, tubes and bells swing, screens light up. Off is idle with a soft standby glow.",
-    
+    intro: "Doorbells and chimes, each on its own door, frame or wall. On means it is ringing (someone is at the door): rings chase, sound ripples, tubes and bells swing, screens light up. Off is idle with a soft standby glow. The video doorbells now live as styles in the Video doorbell builder.",
     css: `.hda-doorbell-chase,.hda-doorbell-wave,.hda-doorbell-pulse,.hda-doorbell-blink{animation-timing-function:linear;animation-iteration-count:infinite}
 .hda-anim .hda-doorbell-chase{animation-name:hda-doorbell-chase}
 .hda-anim .hda-doorbell-wave{animation-name:hda-doorbell-wave;animation-timing-function:ease-out}
@@ -566,7 +630,8 @@ ${ringLight(xr, 100, 148, 7.5, 2.4, .18)}<circle cx="100" cy="148" r="5" fill="$
 @keyframes hda-doorbell-buzz{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-9deg)}}
 @keyframes hda-doorbell-twist{0%,100%{transform:rotate(0deg)}35%,65%{transform:rotate(85deg)}}
 @keyframes hda-doorbell-knock{0%,30%,100%{transform:scale(1,1)}45%{transform:scale(1,.8)}60%{transform:scale(1,1)}70%{transform:scale(1,.9)}80%{transform:scale(1,1)}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-doorbell-chase,.hda-anim .hda-doorbell-wave,.hda-anim .hda-doorbell-pulse,.hda-anim .hda-doorbell-blink,.hda-anim .hda-doorbell-swing,.hda-anim .hda-doorbell-buzz,.hda-anim .hda-doorbell-twist,.hda-anim .hda-doorbell-knock{animation:none}}`,
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-doorbell-chase,.hda-anim .hda-doorbell-wave,.hda-anim .hda-doorbell-pulse,.hda-anim .hda-doorbell-blink,.hda-anim .hda-doorbell-swing,.hda-anim .hda-doorbell-buzz,.hda-anim .hda-doorbell-twist,.hda-anim .hda-doorbell-knock{animation:none}}` + CK.css,
     icons,
+    all: icons, 
   });
 })();

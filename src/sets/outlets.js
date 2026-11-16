@@ -132,7 +132,6 @@ ${extra || ""}</defs>`;
   }
   const usbc = (x, cx, cy, w) => { w = w || 7; const h = w * .36; return `<path d="${rr(cx - w / 2, cy - h / 2, w, h, h / 2)}" fill="#0b0b0d"/><path d="${rr(cx - w * .32, cy - h * .16, w * .64, h * .32, h * .16)}" fill="#555a60"/><path d="${rr(cx - w / 2, cy - h / 2, w, h, h / 2)}" fill="none" stroke="#9aa0a6" stroke-opacity=".6" stroke-width=".4"/>`; };
   const usba = (x, cx, cy, w) => { w = w || 9; const h = w * .4; return `<rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx=".5" fill="#0b0b0d"/><rect x="${f(cx - w * .38)}" y="${f(cy - h * .32)}" width="${f(w * .76)}" height="${f(h * .3)}" fill="#3d73d9"/><rect x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx=".5" fill="none" stroke="#9aa0a6" stroke-opacity=".6" stroke-width=".4"/>`; };
-  // (bd = where the cord ends up at the bottom, from the plug's center; a top plug's cord swings past the lower outlet)
   function plug(x, cx, cy, s, col, bend) {
     if (!x.on) return "";
     const bd = bend == null ? 6 : bend;
@@ -144,10 +143,6 @@ ${extra || ""}</defs>`;
       `<path d="${d}" fill="${col}"/><path d="${d}" fill="${x.url("pv")}"/><path d="${d}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width=".6"/>` +
       `<path d="M${f(cx - w * .3)} ${f(cy - h * .2)}V${f(cy + h * .3)}M${f(cx - w * .12)} ${f(cy - h * .2)}V${f(cy + h * .3)}" stroke="#000" stroke-opacity=".12" stroke-width=".8"/>` + led(x, cx + w * .22, cy - h * .15, GRN, "hg", 1.1);
   }
-  // ---------- (parts) Multi-Function: two receptacles = parts top + bottom (a floor box: left + right), each with its own
-  // plug in and lit when on; outlet + USB / night light as two parts. A Device Image (no o.mf, no parts) is drawn as before;
-  // as a Multi-Function Image (o.mf) o.parts holds only the ticked parts, a part left out is drawn off (no plug, no glow)
-  // and the drawing's own LED follows any part on.
   const MFM = (o) => !!(o.mf || o.parts);
   const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
   const xs = (x, on) => (on === x.on ? x : Object.assign({}, x, { on }));
@@ -158,8 +153,80 @@ ${extra || ""}</defs>`;
     usb: [{ id: "outlet", name: "Outlet", type: "switch" }, { id: "usb", name: "USB ports", type: "switch" }],
     night: [{ id: "outlet", name: "Outlet", type: "switch" }, { id: "light", name: "Night light", type: "switch" }] };
   const anyOn = (o, ps) => { let t = 0, a = 0; ps.forEach((p) => { if (o.parts && o.parts[p.id] != null) { t = 1; if (o.parts[p.id]) a = 1; } }); return t ? !!a : !o.mf && !!o.on; };
-  // the two receptacles' plugs as a Multi-Function Image (top plug's cord swings left of the lower outlet)
   const plugs2 = (x, cx, yt, yb, s, col) => plug(xs(x, pp(x, "top")), cx, yt, s, col, -26) + plug(xs(x, pp(x, "bottom")), cx, yb, s, col);
+  function plugIn(lin, kind, cx, by, k, col, side, sd) {
+    const NH = window.HDAH, sh = (a) => NH.shade(col, a), v = NH.hx(col), dark = (v[0] * .3 + v[1] * .59 + v[2] * .11) / 255 < .45;
+    const R = (x0, y0, w, h, r) => `M${f(x0 + r)} ${f(y0)}H${f(x0 + w - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w)} ${f(y0 + r)}V${f(y0 + h - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w - r)} ${f(y0 + h)}H${f(x0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0)} ${f(y0 + h - r)}V${f(y0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + r)} ${f(y0)}Z`;
+    sd = sd || [.05, .1]; side = side || 1;
+    const shadow = (d) => `<path d="${d}" fill="#000" fill-opacity=".14" transform="translate(${f(sd[0] * k * 2.2)} ${f(sd[1] * k * 2.2)})"/><path d="${d}" fill="#000" fill-opacity=".3" transform="translate(${f(sd[0] * k)} ${f(sd[1] * k)})"/>`;
+    const front = lin([[0, sh(dark ? .3 : .55)], [.42, col], [1, sh(dark ? -.35 : -.24)]], 0, 0, .45, 1);
+    const sideG = lin([[0, sh(-.42)], [.32, sh(dark ? .22 : .3)], [.62, col], [1, sh(-.48)]], 0, 0, 1, 0);
+    const edge = `fill="none" stroke="${sh(-.6)}" stroke-opacity=".75" stroke-width="${f(Math.max(.35, .014 * k))}"`;
+    const hiOp = dark ? .3 : .85, lw = f(Math.max(.4, .022 * k));
+    const top = (x0, y0, w, r) => `<path d="M${f(x0 + r)} ${f(y0 + .04 * k)}H${f(x0 + w - r)}" stroke="#fff" stroke-opacity="${hiOp}" stroke-width="${lw}" stroke-linecap="round"/>`;
+    const sheen = (d) => `<path d="${d}" fill="${lin([[0, "#fff", dark ? .14 : .4], [.45, "#fff", 0], [1, "#000", dark ? 0 : .06]], 0, 0, 1, 1)}"/>`;
+    const rivets = (y) => [-1, 1].map((i) => `<circle cx="${f(cx + i * .25 * k)}" cy="${f(y)}" r="${f(.035 * k)}" fill="${sh(-.4)}"/><circle cx="${f(cx + i * .25 * k - .01 * k)}" cy="${f(y - .012 * k)}" r="${f(.016 * k)}" fill="#fff" fill-opacity="${dark ? .25 : .7}"/>`).join("");
+    let s = "", ox = cx, oy = by, w = .12 * k, c = col;
+    if (kind === "ground3") {
+      const W = .74 * k, Hh = .92 * k, x0 = cx - W / 2, y0 = by - .36 * k, r = .22 * k, d = R(x0, y0, W, Hh, r), yb = y0 + Hh - .05 * k;
+      const neck = `M${f(cx - .17 * k)} ${f(yb)}H${f(cx + .17 * k)}L${f(cx + .11 * k)} ${f(yb + .32 * k)}Q${f(cx)} ${f(yb + .36 * k)} ${f(cx - .11 * k)} ${f(yb + .32 * k)}Z`;
+      s += shadow(d) + shadow(neck) + `<path d="${neck}" fill="${sideG}"/>` + [.08, .16, .24].map((t) => `<path d="M${f(cx - (.16 - t * .2) * k)} ${f(yb + t * k)}H${f(cx + (.16 - t * .2) * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`).join("");
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="${R(x0 + .08 * k, y0 + .08 * k, W - .16 * k, Hh - .2 * k, r * .7)}" fill="none" stroke="${sh(dark ? .18 : -.12)}" stroke-opacity=".55" stroke-width="${lw}"/>`;
+      for (let i = 0; i < 4; i++) [-1, 1].forEach((e) => { const yy = y0 + .34 * k + i * .1 * k, xa = cx + e * (W / 2 - .07 * k), xb = cx + e * (W / 2 - .19 * k);
+        s += `<path d="M${f(xa)} ${f(yy)}H${f(xb)}" stroke="${sh(-.5)}" stroke-opacity=".55" stroke-width="${lw}" stroke-linecap="round"/><path d="M${f(xa)} ${f(yy + .03 * k)}H${f(xb)}" stroke="#fff" stroke-opacity="${hiOp * .5}" stroke-width="${lw}" stroke-linecap="round"/>`; });
+      s += top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = yb + .3 * k; w = .15 * k;
+    } else if (kind === "wart") {
+      const W = 1.08 * k, Hh = 1.14 * k, x0 = cx - W / 2, y0 = by - .4 * k, r = .16 * k, d = R(x0, y0, W, Hh, r);
+      c = dark ? "#2a2b2f" : "#efefed";
+      const boot = R(cx - .1 * k, y0 + Hh + .02 * k, .2 * k, .2 * k, .06 * k);
+      s += shadow(R(x0, y0, W + .06 * k, Hh + .3 * k, r)) + `<path d="${R(x0 + .06 * k, y0 + .1 * k, W, Hh, r)}" fill="${sh(-.5)}"/>` +
+        `<path d="${boot}" fill="${lin([[0, NH.shade(c, -.35)], [.4, NH.shade(c, .2)], [1, NH.shade(c, -.45)]], 0, 0, 1, 0)}"/><path d="${boot}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="${lw}"/>`;
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="M${f(x0 + .12 * k)} ${f(y0 + Hh * .62)}L${f(x0 + W * .62)} ${f(y0 + .12 * k)}" stroke="#fff" stroke-opacity="${dark ? .06 : .22}" stroke-width="${f(.16 * k)}" stroke-linecap="round"/>` +
+        `<path d="${R(x0 + .09 * k, y0 + .09 * k, W - .18 * k, Hh - .18 * k, r * .6)}" fill="none" stroke="${sh(dark ? .2 : -.18)}" stroke-opacity=".5" stroke-width="${lw}"/>` + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = y0 + Hh + .2 * k; w = Math.max(1.4, .075 * k);
+    } else if (kind === "right") {
+      const W = .84 * k, Hh = .58 * k, hx = cx + side * .04 * k, x0 = hx - W / 2, y0 = by - .27 * k, r = .2 * k, d = R(x0, y0, W, Hh, r), my = y0 + Hh * .52;
+      const ex = side > 0 ? x0 + W - .05 * k : x0 + .05 * k, L = .28 * k;
+      const boot = `M${f(ex)} ${f(my - .17 * k)}L${f(ex + side * L)} ${f(my - .1 * k)}Q${f(ex + side * (L + .04 * k))} ${f(my)} ${f(ex + side * L)} ${f(my + .1 * k)}L${f(ex)} ${f(my + .17 * k)}Z`;
+      s += shadow(d) + shadow(boot) + `<path d="${boot}" fill="${lin([[0, sh(dark ? .2 : .35)], [.45, col], [1, sh(-.5)]], 0, 0, 0, 1)}"/>` +
+        [.08, .16].map((t) => `<path d="M${f(ex + side * t * k)} ${f(my - (.16 - t * .25) * k)}V${f(my + (.16 - t * .25) * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`).join("");
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d);
+      for (let i = 0; i < 3; i++) { const xx = hx - side * (W / 2 - .12 * k - i * .07 * k);
+        s += `<path d="M${f(xx)} ${f(y0 + .15 * k)}V${f(y0 + Hh - .15 * k)}" stroke="${sh(-.5)}" stroke-opacity=".55" stroke-width="${lw}" stroke-linecap="round"/><path d="M${f(xx + .025 * k)} ${f(y0 + .15 * k)}V${f(y0 + Hh - .15 * k)}" stroke="#fff" stroke-opacity="${hiOp * .45}" stroke-width="${lw}" stroke-linecap="round"/>`; }
+      s += rivets(by + .02 * k) + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      ox = ex + side * (L + .02 * k); oy = my; w = .13 * k;
+    } else {
+      const W = .6 * k, Hh = .64 * k, x0 = cx - W / 2, y0 = by - .31 * k, r = .16 * k, d = R(x0, y0, W, Hh, r), neck = R(cx - .12 * k, y0 + Hh - .05 * k, .24 * k, .22 * k, .08 * k);
+      s += shadow(d) + shadow(neck) + `<path d="${neck}" fill="${sideG}"/><path d="M${f(cx - .1 * k)} ${f(y0 + Hh + .07 * k)}H${f(cx + .1 * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`;
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="${R(x0 + .07 * k, y0 + .07 * k, W - .14 * k, Hh - .16 * k, r * .7)}" fill="none" stroke="${sh(dark ? .18 : -.12)}" stroke-opacity=".5" stroke-width="${lw}"/>` +
+        rivets(by) + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = y0 + Hh + .15 * k; w = .11 * k;
+    }
+    return { s, x: ox, y: oy, w, c };
+  }
+  function linF(x) { const L = []; const fn = (a, x1, y1, x2, y2) => { const id = x.id("pk" + (x.n++)); L.push(lg(id, a, x1, y1, x2, y2)); return `url(#${id})`; };
+    fn.defs = () => L.length ? `<defs>${L.join("")}</defs>` : ""; return fn; }
+  function wire(x, d, w, col) {
+    const v = H().hx(col), dark = (v[0] * .3 + v[1] * .59 + v[2] * .11) / 255 < .45;
+    return `<path d="${d}" fill="none" stroke="#000" stroke-opacity=".32" stroke-width="${f(w + 1.2)}" stroke-linecap="round" transform="translate(${f(w * .5)} ${f(w)})" filter="${x.url("bl")}"/>` +
+      `<path d="${d}" fill="none" stroke="${H().shade(col, -.55)}" stroke-width="${f(w)}" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${col}" stroke-width="${f(w * .62)}" stroke-linecap="round"/>` +
+      `<path d="${d}" fill="none" stroke="#fff" stroke-opacity="${dark ? .2 : .6}" stroke-width="${f(Math.max(.5, w * .2))}" stroke-linecap="round" transform="translate(${f(-w * .17)} ${f(-w * .17)})"/>`;
+  }
+  const PK = { std: [["flat2", "#26272a"], ["ground3", "#f1f0ec"]], tr: [["wart", "#f1f0ec"], ["ground3", "#8f9298"]],
+    plain: [["right", "#8f9298"], ["wart", "#f1f0ec"]], smart: [["flat2", "#26272a"], ["right", "#f1f0ec"]] };
+  function plugPair(x, kind, cx, yT, yB, t, b) {
+    const k = STD.S, lin = linF(x);
+    let cords = "", heads = "";
+    const one = (i, by) => { const [kd, col] = PK[kind][i], p = plugIn(lin, kd, cx, by, k, col, -1); heads += p.s;
+      const d = kd === "right" ? `M${f(p.x)} ${f(p.y)}C${f(p.x - 4)} ${f(p.y)} ${f(p.x - 6)} ${f(p.y + 3)} ${f(p.x - 6)} ${f(p.y + 12)}S${f(p.x - 9)} ${f(p.y + 70)} ${f(p.x - 4)} 206`
+        : i === 0 ? `M${f(p.x)} ${f(p.y)}C${f(p.x)} ${f(p.y + 9)} ${f(cx - 36)} ${f(p.y + 6)} ${f(cx - 37)} ${f(p.y + 24)}S${f(cx - 40)} ${f(p.y + 80)} ${f(cx - 34)} 206`
+        : `M${f(p.x)} ${f(p.y)}C${f(p.x)} ${f(p.y + 14)} ${f(p.x + 5)} ${f(p.y + 20)} ${f(p.x + 7)} 206`;
+      cords += wire(x, d, p.w, p.c); };
+    if (t) one(0, yT);
+    if (b) one(1, yB);
+    return lin.defs() + cords + heads;
+  }
   const downGlow = (x, cx, y, w, grad, op) => x.on ? `<g class="${P}breath" opacity="${f((op || .9) * x.B)}"><ellipse cx="${f(cx)}" cy="${f(y + 12)}" rx="${f(w * .75)}" ry="22" fill="${x.url(grad)}" filter="${x.url("gw")}"/></g>` : "";
 
   function invis(x, usbC, aura) {
@@ -197,7 +264,6 @@ ${extra || ""}</defs>`;
     if (kind === "usb" && r !== "au" && r !== "it") Hh += 18;
     const X = 100 - W / 2, Y = 100 - Hh / 2 + (kind === "usb" && r !== "au" && r !== "it" ? 9 : 0);
     let s = "";
-    // (parts) each socket's own on: a double = top (first) + bottom (second), a single = the outlet part (else any part)
     const so = (i) => (!x.mf ? x.on : dbl ? pp(x, i ? "bottom" : "top") : kind === "usb" || kind === "night" ? pp(x, "outlet") : x.on);
     const uo = x.mf ? pp(x, "usb") : x.on, lo = x.mf ? pp(x, "light") : x.on;
     if (kind === "night") s += downGlow(xs(x, lo), 100, Y + Hh, W, "wm", .9);
@@ -216,15 +282,24 @@ ${extra || ""}</defs>`;
     if (x.mf) return s + socks.map(([cx, cy], i) => plug(xs(x, so(i)), cx, cy - .2 * 30 * 1.3, 30 * 1.3, x.dark ? "#2e2f33" : "#f2f2f0")).join("");
     return s + plug(x, px, py - .2 * 30 * 1.3, 30 * 1.3, x.dark ? "#2e2f33" : "#f2f2f0");
   }
+  const pOn = (x, id) => x.o.parts && x.o.parts[id] != null ? x.on && !!x.o.parts[id] : x.on;
+  function splitMarks(x, t, b, lx, ty, by, dimTop, dimBot) {
+    if (!x.on || t === b) return "";
+    const dead = (d) => `<path d="${d}" fill="#000" fill-opacity="${x.dark ? .45 : .32}"/>`;
+    const lamp = (cy, on) => on ? led(x, lx, cy, GRN, "hg", 1.1) : `<circle cx="${f(lx)}" cy="${f(cy)}" r="1.1" fill="#000" fill-opacity=".45"/><circle cx="${f(lx)}" cy="${f(cy)}" r=".6" fill="#fff" fill-opacity=".15"/>`;
+    return (t ? "" : dead(dimTop)) + (b ? "" : dead(dimBot)) + lamp(ty, t) + lamp(by, b);
+  }
   function duplex(x, kind) {
     if (REG !== "us") return regional(x, "double");
     const { X, Y, W, Hh, S } = STD, cx = 100;
     let s = plate(x, X, Y, W, Hh, 3, [[cx, Y + Hh / 2]]);
     s += ovalFace(x, cx, Y + 40, S) + ovalFace(x, cx, Y + 98, S) + slots(x, cx, Y + 36, S, kind) + slots(x, cx, Y + 94, S, kind);
     if (kind === "tr") s += word(x, "TR", cx, Y + 64, 4.2, H().shade(x.dev, -.4), .8) + word(x, "TR", cx, Y + 122, 4.2, H().shade(x.dev, -.4), .8);
-    return s + (x.mf ? plugs2(x, cx, Y + 39, Y + 97, S) : plug(x, cx, Y + 97, S));
+    const t = pOn(x, "top"), b = pOn(x, "bottom"), oval = (cy) => { const rx = .66 * S, ry = .58 * S; return `M${f(cx - rx)} ${f(cy)}A${f(rx)} ${f(ry)} 0 0 1 ${f(cx + rx)} ${f(cy)}V${f(cy + ry * .15)}A${f(rx)} ${f(ry)} 0 0 1 ${f(cx - rx)} ${f(cy + ry * .15)}Z`; };
+    s += splitMarks(x, t, b, cx + 28, Y + 40, Y + 98, oval(Y + 40), oval(Y + 98));
+    return s + plugPair(x, kind, cx, Y + 36, Y + 94, t, b);
   }
-  function decora(x, kind, opt) {
+  function rockerFace(x, kind, opt) {
     if (REG !== "us") return regional(x, kind === "usb" || kind === "smart" || kind === "night" ? kind : "plain");
     opt = opt || {};
     const { X, Y, W, Hh, S } = STD, cx = 100, fx = cx - 21, fy = Y + 28, fw = 42, fh = 84;
@@ -255,15 +330,18 @@ ${extra || ""}</defs>`;
       if (xl.on) s += `<rect class="${P}breath" x="${cx - 26}" y="${ly - 6}" width="52" height="12" rx="6" fill="${WARM}" fill-opacity="${f(.55 * x.B)}" filter="${x.url("gw")}"/>`;
       s += `<circle cx="${cx + 30}" cy="${ly}" r="1.4" fill="#1a1a1a" fill-opacity=".55"/><circle cx="${cx}" cy="${Y + Hh - 26}" r="2.2" fill="none" stroke="#000" stroke-opacity=".2" stroke-width=".5"/>`;
     }
-    return s + (!x.mf ? plug(x, cx, bot + 3, S) : one ? plug(xo, cx, bot + 3, S) : plugs2(x, cx, top + 3, bot + 3, S));
+    if (!opt.split) return s + (!x.mf ? plug(x, cx, bot + 3, S) : one ? plug(xo, cx, bot + 3, S) : plugs2(x, cx, top + 3, bot + 3, S));
+    const t = pOn(x, "top"), b = pOn(x, "bottom");
+    s += splitMarks(x, t, b, cx + 28, top + 3, bot + 3, rr(fx + 1, fy + 1, fw - 2, my - fy - 7, 1.5), rr(fx + 1, my + 6, fw - 2, fy + fh - my - 7, 1.5));
+    return s + plugPair(x, kind, cx, top, bot, t, b);
   }
 
   const icons = [];
   const REG_IDS = { duplex: 1, "rocker-style-outlet": 1, usb: 1, smart: 1, night: 1, floor: 1, popup: 1, weather: 1, tvbox: 1 };
-  const add = (id, name, colors, label, fn) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label,
+  const add = (id, name, colors, label, fn, extra) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel: label,
     render: (o) => { REG = REG_IDS[id] && o.opt && o.opt.region || "us";
       const mf = !!PARTS[id] && MFM(o); if (mf) o = Object.assign({}, o, { on: anyOn(o, PARTS[id]) });
-      try { const x = ctx(o); x.mf = mf; return fn(x); } finally { REG = "us"; } } }, REG_IDS[id] ? { options: [REG_OPT] } : {}, PARTS[id] ? { parts: PARTS[id] } : {}));
+      try { const x = ctx(o); x.mf = mf; return fn(x); } finally { REG = "us"; } } }, REG_IDS[id] ? { options: [REG_OPT] } : {}, PARTS[id] ? { parts: PARTS[id] } : {}, extra || {}));
   const RGB = ["#ff4fd8", "#4dabf7", "#69db7c", "#ffa94d", "#9775fa", "#ffffff"];
   const auraCtx = (o) => { const x = ctx(Object.assign({}, o, { color: o.color2 || WH })); x.o = o; return x; };
   icons.push({ id: "hidden-plug-outlet", name: "Hidden plug outlet", colors: [WH, LA, IV, GY, BK, BN], picker: true, colorLabel: "Plate", render: (o) => { const x = ctx(o); return scene(x, "beige", null, invis(x, false, false)); } });
@@ -272,13 +350,13 @@ ${extra || ""}</defs>`;
   icons.push({ id: "hidden-plug-usb-c-ring", name: "Hidden plug, USB-C ring", colors: RGB, picker: true, colorLabel: "Light", colors2: [WH, LA, IV, GY, BK, BN], picker2: true, colorLabel2: "Plate", render: (o) => { const x = auraCtx(o); return scene(x, "navy", null, invis(x, true, true)); } });
 
   add("duplex", "Standard duplex", PLATES, "Plate", (x) => scene(x, "sage", null, duplex(x, "std")));
-  add("rocker-style-outlet", "Rocker-style outlet", [BK, WH, LA, IV, GY, BN], "Plate", (x) => scene(x, "blue", null, decora(x, "plain")));
-  add("usb", "USB-A/C outlet", [BN, WH, BK, GY, LA, IV], "Plate", (x) => scene(x, "cream", null, decora(x, "usb")));
-  add("gfci", "GFCI outlet", [WH, LA, IV, GY, BK, BN], "Plate", (x) => scene(x, "mint", null, decora(x, "gfci")));
-  add("smart", "Smart outlet", [WH, BK, GY, LA, IV, BN], "Plate", (x) => scene(x, "plum", null, decora(x, "smart")));
-  add("tamper", "Tamper-resistant", [LA, WH, IV, GY, BK, BN], "Plate", (x) => scene(x, "sky", null, duplex(x, "tr")));
-  add("tslot", "20A T-slot", [GY, WH, IV, LA, BK, BN], "Plate", (x) => scene(x, "white", null, decora(x, "tslot")));
-  add("night", "Night-light outlet", [WH, LA, IV, BK, GY, BN], "Plate", (x) => scene(x, "olive", null, decora(x, "night")));
+  add("rocker-style-outlet", "Rocker-style outlet", [BK, WH, LA, IV, GY, BN], "Plate", (x) => scene(x, "blue", null, rockerFace(x, "plain", { split: 1 })));
+  add("usb", "USB-A/C outlet", [BN, WH, BK, GY, LA, IV], "Plate", (x) => scene(x, "cream", null, rockerFace(x, "usb")));
+  add("gfci", "GFCI outlet", [WH, LA, IV, GY, BK, BN], "Plate", (x) => scene(x, "mint", null, rockerFace(x, "gfci")));
+  add("smart", "Smart outlet", [WH, BK, GY, LA, IV, BN], "Plate", (x) => scene(x, "plum", null, rockerFace(x, "smart", { split: 1 })));
+  add("tamper", "Tamper-resistant", [LA, WH, IV, GY, BK, BN], "Plate", (x) => scene(x, "sky", null, duplex(x, "tr"))); 
+  add("tslot", "20A T-slot", [GY, WH, IV, LA, BK, BN], "Plate", (x) => scene(x, "white", null, rockerFace(x, "tslot")));
+  add("night", "Night-light outlet", [WH, LA, IV, BK, GY, BN], "Plate", (x) => scene(x, "olive", null, rockerFace(x, "night")));
 
   add("station", "Outlet shelf", [WH, BK, GY, LA, IV, BN], "Plate", (x) => {
     const { X, Y, W, S } = STD, cx = 100, Hh = 112;
@@ -320,7 +398,6 @@ ${extra || ""}</defs>`;
     const xx = Object.assign({}, x, { dev: "#f1f1ee", dark: false });
     s += slots(xx, cx, Y + 38, 28, "std") + slots(xx, cx, Y + 80, 28, "std") + `<rect x="${cx - 8}" y="${Y + 57}" width="16" height="5" rx="1" fill="#e2e2de" stroke="#000" stroke-opacity=".3" stroke-width=".4"/>`;
     s += x.on ? led(xx, cx + 13, Y + 59.5, GRN, "hg", .9) : `<g class="${P}blink"><circle cx="${cx + 13}" cy="${Y + 59.5}" r=".9" fill="${RED}"/></g>`;
-    // (parts) a plug in each receptacle that is on, the top one's cord beside the lower one, both out through the notch
     const wp = (yy, dx) => `<path d="M${cx + dx} ${yy + 14}V${Y + Hh - 12}C${cx + dx} ${Y + Hh + 6} ${cx + 10 + dx} 186 ${cx + 10 + dx} 200" fill="none" stroke="#e57a2b" stroke-width="4.5"/><path d="M${cx - 1 + dx} ${yy + 16}V${Y + Hh - 12}" stroke="#fff" stroke-opacity=".3"/><path d="${rr(cx - 10, yy, 20, 16, 3)}" fill="#e57a2b" fill-opacity=".8"/>`;
     const lid = rr(X + 6, Y + 8, W - 12, Hh - 26, 8);
     s += `<path d="${lid}" fill="${h.mix(x.c, "#ffffff", .3)}" fill-opacity=".28"/><path d="${lid}" fill="none" stroke="${h.shade(x.c, -.35)}" stroke-width="1.4"/><path d="M${X + 14} ${Y + 14}V${Y + Hh - 30}" stroke="#fff" stroke-opacity=".45" stroke-width="2.2" stroke-linecap="round"/>`;
@@ -381,7 +458,6 @@ ${extra || ""}</defs>`;
     const bx = X + 78, br = rr(bx - 14, Y + 26, 28, 48, 4);
     s += `<path d="${br}" fill="#151517"/>`; for (let i = 0; i < 18; i++) s += `<path d="M${f(bx - 13 + i * 1.5)} ${Y + 27}V${Y + 73}" stroke="#3a3b3f" stroke-width=".6"/>`;
     s += `<path d="M${bx - 14} ${Y + 50}H${bx + 14}" stroke="#000" stroke-width="1.4"/>`;
-    // (parts) a flat plug in each receptacle that is on, each cord into the brush plate, the TV cables up out of it
     const tvp = (yy) => `<path d="${rr(dx - 9, yy, 18, 9, 2)}" fill="#2a2b2f"/><path d="M${dx + 9} ${yy + 4}C${dx + 22} ${yy + 4} ${bx - 6} ${yy + 4} ${bx - 2} ${yy < Y + 40 ? yy + 12 : yy - 2}" fill="none" stroke="#2a2b2f" stroke-width="3"/>` + led(x, dx + 6, yy + 3, GRN, "hg", .9);
     if (x.mf && x.on) s += (pp(x, "top") ? tvp(Y + 24) : "") + (pp(x, "bottom") ? tvp(Y + 54) : "") + `<path d="M${bx - 2} ${Y + 50}C${bx + 4} ${Y + 30} ${bx + 6} ${Y + 20} ${bx + 6} 0" fill="none" stroke="#1d1e21" stroke-width="3.5"/><path d="M${bx + 5} ${Y + 50}C${bx + 10} ${Y + 30} ${bx + 12} ${Y + 20} ${bx + 12} 0" fill="none" stroke="#3a3c42" stroke-width="2"/>`;
     else if (x.on) s += `<path d="${rr(dx - 9, Y + 54, 18, 9, 2)}" fill="#2a2b2f"/><path d="M${dx + 9} ${Y + 58}C${dx + 22} ${Y + 58} ${bx - 6} ${Y + 58} ${bx - 2} ${Y + 52}" fill="none" stroke="#2a2b2f" stroke-width="3"/><path d="M${bx - 2} ${Y + 50}C${bx + 4} ${Y + 30} ${bx + 6} ${Y + 20} ${bx + 6} 0" fill="none" stroke="#1d1e21" stroke-width="3.5"/><path d="M${bx + 5} ${Y + 50}C${bx + 10} ${Y + 30} ${bx + 12} ${Y + 20} ${bx + 12} 0" fill="none" stroke="#3a3c42" stroke-width="2"/>` + led(x, dx + 6, Y + 57, GRN, "hg", .9);
@@ -400,8 +476,7 @@ ${extra || ""}</defs>`;
     tab: "Outlets",
     group: "More",
     kind: "device",
-    intro: "In-wall outlets: the InvisOutlet line (Pro, Aura, C Pro with USB-C, C Aura) plus common outlets from a plain duplex to GFCI, smart, floor and pop-up types. On means power on: LEDs and night-lights glow, a plug is in and its lamp is lit. The color is the plate or finish (the light on Aura models).",
-    
+    intro: "In-wall outlets: hidden-plug outlets (plain, light ring, USB-C, USB-C with ring) plus common outlets from a plain duplex to GFCI, smart, floor and pop-up types. On means power on: LEDs and night-lights glow, a plug is in and its lamp is lit. The color is the plate or finish (the light on light-ring models). Split outlets show each plug with its cord, so you can see which half is on.",
     onWord: "On", offWord: "Off",
     css,
     icons,

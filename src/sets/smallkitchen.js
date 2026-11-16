@@ -270,7 +270,7 @@ ${extra || ""}</defs>`;
 
     ic("pod", "Pod brewer", [BK, WH, RED, NAVY, SAGE, SS], (o) => { const V = CF(o), u = o.uid;
       return svg(o, room(o, "zel", "wood") + plug(o, 30, 96, [62, 158]) + sh(o, 104, 165, 52, 5) +
-        `<path d="${rr(140, 46, 18, 106, 6)}" fill="url(#${u}-glb)"/>${!o.mf ? `<path d="${rr(141, 70, 16, 81, 5)}" fill="url(#${u}-wt)"/>` : V.wl == null ? "" : `<path d="${rr(141, n1(151 - 100 * Math.max(.1, V.wl)), 16, n1(100 * Math.max(.1, V.wl)), 5)}" fill="url(#${u}-wt)"/>`}<path d="${rr(140, 46, 18, 106, 6)}" fill="none" stroke="#e8f6ff" stroke-opacity=".4"/>` + (V.B.on ? bubbles(V.B, [[146, 140, 1], [151, 130, 1.2], [148, 118, .9]]) : "") +
+        `<path d="${rr(140, 46, 18, 106, 6)}" fill="url(#${u}-glb)"/>${!o.mf ? `<path d="${rr(141, 70, 16, 81, 5)}" fill="url(#${u}-wt)"/>` : V.wl == null ? "" : `<path d="${rr(141, +n1(151 - 100 * Math.max(.1, V.wl)), 16, +n1(100 * Math.max(.1, V.wl)), 5)}" fill="url(#${u}-wt)"/>`}<path d="${rr(140, 46, 18, 106, 6)}" fill="none" stroke="#e8f6ff" stroke-opacity=".4"/>` + (V.B.on ? bubbles(V.B, [[146, 140, 1], [151, 130, 1.2], [148, 118, .9]]) : "") +
         face(o, rr(66, 30, 80, 132, 14), "c") + face(o, "M60 44Q60 28 76 28H138Q150 28 150 42V58H60Z") + groove("M60 58H150") +
         `<path d="${rr(86, 32, 40, 6, 3)}" fill="#000" fill-opacity=".22"/>` +
         face(o, rr(60, 58, 90, 24, 9)) + `<path d="M66 60H144" stroke="#fff" stroke-opacity=".35"/>` +

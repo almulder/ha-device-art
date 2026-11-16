@@ -280,10 +280,6 @@
   const glass = (x, x0, y0, w, h) => `<path d="M${f(x0 + 2)} ${f(y0 + 1.5)}H${f(x0 + w * .7)}L${f(x0 + w * .45)} ${f(y0 + h - 1.5)}H${f(x0 + 2)}Z" fill="#fff" fill-opacity=".07"/>`;
   const watts = (x) => x.on ? Math.round(2 + 1498 * Math.pow(x.lv, 1.25)) : 0;
 
-  // ---------- (parts) Multi-Function: each outlet its own switch part (o1..oN), plus USB / light / power where drawn ----------
-  // A Device Image (no o.mf, no parts) is drawn exactly as before. As a Multi-Function Image (o.mf) o.parts holds only the
-  // ticked parts (true = on); a part left out is drawn off and never animated, every outlet shows its own little LED, and
-  // the drawing's own light (master LED, rocker, ring) is on when any switch part is on. o.pval.power = a power reading (W).
   const MFM = (o) => !!(o.mf || o.parts);
   const pon = (o, k) => (o.parts && o.parts[k] != null ? !!o.parts[k] : !o.mf && !!o.on);
   const tick = (o, k) => !!(o.parts && o.parts[k] != null);
@@ -298,12 +294,92 @@
     energy: [{ id: "outlet", name: "Outlet", type: "switch" }, { id: "power", name: "Power", type: "value", unit: "W", min: 0, max: 1800, def: 60 }],
     ev: [EVST],
   };
-  // the drawing's own on as a Multi-Function Image: any of its switch parts on (a stage drawing: its stage decides)
   const anyOn = (o, ps) => { const sw = ps.filter((p) => !p.type || p.type === "switch"); if (!sw.length) return !!o.on;
     let t = 0, a = 0; sw.forEach((p) => { if (tick(o, p.id)) { t = 1; if (o.parts[p.id]) a = 1; } }); return t ? !!a : !o.mf && !!o.on; };
-  // a small status LED per outlet, only drawn as a Multi-Function Image
   const oled = (x, o, k, cx, cy, r, col) => (o.mf ? led(sub(x, pon(o, k)), cx, cy, r || 1, col || "#34d399", .7) : "");
   const stv = (o, k) => (o.pval && o.pval[k] != null && o.pval[k] !== "" ? String(o.pval[k]) : null);
+  const METER = { id: "meter", name: "Meter", values: [["off", "Off"], ["on", "On"]] };
+  function meter(x, o) {
+    if (!(o.opt && o.opt.meter === "on")) return "";
+    const X0 = 128, Y0 = 16, w = 58, h = 20, col = x.led, lit = x.on ? H.mix(col, "#ffffff", .3) : "#ffffff";
+    return `<rect x="${X0 + 1}" y="${Y0 + 2}" width="${w}" height="${h}" rx="7" fill="#000" fill-opacity=".35"/><rect x="${X0}" y="${Y0}" width="${w}" height="${h}" rx="7" fill="${x.lg([[0, "#1b1e26"], [1, "#0b0d12"]])}"/>` +
+      `<rect x="${X0 + .5}" y="${Y0 + .5}" width="${w - 1}" height="${h - 1}" rx="6.5" fill="none" stroke="${x.on ? col : "#ffffff"}" stroke-opacity="${x.on ? .55 : .14}" stroke-width=".9"/>` +
+      (x.on ? `<g class="${P}pulse"><rect x="${X0}" y="${Y0}" width="${w}" height="${h}" rx="7" fill="${x.rg([[0, col, .3], [1, col, 0]], .5, .5, .7)}"/></g>` : "") +
+      `<path d="M${X0 + 9.5} ${Y0 + 4}L${X0 + 6} ${Y0 + 11}H${X0 + 9}L${X0 + 7.5} ${Y0 + 16}L${X0 + 12.5} ${Y0 + 8.6}H${X0 + 9.6}L${X0 + 11} ${Y0 + 4}Z" fill="${lit}" fill-opacity="${x.on ? .95 : .2}"/>` +
+      digits(x, X0 + 46, Y0 + 5, 10, watts(x), 4, col) +
+      `<path d="M${X0 + 47.6} ${Y0 + 7.6}L${X0 + 49.2} ${Y0 + 14.6}L${X0 + 50.8} ${Y0 + 9.6}L${X0 + 52.4} ${Y0 + 14.6}L${X0 + 54} ${Y0 + 7.6}" fill="none" stroke="${lit}" stroke-opacity="${x.on ? 1 : .2}" stroke-width="1" stroke-linejoin="round"/>`;
+  }
+  const part = (x, id) => x.o.parts && x.o.parts[id] != null ? x.on && !!x.o.parts[id] : x.on;
+  function as(x, on, fn) { const keep = [x.on, x.an, x.L]; x.on = on; x.an = on && x.o.anim; x.L = on ? .35 + .65 * x.lv : 0; try { return fn(); } finally { x.on = keep[0]; x.an = keep[1]; x.L = keep[2]; } }
+  function plugIn(lin, kind, cx, by, k, col, side, sd) {
+    const NH = window.HDAH, sh = (a) => NH.shade(col, a), v = NH.hx(col), dark = (v[0] * .3 + v[1] * .59 + v[2] * .11) / 255 < .45;
+    const R = (x0, y0, w, h, r) => `M${f(x0 + r)} ${f(y0)}H${f(x0 + w - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w)} ${f(y0 + r)}V${f(y0 + h - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + w - r)} ${f(y0 + h)}H${f(x0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0)} ${f(y0 + h - r)}V${f(y0 + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x0 + r)} ${f(y0)}Z`;
+    sd = sd || [.05, .1]; side = side || 1;
+    const shadow = (d) => `<path d="${d}" fill="#000" fill-opacity=".14" transform="translate(${f(sd[0] * k * 2.2)} ${f(sd[1] * k * 2.2)})"/><path d="${d}" fill="#000" fill-opacity=".3" transform="translate(${f(sd[0] * k)} ${f(sd[1] * k)})"/>`;
+    const front = lin([[0, sh(dark ? .3 : .55)], [.42, col], [1, sh(dark ? -.35 : -.24)]], 0, 0, .45, 1);
+    const sideG = lin([[0, sh(-.42)], [.32, sh(dark ? .22 : .3)], [.62, col], [1, sh(-.48)]], 0, 0, 1, 0);
+    const edge = `fill="none" stroke="${sh(-.6)}" stroke-opacity=".75" stroke-width="${f(Math.max(.35, .014 * k))}"`;
+    const hiOp = dark ? .3 : .85, lw = f(Math.max(.4, .022 * k));
+    const top = (x0, y0, w, r) => `<path d="M${f(x0 + r)} ${f(y0 + .04 * k)}H${f(x0 + w - r)}" stroke="#fff" stroke-opacity="${hiOp}" stroke-width="${lw}" stroke-linecap="round"/>`;
+    const sheen = (d) => `<path d="${d}" fill="${lin([[0, "#fff", dark ? .14 : .4], [.45, "#fff", 0], [1, "#000", dark ? 0 : .06]], 0, 0, 1, 1)}"/>`;
+    const rivets = (y) => [-1, 1].map((i) => `<circle cx="${f(cx + i * .25 * k)}" cy="${f(y)}" r="${f(.035 * k)}" fill="${sh(-.4)}"/><circle cx="${f(cx + i * .25 * k - .01 * k)}" cy="${f(y - .012 * k)}" r="${f(.016 * k)}" fill="#fff" fill-opacity="${dark ? .25 : .7}"/>`).join("");
+    let s = "", ox = cx, oy = by, w = .12 * k, c = col;
+    if (kind === "ground3") {
+      const W = .74 * k, Hh = .92 * k, x0 = cx - W / 2, y0 = by - .36 * k, r = .22 * k, d = R(x0, y0, W, Hh, r), yb = y0 + Hh - .05 * k;
+      const neck = `M${f(cx - .17 * k)} ${f(yb)}H${f(cx + .17 * k)}L${f(cx + .11 * k)} ${f(yb + .32 * k)}Q${f(cx)} ${f(yb + .36 * k)} ${f(cx - .11 * k)} ${f(yb + .32 * k)}Z`;
+      s += shadow(d) + shadow(neck) + `<path d="${neck}" fill="${sideG}"/>` + [.08, .16, .24].map((t) => `<path d="M${f(cx - (.16 - t * .2) * k)} ${f(yb + t * k)}H${f(cx + (.16 - t * .2) * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`).join("");
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="${R(x0 + .08 * k, y0 + .08 * k, W - .16 * k, Hh - .2 * k, r * .7)}" fill="none" stroke="${sh(dark ? .18 : -.12)}" stroke-opacity=".55" stroke-width="${lw}"/>`;
+      for (let i = 0; i < 4; i++) [-1, 1].forEach((e) => { const yy = y0 + .34 * k + i * .1 * k, xa = cx + e * (W / 2 - .07 * k), xb = cx + e * (W / 2 - .19 * k);
+        s += `<path d="M${f(xa)} ${f(yy)}H${f(xb)}" stroke="${sh(-.5)}" stroke-opacity=".55" stroke-width="${lw}" stroke-linecap="round"/><path d="M${f(xa)} ${f(yy + .03 * k)}H${f(xb)}" stroke="#fff" stroke-opacity="${hiOp * .5}" stroke-width="${lw}" stroke-linecap="round"/>`; });
+      s += top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = yb + .3 * k; w = .15 * k;
+    } else if (kind === "wart") {
+      const W = 1.08 * k, Hh = 1.14 * k, x0 = cx - W / 2, y0 = by - .4 * k, r = .16 * k, d = R(x0, y0, W, Hh, r);
+      c = dark ? "#2a2b2f" : "#efefed";
+      const boot = R(cx - .1 * k, y0 + Hh + .02 * k, .2 * k, .2 * k, .06 * k);
+      s += shadow(R(x0, y0, W + .06 * k, Hh + .3 * k, r)) + `<path d="${R(x0 + .06 * k, y0 + .1 * k, W, Hh, r)}" fill="${sh(-.5)}"/>` +
+        `<path d="${boot}" fill="${lin([[0, NH.shade(c, -.35)], [.4, NH.shade(c, .2)], [1, NH.shade(c, -.45)]], 0, 0, 1, 0)}"/><path d="${boot}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="${lw}"/>`;
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="M${f(x0 + .12 * k)} ${f(y0 + Hh * .62)}L${f(x0 + W * .62)} ${f(y0 + .12 * k)}" stroke="#fff" stroke-opacity="${dark ? .06 : .22}" stroke-width="${f(.16 * k)}" stroke-linecap="round"/>` +
+        `<path d="${R(x0 + .09 * k, y0 + .09 * k, W - .18 * k, Hh - .18 * k, r * .6)}" fill="none" stroke="${sh(dark ? .2 : -.18)}" stroke-opacity=".5" stroke-width="${lw}"/>` + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = y0 + Hh + .2 * k; w = Math.max(1.4, .075 * k);
+    } else if (kind === "right") {
+      const W = .84 * k, Hh = .58 * k, hx = cx + side * .04 * k, x0 = hx - W / 2, y0 = by - .27 * k, r = .2 * k, d = R(x0, y0, W, Hh, r), my = y0 + Hh * .52;
+      const ex = side > 0 ? x0 + W - .05 * k : x0 + .05 * k, L = .28 * k;
+      const boot = `M${f(ex)} ${f(my - .17 * k)}L${f(ex + side * L)} ${f(my - .1 * k)}Q${f(ex + side * (L + .04 * k))} ${f(my)} ${f(ex + side * L)} ${f(my + .1 * k)}L${f(ex)} ${f(my + .17 * k)}Z`;
+      s += shadow(d) + shadow(boot) + `<path d="${boot}" fill="${lin([[0, sh(dark ? .2 : .35)], [.45, col], [1, sh(-.5)]], 0, 0, 0, 1)}"/>` +
+        [.08, .16].map((t) => `<path d="M${f(ex + side * t * k)} ${f(my - (.16 - t * .25) * k)}V${f(my + (.16 - t * .25) * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`).join("");
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d);
+      for (let i = 0; i < 3; i++) { const xx = hx - side * (W / 2 - .12 * k - i * .07 * k);
+        s += `<path d="M${f(xx)} ${f(y0 + .15 * k)}V${f(y0 + Hh - .15 * k)}" stroke="${sh(-.5)}" stroke-opacity=".55" stroke-width="${lw}" stroke-linecap="round"/><path d="M${f(xx + .025 * k)} ${f(y0 + .15 * k)}V${f(y0 + Hh - .15 * k)}" stroke="#fff" stroke-opacity="${hiOp * .45}" stroke-width="${lw}" stroke-linecap="round"/>`; }
+      s += rivets(by + .02 * k) + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      ox = ex + side * (L + .02 * k); oy = my; w = .13 * k;
+    } else {
+      const W = .6 * k, Hh = .64 * k, x0 = cx - W / 2, y0 = by - .31 * k, r = .16 * k, d = R(x0, y0, W, Hh, r), neck = R(cx - .12 * k, y0 + Hh - .05 * k, .24 * k, .22 * k, .08 * k);
+      s += shadow(d) + shadow(neck) + `<path d="${neck}" fill="${sideG}"/><path d="M${f(cx - .1 * k)} ${f(y0 + Hh + .07 * k)}H${f(cx + .1 * k)}" stroke="${sh(-.55)}" stroke-opacity=".6" stroke-width="${lw}"/>`;
+      s += `<path d="${d}" fill="${front}"/>` + sheen(d) + `<path d="${R(x0 + .07 * k, y0 + .07 * k, W - .14 * k, Hh - .16 * k, r * .7)}" fill="none" stroke="${sh(dark ? .18 : -.12)}" stroke-opacity=".5" stroke-width="${lw}"/>` +
+        rivets(by) + top(x0, y0, W, r) + `<path d="${d}" ${edge}/>`;
+      oy = y0 + Hh + .15 * k; w = .11 * k;
+    }
+    return { s, x: ox, y: oy, w, c };
+  }
+  function plugAt(x, kind, cx, cy, s, col, side, rot) {
+    if (REG !== "us") return { s: plugHead(x, cx, cy + 1.5 * s, 1.12 * s, col, rot ? -rot : 0), x: rot ? cx + 8 * s : cx, y: rot ? cy : cy + 12 * s };
+    const p = plugIn(x.lg, kind, cx, cy - 3.1 * s, 18 * s, col, side, rot ? [-.1, .05] : null);
+    if (rot) { p.s = `<g transform="rotate(${rot} ${f(cx)} ${f(cy)})">${p.s}</g>`; const dx = p.x - cx, dy = p.y - cy; p.x = cx + dy; p.y = cy - dx; }
+    return p;
+  }
+  function plugged(x, on, kind, cx, cy, s, col, w, rest, flow, side, rot, n) {
+    if (!on) return "";
+    const p = plugAt(x, kind, cx, cy, s, col, side, rot);
+    return cord(x, [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10].concat(rest), w, p.c || col, flow, n) + p.s;
+  }
+  function hood(x) {
+    const d = "M66 98H134V142Q134 150 126 150H124V145H108V150H74Q66 150 66 142Z";
+    return `<path d="${d}" fill="#000" fill-opacity=".22" transform="translate(2 3)"/>` +
+      `<path d="${d}" fill="${x.lg([[0, "#d9e2ea", .34], [.5, "#9fb0bf", .18], [1, "#55606b", .3]], 0, 0, 1, 1)}" stroke="#c9d3dc" stroke-opacity=".55" stroke-width="1.1"/>` +
+      `<path d="M70 104V138" stroke="#fff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/><path d="M80 101H122" stroke="#fff" stroke-opacity=".3" stroke-width="1"/>` +
+      `<rect x="64" y="95" width="72" height="6" rx="3" fill="${M.v(x, "#4a4e56")}"/><path d="M66 96H134" stroke="#fff" stroke-opacity=".3"/>`;
+  }
 
   const NO_REG = { heavy: 1, ev: 1 };
   const ic = (id, name, colors, label, render, extra) => Object.assign({ id, name, colors, picker: true, colorLabel: label,
@@ -319,9 +395,8 @@
         box(x, 80, 58, 40, 46, 10, 3, 4, "#eef0f2") +
         `<path d="M84 64Q100 58 116 64" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="1.2" stroke-linecap="round"/>` +
         holes(x, 100, 89, .8) + ringLed(x, 100, 70, 5.4, 5.4, 1.4) + button(x, 100, 70, 3.8, "#e4e6ea") +
-        plugHead(x, 100, 90, .9, "#3a3d45") +
-        cord(x, [100, 102, 100, 128, 96, 146, 112, 166, 128, 184, 160, 180, 200, 186], 3.4, "#3a3d45", x.led);
-      return scene(x, back, body); }),
+        plugged(x, x.on, "wart", 100, 89, .8, "#2c2e33", 1.9, [100, 128, 96, 146, 112, 166, 128, 184, 160, 180, 200, 186], x.led) + meter(x, o);
+      return scene(x, back, body); }, { options: [REG_OPT, METER] }),
 
     ic("round", "Round smart plug", sw(LEDS, "#f2f6ff"), "LED", (o) => { const x = X(o);
       const back = wallB(x, "blue", 8, 166) + baseB(x, 166, "#6e4a33");
@@ -331,9 +406,9 @@
         ringLed(x, 100, 91, 26, 26, 1.6) +
         `<circle cx="100" cy="91" r="22" fill="${x.rg([[0, "#ffffff"], [.7, "#eceef2"], [1, "#cfd2d9"]], .4, .35, .7)}"/>
 <path d="M82 80A22 22 0 0 1 104 69.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-opacity=".9"/>` +
-        holes(x, 100, 90, .8) + plugHead(x, 100, 92, .9, "#f0f0f2") +
-        cord(x, [100, 104, 100, 130, 92, 150, 76, 166, 60, 182, 34, 180, 6, 186], 3.4, "#e8e8ec", x.led);
-      return scene(x, back, body); }),
+        holes(x, 100, 90, .8) +
+        plugged(x, x.on, "ground3", 100, 90, .8, "#8f949b", 3.4, [100, 130, 92, 150, 76, 166, 60, 182, 34, 180, 6, 186], x.led) + meter(x, o);
+      return scene(x, back, body); }, { options: [REG_OPT, METER] }),
 
     ic("side", "Side-button plug", sw(BODY, "#eef0f2"), "Body", (o) => { const x = X(o, { body: o.color, led: "#4da3ff" }); const p = pal(x.body);
       const back = wallB(x, "clay");
@@ -342,13 +417,12 @@
         `<path d="M110 104L121 107V151L110 148Z" fill="${x.lg([[0, H.shade(x.body, -.12)], [1, H.shade(x.body, -.42)]], 0, 0, 1, 0)}" opacity=".55"/>` +
         `<ellipse cx="116.4" cy="116" rx="3" ry="5.4" fill="#000" fill-opacity=".3"/><ellipse cx="116" cy="115.4" rx="2.6" ry="5" fill="${M.h(x, H.shade(x.body, -.05))}"/>` +
         led(x, 116, 130, 1.3, "#4da3ff") +
-        holes(x, 90, 128, .82) + plugHead(x, 90, 130, .9, "#2d3037") +
+        holes(x, 90, 128, .82) +
         `<path d="M74 103Q90 99 106 103" fill="none" stroke="${p.l}" stroke-opacity=".8" stroke-width="1.2" stroke-linecap="round"/>` +
-        cord(x, [90, 142, 90, 162, 104, 172, 130, 176, 156, 180, 176, 190, 196, 200], 3.4, "#2d3037", "#4da3ff");
-      return scene(x, back, body); }),
+        plugged(x, x.on, "flat2", 90, 128, .82, "#2d3037", 3, [90, 162, 104, 172, 130, 176, 156, 180, 176, 190, 196, 200], "#4da3ff") + meter(x, o);
+      return scene(x, back, body); }, { options: [REG_OPT, METER] }),
 
     ic("energy", "Energy monitor plug", sw(["#7dd3fc", "#f2f6ff", "#34d399", "#ffb347", "#ff5257"], "#7dd3fc"), "Display", (o) => { const x = X(o);
-      // (parts) the readout: o.pval.power when the Power part is ticked, else (Device Image) today's watts from the slider
       const xd = o.mf ? sub(x, x.on || tick(o, "power")) : x, pw = stv(o, "power");
       const rd = !o.mf ? watts(x) : tick(o, "power") && pw != null ? Math.max(0, Math.min(9999, Math.round(+pw || 0))) : "";
       const back = tileB(x, 8, 152) + counterB(x, 152, "#c9cbd2");
@@ -359,8 +433,8 @@
         `<path d="M114.5 69L116 74L117.4 70.5L118.8 74L120.3 69" fill="none" stroke="${xd.on ? H.mix(x.led, "#fff", .25) : "#fff"}" stroke-opacity="${xd.on ? 1 : .08}" stroke-width=".9" stroke-linejoin="round"/>` +
         glass(x, 77, 58, 46, 20) +
         button(x, 92, 88, 3.4, "#3d4048") + led(x, 108, 88, 1.3) +
-        holes(x, 100, 108, .82) + plugHead(x, 100, 110, .9, "#e8e8ec") +
-        cord(x, [100, 122, 100, 140, 112, 156, 136, 162, 160, 168, 180, 164, 200, 168], 3.4, "#e8e8ec", x.led);
+        holes(x, 100, 108, .82) +
+        plugged(x, x.on, "right", 100, 108, .82, "#e8e8ec", 3.2, [117, 106, 121, 110, 122, 120, 123, 136, 138, 158, 160, 164, 176, 170, 190, 164, 204, 168], x.led, 1);
       return scene(x, back, body); }),
 
     ic("outdoor", "Outdoor plug", sw(["#2c2f36", "#8d949d", "#3f5a45", "#e9ebee", "#6b5a45"], "#2c2f36"), "Body", (o) => { const x = X(o, { body: o.color, led: "#34d399" });
@@ -372,21 +446,24 @@
         `<path d="M72 52Q100 44 128 52" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.3" stroke-linecap="round"/>` +
         ringLed(x, 100, 74, 8, 8, 1.4, "#34d399") + button(x, 100, 74, 6, H.shade(x.body, .08)) +
         pocket(84) + pocket(116) +
-        `<rect x="72.5" y="106" width="23" height="31" rx="5.4" fill="${rub}"/><path d="M75 113H93M75 118H93M75 123H93M75 128H93" stroke="#fff" stroke-opacity=".08"/><path d="M73 107H95" stroke="#fff" stroke-opacity=".25"/>` +
+        (x.on && part(x, "o1") !== part(x, "o2") ? as(x, part(x, "o1"), () => led(x, 84, 101, 1.1, "#34d399")) + as(x, part(x, "o2"), () => led(x, 116, 101, 1.1, "#34d399")) : "") +
+        (part(x, "o1") ? holes(x, 84, 121, .78) + `<path d="M72 106Q84 92 96 106L96 103Q84 88 72 103Z" fill="${rub}"/>`
+          : `<rect x="72.5" y="106" width="23" height="31" rx="5.4" fill="${rub}"/><path d="M75 113H93M75 118H93M75 123H93M75 128H93" stroke="#fff" stroke-opacity=".08"/><path d="M73 107H95" stroke="#fff" stroke-opacity=".25"/>`) +
         holes(x, 116, 121, .78) +
         `<path d="M104 106Q116 92 128 106L128 103Q116 88 104 103Z" fill="${rub}"/>` +
-        plugHead(x, 116, 123, .9, "#e8792c") + oled(x, o, "o1", 93, 143.5, .9) + oled(x, o, "o2", 125, 143.5, .9) +
-        cord(sub(x, pon(o, "o2")), [116, 135, 116, 156, 128, 166, 146, 174, 164, 182, 176, 194, 186, 206], 4, "#e8792c", "#34d399");
-      return scene(x, back, body); }),
+        as(x, part(x, "o1"), () => plugged(x, x.on, "ground3", 84, 121, .78, "#8c9097", 3.6, [84, 144, 111, 140, 112, 154, 113, 170, 126, 186, 134, 206], "#34d399")) +
+        as(x, part(x, "o2"), () => plugged(x, x.on, "ground3", 116, 121, .78, "#2b2d33", 4, [117, 150, 128, 166, 146, 174, 164, 182, 176, 194, 186, 206], "#34d399")) +
+        (o.opt && o.opt.cover === "hood" ? hood(x) : "") + meter(x, o);
+      return scene(x, back, body); }, { options: [REG_OPT, { id: "cover", name: "Cover", values: [["flaps", "Flaps"], ["hood", "Rain hood"]] }, METER] }),
 
     ic("inwall", "In-wall smart outlet", sw(LEDS, "#f2f6ff"), "LED", (o) => { const x = X(o);
       const back = wallB(x, "navy");
-      const bar = (y) => `<rect x="88.5" y="${y - 2.2}" width="23" height="4.4" rx="2.2" fill="#14161b"/>` + (pon(o, y < 100 ? "o1" : "o2") ? `<g class="${P}pulse"><rect x="86" y="${y - 3}" width="28" height="7" rx="3.5" fill="${M.halo(x, x.led)}" opacity="${a2(.9 * x.L)}"/></g><rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#fff", .5)}"/>`
+      const bar = (y) => as(x, part(x, y < 100 ? "o1" : "o2"), () => bar0(y)), bar0 = (y) => `<rect x="88.5" y="${y - 2.2}" width="23" height="4.4" rx="2.2" fill="#14161b"/>` + (x.on ? `<g class="${P}pulse"><rect x="86" y="${y - 3}" width="28" height="7" rx="3.5" fill="${M.halo(x, x.led)}" opacity="${a2(.9 * x.L)}"/></g><rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#fff", .5)}"/>`
         : `<rect x="90" y="${y - .9}" width="20" height="1.8" rx=".9" fill="${H.mix(x.led, "#15161b", .7)}"/>`);
       const inner = bar(66) + bar(134) + `<rect x="95" y="97.5" width="10" height="5" rx="1.6" fill="#000" fill-opacity=".25"/><rect x="95" y="97" width="10" height="5" rx="1.6" fill="${M.v(x, "#e4e6ea")}"/>`;
       const body = spot(x, 100, 100, 60, 70, x.led, .22) + plateD(x, 100, 100, 1.45, "#eef0f2", inner) +
-        plugHead(x, 100, 121, 1.1, "#3a3d45") +
-        cord(sub(x, pon(o, "o2")), [100, 135, 100, 156, 112, 170, 132, 178, 152, 186, 170, 188, 200, 196], 4, "#3a3d45", x.led);
+        as(x, part(x, "o1"), () => plugged(x, x.on, "flat2", 100, 81.15, 1.45, "#f2f2f0", 3.6, [100, 100, 74, 98, 72, 116, 70, 134, 66, 160, 60, 206], x.led)) +
+        as(x, part(x, "o2"), () => plugged(x, x.on, "ground3", 100, 118.85, 1.45, "#3a3d45", 4, [100, 156, 112, 170, 132, 178, 152, 186, 170, 188, 200, 196], x.led));
       return scene(x, back, body); }),
 
     ic("usbc", "USB-C outlet", sw(["#eef0f2", "#e6dcc6", "#2c2f36", "#9aa1aa", "#c9d2dc"], "#eef0f2"), "Body", (o) => { const x = X(o, { body: o.color, led: "#4da3ff" });
@@ -409,8 +486,8 @@
       const back = wallB(x, "gray", 8, 92) + `<rect x="8" y="92" width="184" height="100" fill="${x.lg([[0, "#5a3f2b"], [1, "#8d6646"]])}"/>` +
         `<path d="M8 92.6H192" stroke="#000" stroke-opacity=".5" stroke-width="1.4"/>` + [104, 118, 136, 158, 184].map((y, i) => `<path d="M8 ${y}C60 ${y - 2} 120 ${y + 3} 192 ${y - 1}" fill="none" stroke="#2a180b" stroke-opacity="${(.15 + i * .03).toFixed(2)}" stroke-width=".7"/>`).join("");
       let outs = "";
-      const lt = (i) => (MFM(o) ? pon(o, "o" + (i + 1)) : i < n);
-      [46, 76, 106, 136].forEach((cx, i) => { const lit = lt(i);
+      const lit4 = (i) => (MFM(o) ? pon(o, "o" + (i + 1)) : i < n);
+      [46, 76, 106, 136].forEach((cx, i) => { const lit = lit4(i);
         outs += `<rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="#000" fill-opacity=".12"/>` +
           (lit ? `<g class="${P}pulse"><rect x="${cx - 13}" y="117" width="26" height="30" rx="6" fill="none" stroke="${x.led}" stroke-opacity="${a2(.45 * x.L)}" stroke-width="3"/></g><rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="none" stroke="${H.mix(x.led, "#fff", .4)}" stroke-width="1"/>`
             : `<rect x="${cx - 12}" y="118" width="24" height="28" rx="5" fill="none" stroke="#9aa0aa" stroke-opacity=".5" stroke-width=".8"/>`) +
@@ -420,9 +497,10 @@
         `<rect x="155" y="118" width="12" height="5.4" rx="1" fill="#0b0c10"/><rect x="156.4" y="119.2" width="9" height="1.6" fill="#5a6070"/><rect x="155" y="127" width="12" height="5.4" rx="1" fill="#0b0c10"/><rect x="156.4" y="128.2" width="9" height="1.6" fill="#5a6070"/>
 <rect x="155.4" y="137" width="11" height="4.4" rx="2.2" fill="#0b0c10"/>` + oled(x, o, "usb", 161, 147, .9) +
         cord(x, [24, 132, 14, 132, 10, 124, 4, 112], 3.6, "#e4e4ea") +
-        plugHead(x, 46, 133, .9, "#2d3037", 90) + plugHead(x, 106, 133, .9, "#e9e9ee", 90) +
-        cord(x, [54, 133, 64, 133, 62, 96, 60, 70, 58, 44, 70, 20, 66, 0], 3.2, "#2d3037", lt(0) ? x.led : null) +
-        cord(x, [114, 133, 124, 133, 122, 98, 126, 70, 130, 44, 120, 22, 128, 0], 3.2, "#e9e9ee", lt(2) ? x.led : null);
+        plugged(x, lit4(0), "ground3", 46, 132, .82, "#2d3037", 3.2, [64, 132, 62, 96, 60, 70, 58, 44, 70, 20, 66, 0], x.led, 0, -90) +
+        plugged(x, lit4(1), "flat2", 76, 132, .82, "#e9e9ee", 2.8, [88, 132, 92, 100, 90, 72, 88, 46, 96, 24, 92, 0], x.led, 0, -90) +
+        plugged(x, lit4(2), "wart", 106, 132, .82, "#2b2d33", 1.8, [124, 132, 122, 98, 126, 70, 130, 44, 120, 22, 128, 0], x.led, 0, -90) +
+        plugged(x, lit4(3), "right", 136, 132, .82, "#c9ccd2", 3, [134, 152, 140, 160, 146, 170, 152, 180, 150, 192, 158, 206], x.led, -1, -90);
       return scene(x, back, body); }),
 
     ic("surge", "Surge protector", sw(["#ff5257", "#ffb347", "#34d399", "#4da3ff", "#f2f6ff"], "#ff5257"), "Switch light", (o) => { const x = X(o);
@@ -488,8 +566,8 @@
         `<g transform="rotate(${f(ang)} 92 82)"><rect x="91" y="72.5" width="2" height="6" rx="1" fill="#6b707a"/></g>`;
       const body = plateT(x, 92, 100, 1.05) + spot(x, 92, 82, 40, 40, x.led, .3) +
         box(x, 68, 52, 48, 74, 9, 4, 4, "#eef0f2") + arc + knob +
-        holes(x, 92, 112, .8) + plugHead(x, 92, 114, .9, "#3a3d45") +
-        cord(x, [92, 126, 92, 150, 110, 156, 130, 160, 152, 164, 166, 180, 178, 204], 3.4, "#3a3d45", x.led);
+        holes(x, 92, 112, .8) +
+        plugged(x, x.on, "ground3", 92, 112, .8, "#3a3d45", 3.4, [92, 150, 110, 156, 130, 160, 152, 164, 166, 180, 178, 204], x.led);
       return scene(x, back, body); }),
 
     ic("night", "Night-light plug", ["#ffc477", "#fff1d6", "#a5d8ff", "#c4b5fd", "#7ee8c4"], "Light", (o) => { const x0 = X(o), x = sub(x0, pon(o, "light")), xo = sub(x0, pon(o, "outlet")); const c = x.led;
@@ -501,7 +579,7 @@
         `<path d="M80 130H120V143Q120 152 111 152H89Q80 152 80 143Z" fill="${lens}"/>` +
         (x.on ? `<g class="${P}breath"><ellipse cx="100" cy="146" rx="26" ry="12" fill="${M.halo(x, c)}" opacity="${a2(.7 * x.L)}"/></g>` : "") +
         `<path d="M80 130H120" stroke="#000" stroke-opacity=".2"/><path d="M84 134Q100 132 116 134" fill="none" stroke="#fff" stroke-opacity=".6" stroke-linecap="round"/>` +
-        holes(x, 100, 112, .78) + `<circle cx="112" cy="99" r="1.8" fill="#16171c"/><circle cx="111.5" cy="98.5" r=".6" fill="#fff" fill-opacity=".5"/>` +
+        holes(x, 100, 112, .78) + plugged(xo, xo.on, "right", 100, 112, .78, "#9a9ea5", 3, [118, 110, 124, 114, 126, 124, 128, 140, 130, 158, 140, 170, 150, 180, 168, 184, 206, 188], null, 1) + `<circle cx="112" cy="99" r="1.8" fill="#16171c"/><circle cx="111.5" cy="98.5" r=".6" fill="#fff" fill-opacity=".5"/>` +
         led(xo, 88, 99, 1, "#4da3ff");
       return scene(x, back, body); }, { glow: { x: .5, y: .72, r: .7 }, cast: "down" }),
 
@@ -603,8 +681,6 @@
       return scene(x, back, body); }, { glow: { x: .84, y: .4, r: .8 }, cast: "both" }),
 
     ic("ev", "EV charger", sw(["#34d399", "#4da3ff", "#f2f6ff", "#ffb347", "#c4b5fd"], "#34d399"), "LED", (o) => {
-      // (parts) the Charging state stage (Multi-Function): idle = no car (ring dark, standby LED), plugged in = ring dimly lit,
-      // charging = today's on look (ring fills with the slider, sweep, power along the cord), charged = full ring, still
       const st = o.mf ? stv(o, "state") : null, x = X(st ? Object.assign({}, o, { on: st !== "idle" }) : o), chg = st ? st === "charging" : x.on;
       const back = wallB(x, "garage", 8, 172) + `<path d="M64 8V172M136 8V172" stroke="#000" stroke-opacity=".12"/>` + concreteB(x, 172, "#6c6f75");
       const segs = 30, lit = st === "done" ? segs : st === "connected" ? 0 : x.on ? Math.max(1, Math.round(x.lv * segs)) : 0; let ring = "";
@@ -643,7 +719,6 @@
   (window.HDA = window.HDA || []).push({
     id: "plug", tab: "Plugs & power strips", group: "More", kind: "device",
     intro: "Twenty smart plugs, US outlets and power strips on real walls, floors and counters. On means powered: the LED lights in your color, the plugged-in thing comes alive (lamp, string lights, night light, phone, kettle), power runs along the cord, and the watt or amp displays climb with the slider.",
-    
     css, icons,
   });
 })();

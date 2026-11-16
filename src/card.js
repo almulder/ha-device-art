@@ -22,16 +22,23 @@
 
   const BASE_CSS = `.hda-nobg .hda-bg{display:none}
 @media (prefers-reduced-motion:reduce){.hda-anim *{animation:none!important;transition:none!important}}`;
+  /* builders that draw another set's drawing inside their own (a lock on the door, an older doorbell style) */
+  const CSS_DEPS = { doorcfg: ["lock", "lock2", "deadbolts"], camdoorbells: ["doorbell"] };
   const cssCache = {};
   function cssFor(key) {
     const it = ITEMS[key]; if (!it) return BASE_CSS;
     if (cssCache[key]) return cssCache[key];
     const parts = [BASE_CSS];
     if (it.builder) (it.builder.id === "treebuilder" ? ["trees"] : ["plants", "flowers"]).forEach((id) => { if (SETS[id] && SETS[id].css) parts.push(SETS[id].css); });
+    (CSS_DEPS[it.set && it.set.id] || []).forEach((id) => { if (SETS[id] && SETS[id].css) parts.push(SETS[id].css); });
     if (it.set && it.set.css) parts.push(it.set.css);
     return (cssCache[key] = parts.join("\n"));
   }
   /* resolve "set/icon", "cat/sub/set/icon" or "builder:id" */
+  /* drawings that became styles of a builder card: old art key -> [new key, options] (old dashboards keep working) */
+  const MOVED = { "doorbell/tall": "dbtall", "doorbell/square": "dbsquare", "doorbell/wedge": "dbwedge", "doorbell/package": "dbpackage",
+    "doorbell/intercom": "dbintercom", "doorbell/gatepost": "dbgate", "doorbell/peephole": "dbpeep" };
+  const moved = (art) => { const k = String(art || "").trim().split("/").slice(-2).join("/"); return MOVED[k] && ITEMS["camdoorbells/bell"] ? ["camdoorbells/bell", { style: MOVED[k] }] : null; };
   function resolve(art) {
     if (!art) return null;
     art = String(art).trim();
@@ -124,6 +131,8 @@
     }
     setConfig(config) {
       if (!config || !config.art) throw new Error("Set 'art' to a drawing, for example art: pendant/globe");
+      const mv = !ITEMS[String(config.art).trim()] && moved(config.art);
+      if (mv) config = Object.assign({}, config, { art: mv[0], options: Object.assign({}, mv[1], config.options || {}) });
       const key = resolve(config.art);
       if (!key) throw new Error("Unknown art: " + config.art);
       this._config = Object.assign({ show_name: true, show_state: true, animate: true, scenery: true }, config);
@@ -286,7 +295,7 @@
   if (!customElements.get("device-art-card-editor")) customElements.define("device-art-card-editor", DeviceArtCardEditor);
 
   /* version line in the browser console, so anyone can check which release they are running */
-  const VERSION = "1.2.0";
+  const VERSION = "1.3.0";
   console.info("%c DEVICE-ART-CARD %c v" + VERSION + " · " + Object.keys(ITEMS).length + " drawings ", "background:#7c5cff;color:#fff;font-weight:700;border-radius:3px 0 0 3px", "background:#2a1f5c;color:#fff;border-radius:0 3px 3px 0");
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === "device-art-card"))

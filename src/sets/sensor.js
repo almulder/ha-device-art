@@ -144,6 +144,19 @@ ${extra || ""}</defs>`;
 .hda-sensor-dots{opacity:.8}
 .hda-anim .hda-sensor-dots{animation:hda-sensor-dots 1.6s ease-in-out infinite}
 @keyframes hda-sensor-dots{0%,100%{opacity:.35}50%{opacity:1}}
+.hda-sensor-p-single,.hda-sensor-p-double,.hda-sensor-p-long{transform-box:fill-box;transform-origin:center}
+.hda-anim .hda-sensor-p-single{animation:hda-sensor-p-single 1.6s ease-out infinite}
+.hda-anim .hda-sensor-p-double{animation:hda-sensor-p-double 1.6s ease-out infinite}
+.hda-anim .hda-sensor-p-long{animation:hda-sensor-p-long 2.2s ease-in-out infinite}
+@keyframes hda-sensor-p-single{0%,30%,100%{transform:translate(0,0)}10%,18%{transform:translate(0,3px)}}
+@keyframes hda-sensor-p-double{0%,40%,100%{transform:translate(0,0)}7%{transform:translate(0,3px)}14%{transform:translate(0,0)}21%{transform:translate(0,3px)}28%{transform:translate(0,0)}}
+@keyframes hda-sensor-p-long{0%,85%,100%{transform:translate(0,0)}8%,75%{transform:translate(0,3px)}}
+.hda-anim .hda-sensor-f-single{animation:hda-sensor-f-single 1.6s ease-out infinite}
+.hda-anim .hda-sensor-f-double{animation:hda-sensor-f-double 1.6s ease-out infinite}
+.hda-anim .hda-sensor-f-long{animation:hda-sensor-f-long 2.2s ease-in-out infinite}
+@keyframes hda-sensor-f-single{0%,32%,100%{opacity:.15}10%,20%{opacity:1}}
+@keyframes hda-sensor-f-double{0%,42%,100%{opacity:.15}7%,11%{opacity:1}14%{opacity:.15}21%,25%{opacity:1}}
+@keyframes hda-sensor-f-long{0%,88%,100%{opacity:.15}8%,78%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.hda-anim [class*="hda-sensor-"]{animation:none!important}}
 `;
 
@@ -435,20 +448,23 @@ ${extra || ""}</defs>`;
       `<path d="${rr(61, 36, 54, 10, 4)}" fill="#fff" fill-opacity=".14"/>` + led(o, 70, 71, 1.2, "r", o.on),
       lin(u + "-lcdf", [[0, "#ffb2a0"], [1, "#ff5a48"]], 1)); }),
 
-    ic("button", "Scene button", WH, (o) => { const u = o.uid, d = o.on ? 3 : 0, p = pal(o.color);
+    ic("button", "Scene button", WH, (o) => { const u = o.uid, act = (o.opt && o.opt.act) || "idle", ac = o.on && o.anim && act !== "idle", d = o.on && !ac ? 3 : 0, p = pal(o.color);
+      const mk = !o.on || act === "idle" ? "" : `<g class="${P}f-${act}"><ellipse cx="100" cy="${112 + d}" rx="22" ry="9" fill="url(#${u}-hc)"/><g fill="${C.c}">` +
+        (act === "single" ? `<ellipse cx="100" cy="${112 + d}" rx="4.2" ry="2"/>` : act === "double" ? `<ellipse cx="94.5" cy="${112 + d}" rx="3.6" ry="1.8"/><ellipse cx="105.5" cy="${112 + d}" rx="3.6" ry="1.8"/>` : `<rect x="88" y="${110.4 + d}" width="24" height="3.2" rx="1.6"/>`) + `</g></g>`;
       return svg(o, `<g class="hda-bg"><g mask="url(#${u}-fade)"><path d="M0 112H200V200H0Z" fill="url(#${u}-wood)" opacity=".7"/><path d="M0 112H200V200H0Z" fill="url(#${u}-grain)"/><path d="M0 112H200" stroke="#fff" stroke-opacity=".2"/></g></g>` +
       (o.on ? rings(o, 100, 134, 96, 34, C.c, 3, 1.6) : "") + sh(o, 100, 142, 64, 16) +
       `<path d="${band(48, 152, 112, 132, 22)}" fill="url(#${u}-c)"/><path d="M48 132A52 22 0 0 0 152 132" fill="none" stroke="#000" stroke-opacity=".3"/>` +
+      (ac ? `<g class="${P}p-${act}">` : "") +
       (o.on ? `<ellipse cx="100" cy="${112 + d}" rx="53" ry="23" fill="none" stroke="${C.c}" stroke-width="2.6"/><ellipse cx="100" cy="${118 + d}" rx="64" ry="30" fill="url(#${u}-hc)" opacity=".55"/>` : `<ellipse cx="100" cy="112" rx="52.5" ry="22.5" fill="none" stroke="${p.k}" stroke-width="1.6"/>`) +
       `<ellipse cx="100" cy="${112 + d}" rx="50" ry="20.6" fill="url(#${u}-s)"/><ellipse cx="100" cy="${112 + d}" rx="50" ry="20.6" fill="${o.on ? "#000" : "#fff"}" fill-opacity="${o.on ? .08 : .06}"/>` +
       `<ellipse cx="100" cy="${112 + d}" rx="13" ry="5.4" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="1.4"/><ellipse cx="100" cy="${112 + d}" rx="3" ry="1.3" fill="#000" fill-opacity=".25"/>` +
-      `<path d="M62 ${106 + d}Q76 ${96 + d} 98 ${95 + d}" fill="none" stroke="#fff" stroke-opacity="${o.on ? .4 : .75}" stroke-width="2.2" stroke-linecap="round"/>`); }),
+      `<path d="M62 ${106 + d}Q76 ${96 + d} 98 ${95 + d}" fill="none" stroke="#fff" stroke-opacity="${o.on ? .4 : .75}" stroke-width="2.2" stroke-linecap="round"/>` + mk + (ac ? "</g>" : "")); },
+      { options: [{ id: "act", name: "Action", values: [["idle", "Idle"], ["single", "Single"], ["double", "Double"], ["long", "Long press"]] }] }),
   ];
 
   (window.HDA = window.HDA || []).push({
     id: "sensor", tab: "Sensors", group: "More", kind: "device",
     intro: "Twenty sensors, each drawn where it lives. On means triggered: motion seen, door or window open, water, smoke, a hot or cold reading, a button pressed; off means idle and all clear. The slider sets how strong the event is (beams, puddle size, smoke, the reading on the display).",
-    
     css, icons,
   });
 })();

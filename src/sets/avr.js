@@ -5,7 +5,7 @@
   const rnd = (seed) => { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; };
 
   // (multi-function) parts: Power (switch), Mute (switch), Volume (value, %) and, where the drawing has a display,
-  // Input (stage). o.parts holds only the parts the owner ticked; as a Device Image (no o.mf) the drawing is exactly as
+  // Input (stage). o.parts holds only the parts the user ticked; as a Device Image (no o.mf) the drawing is exactly as
   // today (on = playing, the slider = the volume). As a Multi-Function Image (o.mf): on = the Power part (left out =
   // on), the volume = o.pval.volume (left out = "--" on the display), Mute = a muted-speaker sign on the display and
   // the meters at rest, Input = the source's short name on the display.

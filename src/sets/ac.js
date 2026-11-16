@@ -7,6 +7,8 @@
   const sw = (a) => [a].concat(AIRS.filter((c) => c !== a));
   const WH = "#eceef0", OFF = "#e3e1da", GY = "#a7adb4", DG = "#4a4f57", TR = "#f1efe9";
 
+  const MAIR = { cool: ICE, heat: WARM, dry: "#7fe6da", fan: FANG, auto: "#a8f0b4", eco: "#c4eea0" };
+  const MDISP = { cool: "#8fd8ff", heat: "#ffb070", dry: "#7fe8dc", fan: "#e8eef5", auto: "#9ff0a8", eco: "#c2f07a" };
   function modeOf(c) {
     const x = H.hx(c), mx = Math.max(x[0], x[1], x[2]), mn = Math.min(x[0], x[1], x[2]);
     if (x[0] - x[2] > 50 && x[0] >= x[1]) return "heat";
@@ -15,11 +17,6 @@
     return "cool";
   }
 
-  // (parts) every unit: Mode, Operating state and Fan speed, each a stage part (o.pval[id] = one of its stage ids), like a
-  // thermostat in Hubitat (thermostatMode, thermostatOperatingState, the fan speed). As a Multi-Function Image (o.mf):
-  // the state picks the air (cooling = cool air, heating = warm, fan only = plain, idle = no air but the display stays
-  // lit); left out, the mode does (auto follows the state, else cool); Mode off = the unit off; the speed sets the air's
-  // pace (low / medium / high; auto = medium). A stage left out is not used; a Device Image is drawn as before.
   const ACP = [
     { id: "mode", name: "Mode", type: "stage", values: [["off", "Off"], ["cool", "Cool"], ["heat", "Heat"], ["dry", "Dry"], ["fan", "Fan only"], ["auto", "Auto"]], def: "cool" },
     { id: "state", name: "Operating state", type: "stage", values: [["idle", "Idle"], ["cooling", "Cooling"], ["heating", "Heating"], ["fan", "Fan only"]], def: "cooling" },
@@ -53,10 +50,15 @@
       dur(a, b) { return Math.max(0.25, a - b * k.lv).toFixed(2); },
       svg(body) {
         const tile = rr(6, 6, 188, 188, 16), cp = k.clip(tile);
-        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="${P}svg" aria-hidden="true"><defs>${defs.join("")}</defs>` +
+        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="${P}svg${k.swing ? ` ${P}sw-${k.swing}` : ""}" aria-hidden="true"><defs>${defs.join("")}</defs>` +
           `<g${cp}>${body}</g><path class="hda-bg" d="${tile}" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="1"/></svg>`;
       },
     };
+    const op = o.opt || {}, mm = op.mode;
+    if (mm === "off") k.on = false;
+    else if (mm && mm !== o.hvDef && MAIR[mm]) { k.mode = mm; k.dcol = MDISP[mm]; if (AIRS.indexOf(String(c).toLowerCase()) >= 0) k.c = MAIR[mm]; }
+    k.preset = op.preset || "none"; k.swing = op.swing || "";
+    k.sweep = k.on && (k.swing === "horizontal" || k.swing === "both");
     return k;
   }
 
@@ -100,9 +102,9 @@
     return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${p}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${k.lin("fsh", [[0, "#000", 0.1], [0.5, "#fff", 0.08], [1, "#000", 0.35]], 0, 0, 0, 1)}"/>`;
   }
 
-  const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
-  function dispCol(k) { return { heat: "#ffb070", cool: "#8fd8ff", dry: "#9ef0c0", fan: "#e8eef5" }[k.mode]; }
-  function temp(k) { return k.mode === "heat" ? 68 + Math.round(6 * k.lv) : k.mode === "cool" ? 76 - Math.round(10 * k.lv) : k.mode === "dry" ? 74 : 75; }
+  const SEG = { A: "abcefg", 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
+  function dispCol(k) { return k.dcol || { heat: "#ffb070", cool: "#8fd8ff", dry: "#9ef0c0", fan: "#e8eef5" }[k.mode]; }
+  function temp(k) { return k.mode === "heat" ? 68 + Math.round(6 * k.lv) : k.mode === "cool" ? 76 - Math.round(10 * k.lv) : k.mode === "dry" ? 74 : k.mode === "auto" ? 72 : k.mode === "eco" ? 78 : 75; }
   function digW(h, str) { const w = h * 0.56, t = Math.max(0.6, h * 0.15), g = h * 0.24; let s = 0; for (const ch of String(str)) s += ch === "°" ? t * 3.2 : w + g; return s; }
   function digits(x, y, h, str, col) {
     const w = h * 0.56, t = Math.max(0.6, h * 0.15), g = h * 0.24; let s = "", cx = x;
@@ -117,8 +119,24 @@
     }
     return s;
   }
+  function pglyph(p, cx, cy, s, col) {
+    const g = (b, fill) => `<g transform="translate(${f(cx)} ${f(cy)}) scale(${f(s)})" fill="${fill ? col : "none"}" stroke="${fill ? "none" : col}" stroke-width=".2" stroke-linecap="round" stroke-linejoin="round">${b}</g>`;
+    if (p === "boost") return g(`<path d="M.2 -1 L-.6 .12 H-.02 L-.22 1 L.6 -.15 H.02 Z"/>`, 1);
+    if (p === "comfort") return g(`<path d="M-.5 .1 V-.55 H.5 V.1 M-.85 .55 V-.05 H-.5 V.15 H.5 V-.05 H.85 V.55 Z M-.7 .55 V.8 M.7 .55 V.8"/>`);
+    if (p === "sleep") return g(`<path d="M.3 -.9 A.92 .92 0 1 0 .9 .35 A.7 .7 0 0 1 .3 -.9 Z"/>`, 1);
+    if (p === "away") return g(`<path d="M-.85 -.02 L0 -.82 L.85 -.02 M-.6 -.25 V.82 H.6 V-.25 M-.18 .82 V.32 H.18 V.82"/>`);
+    if (p === "frost") return g(`<path d="M0 -.95 V.95 M-.82 -.47 L.82 .47 M-.82 .47 L.82 -.47 M-.25 -.75 L0 -.52 L.25 -.75 M-.25 .75 L0 .52 L.25 .75"/>`);
+    return "";
+  }
+  function vanes(k, x, y, w, h) {
+    if (!k.sweep) return ""; let s = ""; const n = Math.max(4, Math.round(w / 10));
+    for (let i = 0; i < n; i++) { const xx = x + (w * (i + 0.5)) / n; s += `<rect x="${f(xx - 0.7)}" y="${f(y)}" width="1.4" height="${f(h)}" rx=".7" fill="#1d2228" opacity=".6"/>`; }
+    return `<g class="${P}vane" style="animation-duration:5s">${s}</g>`;
+  }
   function glyph(k, x, y, s, col) {
     const m = k.mode;
+    if (m === "auto") { const h = s * 1.1; return digits(x - h * 0.28, y - h / 2, h, "A", col); }
+    if (m === "eco") return `<g transform="translate(${x} ${y}) scale(${f(s * 0.6)})"><path d="M-.8 .8 C-.85 -.2 -.15 -.85 .85 -.85 C.9 .15 .25 .85 -.8 .8 Z" fill="${col}"/><path d="M-.8 .8 L.35 -.35" stroke="#000" stroke-opacity=".35" stroke-width=".14" stroke-linecap="round"/></g>`;
     if (m === "heat") { let r = `<circle cx="${x}" cy="${y}" r="${f(s * 0.32)}" fill="${col}"/>`; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; r += line(`M${f(x + Math.cos(a) * s * 0.5)} ${f(y + Math.sin(a) * s * 0.5)}L${f(x + Math.cos(a) * s * 0.75)} ${f(y + Math.sin(a) * s * 0.75)}`, col, 1, s * 0.1); } return r; }
     if (m === "dry") return `<path d="M${x} ${f(y - s * 0.7)}C${f(x + s * 0.45)} ${f(y - s * 0.1)} ${f(x + s * 0.5)} ${f(y + s * 0.2)} ${x} ${f(y + s * 0.6)}C${f(x - s * 0.5)} ${f(y + s * 0.2)} ${f(x - s * 0.45)} ${f(y - s * 0.1)} ${x} ${f(y - s * 0.7)}Z" fill="${col}"/>`;
     if (m === "fan") { let r = ""; for (let i = 0; i < 3; i++) r += `<path transform="translate(${x} ${y}) rotate(${i * 120})" d="M0 0C${f(s * 0.2)} ${f(-s * 0.2)} ${f(s * 0.2)} ${f(-s * 0.6)} 0 ${f(-s * 0.7)}C${f(-s * 0.25)} ${f(-s * 0.5)} ${f(-s * 0.15)} ${f(-s * 0.2)} 0 0Z" fill="${col}"/>`; return r + `<circle cx="${x}" cy="${y}" r="${f(s * 0.12)}" fill="${col}"/>`; }
@@ -129,10 +147,11 @@
     const col = dispCol(k);
     let s = R(x - 0.8, y - 0.8, w + 1.6, h + 1.6, 2, "#9aa0a6", ` opacity=".5"`) + R(x, y, w, h, 1.6, k.lin("dsp", [[0, "#05070b"], [1, "#1a2028"]], 0, 0, 0, 1));
     if (k.on || k.idle) {
-      const str = q.str != null ? q.str : temp(k) + "°", dh = h * (q.dh || 0.6), gw = q.glyph ? dh * 1.2 : 0, tw = digW(dh, str) + gw;
+      const str = q.str != null ? q.str : temp(k) + "°", dh = h * (q.dh || 0.6), gw = q.glyph ? dh * 1.2 : 0, pw = k.preset !== "none" ? dh * 0.95 : 0, tw = digW(dh, str) + gw + pw;
       const x0 = x + (w - tw) / 2 + gw, y0 = y + (h - dh) / 2;
       s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.6" fill="${k.rad("dgl" + col.slice(1), [[0, col, 0.35], [1, col, 0]])}"/>` + digits(x0, y0, dh, str, col);
       if (q.glyph) s += glyph(k, x0 - gw * 0.6, y + h / 2, dh * 0.62, col);
+      if (pw) s += pglyph(k.preset, x0 + digW(dh, str) + pw * 0.3, y + h / 2, dh * 0.36, col);
     }
     return s + `<path d="M${f(x + 1)} ${f(y + h - 1)}L${f(x + w * 0.45)} ${f(y + 1)}H${f(x + w * 0.62)}L${f(x + 1 + w * 0.17)} ${f(y + h - 1)}Z" fill="#fff" opacity=".07"/>`;
   }
@@ -156,7 +175,7 @@
       s += `<g class="${P}flow" style="animation-duration:${d}s;animation-delay:-${f((i * 0.37 % 1) * d)}s"><path d="${p}" fill="none" stroke="${gs}" stroke-width="${(q.w || 5) + 2}" stroke-linecap="round" transform="translate(.6 1.2)"/><path d="${p}" fill="none" stroke="${g}" stroke-width="${q.w || 5}" stroke-opacity=".5" stroke-linecap="round"/><path d="${p}" fill="none" stroke="${g}" stroke-width="${q.tw || 1.6}" stroke-linecap="round"/></g>`;
       if (q.mist) for (let j = 0; j < 2; j++) s += `<g opacity=".8"><circle class="${P}flow" style="animation-duration:${d}s;animation-delay:-${f(((i * 0.37 + j * 0.5) % 1) * d)}s" cx="${f(L * (0.35 + j * 0.25))}" cy="${f(oy + s1 * 0.5)}" r=".9" fill="#fff"/></g>`;
     }
-    return `<g transform="translate(${f(x)} ${f(y)}) rotate(${ang})">${s}</g>`;
+    return `<g transform="translate(${f(x)} ${f(y)}) rotate(${ang})">${k.sweep ? `<g class="${P}sweep">${s}</g>` : s}</g>`;
   }
   function wash(k, cx, cy, rx, ry, a = 0.45) { if (!k.on) return ""; return `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${k.rad("ws" + k.c.slice(1), [[0, k.c, a], [1, k.c, 0]])}"/>`; }
   function shimmer(k, x, y, w, n = 3) {
@@ -170,7 +189,7 @@
     const c = q.c || WH, h = (q.h || 7) * (0.6 + 0.4 * k.lv);
     if (!k.on) return `<path d="M${x + 2} ${y}H${x + w - 2}" stroke="#000" stroke-opacity=".35" stroke-width=".9"/>` + hl(x + 3, y + 1, x + w - 3, y + 1, 0.5, 0.7);
     return R(x, y - 1.6, w, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:${q.sd || 6}s"><path d="M${x + 1} ${y + 1.6}H${x + w - 1}L${f(x + w - 4)} ${f(y + 1.6 + h)}H${f(x + 4)}Z" fill="${k.lin("flp" + c.slice(1), [[0, sh(c, -0.35)], [1, sh(c, 0.25)]], 0, 0, 0, 1)}"/>` +
-      hl(x + 5, y + 1.6 + h, x + w - 5, y + 1.6 + h, 0.6, 0.8) + `</g>`;
+      hl(x + 5, y + 1.6 + h, x + w - 5, y + 1.6 + h, 0.6, 0.8) + `</g>` + vanes(k, x + 3, y - 1.6, w - 6, 3.2 + h * 0.8);
   }
 
   function rotor(k, cx, cy, r, q = {}) {
@@ -282,7 +301,7 @@
       b += sky(k, "dusk", 42, 86, 116, 34, { seed: 2, city: 1, hz: 0.1 }) + `<path d="${rr(64, 98, 72, 30, 4)}" fill="#3a3f48" opacity=".85"/>` + vslats(k, 70, 104, 60, 18, 3, "#7d848c") + `<rect x="42" y="86" width="116" height="34" fill="#cfe3f2" opacity=".12"/>`;
       b += rail(k, 42, 118, 116, 8) + sill(k, 28, 144, 144);
       b += shadow(k, 100, 186, 52, 4, 0.5) + box(k, 52, 122, 96, 60, 14, B) + R(60, 128, 80, 6, 3, "#0b0e12", ` opacity="${k.on ? 0.9 : 0.25}"`) + `<path d="${rr(52, 122, 96, 22, 11)}" fill="#fff" opacity=".12"/>` +
-        mesh(k, 62, 152, 76, 22, B, 4) + display(k, 86, 139, 28, 10, { glyph: 1 }) + led(k, 140, 140, "#7dd3fc", 1);
+        mesh(k, 62, 152, 76, 22, B, 4) + display(k, 86, 139, 28, 10, { glyph: 1 }) + led(k, 140, 140, k.dcol || "#7dd3fc", 1);
       b += wash(k, 100, 126, 46, 10) + air(k, 100, 126, -90, { len: 30, sp: 14, cu: 5, fan: 0.5, n: 3 + Math.round(k.lv * 2) });
       return k.svg(b); } });
 
@@ -307,7 +326,7 @@
       b += hose(k, "M96 74C122 66 152 76 157 106", 12);
       b += shadow(k, 66, 166, 36, 5, 0.6) + box(k, 36, 32, 62, 128, 12, B) + `<path d="${rr(36, 32, 62, 30, 12)}" fill="#fff" opacity=".18"/>`;
       b += R(42, 40, 50, 5, 2, "#0b0e12", ` opacity="${k.on ? 0.9 : 0.3}"`) + flap(k, 42, 44, 50, { c: B, h: 6 }) + R(50, 58, 34, 10, 3, pv(k, sh(B, -0.08))) + display(k, 55, 59.5, 24, 7, { glyph: 1 });
-      b += mesh(k, 44, 80, 46, 56, B, 6) + `<rect x="62" y="146" width="10" height="4" rx="1" fill="#2c3036"/>` + led(k, 88, 63, "#7dd3fc", 0.9);
+      b += mesh(k, 44, 80, 46, 56, B, 6) + `<rect x="62" y="146" width="10" height="4" rx="1" fill="#2c3036"/>` + led(k, 88, 63, k.dcol || "#7dd3fc", 0.9);
       b += `<ellipse cx="46" cy="161" rx="5" ry="3" fill="#2b2f35"/><ellipse cx="88" cy="161" rx="5" ry="3" fill="#2b2f35"/>`;
       b += wash(k, 67, 40, 32, 9) + air(k, 67, 38, -100, { len: 34, sp: 13, cu: 6, fan: 0.5, n: 3 + Math.round(k.lv) }) + shimmer(k, 178, 98, 10, 1);
       return k.svg(b); } });
@@ -319,7 +338,7 @@
       b += hose(k, "M112 70C96 50 52 66 46 104", 11, "#cfd3d7") + hose(k, "M120 78C110 92 40 80 26 104", 11, "#cfd3d7") + R(42, 100, 8, 4, 1, "#3f84d8") + R(22, 100, 8, 4, 1, "#e0653f");
       b += shadow(k, 128, 170, 46, 5, 0.6) + box3(k, 90, 54, 76, 108, 10, 8, B, 6);
       b += R(96, 60, 64, 22, 3, pv(k, sh(B, 0.25))) + vslats(k, 99, 63, 58, 16, 3.6, sh(B, 0.2)) + `<g class="${k.on ? P + "vane" : ""}">${k.on ? `<rect x="99" y="63" width="58" height="16" fill="#0b0e12" opacity=".2"/>` : ""}</g>`;
-      b += R(104, 88, 48, 12, 3, k.lin("blk", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1)) + display(k, 108, 90, 26, 8, { glyph: 1 }) + led(k, 140, 94, "#34d399", 1) + led(k, 146, 94, "#7dd3fc", 1);
+      b += R(104, 88, 48, 12, 3, k.lin("blk", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1)) + display(k, 108, 90, 26, 8, { glyph: 1 }) + led(k, 140, 94, "#34d399", 1) + led(k, 146, 94, k.dcol || "#7dd3fc", 1);
       b += slats(k, 100, 108, 56, 46, 3.6, B) + `<ellipse cx="98" cy="164" rx="5" ry="3" fill="#25292e"/><ellipse cx="160" cy="164" rx="5" ry="3" fill="#25292e"/>`;
       b += wash(k, 128, 72, 40, 12) + air(k, 128, 72, -80, { len: 34, sp: 14, cu: 5, fan: 0.5, n: 3 + Math.round(k.lv) });
       return k.svg(b); } });
@@ -332,7 +351,7 @@
       b += `<path d="M28 74C30 84 170 84 172 74" fill="#000" opacity=".2"/>` + `<path d="M24 46C24 38 30 34 40 34H160C170 34 176 38 176 46V66C176 76 170 82 160 82H40C30 82 24 76 24 66Z" fill="${pv(k, B)}"/>` +
         `<path d="M24 46C24 38 30 34 40 34H160C170 34 176 38 176 46V66C176 76 170 82 160 82H40C30 82 24 76 24 66Z" fill="${edge(k)}"/>` + hl(40, 35.5, 160, 35.5, 0.8, 1.2) + `<path d="M28 44C28 40 34 38 42 38H158" stroke="#fff" stroke-opacity=".6" stroke-width="2" fill="none" stroke-linecap="round"/>`;
       b += `<path d="M24 66H176" stroke="#000" stroke-opacity=".12" stroke-width=".8"/>` + display(k, 132, 50, 24, 10, { glyph: 1 }) + led(k, 124, 55, "#34d399", 0.9) + R(30, 38, 140, 3, 1.5, k.pat("top", 3, 3, `<rect width="2" height="3" fill="#000" fill-opacity=".14"/>`));
-      if (k.on) b += R(34, 76, 132, 5, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M34 80H166L162 ${f(90 + 4 * k.lv)}H38Z" fill="${k.lin("flp2", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/>` + hl(40, f(89 + 4 * k.lv), 160, f(89 + 4 * k.lv), 0.7, 0.8) + `</g>`;
+      if (k.on) b += R(34, 76, 132, 5, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M34 80H166L162 ${f(90 + 4 * k.lv)}H38Z" fill="${k.lin("flp2", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/>` + hl(40, f(89 + 4 * k.lv), 160, f(89 + 4 * k.lv), 0.7, 0.8) + `</g>` + vanes(k, 38, 76, 124, 13);
       else b += `<path d="M36 79H164" stroke="#000" stroke-opacity=".3" stroke-width=".9"/>`;
       b += wash(k, 100, 90, 70, 12) + air(k, 100, 92, 100, { len: 54, sp: 22, cu: 6, fan: 0.4, n: 3 + Math.round(k.lv * 2), w: 6 });
       return k.svg(b); } });
@@ -419,7 +438,7 @@
       b += shadow(k, 106, 170, 48, 5, 0.6) + box3(k, 62, 36, 76, 128, 16, 12, B, 6);
       b += `<path d="M138 42L152 32V150L138 162Z" fill="${k.pat("hc", 5.2, 9, `<path d="M2.6 0L5.2 1.5V4.5L2.6 6L0 4.5V1.5Z M2.6 6V9" fill="#d8c79a" stroke="#6b5a35" stroke-width=".6"/>`)}"/><path d="M138 42L152 32V150L138 162Z" fill="#000" opacity=".25"/>`;
       if (k.on) b += `<g opacity=".18"><path class="${P}pulse" d="M138 42L152 32V150L138 162Z" fill="#7dc8ff"/></g>`;
-      b += R(70, 44, 60, 14, 3, k.lin("blk2", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1)) + display(k, 74, 47, 26, 8, { glyph: 1 }) + led(k, 108, 51, "#34d399", 1) + led(k, 115, 51, "#7dd3fc", 1) + led(k, 122, 51, "#7dd3fc", 1);
+      b += R(70, 44, 60, 14, 3, k.lin("blk2", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1)) + display(k, 74, 47, 26, 8, { glyph: 1 }) + led(k, 108, 51, "#34d399", 1) + led(k, 115, 51, k.dcol || "#7dd3fc", 1) + led(k, 122, 51, k.dcol || "#7dd3fc", 1);
       b += R(70, 64, 60, 50, 4, "#0b0e12", ` opacity=".85"`);
       for (let i = 0; i < 7; i++) b += `<g${k.on ? ` class="${P}swing" style="animation-duration:5s;animation-delay:-${i * 0.12}s"` : ""}><rect x="71" y="${65 + i * 7}" width="58" height="${k.on ? 3.5 : 6}" rx="1.2" fill="${pv(k, B)}"/></g>`;
       b += vslats(k, 72, 120, 56, 10, 4, B);
@@ -433,10 +452,10 @@
     render(o) { const k = K(o), B = "#f6f7f8";
       let b = wall(k, "#c6bfb2", { cx: 0.6, cy: 0.6 }) + `<rect x="0" y="0" width="200" height="12" fill="${pv(k, "#e8e3da")}"/>`;
       b += `<path d="M-10 22C-10 16 -6 14 0 14H120C128 14 132 18 132 24V40C132 46 128 50 120 50H0Z" fill="${pv(k, B)}"/>` + `<path d="M-10 22C-10 16 -6 14 0 14H120C128 14 132 18 132 24V40C132 46 128 50 120 50H0Z" fill="${edge(k)}"/>` + hl(0, 15.5, 120, 15.5, 0.8) + display(k, 92, 24, 20, 8);
-      if (k.on) b += R(4, 46, 122, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M4 50H126L122 58H8Z" fill="${k.lin("flp3", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>`; else b += line("M6 48H124", "#000", 0.3, 0.9);
+      if (k.on) b += R(4, 46, 122, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M4 50H126L122 58H8Z" fill="${k.lin("flp3", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>` + vanes(k, 8, 46, 114, 11); else b += line("M6 48H124", "#000", 0.3, 0.9);
       b += air(k, 64, 60, 100, { len: 36, sp: 22, cu: 5, n: 3 + Math.round(k.lv) });
       b += `<rect x="80" y="92" width="84" height="84" rx="16" fill="#000" opacity=".3" transform="translate(2 3)"/>` + box(k, 80, 90, 84, 84, 16, B) + R(88, 98, 68, 68, 11, k.lin("cg", [[0, "#1d232b"], [1, "#07090c"]], 0, 0, 0, 1));
-      if (k.on || k.idle) { const col = dispCol(k), t = temp(k) + "", tw = digW(26, t); b += `<circle cx="122" cy="132" r="32" fill="${k.rad("cgl" + col.slice(1), [[0, col, 0.22], [1, col, 0]])}"/>` + digits(122 - tw / 2 - 2, 116, 26, t, col) + `<circle cx="${f(122 + tw / 2 + 2)}" cy="118" r="2.2" fill="none" stroke="${col}" stroke-width="1.4"/>` + glyph(k, 104, 155, 6, col) + `<rect x="114" y="154" width="${f(24 * k.lv + 4)}" height="2.4" rx="1.2" fill="${col}"/><rect x="114" y="154" width="28" height="2.4" rx="1.2" fill="${col}" opacity=".2"/>`; }
+      if (k.on || k.idle) { const col = dispCol(k), t = temp(k) + "", tw = digW(26, t); b += `<circle cx="122" cy="132" r="32" fill="${k.rad("cgl" + col.slice(1), [[0, col, 0.22], [1, col, 0]])}"/>` + digits(122 - tw / 2 - 2, 116, 26, t, col) + `<circle cx="${f(122 + tw / 2 + 2)}" cy="118" r="2.2" fill="none" stroke="${col}" stroke-width="1.4"/>` + glyph(k, 104, 155, 6, col) + `<rect x="114" y="154" width="${f(24 * k.lv + 4)}" height="2.4" rx="1.2" fill="${col}"/><rect x="114" y="154" width="28" height="2.4" rx="1.2" fill="${col}" opacity=".2"/>` + pglyph(k.preset, 148, 155, 3.4, col); }
       b += `<path d="M88 112L114 98H156V106L88 140Z" fill="#fff" opacity=".05"/>` + `<circle cx="122" cy="94" r="1.6" fill="#1a1f25"/>`;
       if (k.on) for (let i = 0; i < 3; i++) b += `<path class="${P}chase" style="animation-delay:-${f((2 - i) * 0.4)}s" d="M${f(100 - i * 9)} ${f(86 - i * 6)}A${14 + i * 10} ${14 + i * 10} 0 0 1 ${f(126 - i * 2)} ${f(80 - i * 10)}" fill="none" stroke="#e6b3ff" stroke-opacity=".75" stroke-width="1.6" stroke-linecap="round" transform="rotate(-18 122 94)"/>`;
       return k.svg(b); } });
@@ -476,7 +495,7 @@
       b += `<path d="M10 88C10 80 30 78 54 79C78 78 98 80 98 88C98 92 90 90 84 92C76 90 70 92 62 90C52 92 44 90 36 92C26 90 18 92 10 88Z" fill="#fff"/>` + `<path d="M24 92v6M44 92v4M70 92v7" stroke="#e6f3ff" stroke-width="2" stroke-linecap="round"/>`;
       b += pipe("M96 112H110", 4, "#f2f3f4") + shimmer(k, 26, 82, 32, 2);
       b += `<path d="M122 34C122 28 126 26 132 26H186C192 26 196 28 196 34V52C196 58 192 62 186 62H132C126 62 122 58 122 52Z" fill="${pv(k, "#f7f8f9")}"/>` + hl(132, 27.5, 186, 27.5, 0.8) + display(k, 166, 36, 22, 9, { glyph: 1 });
-      if (k.on) b += R(126, 58, 66, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M126 62H192L189 69H129Z" fill="${k.lin("flp4", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>`; else b += line("M128 60H190", "#000", 0.3, 0.9);
+      if (k.on) b += R(126, 58, 66, 4, 2, "#0b0e12") + `<g class="${P}swing" style="animation-duration:7s"><path d="M126 62H192L189 69H129Z" fill="${k.lin("flp4", [[0, "#c3c7cc"], [1, "#fdfdfe"]], 0, 0, 0, 1)}"/></g>` + vanes(k, 129, 58, 60, 10); else b += line("M128 60H190", "#000", 0.3, 0.9);
       b += wash(k, 158, 74, 40, 12, 0.55) + air(k, 158, 70, 100, { len: 60, sp: 18, cu: 6, fan: 0.4, n: 2 + Math.round(k.lv * 2) });
       const SO = "#5f7c8c"; b += `<g class="hda-bg">` + shadow(k, 166, 176, 44, 3, 0.6) + R(136, 120, 70, 34, 8, pv(k, sh(SO, 0.08))) + `<path d="M144 126C156 122 176 122 196 126" stroke="#000" stroke-opacity=".18" stroke-width="1" fill="none"/>` + R(132, 144, 72, 24, 5, pv(k, SO)) + hl(138, 145, 198, 145, 0.35, 1.4) + R(126, 136, 16, 34, 6, pv(k, sh(SO, -0.06))) + hl(130, 138, 138, 138, 0.4, 1.2) + R(150, 132, 22, 16, 5, pv(k, "#e7c27a")) + `<rect x="134" y="168" width="4" height="6" fill="#3a2a1c"/><rect x="194" y="168" width="4" height="6" fill="#3a2a1c"/></g>`;
       return k.svg(b); } });
@@ -487,7 +506,7 @@
       b += R(124, 20, 56, 30, 1, pv(k, "#dddcd7")) + R(124, 106, 56, 18, 1, pv(k, "#dddcd7"));
       b += box(k, 128, 48, 48, 60, 6, B) + vslats(k, 134, 56, 22, 44, 3.4, B) + R(160, 56, 12, 44, 3, k.lin("blk3", [[0, "#2b2f35"], [1, "#16191d"]], 0, 0, 0, 1));
       b += k.on ? `<rect x="128" y="104" width="48" height="2" rx="1" fill="${k.c}"/><rect x="128" y="102" width="48" height="6" fill="${k.rad("strp" + k.c.slice(1), [[0, k.c, 0.6], [1, k.c, 0]])}"/>` : "";
-      b += display(k, 161, 60, 10, 12, { str: temp(k) + "", dh: 0.5 }) + led(k, 166, 92, "#7dd3fc", 1);
+      b += display(k, 161, 60, 10, 12, { str: temp(k) + "", dh: 0.5 }) + led(k, 166, 92, k.dcol || "#7dd3fc", 1);
       if (k.on) b += `<g class="${P}vane" style="animation-duration:6s"><rect x="134" y="56" width="22" height="44" fill="${k.c}" opacity=".08"/></g>`;
       b += sill(k, 8, 128, 184) + floor(k, 178);
       b += `<g transform="rotate(-8 60 160)"><rect x="40" y="132" width="40" height="66" rx="7" fill="#15181d"/><rect x="43" y="138" width="34" height="56" rx="4" fill="${k.lin("ph", [[0, "#1f2a3c"], [1, "#0c1220"]], 0, 0, 0, 1)}"/>`;
@@ -516,11 +535,27 @@
       return k.svg(b); } });
 
   icons.forEach((i) => { i.parts = ACP; });
+  const ML = { off: "Off", heat: "Heat", cool: "Cool", auto: "Auto", dry: "Dry", fan: "Fan", eco: "Eco" };
+  const PL = { none: "None", boost: "Boost", comfort: "Comfort", sleep: "Sleep", away: "Away", frost: "Frost" };
+  const SWL = { vertical: "Vertical", off: "Off", horizontal: "Horizontal", both: "Both" };
+  const ROOM = ["cool off dry fan eco", "boost sleep"], SPLIT = ["cool off heat auto dry fan eco", "boost comfort sleep away"], SW4 = "vertical off horizontal both";
+  const HV = { window: ROOM, ushape: ROOM, saddle: ROOM, portable: [ROOM[0], ROOM[1], SW4], dualhose: ROOM, wall: ["cool off heat fan eco", "sleep"],
+    minisplit: [SPLIT[0], SPLIT[1], SW4], cassette: [SPLIT[0], SPLIT[1], "vertical off"], console: [SPLIT[0], SPLIT[1], SW4], remote: [SPLIT[0], SPLIT[1], SW4],
+    condenser: ["cool off heat auto dry"], ptac: ["cool off heat auto fan eco", "sleep"], central: ["cool off fan"], swamp: ["cool off fan", null, "vertical off"],
+    rv: ["cool off heat fan"], desk: ["cool off fan"], heatpump: ["heat off cool auto dry fan eco", SPLIT[1], SW4], smart: ["cool off dry fan eco"],
+    attic: ["cool off heat auto fan"] };
+  icons.forEach((ic) => { const h = HV[ic.id]; if (!h) return;
+    const modes = h[0].split(" "), on = modes.filter((m) => m !== "off"), when = { opt: "mode", is: on };
+    ic.options = [{ id: "mode", name: "Mode", values: modes.map((m) => [m, ML[m]]) }];
+    if (h[1]) ic.options.push({ id: "preset", name: "Preset", values: ("none " + h[1]).split(" ").map((p) => [p, PL[p]]), when });
+    if (h[2]) ic.options.push({ id: "swing", name: "Swing", values: h[2].split(" ").map((v) => [v, SWL[v]]), when });
+    const r0 = ic.render, def = modes[0];
+    ic.render = function (o) { return r0.call(this, Object.assign({}, o, { hvDef: def })); };
+  });
 
   (window.HDA = window.HDA || []).push({
     id: "ac", tab: "Air conditioners", group: "Air", kind: "device",
-    intro: "Window, portable, split, central and rooftop units, each in its own spot. On, flaps open and swing, air ribbons flow out in the air color (cool, heat, dry or fan), outdoor fans spin and the display shows the set temperature. Speed sets the fan speed.",
-    
+    intro: "Window, portable, split, central and rooftop units, each in its own spot. On, flaps open and swing, air ribbons flow out in the air color (cool, heat, dry or fan), outdoor fans spin and the display shows the set temperature. Speed sets the fan speed. Mode, Preset and Swing menus (only what each unit has) set the display and air color and sweep the louvers.",
     css: `
 .hda-ac-svg{overflow:hidden}
 .hda-ac-spin{transform-box:fill-box;transform-origin:50% 50%}
@@ -547,7 +582,10 @@
 @keyframes hda-ac-drip{0%{opacity:0;transform:translateY(0)}20%{opacity:1}100%{opacity:0;transform:translateY(16px)}}
 .hda-anim .hda-ac-wave{animation:hda-ac-wave 2.2s linear infinite}
 @keyframes hda-ac-wave{from{transform:translateX(0)}to{transform:translateX(8px)}}
-@media (prefers-reduced-motion:reduce){.hda-anim .hda-ac-spin,.hda-anim .hda-ac-flow,.hda-anim .hda-ac-swing,.hda-anim .hda-ac-vane,.hda-anim .hda-ac-pulse,.hda-anim .hda-ac-chase,.hda-anim .hda-ac-rise,.hda-anim .hda-ac-drip,.hda-anim .hda-ac-wave{animation:none}}
+.hda-anim .hda-ac-sw-off .hda-ac-swing,.hda-anim .hda-ac-sw-horizontal .hda-ac-swing{animation:none}
+.hda-anim .hda-ac-sweep{animation:hda-ac-sweep 5s ease-in-out infinite}
+@keyframes hda-ac-sweep{0%,100%{transform:skewY(-9deg)}50%{transform:skewY(9deg)}}
+@media (prefers-reduced-motion:reduce){.hda-anim .hda-ac-sweep,.hda-anim .hda-ac-spin,.hda-anim .hda-ac-flow,.hda-anim .hda-ac-swing,.hda-anim .hda-ac-vane,.hda-anim .hda-ac-pulse,.hda-anim .hda-ac-chase,.hda-anim .hda-ac-rise,.hda-anim .hda-ac-drip,.hda-anim .hda-ac-wave{animation:none}}
 `,
     icons,
   });
