@@ -1,12 +1,30 @@
 # Device Art Card
 
-**Animated, realistic device drawings for your Home Assistant dashboard.** **1,596 drawings** in **17 categories** and 112 groups:
+**Animated, realistic device drawings for your Home Assistant dashboard.** **1,603 drawings** in **17 categories** and 113 groups:
 lights, fans, appliances, locks, sensors, plants and more. Builder cards and plant/tree builders add thousands more combinations. Each one comes alive with your device's state: lamps glow in the bulb's color, fans spin with their speed, washers
-show their cycle and doors open. **428 of them are multi-function:** each door, light, reading or stage can follow its own entity.
+show their cycle and doors open. **429 of them are multi-function:** each door, light, reading or stage can follow its own entity.
 
 ![Fans](docs/images/anim-fans.gif)
 ![Lights and glow](docs/images/anim-lights.gif)
 ![Things that move](docs/images/anim-home.gif)
+
+## What's new in 1.3.1: display cabinet lights and ceiling fan light kits
+
+![New in 1.3.1](docs/images/anim-131-new.gif)
+
+![Display cabinet lights](docs/images/new-131-cabinets.png)
+
+**7 new drawings**, so there are **1,603 drawings** in all.
+
+- **Display cabinet lights** (Lighting, **Cabinet & display**): a curio, a corner curio, a china hutch, a glass tower, a
+  wall glass cabinet, a wine bar cabinet and a bookcase with LED, lit from inside. Pick the **Light type**, the number of
+  **Shelves** (3, 4 or 5) and the **Contents**; the light takes any color and the second color row is the frame finish.
+  The **glass tower** lights each shelf on its own, so each shelf can follow its own entity.
+- **Ceiling fan light kits:** six fans without a light of their own (brushed nickel, palm leaf, rattan, windmill,
+  minimal white and airplane) can now take a **Bowl**, **Bar** or **Drum** light kit from the **Light kit** menu.
+  **Fan only** and **Fan + light** work as before.
+
+The **[gallery](https://almulder.github.io/ha-device-art/)** has a **Show: New in 1.3.1** filter.
 
 ## What's new in 1.3.0: new drawings, builders and menus
 
@@ -139,6 +157,8 @@ How to set it up: see [Multi-function cards (parts)](#multi-function-cards-parts
 
 ## Version history
 
+- **1.3.1:** 7 display cabinet lights (curio, corner curio, china hutch, glass tower, wall glass cabinet, wine bar,
+  bookcase with LED) and Bowl, Bar and Drum light kits on six ceiling fans. See above.
 - **1.3.0:** 72 new drawings (relays, pergolas, buttons, grow/UV/emergency/pool lights, leak sensors) and builders for
   smoke & CO alarms, video doorbells, garage doors, doors and windows; new menus on 129 drawings. See above.
 - **1.2.0:** multi-function drawings (parts, doors, stages, readings, light level and color), ceiling fan light kits,
@@ -213,7 +233,7 @@ Almost everything on a drawing can be set. The pictures below show only a few of
 
 **Getting updates:** HACS shows "Update available" for each new version. After updating, reload the page
 (Ctrl+F5, or in the phone app: Settings → Companion App → Debugging → Reset frontend cache). To check your version,
-open the browser console: it shows `DEVICE-ART-CARD v1.3.0`.
+open the browser console: it shows `DEVICE-ART-CARD v1.3.1`.
 
 **Manual**
 1. Copy `dist/ha-device-art.js` to `config/www/`.
@@ -447,7 +467,7 @@ Some cards are builders: pick the style, layout and extras from menus, and the d
 
 ## Every category
 
-A sample from each category, 1,596 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
+A sample from each category, 1,603 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
 
 | | |
 |---|---|

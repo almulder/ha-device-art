@@ -9,6 +9,9 @@
   const LC = (o) => (o.pcolor && /^#[0-9a-fA-F]{6}$/.test(o.pcolor.light || "") ? o.pcolor.light : null);
   const LK = [{ id: "fan", name: "Fan" }, { id: "light", name: "Light", when: { opt: "kit", is: ["light"] } }];
   const KITOPT = [{ id: "kit", name: "Light kit", values: [["none", "Fan only"], ["light", "Fan + light"]] }];
+  const GK = ["bowl", "bar", "drum"];
+  const LK2 = [{ id: "fan", name: "Fan" }, { id: "light", name: "Light", when: { opt: "kit", is: ["light"].concat(GK) } }];
+  const KITOPT2 = [{ id: "kit", name: "Light kit", values: KITOPT[0].values.concat([["bowl", "Bowl"], ["bar", "Bar"], ["drum", "Drum"]]) }];
 
   function K(o) {
     const u = o.uid, defs = [], seen = {};
@@ -17,7 +20,8 @@
       u, o, on: !!o.on, lv: Math.max(0.05, Math.min(1, +o.level || 0)),
       fn: { on: pon(o, "fan"), lv: Math.max(0.05, Math.min(1, o.plevel && o.plevel.fan != null ? +o.plevel.fan || 0 : +o.level || 0)) },
       kit: !!(o.opt && o.opt.kit === "light"),
-      lt: { on: pon(o, "light") && !!(o.opt && o.opt.kit === "light"), a: o.plevel && o.plevel.light != null ? f(0.35 + 0.65 * Math.max(0, Math.min(1, +o.plevel.light || 0))) : 1 },
+      gk: o.opt && GK.indexOf(o.opt.kit) >= 0 ? o.opt.kit : "",
+      lt: { on: pon(o, "light") && !!(o.opt && (o.opt.kit === "light" || GK.indexOf(o.opt.kit) >= 0)), a: o.plevel && o.plevel.light != null ? f(0.35 + 0.65 * Math.max(0, Math.min(1, +o.plevel.light || 0))) : 1 },
       lc(d, t) { return LC(o) ? H.mix(LC(o), "#ffffff", t) : d; },
       def(n, s) { if (!seen[n]) { seen[n] = 1; defs.push(s); } return `url(#${u}-${n})`; },
       lin(n, a, x1 = 0, y1 = 0, x2 = 1, y2 = 0) { return k.def(n, `<linearGradient id="${u}-${n}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops(a)}</linearGradient>`); },
@@ -176,6 +180,23 @@
       ell(cx, y + dep, r - 1, k.lt.on ? k.HOT : sh(c, -0.7)) + ell(cx, y + dep, r, "none", ` stroke="${sh(c, -0.25)}" stroke-width="2.4"`);
   }
 
+  function gkit(k, cx, y, mc, kind = "metal") {
+    const t = k.gk, on = k.lt.on; if (!t) return { back: "", front: "" };
+    const fit = cyl(k, cx, y - 1, y + 4, 7.5, 7, mc, kind);
+    if (t === "bowl") return { back: on ? cast(k, cx, y + 18, 14, 56) : "", front: fit + halo(k, cx, y + 16, 40, 0.9) + bowl(k, cx, y + 4, 19, 17) };
+    if (t === "bar") {
+      const gl = on ? k.lin("kbar", [[0, k.lc("#fff4dc", 0.72)], [0.5, k.HOT], [1, sh(k.W, -0.15)]], 0, 0, 0, 1) : k.lin("kbar", [[0, "#f4f2ee"], [0.55, "#d3d0c9"], [1, "#8f8b84"]], 0, 0, 0, 1);
+      return { back: on ? cast(k, cx, y + 16, 26, 64) : "",
+        front: fit + `<rect x="${cx - 1.6}" y="${y + 4}" width="3.2" height="5" fill="${mg(k, mc, kind)}"/>` + halo(k, cx, y + 14, 42, 0.85) +
+          `<rect x="${cx - 30}" y="${y + 9}" width="60" height="8" rx="4" fill="${gl}"/><rect x="${cx - 30}" y="${y + 9}" width="60" height="8" rx="4" fill="none" stroke="#000" stroke-opacity=".25" stroke-width=".7"/>` +
+          `<path d="M${cx - 26} ${y + 10.6}H${cx + 22}" stroke="#fff" stroke-opacity=".6" stroke-width="1.2" stroke-linecap="round"/>` +
+          `<rect x="${cx - 32}" y="${y + 8.4}" width="5" height="9.2" rx="2" fill="${mg(k, mc, kind)}"/><rect x="${cx + 27}" y="${y + 8.4}" width="5" height="9.2" rx="2" fill="${mg(k, mc, kind)}"/>` };
+    }
+    const lin = on ? k.lin("kdr", [[0, sh(k.W, -0.2)], [0.35, k.lc("#fff1d6", 0.7)], [0.55, k.HOT], [0.75, k.lc("#fff1d6", 0.7)], [1, sh(k.W, -0.25)]]) : k.lin("kdr", [[0, "#8d877c"], [0.35, "#e3dccd"], [0.6, "#d2cab9"], [1, "#7a7468"]]);
+    return { back: on ? cast(k, cx, y + 22, 18, 60) : "",
+      front: fit + halo(k, cx, y + 20, 44, 0.85) + `<path d="${cylP(cx, y + 4, y + 21, 17, 17)}" fill="${lin}"/>` + band(cx, y + 4, 17, "#fff", 0.3, 1) +
+        ell(cx, y + 21, 17, on ? k.HOT : "#cfc8b9") + ell(cx, y + 21, 17, "none", ` stroke="#000" stroke-opacity=".2" stroke-width=".7"`) };
+  }
   function sparkle(x, y, s, delay) {
     return `<path class="${P}tw" style="animation-delay:-${delay}s" d="M${x} ${y - s}L${f(x + s * 0.22)} ${f(y - s * 0.22)}L${x + s} ${y}L${f(x + s * 0.22)} ${f(y + s * 0.22)}L${x} ${y + s}L${f(x - s * 0.22)} ${f(y + s * 0.22)}L${x - s} ${y}L${f(x - s * 0.22)} ${f(y - s * 0.22)}Z" fill="#fff"/>`;
   }
@@ -190,16 +211,17 @@
         (k.kit ? cyl(k, cx, 89, 93, 9.5, 9.5, C.brass) + halo(k, cx, 110, 40) + schoolhouse(k, cx, 93) : finial(k, cx, 90.5, C.brass)) + air(k, cx, 72, 86, [-0.9, -0.62, 0.62, 0.9]);
       return k.svg(b); } });
 
-  icons.push({ id: "nickel", name: "Brushed nickel", colors: ["#c9cdd2", "#7a5236", "#2f3035", "#ebe8e1", "#a58b6a"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
+  icons.push({ id: "nickel", name: "Brushed nickel", colors: ["#c9cdd2", "#7a5236", "#2f3035", "#ebe8e1", "#a58b6a"], picker: true, parts: LK2, options: KITOPT2, colorLabel: "Blades",
     render(o) { const k = K(o), c = o.color, cx = 100;
       const d = "M-7 -20C-15 -34 -17 -58 -12 -78C-9 -88 -2 -92 4 -91C8 -88 9 -80 8 -68C7 -48 9 -32 7 -20Z";
       const bl = `<path d="${d}" fill="${mg(k, c, "satin")}" stroke="${sh(c, -0.55)}" stroke-opacity=".5" stroke-width=".8"/><path d="M-9 -26C-14 -42 -14 -62 -10 -78" stroke="#fff" stroke-opacity=".35" stroke-width="1.8" fill="none" stroke-linecap="round"/>` +
         `<path d="M-3 -6L-5 -22L5 -22L3 -6Z" fill="${mg(k, C.nickel)}"/>`;
-      const b = floorShadow(k, cx, 64) + canopy(k, cx, 10, 11, C.nickel, "satin") + rod(k, cx, 17, 50, C.nickel, 4.5, "satin") +
+      const kt = gkit(k, cx, 82, C.nickel, "satin");
+      const b = kt.back + floorShadow(k, cx, 64) + canopy(k, cx, 10, 11, C.nickel, "satin") + rod(k, cx, 17, 50, C.nickel, 4.5, "satin") +
         rotor(k, { cx, cy: 70, R: 91, n: 3, phase: 25, r0: 22, disc: c, blade: bl }) +
         cyl(k, cx, 48, 64, 15, 19, C.nickel, "satin", false) + cyl(k, cx, 64, 78, 19, 18, C.nickel, "satin", true) + band(cx, 64, 19, "#000", 0.3) +
         (k.kit ? glowCast(k, cx, 100, 16, 62, 168) + cyl(k, cx, 78, 83, 9, 9, C.nickel, "satin", false) + halo(k, cx, 96, 46, 0.9) + bowl(k, cx, 83, 22.5, 21) + finial(k, cx, 104.6, C.nickel, 2.5)
-          : cyl(k, cx, 78, 82, 6, 4, C.nickel, "metal")) + air(k, cx, 70, 91);
+          : cyl(k, cx, 78, 82, 6, 4, C.nickel, "metal")) + air(k, cx, 70, 91) + kt.front;
       return k.svg(b, 16); } });
 
   icons.push({ id: "ledblack", name: "Matte black LED", colors: ["#2c2d31", "#5b4636", "#8c9096", "#efece6", "#3d4a3f"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
@@ -245,27 +267,29 @@
     return `<path d="${d}" fill="${k.lin("leaf", [[0, sh(c, -0.45)], [0.45, sh(c, 0.12)], [0.52, sh(c, 0.3)], [0.6, c], [1, sh(c, -0.45)]])}" stroke="${sh(c, -0.55)}" stroke-opacity=".5" stroke-width=".7"/>` +
       `<path d="${veins}" stroke="${sh(c, -0.35)}" stroke-opacity=".7" stroke-width=".8"/><path d="M0 ${-r0}L0 ${-R + 2}" stroke="${sh(c, 0.45)}" stroke-width="1.6"/>` + iron(k, r0 + 2, C.bronze);
   }
-  icons.push({ id: "palm", name: "Palm leaf", colors: ["#6e8b3d", "#9a7b4f", "#3f6b3a", "#c7b48a", "#2f4f3a"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
+  icons.push({ id: "palm", name: "Palm leaf", colors: ["#6e8b3d", "#9a7b4f", "#3f6b3a", "#c7b48a", "#2f4f3a"], picker: true, parts: LK2, options: KITOPT2, colorLabel: "Blades",
     render(o) { const k = K(o), c = o.color, cx = 100;
-      const b = floorShadow(k, cx, 66) + canopy(k, cx, 10, 13, C.bronze) + rod(k, cx, 17, 52, C.bronze) +
+      const kt = gkit(k, cx, 86, C.bronze, "metal");
+      const b = kt.back + floorShadow(k, cx, 66) + canopy(k, cx, 10, 13, C.bronze) + rod(k, cx, 17, 52, C.bronze) +
         rotor(k, { cx, cy: 72, R: 89, n: 5, phase: 20, r0: 22, disc: c, blade: leaf(k, c, 22, 89, 16) }) +
         motor(k, cx, 50, 80, 24, C.bronze) + band(cx, 66, 21, "#c9a46a", 0.6, 1.4) + (k.kit ? cyl(k, cx, 80, 86, 10, 8, C.bronze, "metal", false) + cast(k, cx, 108, 14, 60, 168) + halo(k, cx, 100, 40, 0.9) + bell(k, cx, 87, 15, 21)
-          : cyl(k, cx, 80, 86, 10, 6, C.bronze) + `<circle cx="${cx}" cy="89" r="3.2" fill="${mg(k, C.brass)}"/>`) + air(k, cx, 72, 89);
+          : cyl(k, cx, 80, 86, 10, 6, C.bronze) + `<circle cx="${cx}" cy="89" r="3.2" fill="${mg(k, C.brass)}"/>`) + air(k, cx, 72, 89) + kt.front;
       return k.svg(b, 16); } });
 
-  icons.push({ id: "rattan", name: "Rattan", colors: ["#c9a46a", "#8b6a3e", "#e2cfa6", "#3b2f25", "#6b7a52"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
+  icons.push({ id: "rattan", name: "Rattan", colors: ["#c9a46a", "#8b6a3e", "#e2cfa6", "#3b2f25", "#6b7a52"], picker: true, parts: LK2, options: KITOPT2, colorLabel: "Blades",
     render(o) { const k = K(o), c = o.color, cx = 100, u = k.u;
       k.def("weave", `<pattern id="${u}-weave" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="${sh(c, -0.55)}"/><rect x=".6" width="2.2" height="6" fill="${sh(c, 0.1)}"/><rect y=".6" width="6" height="2.2" fill="${c}"/><rect x="3.6" y="3.6" width="2" height="2" fill="${sh(c, -0.35)}"/></pattern>`);
       const bl = `<ellipse cx="0" cy="-57" rx="16" ry="31" fill="url(#${u}-weave)"/><ellipse cx="0" cy="-57" rx="16" ry="31" fill="${k.lin("rsh", [[0, "#000", 0.35], [0.4, "#fff", 0.12], [1, "#000", 0.4]])}"/>` +
         `<ellipse cx="0" cy="-57" rx="16" ry="31" fill="none" stroke="${sh(c, -0.25)}" stroke-width="3.2"/><ellipse cx="0" cy="-57" rx="16" ry="31" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="1" stroke-dasharray="3 2"/>` +
         `<path d="M0 -27V-87" stroke="${sh(c, -0.3)}" stroke-width="2"/>` + iron(k, 24, C.bronze);
-      const b = floorShadow(k, cx, 64) + canopy(k, cx, 10, 13, C.bronze) + rod(k, cx, 17, 52, C.bronze) +
+      const kt = gkit(k, cx, 85, C.bronze, "metal");
+      const b = kt.back + floorShadow(k, cx, 64) + canopy(k, cx, 10, 13, C.bronze) + rod(k, cx, 17, 52, C.bronze) +
         rotor(k, { cx, cy: 72, R: 88, n: 5, phase: 0, r0: 26, disc: c, blade: bl }) +
         motor(k, cx, 50, 80, 23, C.bronze) + (k.kit ? cyl(k, cx, 80, 85, 9, 8, C.bronze, "metal", false) + cast(k, cx, 104, 16, 60, 168) + halo(k, cx, 98, 40, 0.9) + wovenDome(k, cx, 86, 18, 17, `url(#${u}-weave)`, c)
-          : cyl(k, cx, 80, 85, 9, 7, C.bronze) + `<circle cx="${cx}" cy="88" r="3" fill="${mg(k, C.brass)}"/>`) + air(k, cx, 72, 88);
+          : cyl(k, cx, 80, 85, 9, 7, C.bronze) + `<circle cx="${cx}" cy="88" r="3" fill="${mg(k, C.brass)}"/>`) + air(k, cx, 72, 88) + kt.front;
       return k.svg(b, 16); } });
 
-  icons.push({ id: "windmill", name: "Windmill", colors: ["#9aa2a8", "#2f3035", "#a8503a", "#ddd6c6", "#5d7a8c"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
+  icons.push({ id: "windmill", name: "Windmill", colors: ["#9aa2a8", "#2f3035", "#a8503a", "#ddd6c6", "#5d7a8c"], picker: true, parts: LK2, options: KITOPT2, colorLabel: "Blades",
     render(o) { const k = K(o), c = o.color, cx = 100, R = 82, ri = 24, a = 0.2;
       const p = (r, t) => `${f(r * Math.sin(t))} ${f(-r * Math.cos(t))}`;
       const bl = `<path d="M${p(ri, -a * 0.8)}L${p(R - 2, -a)}A${R - 2} ${R - 2} 0 0 1 ${p(R - 2, a)}L${p(ri, a * 0.8)}Z" fill="${mg(k, c, "satin")}" stroke="${sh(c, -0.55)}" stroke-opacity=".55" stroke-width=".8"/>` +
@@ -273,10 +297,11 @@
       const g = C.galv, over = `<circle r="${R}" fill="none" stroke="${sh(g, -0.35)}" stroke-width="5"/><circle r="${R}" fill="none" stroke="${sh(g, 0.4)}" stroke-width="1.6"/><circle r="${ri}" fill="none" stroke="${sh(g, -0.3)}" stroke-width="4"/>`;
       const rotOver = `<g class="${k.fn.on ? P + "spin" : ""}" style="animation-duration:${(1.45 - k.fn.lv).toFixed(2)}s"><circle r="${R + 8}" fill="none"/>${over}</g>`;
       let riv = ""; for (let i = 0; i < 9; i++) { const t = (i - 4) / 4.6; riv += `<circle cx="${f(cx + 23 * t)}" cy="${f(71 + 23 * PK * Math.sqrt(1 - t * t))}" r=".9" fill="#fff" fill-opacity=".45"/>`; }
-      const b = floorShadow(k, cx, 70) + canopy(k, cx, 10, 13, g) + rod(k, cx, 17, 46, g, 6) +
+      const kt = gkit(k, cx, 74, g, "metal");
+      const b = kt.back + floorShadow(k, cx, 70) + canopy(k, cx, 10, 13, g) + rod(k, cx, 17, 46, g, 6) +
         rotor(k, { cx, cy: 66, R, n: 8, phase: 0, r0: ri, disc: c, blade: bl, over: rotOver }) +
         cyl(k, cx, 44, 50, 9, 9, g, "metal", false) + cyl(k, cx, 50, 74, 22, 23, g, "metal", true) + band(cx, 58, 22.4, "#000", 0.3) + band(cx, 70, 23, "#000", 0.3) + riv +
-        (k.kit ? glowCast(k, cx, 99, 23, 66, 170) + halo(k, cx, 100, 46, 0.85) + `<g transform="translate(${cx} 73) scale(1.3) translate(${-cx} -73)">${barn(k, cx, 73, 21, g)}</g>` : `<circle cx="${cx}" cy="74" r="4" fill="${mg(k, sh(g, -0.2))}"/>`) + air(k, cx, 66, R);
+        (k.kit ? glowCast(k, cx, 99, 23, 66, 170) + halo(k, cx, 100, 46, 0.85) + `<g transform="translate(${cx} 73) scale(1.3) translate(${-cx} -73)">${barn(k, cx, 73, 21, g)}</g>` : `<circle cx="${cx}" cy="74" r="4" fill="${mg(k, sh(g, -0.2))}"/>`) + air(k, cx, 66, R) + kt.front;
       return k.svg(b, 14); } });
 
   icons.push({ id: "propeller", name: "Propeller", colors: ["#c9ced4", "#7a3e22", "#2a2a2d", "#b23b30", "#d9b16a"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
@@ -364,13 +389,14 @@
       return k.svg(b); } });
   function mixW(k, c, t) { return H.mix(c, k.lc("#fff4dc", 0.72), t); }
 
-  icons.push({ id: "minimal", name: "Minimal white", colors: ["#f2f1ee", "#2a2b2f", "#c9cdd2", "#b9a17e", "#9fb3a6"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
+  icons.push({ id: "minimal", name: "Minimal white", colors: ["#f2f1ee", "#2a2b2f", "#c9cdd2", "#b9a17e", "#9fb3a6"], picker: true, parts: LK2, options: KITOPT2, colorLabel: "Blades",
     render(o) { const k = K(o), c = o.color, cx = 100, w = C.white;
       const d = "M-4 -14C-7 -36 -8 -66 -5 -88Q0 -93 5 -88C7 -66 6 -36 4 -14Z";
       const bl = `<path d="${d}" fill="${mg(k, c, "satin")}" stroke="${sh(c, -0.5)}" stroke-opacity=".4" stroke-width=".7"/><path d="M-3 -20C-5 -42 -5 -66 -3 -84" stroke="#fff" stroke-opacity=".45" stroke-width="1.2" fill="none"/>`;
-      const b = floorShadow(k, cx, 60) + canopy(k, cx, 10, 9, w, "satin") + rod(k, cx, 17, 58, w, 3.5, "satin") +
+      const kt = gkit(k, cx, 72, w, "satin");
+      const b = kt.back + floorShadow(k, cx, 60) + canopy(k, cx, 10, 9, w, "satin") + rod(k, cx, 17, 58, w, 3.5, "satin") +
         rotor(k, { cx, cy: 70, R: 92, n: 3, phase: 0, r0: 14, disc: c, blade: bl }) +
-        cyl(k, cx, 56, 66, 9, 14, w, "satin", false) + cyl(k, cx, 66, 72, 14, 12, w, "satin") + (k.kit ? glowCast(k, cx, 74, 12, 62, 168) + ringLight(k, cx, 72.4, 12, w) + halo(k, cx, 80, 38, 0.8) + `<circle cx="${cx}" cy="72.7" r="2.4" fill="#9aa0a8"/>` : `<circle cx="${cx}" cy="72" r="2" fill="#9aa0a8"/>`) + air(k, cx, 70, 92);
+        cyl(k, cx, 56, 66, 9, 14, w, "satin", false) + cyl(k, cx, 66, 72, 14, 12, w, "satin") + (k.kit ? glowCast(k, cx, 74, 12, 62, 168) + ringLight(k, cx, 72.4, 12, w) + halo(k, cx, 80, 38, 0.8) + `<circle cx="${cx}" cy="72.7" r="2.4" fill="#9aa0a8"/>` : `<circle cx="${cx}" cy="72" r="2" fill="#9aa0a8"/>`) + air(k, cx, 70, 92) + kt.front;
       return k.svg(b, 16); } });
 
   icons.push({ id: "crystal", name: "Crystal chandelier", colors: ["#d7ecf7", "#e9d7f5", "#f5e6c8", "#cfd3d8", "#f7d6dc"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
@@ -390,7 +416,7 @@
         tier(102, 15, 10, 0.9, true) + tier(88, 24, 14, 1, true) + drop(cx, 106, 1.5) + sp + air(k, cx, 70, 86, [-0.9, -0.62, 0.62, 0.9]);
       return k.svg(b); } });
 
-  icons.push({ id: "airplane", name: "Airplane", colors: ["#e5483b", "#3b82f6", "#f5b82e", "#3fb67a", "#a06cd5"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
+  icons.push({ id: "airplane", name: "Airplane", colors: ["#e5483b", "#3b82f6", "#f5b82e", "#3fb67a", "#a06cd5"], picker: true, parts: LK2, options: KITOPT2, colorLabel: "Blades",
     render(o) { const k = K(o), c = o.color, cx = 100, w = C.white;
       const body = mg(k, c, "satin"), wing = mg(k, sh(c, 0.18), "satin");
       const bl = `<path d="M-2.5 -8L-2.5 -26L2.5 -26L2.5 -8Z" fill="${mg(k, "#9aa0a8")}"/>` +
@@ -399,12 +425,13 @@
         `<path d="M-6 -24L-6 -76C-6 -84 -3 -88 0 -88C3 -88 6 -84 6 -76L6 -24Z" fill="${body}" stroke="${sh(c, -0.5)}" stroke-opacity=".5" stroke-width=".7"/>` +
         `<path d="M-6 -66H6V-62H-6Z" fill="#fff" fill-opacity=".85"/><ellipse cx="0" cy="-78" rx="3.2" ry="5" fill="#bfe3ff"/><path d="M-1.6 -81V-75" stroke="#fff" stroke-width="1"/>` +
         `<path d="M-9 -88.5H9" stroke="#555" stroke-opacity=".7" stroke-width="1.6"/><circle cy="-88" r="1.6" fill="#ddd"/>`;
-      const b = floorShadow(k, cx, 64) + canopy(k, cx, 10, 12, w, "satin") + rod(k, cx, 17, 52, w, 5, "satin") +
+      const kt = gkit(k, cx, 79, w, "satin");
+      const b = kt.back + floorShadow(k, cx, 64) + canopy(k, cx, 10, 12, w, "satin") + rod(k, cx, 17, 52, w, 5, "satin") +
         rotor(k, { cx, cy: 72, R: 90, n: 4, phase: 45, r0: 24, disc: sh(c, 0.55), blade: bl }) +
         cyl(k, cx, 50, 62, 14, 22, w, "satin", false) + cyl(k, cx, 62, 76, 22, 21, w, "satin", false) + `<path d="${cylP(cx, 64, 69, 22, 22)}" fill="${body}"/>` +
         ell(cx, 76, 21, k.rad("hub", [[0, "#ffffff"], [0.7, "#dfe3ea"], [1, "#9aa0a8"]], 0.45, 0.35, 0.65)) +
         [0, 1, 2, 3, 4].map((i) => { const t = (i - 2) / 2.6; return `<path d="M${f(cx + 21 * t + 1.6)} ${f(76 + 21 * PK * Math.sqrt(1 - t * t) * 0.5)}l-1.6 -2.8 -1.6 2.8z" fill="#f5b82e"/>`; }).join("") +
-        (k.kit ? glowCast(k, cx, 90, 14, 60, 170) + halo(k, cx, 88, 36, 0.85) + bowl(k, cx, 77.5, 13, 12, "milk") + `<circle cx="${cx}" cy="89.5" r="2.2" fill="${body}"/>` : `<circle cx="${cx}" cy="77" r="4.5" fill="${body}"/>`) + air(k, cx, 72, 90);
+        (k.kit ? glowCast(k, cx, 90, 14, 60, 170) + halo(k, cx, 88, 36, 0.85) + bowl(k, cx, 77.5, 13, 12, "milk") + `<circle cx="${cx}" cy="89.5" r="2.2" fill="${body}"/>` : `<circle cx="${cx}" cy="77" r="4.5" fill="${body}"/>`) + air(k, cx, 72, 90) + kt.front;
       return k.svg(b, 14); } });
 
   icons.push({ id: "vintage", name: "Vintage brass", colors: ["#6e3f24", "#c4935a", "#2e2a28", "#efece6", "#4a5a3c"], picker: true, parts: LK, options: KITOPT, colorLabel: "Blades",
@@ -426,7 +453,7 @@
 
   (window.HDA = window.HDA || []).push({
     id: "ceilingfan", tab: "Ceiling fans", group: "Fans", kind: "fan",
-    intro: "Ceiling fans seen from just below. On, the blades spin with a motion blur (faster with the speed slider) and light kits glow down. Parts: Fan (the blades) and Light (the light kit, in the light's color), each with its own on and level. Light kit option: Fan only (a light kit hidden, a built-in light unlit) or Fan + light (every fan).",
+    intro: "Ceiling fans seen from just below. On, the blades spin with a motion blur (faster with the speed slider) and light kits glow down. Parts: Fan (the blades) and Light (the light kit, in the light's color), each with its own on and level. Light kit option: Fan only (a light kit hidden, a built-in light unlit) or Fan + light (every fan); six fans without a light of their own (brushed nickel, palm leaf, rattan, windmill, minimal white, airplane) can also take a Bowl, Bar or Drum light kit.",
     
     css: `
 .hda-ceilingfan-svg{overflow:visible}

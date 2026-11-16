@@ -142,6 +142,9 @@ body.sheetmode { background: #140b3a !important; }
       manual card in your dashboard. Install the card with HACS (or add <code>ha-device-art.js</code> as a dashboard resource), then set <code>entity</code> to your own device.
       <br><b>Multi-function drawings</b> (the <b>N parts</b> badge) can follow one entity per part: tick only the parts your device has, open each door or drawer,
       pick a stage (cycle, mode, state) and set the readings. Switch <b>Mode</b> to <b>One device</b> for the classic single-entity look.
+      <br><b>New in 1.3.1:</b> display cabinet lights (curio, corner curio, china hutch, glass tower, wall glass cabinet, wine bar and a bookcase with LED)
+      with a light type, shelves, contents, light color and frame finish, and the glass tower lights each shelf on its own; six ceiling fans also take a Bowl, Bar or Drum
+      light kit (pick <b>Show: New in 1.3.1</b>).
       <br><b>New in 1.3.0:</b> relays and modules, pergolas and radiator valves, buttons and remotes, grow, UV and emergency lights, leak sensors,
       and builders for smoke and CO alarms, video doorbells, garage doors, doors and windows (pick <b>Show: New in 1.3.0</b>). Many drawings also got new menus:
       lock states, HVAC mode, preset and swing, camera states, switch gangs, plug meters and more. Every menu and color can be mixed, so there are far more looks than any picture shows.
@@ -160,11 +163,12 @@ body.sheetmode { background: #140b3a !important; }
   const RM = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const P = new URLSearchParams(location.search);
   const view = { on: P.get("on") !== "0", scene: P.get("scene") !== "0", cat: P.get("cat") || "", sub: P.get("sub") || "", q: "",
-    mfOnly: P.get("filter") === "mf", newOnly: P.get("filter") === "new", mf: P.get("mode") !== "one" };
-  /* the drawings that are new in 1.3.0 (the Show: New filter) */
-  const NEW_SETS = ["relays", "covers2", "buttons", "lights9", "leaks", "smoke", "camdoorbells", "garagecfg", "doorcfg", "windowcfg"];
-  const isNew = (k) => { const it = DA.items[k]; return !!(it && it.set && NEW_SETS.indexOf(it.set.id) >= 0); };
-  const keep = (k) => (!view.mfOnly || hasParts(k)) && (!view.newOnly || isNew(k));
+    mfOnly: P.get("filter") === "mf", newOnly: P.get("filter") === "new" ? "1.3.1" : P.get("filter") === "new130" ? "1.3.0" : "", mf: P.get("mode") !== "one" };
+  /* the drawings that are new in each version (the Show: New in filters) */
+  const NEW_SETS = { "1.3.1": ["cablights"], "1.3.0": ["relays", "covers2", "buttons", "lights9", "leaks", "smoke", "camdoorbells", "garagecfg", "doorcfg", "windowcfg"] };
+  const LATEST = "1.3.1";
+  const isNew = (k, v) => { const it = DA.items[k]; return !!(it && it.set && NEW_SETS[v || LATEST].indexOf(it.set.id) >= 0); };
+  const keep = (k) => (!view.mfOnly || hasParts(k)) && (!view.newOnly || isNew(k, view.newOnly));
   const LVL = { light: "Brightness", fan: "Speed", plant: "Water" };
   const tiles = new Map(); /* key -> per-tile state */
   let uidN = 0;
@@ -343,7 +347,7 @@ body.sheetmode { background: #140b3a !important; }
   function renderSegs() {
     $("#f-on").innerHTML = [["1", "On"], ["0", "Off"]].map(([v, l]) => `<button type="button" data-on="${v}" aria-pressed="${(v === "1") === view.on}">${l}</button>`).join("");
     $("#f-scene").innerHTML = [["1", "Show"], ["0", "Hide"]].map(([v, l]) => `<button type="button" data-scene="${v}" aria-pressed="${(v === "1") === view.scene}">${l}</button>`).join("");
-    $("#f-filter").innerHTML = [["0", "All"], ["1", "Multi-function"], ["2", "New in 1.3.0"]].map(([v, l]) => `<button type="button" data-filter="${v}" aria-pressed="${v === (view.mfOnly ? "1" : view.newOnly ? "2" : "0")}">${l}</button>`).join("");
+    $("#f-filter").innerHTML = [["0", "All"], ["1", "Multi-function"], ["1.3.1", "New in 1.3.1"], ["1.3.0", "New in 1.3.0"]].map(([v, l]) => `<button type="button" data-filter="${v}" aria-pressed="${v === (view.mfOnly ? "1" : view.newOnly || "0")}">${l}</button>`).join("");
     $("#f-mode").innerHTML = [["0", "One device"], ["1", "Multi-function"]].map(([v, l]) => `<button type="button" data-mode="${v}" aria-pressed="${(v === "1") === view.mf}">${l}</button>`).join("");
   }
   /* keep the open category and group valid for the current filter */
@@ -369,7 +373,7 @@ body.sheetmode { background: #140b3a !important; }
     }
     injectCss(keys);
     $("#body").innerHTML = `<section class="sect"><h2>${esc(title)} <small>${esc(sub)}</small></h2>${keys.length ? `<div class="grid">${keys.map(tileHTML).join("")}</div>` : `<div class="empty">Nothing found.</div>`}</section>`;
-    $("#counts").innerHTML = `<b>${DA.order.length}</b> drawings · <b>${DA.order.filter(hasParts).length}</b> multi-function · <b>${DA.order.filter(isNew).length}</b> new`;
+    $("#counts").innerHTML = `<b>${DA.order.length}</b> drawings · <b>${DA.order.filter(hasParts).length}</b> multi-function · <b>${DA.order.filter((k) => isNew(k)).length}</b> new in ${LATEST}`;
   }
   /* a picture sheet for the README: a few drawings from every subcategory of one category, art and name only */
   function renderSheet(catId, n) {
@@ -410,7 +414,7 @@ body.sheetmode { background: #140b3a !important; }
     if (t.dataset.sub) { e.preventDefault(); view.sub = t.dataset.sub; view.q = ""; $("#q").value = ""; history.replaceState(null, "", `?cat=${view.cat}&sub=${view.sub}`); renderSide(); renderBody(); window.scrollTo(0, 0); return; }
     if (t.dataset.on) { view.on = t.dataset.on === "1"; tiles.forEach((s) => { delete s.on; delete s.parts; delete s.ps; }); renderSegs(); renderBody(); return; }
     if (t.dataset.scene) { view.scene = t.dataset.scene === "1"; renderSegs(); renderBody(); return; }
-    if (t.dataset.filter) { view.mfOnly = t.dataset.filter === "1"; view.newOnly = t.dataset.filter === "2"; if (!view.q) fixCat(); renderSegs(); renderSide(); renderBody(); return; }
+    if (t.dataset.filter) { view.mfOnly = t.dataset.filter === "1"; view.newOnly = NEW_SETS[t.dataset.filter] ? t.dataset.filter : ""; if (!view.q) fixCat(); renderSegs(); renderSide(); renderBody(); return; }
     if (t.dataset.mode) { view.mf = t.dataset.mode === "1"; tiles.forEach((s) => { delete s.mf; }); renderSegs(); renderBody(); return; }
     const tile = t.closest(".tile"); if (!tile) return;
     const k = tile.dataset.k, s = tiles.get(k) || {}; tiles.set(k, s); const c = stateOf(k);

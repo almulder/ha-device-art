@@ -137,6 +137,19 @@
     ]
    },
    {
+    "id": "cabinet",
+    "name": "Cabinet & display",
+    "items": [
+     "cablights/curio",
+     "cablights/cornercurio",
+     "cablights/hutch",
+     "cablights/vitrine",
+     "cablights/wallglass",
+     "cablights/winebar",
+     "cablights/bookcase"
+    ]
+   },
+   {
     "id": "bulbs",
     "name": "Bulbs",
     "items": [
