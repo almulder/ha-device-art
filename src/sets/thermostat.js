@@ -32,8 +32,8 @@
   const MC = { heat: "#ff8a2a", cool: "#36a6ff", auto: "#3ecf6e", dry: "#1fc8b4", fan: "#9aa3ad", eco: "#7fcf3a" };
   const ML = { heatcool: "Heat/Cool", off: "Off", heat: "Heat", cool: "Cool", auto: "Auto", dry: "Dry", fan: "Fan", eco: "Eco" };
   const PL = { none: "None", boost: "Boost", comfort: "Comfort", sleep: "Sleep", away: "Away", frost: "Frost" };
-  function hvOpts(modes, presets) {
-    const a = [{ id: "mode", name: "Mode", values: modes.split(" ").map((k) => [k, ML[k]]) }];
+  function hvOpts(modes, presets, lab) {
+    const a = [{ id: "mode", name: "Mode", values: modes.split(" ").map((k) => [k, (lab && lab[k]) || ML[k]]) }];
     if (presets) a.push({ id: "preset", name: "Preset", values: ("none " + presets).split(" ").map((k) => [k, PL[k]]),
       when: { opt: "mode", is: modes.split(" ").filter((k) => k !== "off") } });
     return a;
@@ -575,13 +575,14 @@ ${x.defs.join("")}</defs>
     if (ic.id === "zone") ic.parts = [1, 2, 3, 4].map((i) => ({ id: "z" + i, name: "Zone " + i }));
     if (ic.id === "vent") ic.parts = [{ id: "vent", name: "Damper" }, TEMPS[0]];
   });
+  const AUTO = { heatcool: "Automatic" };
   const SMART = ["heatcool off heat cool fan eco", "comfort sleep away"], SPLIT = ["heatcool off heat cool auto dry fan eco", "boost comfort sleep"],
-    HEATONLY_O = ["heat off eco", "comfort sleep away frost"];
+    HEATONLY_O = ["heatcool heat off eco", "comfort sleep away frost", AUTO];
   const HV = { learning: SMART, square: SMART, touchscreen: SMART, pill: SMART, withsensor: SMART, colorring: SMART,
     programmable: ["heatcool off heat cool fan", "sleep away"], dial: ["heatcool off heat cool"], mercury: ["heatcool off heat cool fan"],
     zone: ["heatcool off heat cool fan"], splitwall: SPLIT, remote: SPLIT, ptac: ["heatcool off heat cool auto fan eco"],
-    baseboard: HEATONLY_O, radiant: HEATONLY_O, boiler: ["heat off eco", "boost comfort sleep away frost"] };
-  icons.forEach((ic) => { const h = HV[ic.id]; if (h) ic.options = hvOpts(h[0], h[1]); });
+    baseboard: HEATONLY_O, radiant: HEATONLY_O, boiler: ["heatcool heat off eco", "boost comfort sleep away frost", AUTO] };
+  icons.forEach((ic) => { const h = HV[ic.id]; if (h) ic.options = hvOpts(h[0], h[1], h[2]); });
 
   (window.HDA = window.HDA || []).push({
     id: "thermostat",

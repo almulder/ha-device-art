@@ -8,6 +8,13 @@ show their cycle and doors open. **429 of them are multi-function:** each door, 
 ![Lights and glow](docs/images/anim-lights.gif)
 ![Things that move](docs/images/anim-home.gif)
 
+## What's new in 1.3.2: fixes
+
+- Baseboard, radiant floor and boiler thermostats get a first Mode, **Automatic**, that looks just like before the Mode menu: it follows on/off and the setpoint (Heat stays a choice).
+- The door builder's Deadbolt menu and three smart lock drawings now have plain, descriptive names.
+- Double and French doors no longer repeat an internal drawing id when open.
+- Cabinet lights, switches, smart locks and deadbolts light up right away (no fade-in); doors still swing open without fading.
+
 ## What's new in 1.3.1: display cabinet lights and ceiling fan light kits
 
 ![New in 1.3.1](docs/images/anim-131-new.gif)

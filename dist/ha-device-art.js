@@ -7582,9 +7582,7 @@ ${extra || ""}</defs>`;
     group: "Lights",
     kind: "light",
     intro: "Glass display cabinets lit from inside: pick the light type, how many shelves and what is on them; the frame finish is the second swatch row. The glass tower lights each shelf on its own.",
-    css: `.hda-anim .hda-cablights-fade{animation:hda-cablights-fade 1.1s ease-out both}
-@keyframes hda-cablights-fade{0%{opacity:.25}100%{opacity:1}}
-.hda-anim .hda-cablights-glint{animation:hda-cablights-glint 7s ease-in-out infinite}
+    css: `.hda-anim .hda-cablights-glint{animation:hda-cablights-glint 7s ease-in-out infinite}
 @keyframes hda-cablights-glint{0%,55%{transform:translate(0,0);opacity:0}60%{opacity:1}90%{opacity:1}100%{transform:translate(160px,0);opacity:0}}
 @media (prefers-reduced-motion:reduce){.hda-anim .hda-cablights-fade,.hda-anim .hda-cablights-glint{animation:none}}`,
     icons,
@@ -12518,8 +12516,6 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
 @keyframes hda-deadbolts-bo{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 .hda-anim .hda-deadbolts-bi{animation:hda-deadbolts-bi .7s cubic-bezier(.5,0,.2,1) .25s both}
 @keyframes hda-deadbolts-bi{from{transform:translateX(100%)}to{transform:translateX(0)}}
-.hda-anim .hda-deadbolts-wake{animation:hda-deadbolts-wake 1.1s ease-out .2s both}
-@keyframes hda-deadbolts-wake{from{opacity:0}to{opacity:1}}
 .hda-anim .hda-deadbolts-pulse{animation:hda-deadbolts-pulse 3.2s ease-in-out infinite}
 @keyframes hda-deadbolts-pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .hda-anim .hda-deadbolts-breath{animation:hda-deadbolts-breath 2.8s ease-in-out infinite}
@@ -15587,7 +15583,7 @@ ${ringLight(xr, 100, 148, 7.5, 2.4, .18)}<circle cx="100" cy="148" r="5" fill="$
   const PAT_S = [["slider2", "2-panel slider"], ["slider3", "3-panel slider"], ["french", "French swing"], ["folding", "Folding glass wall"]];
   const BOLTS = [["none", "None"], ["lock:keypad", "Keypad deadbolt"], ["lock:touch", "Touchscreen lock"], ["lock:retrofit", "Retrofit lock"], ["lock:fingerprint", "Fingerprint lever"], ["lock:handleset", "Handle set"], ["lock:mortise", "Mortise lock"], ["lock:video", "Video doorbell lock"], ["lock:sliding", "Sliding door lock"], ["lock:office", "Office lever"], ["lock:cylinder", "Key deadbolt"], ["lock:euro", "Euro cylinder"], ["lock:card", "Card key lock"],
     ["deadbolts:arched-push-button", "Keypad deadbolt, curved"], ["deadbolts:round-push-button", "Keypad deadbolt, oval"], ["deadbolts:arched-wi-fi-touch", "Touchscreen deadbolt, curved"], ["deadbolts:slim-wi-fi-touch", "Touchscreen deadbolt, square"], ["deadbolts:arched-keypad-lever", "Keypad lever, curved"], ["deadbolts:arched-touch-lever", "Touchscreen lever, curved"], ["deadbolts:slim-touch-lever", "Touchscreen lever, square"],
-    ["lock2:glass-touchscreen", "Slim touchscreen lock"], ["lock2:push-button-keypad", "Slim push-button lock"], ["lock2:a2kftouch", "Key-free Touch"], ["lock2:slim-touchscreen", "Keyless slim lock"], ["lock2:levertouch", "Lever Touch"], ["lock2:leverkeypad", "Lever Keypad"], ["lock2:smart-lock-black", "Matter Black"], ["lock2:entrance-handle-lock", "Unity Entrance"]];
+    ["lock2:glass-touchscreen", "Slim touchscreen lock"], ["lock2:push-button-keypad", "Slim push-button lock"], ["lock2:a2kftouch", "Key-free touchscreen deadbolt"], ["lock2:slim-touchscreen", "Keyless slim lock"], ["lock2:levertouch", "Tall touchscreen lever"], ["lock2:leverkeypad", "Tall keypad lever"], ["lock2:smart-lock-black", "Black pill keypad deadbolt"], ["lock2:entrance-handle-lock", "Glass keypad handle lock"]];
   const WITH_HANDLE = ["lock:fingerprint", "lock:handleset", "lock:mortise", "lock:office", "lock:card", "lock:sliding", "deadbolts:arched-keypad-lever", "deadbolts:arched-touch-lever", "deadbolts:slim-touch-lever", "lock2:levertouch", "lock2:leverkeypad", "lock2:entrance-handle-lock"];
   const BASE = ((typeof document !== "undefined" && document.currentScript && document.currentScript.src) || "").replace(/[^/]*$/, "");
   const setOf = (id) => (window.HDA || []).filter((st) => st && st.id === id && st.icons)[0];
@@ -15620,7 +15616,7 @@ ${ringLight(xr, 100, 148, 7.5, 2.4, .18)}<circle cx="100" cy="148" r="5" fill="$
     return { o, u: o.uid, c, t, opt, state, ang: { closed: 0, ajar: 25, open: 75 }[state] * Math.PI / 180, slide: { closed: 0, ajar: .32, open: .92 }[state],
       hw: HW[opt.hw] || HW.nickel, locked: opt.lock === "locked", lock: LOCKC[opt.lock] ? opt.lock : "unlocked", bolt: opt.bolt || "none",
       p: { l: h.shade(c, .3), m: c, d: h.shade(c, -.28), k: h.shade(c, -.55) }, tp: { l: h.shade(t, .25), m: t, d: h.shade(t, -.3) },
-      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, n: 0 };
+      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, n: [0] }; // n: one strip counter shared by both leaves of a pair
   }
   function defs(x) {
     const id = x.id, p = x.p, t = x.tp;
@@ -15720,7 +15716,7 @@ ${rg(id("vig"), [[0, "#000", 0], [.66, "#000", .06], [1, "#000", .45]], .5, .45,
     const M = (xl) => { const u = uOf(xl); return hx - hs * u * c * k(u); };
     const n = 8; let strips = "";
     for (let i = 0; i < n; i++) {
-      const x0 = i * W / n, x1 = (i + 1) * W / n, A = (M(x1) - M(x0)) / (x1 - x0), sk = k(uOf((x0 + x1) / 2)), cid = x.id("st" + (x.n++));
+      const x0 = i * W / n, x1 = (i + 1) * W / n, A = (M(x1) - M(x0)) / (x1 - x0), sk = k(uOf((x0 + x1) / 2)), cid = x.id("st" + (x.n[0]++));
       strips += `<g transform="matrix(${A.toFixed(4)} 0 0 ${sk.toFixed(4)} ${f(M(x0) - A * x0)} ${f(y0 + (Y - y0) * sk)})"><clipPath id="${cid}"><rect x="${f(x0 - .05)}" y="-1" width="${f(x1 - x0 + .1)}" height="${f(H + 2)}"/></clipPath><g clip-path="url(#${cid})">${face}</g></g>`;
     }
     const kf = k(W), fx = M(hs < 0 ? W : 0), top = (kk) => y0 + (Y - y0) * kk, bot = (kk) => y0 + (Y + H - y0) * kk;
@@ -15848,7 +15844,7 @@ ${rg(id("vig"), [[0, "#000", 0], [.66, "#000", .06], [1, "#000", .45]], .5, .45,
 .hda-doorcfg-slide{transform-box:fill-box}
 .hda-anim .hda-doorcfg-swing{animation:hda-doorcfg-ease 1.2s cubic-bezier(.3,.7,.3,1) both}
 .hda-anim .hda-doorcfg-slide{animation:hda-doorcfg-slide 1.2s cubic-bezier(.3,.7,.3,1) both}
-@keyframes hda-doorcfg-ease{from{opacity:.4;transform:scaleX(1.25)}to{opacity:1;transform:scaleX(1)}}
+@keyframes hda-doorcfg-ease{from{transform:scaleX(1.25)}to{transform:scaleX(1)}}
 @keyframes hda-doorcfg-slide{from{transform:translateX(-8%)}to{transform:translateX(0)}}
 .hda-anim .hda-doorcfg-blink{animation:hda-doorcfg-blink 1.2s ease-in-out infinite}
 @keyframes hda-doorcfg-blink{0%,100%{opacity:.25}50%{opacity:.6}}
@@ -28600,14 +28596,14 @@ ${extra || ""}</defs>`;
   add("a2touchorb", "Touchscreen Bronze", [ORB, BS, SN], (x) => put(x, "cream", PANELS(15), assure2(x, "keyed", "ring")));
   add("push-button-keypad", "Push-button keypad", A2, (x) => put(x, "oak", WOOD(17), assure2(x, "keyed", "btn")));
   add("a2keypadsn", "Keypad Nickel", [SN, BS, ORB], (x) => put(x, "slate", speck(19, 50), assure2(x, "keyed", "btn")));
-  add("a2kftouch", "Key-free Touch", A2, (x) => put(x, "green", PANELS(21), assure2(x, "kf", "ring")));
+  add("a2kftouch", "Key-free touchscreen", A2, (x) => put(x, "green", PANELS(21), assure2(x, "kf", "ring")));
   add("a2kftouchsn", "Key-free Nickel", [SN, BS, ORB], (x) => put(x, "navy", PANELS(23), assure2(x, "kf", "ring")));
   add("a2kfkeypad", "Key-free Keypad", A2, (x) => put(x, "red", PANELS(25), assure2(x, "kf", "btn")));
   add("touchscreen-plus", "Touchscreen plus", [BS, SN, ORB], (x) => put(x, "glassdoor", LITE(27), assure2(x, "kf", "ring", { plus: true })));
   add("slim-touchscreen", "Slim touchscreen", [BS, SN, ORB, PB], (x) => put(x, "sage", PANELS(29), sl(x, 94, 38, 92, 122)));
   add("slim-touchscreen-brass", "Slim touchscreen, brass", [PB, SN, ORB, BS], (x) => put(x, "walnut", WOOD(31), sl(x, 94, 38, 92, 122)));
-  add("levertouch", "Lever Touch", [SN, ORB, BS], (x) => { const l = lever(x, "touch"); l.lever = 1; return scene(x, "gray", PANELS(33), edge(x, l.by, true) + l.s); });
-  add("leverkeypad", "Lever Keypad", [BS, SN, ORB], (x) => { const l = lever(x, "keypad"); return scene(x, "teal", PANELS(35), edge(x, l.by, true) + l.s); });
+  add("levertouch", "Tall touchscreen lever", [SN, ORB, BS], (x) => { const l = lever(x, "touch"); l.lever = 1; return scene(x, "gray", PANELS(33), edge(x, l.by, true) + l.s); });
+  add("leverkeypad", "Tall keypad lever", [BS, SN, ORB], (x) => { const l = lever(x, "keypad"); return scene(x, "teal", PANELS(35), edge(x, l.by, true) + l.s); });
   add("retrofit-lock", "Retrofit lock", [BS, SN], (x) => put(x, "yellow", PANELS(37), approach(x)));
   add("smart-lock-white", "Smart lock, white", [SNOW, MBK, ASH], (x) => put(x, "maple", WOOD(39), pill(x)));
   add("smart-lock-black", "Smart lock, black", [MBK, SNOW, ASH], (x) => put(x, "plum", PANELS(41), pill(x)));
@@ -28620,8 +28616,6 @@ ${extra || ""}</defs>`;
 @keyframes hda-lock2-bo{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 .hda-anim .hda-lock2-bi{animation:hda-lock2-bi .7s cubic-bezier(.5,0,.2,1) .25s both}
 @keyframes hda-lock2-bi{from{transform:translateX(100%)}to{transform:translateX(0)}}
-.hda-anim .hda-lock2-wake{animation:hda-lock2-wake 1.1s ease-out .2s both}
-@keyframes hda-lock2-wake{from{opacity:0}to{opacity:1}}
 .hda-anim .hda-lock2-pulse{animation:hda-lock2-pulse 3.2s ease-in-out infinite}
 @keyframes hda-lock2-pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .hda-anim .hda-lock2-breath{animation:hda-lock2-breath 2.8s ease-in-out infinite}
@@ -47299,9 +47293,7 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
     group: "More",
     kind: "light",
     intro: "Twenty wall switches, dimmers and keypads on painted walls. On flips each one to its ON position and lights its status LED in the LED color; dimmers fill their LED bar to the brightness. Plates come in white, ivory, almond, black, stainless, brass and glass by model. Gangs makes 1 to 4 of the same switch on one plate (each gang can follow its own entity), Role picks Main or Aux, and some dimmers let you pick the Control (paddle, rotary, slide or touch).",
-    css: `.hda-anim .hda-switch-in{animation:hda-switch-in .6s ease-out both}
-@keyframes hda-switch-in{from{opacity:0}}
-.hda-switch-pulse,.hda-switch-spin{transform-box:fill-box;transform-origin:center}
+    css: `.hda-switch-pulse,.hda-switch-spin{transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-switch-pulse{animation:hda-switch-pulse 3.2s ease-in-out infinite}
 @keyframes hda-switch-pulse{50%{opacity:.6;transform:scale(.9)}}
 .hda-anim .hda-switch-blink{animation:hda-switch-blink 1.4s ease-in-out infinite}
@@ -47372,8 +47364,8 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
   const MC = { heat: "#ff8a2a", cool: "#36a6ff", auto: "#3ecf6e", dry: "#1fc8b4", fan: "#9aa3ad", eco: "#7fcf3a" };
   const ML = { heatcool: "Heat/Cool", off: "Off", heat: "Heat", cool: "Cool", auto: "Auto", dry: "Dry", fan: "Fan", eco: "Eco" };
   const PL = { none: "None", boost: "Boost", comfort: "Comfort", sleep: "Sleep", away: "Away", frost: "Frost" };
-  function hvOpts(modes, presets) {
-    const a = [{ id: "mode", name: "Mode", values: modes.split(" ").map((k) => [k, ML[k]]) }];
+  function hvOpts(modes, presets, lab) {
+    const a = [{ id: "mode", name: "Mode", values: modes.split(" ").map((k) => [k, (lab && lab[k]) || ML[k]]) }];
     if (presets) a.push({ id: "preset", name: "Preset", values: ("none " + presets).split(" ").map((k) => [k, PL[k]]),
       when: { opt: "mode", is: modes.split(" ").filter((k) => k !== "off") } });
     return a;
@@ -47915,13 +47907,14 @@ ${x.defs.join("")}</defs>
     if (ic.id === "zone") ic.parts = [1, 2, 3, 4].map((i) => ({ id: "z" + i, name: "Zone " + i }));
     if (ic.id === "vent") ic.parts = [{ id: "vent", name: "Damper" }, TEMPS[0]];
   });
+  const AUTO = { heatcool: "Automatic" };
   const SMART = ["heatcool off heat cool fan eco", "comfort sleep away"], SPLIT = ["heatcool off heat cool auto dry fan eco", "boost comfort sleep"],
-    HEATONLY_O = ["heat off eco", "comfort sleep away frost"];
+    HEATONLY_O = ["heatcool heat off eco", "comfort sleep away frost", AUTO];
   const HV = { learning: SMART, square: SMART, touchscreen: SMART, pill: SMART, withsensor: SMART, colorring: SMART,
     programmable: ["heatcool off heat cool fan", "sleep away"], dial: ["heatcool off heat cool"], mercury: ["heatcool off heat cool fan"],
     zone: ["heatcool off heat cool fan"], splitwall: SPLIT, remote: SPLIT, ptac: ["heatcool off heat cool auto fan eco"],
-    baseboard: HEATONLY_O, radiant: HEATONLY_O, boiler: ["heat off eco", "boost comfort sleep away frost"] };
-  icons.forEach((ic) => { const h = HV[ic.id]; if (h) ic.options = hvOpts(h[0], h[1]); });
+    baseboard: HEATONLY_O, radiant: HEATONLY_O, boiler: ["heatcool heat off eco", "boost comfort sleep away frost", AUTO] };
+  icons.forEach((ic) => { const h = HV[ic.id]; if (h) ic.options = hvOpts(h[0], h[1], h[2]); });
 
   (window.HDA = window.HDA || []).push({
     id: "thermostat",
@@ -53679,7 +53672,7 @@ window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles
   if (!customElements.get("device-art-card-editor")) customElements.define("device-art-card-editor", DeviceArtCardEditor);
 
   /* version line in the browser console, so anyone can check which release they are running */
-  const VERSION = "1.3.1";
+  const VERSION = "1.3.2";
   console.info("%c DEVICE-ART-CARD %c v" + VERSION + " · " + Object.keys(ITEMS).length + " drawings ", "background:#7c5cff;color:#fff;font-weight:700;border-radius:3px 0 0 3px", "background:#2a1f5c;color:#fff;border-radius:0 3px 3px 0");
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === "device-art-card"))

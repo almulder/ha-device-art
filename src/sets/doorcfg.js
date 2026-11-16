@@ -22,7 +22,7 @@
   const PAT_S = [["slider2", "2-panel slider"], ["slider3", "3-panel slider"], ["french", "French swing"], ["folding", "Folding glass wall"]];
   const BOLTS = [["none", "None"], ["lock:keypad", "Keypad deadbolt"], ["lock:touch", "Touchscreen lock"], ["lock:retrofit", "Retrofit lock"], ["lock:fingerprint", "Fingerprint lever"], ["lock:handleset", "Handle set"], ["lock:mortise", "Mortise lock"], ["lock:video", "Video doorbell lock"], ["lock:sliding", "Sliding door lock"], ["lock:office", "Office lever"], ["lock:cylinder", "Key deadbolt"], ["lock:euro", "Euro cylinder"], ["lock:card", "Card key lock"],
     ["deadbolts:arched-push-button", "Keypad deadbolt, curved"], ["deadbolts:round-push-button", "Keypad deadbolt, oval"], ["deadbolts:arched-wi-fi-touch", "Touchscreen deadbolt, curved"], ["deadbolts:slim-wi-fi-touch", "Touchscreen deadbolt, square"], ["deadbolts:arched-keypad-lever", "Keypad lever, curved"], ["deadbolts:arched-touch-lever", "Touchscreen lever, curved"], ["deadbolts:slim-touch-lever", "Touchscreen lever, square"],
-    ["lock2:glass-touchscreen", "Slim touchscreen lock"], ["lock2:push-button-keypad", "Slim push-button lock"], ["lock2:a2kftouch", "Key-free Touch"], ["lock2:slim-touchscreen", "Keyless slim lock"], ["lock2:levertouch", "Lever Touch"], ["lock2:leverkeypad", "Lever Keypad"], ["lock2:smart-lock-black", "Matter Black"], ["lock2:entrance-handle-lock", "Unity Entrance"]];
+    ["lock2:glass-touchscreen", "Slim touchscreen lock"], ["lock2:push-button-keypad", "Slim push-button lock"], ["lock2:a2kftouch", "Key-free touchscreen deadbolt"], ["lock2:slim-touchscreen", "Keyless slim lock"], ["lock2:levertouch", "Tall touchscreen lever"], ["lock2:leverkeypad", "Tall keypad lever"], ["lock2:smart-lock-black", "Black pill keypad deadbolt"], ["lock2:entrance-handle-lock", "Glass keypad handle lock"]];
   const WITH_HANDLE = ["lock:fingerprint", "lock:handleset", "lock:mortise", "lock:office", "lock:card", "lock:sliding", "deadbolts:arched-keypad-lever", "deadbolts:arched-touch-lever", "deadbolts:slim-touch-lever", "lock2:levertouch", "lock2:leverkeypad", "lock2:entrance-handle-lock"];
   const BASE = ((typeof document !== "undefined" && document.currentScript && document.currentScript.src) || "").replace(/[^/]*$/, "");
   const setOf = (id) => (window.HDA || []).filter((st) => st && st.id === id && st.icons)[0];
@@ -55,7 +55,7 @@
     return { o, u: o.uid, c, t, opt, state, ang: { closed: 0, ajar: 25, open: 75 }[state] * Math.PI / 180, slide: { closed: 0, ajar: .32, open: .92 }[state],
       hw: HW[opt.hw] || HW.nickel, locked: opt.lock === "locked", lock: LOCKC[opt.lock] ? opt.lock : "unlocked", bolt: opt.bolt || "none",
       p: { l: h.shade(c, .3), m: c, d: h.shade(c, -.28), k: h.shade(c, -.55) }, tp: { l: h.shade(t, .25), m: t, d: h.shade(t, -.3) },
-      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, n: 0 };
+      id: (s) => `${o.uid}-${s}`, url: (s) => `url(#${o.uid}-${s})`, n: [0] }; // n: one strip counter shared by both leaves of a pair
   }
   function defs(x) {
     const id = x.id, p = x.p, t = x.tp;
@@ -155,7 +155,7 @@ ${rg(id("vig"), [[0, "#000", 0], [.66, "#000", .06], [1, "#000", .45]], .5, .45,
     const M = (xl) => { const u = uOf(xl); return hx - hs * u * c * k(u); };
     const n = 8; let strips = "";
     for (let i = 0; i < n; i++) {
-      const x0 = i * W / n, x1 = (i + 1) * W / n, A = (M(x1) - M(x0)) / (x1 - x0), sk = k(uOf((x0 + x1) / 2)), cid = x.id("st" + (x.n++));
+      const x0 = i * W / n, x1 = (i + 1) * W / n, A = (M(x1) - M(x0)) / (x1 - x0), sk = k(uOf((x0 + x1) / 2)), cid = x.id("st" + (x.n[0]++));
       strips += `<g transform="matrix(${A.toFixed(4)} 0 0 ${sk.toFixed(4)} ${f(M(x0) - A * x0)} ${f(y0 + (Y - y0) * sk)})"><clipPath id="${cid}"><rect x="${f(x0 - .05)}" y="-1" width="${f(x1 - x0 + .1)}" height="${f(H + 2)}"/></clipPath><g clip-path="url(#${cid})">${face}</g></g>`;
     }
     const kf = k(W), fx = M(hs < 0 ? W : 0), top = (kk) => y0 + (Y - y0) * kk, bot = (kk) => y0 + (Y + H - y0) * kk;
@@ -283,7 +283,7 @@ ${rg(id("vig"), [[0, "#000", 0], [.66, "#000", .06], [1, "#000", .45]], .5, .45,
 .hda-doorcfg-slide{transform-box:fill-box}
 .hda-anim .hda-doorcfg-swing{animation:hda-doorcfg-ease 1.2s cubic-bezier(.3,.7,.3,1) both}
 .hda-anim .hda-doorcfg-slide{animation:hda-doorcfg-slide 1.2s cubic-bezier(.3,.7,.3,1) both}
-@keyframes hda-doorcfg-ease{from{opacity:.4;transform:scaleX(1.25)}to{opacity:1;transform:scaleX(1)}}
+@keyframes hda-doorcfg-ease{from{transform:scaleX(1.25)}to{transform:scaleX(1)}}
 @keyframes hda-doorcfg-slide{from{transform:translateX(-8%)}to{transform:translateX(0)}}
 .hda-anim .hda-doorcfg-blink{animation:hda-doorcfg-blink 1.2s ease-in-out infinite}
 @keyframes hda-doorcfg-blink{0%,100%{opacity:.25}50%{opacity:.6}}

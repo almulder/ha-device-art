@@ -291,14 +291,14 @@ ${extra || ""}</defs>`;
   add("a2touchorb", "Touchscreen Bronze", [ORB, BS, SN], (x) => put(x, "cream", PANELS(15), assure2(x, "keyed", "ring")));
   add("push-button-keypad", "Push-button keypad", A2, (x) => put(x, "oak", WOOD(17), assure2(x, "keyed", "btn")));
   add("a2keypadsn", "Keypad Nickel", [SN, BS, ORB], (x) => put(x, "slate", speck(19, 50), assure2(x, "keyed", "btn")));
-  add("a2kftouch", "Key-free Touch", A2, (x) => put(x, "green", PANELS(21), assure2(x, "kf", "ring")));
+  add("a2kftouch", "Key-free touchscreen", A2, (x) => put(x, "green", PANELS(21), assure2(x, "kf", "ring")));
   add("a2kftouchsn", "Key-free Nickel", [SN, BS, ORB], (x) => put(x, "navy", PANELS(23), assure2(x, "kf", "ring")));
   add("a2kfkeypad", "Key-free Keypad", A2, (x) => put(x, "red", PANELS(25), assure2(x, "kf", "btn")));
   add("touchscreen-plus", "Touchscreen plus", [BS, SN, ORB], (x) => put(x, "glassdoor", LITE(27), assure2(x, "kf", "ring", { plus: true })));
   add("slim-touchscreen", "Slim touchscreen", [BS, SN, ORB, PB], (x) => put(x, "sage", PANELS(29), sl(x, 94, 38, 92, 122)));
   add("slim-touchscreen-brass", "Slim touchscreen, brass", [PB, SN, ORB, BS], (x) => put(x, "walnut", WOOD(31), sl(x, 94, 38, 92, 122)));
-  add("levertouch", "Lever Touch", [SN, ORB, BS], (x) => { const l = lever(x, "touch"); l.lever = 1; return scene(x, "gray", PANELS(33), edge(x, l.by, true) + l.s); });
-  add("leverkeypad", "Lever Keypad", [BS, SN, ORB], (x) => { const l = lever(x, "keypad"); return scene(x, "teal", PANELS(35), edge(x, l.by, true) + l.s); });
+  add("levertouch", "Tall touchscreen lever", [SN, ORB, BS], (x) => { const l = lever(x, "touch"); l.lever = 1; return scene(x, "gray", PANELS(33), edge(x, l.by, true) + l.s); });
+  add("leverkeypad", "Tall keypad lever", [BS, SN, ORB], (x) => { const l = lever(x, "keypad"); return scene(x, "teal", PANELS(35), edge(x, l.by, true) + l.s); });
   add("retrofit-lock", "Retrofit lock", [BS, SN], (x) => put(x, "yellow", PANELS(37), approach(x)));
   add("smart-lock-white", "Smart lock, white", [SNOW, MBK, ASH], (x) => put(x, "maple", WOOD(39), pill(x)));
   add("smart-lock-black", "Smart lock, black", [MBK, SNOW, ASH], (x) => put(x, "plum", PANELS(41), pill(x)));
@@ -311,8 +311,6 @@ ${extra || ""}</defs>`;
 @keyframes hda-lock2-bo{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 .hda-anim .hda-lock2-bi{animation:hda-lock2-bi .7s cubic-bezier(.5,0,.2,1) .25s both}
 @keyframes hda-lock2-bi{from{transform:translateX(100%)}to{transform:translateX(0)}}
-.hda-anim .hda-lock2-wake{animation:hda-lock2-wake 1.1s ease-out .2s both}
-@keyframes hda-lock2-wake{from{opacity:0}to{opacity:1}}
 .hda-anim .hda-lock2-pulse{animation:hda-lock2-pulse 3.2s ease-in-out infinite}
 @keyframes hda-lock2-pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .hda-anim .hda-lock2-breath{animation:hda-lock2-breath 2.8s ease-in-out infinite}

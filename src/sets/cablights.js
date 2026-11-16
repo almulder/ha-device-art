@@ -535,9 +535,7 @@ ${extra || ""}</defs>`;
     group: "Lights",
     kind: "light",
     intro: "Glass display cabinets lit from inside: pick the light type, how many shelves and what is on them; the frame finish is the second swatch row. The glass tower lights each shelf on its own.",
-    css: `.hda-anim .hda-cablights-fade{animation:hda-cablights-fade 1.1s ease-out both}
-@keyframes hda-cablights-fade{0%{opacity:.25}100%{opacity:1}}
-.hda-anim .hda-cablights-glint{animation:hda-cablights-glint 7s ease-in-out infinite}
+    css: `.hda-anim .hda-cablights-glint{animation:hda-cablights-glint 7s ease-in-out infinite}
 @keyframes hda-cablights-glint{0%,55%{transform:translate(0,0);opacity:0}60%{opacity:1}90%{opacity:1}100%{transform:translate(160px,0);opacity:0}}
 @media (prefers-reduced-motion:reduce){.hda-anim .hda-cablights-fade,.hda-anim .hda-cablights-glint{animation:none}}`,
     icons,

@@ -410,8 +410,6 @@ ${plate(x, cx, cy - r * .38, r * .9, r * .24)}${plug(x, cx, cy + r * .2, r * .36
 @keyframes hda-deadbolts-bo{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 .hda-anim .hda-deadbolts-bi{animation:hda-deadbolts-bi .7s cubic-bezier(.5,0,.2,1) .25s both}
 @keyframes hda-deadbolts-bi{from{transform:translateX(100%)}to{transform:translateX(0)}}
-.hda-anim .hda-deadbolts-wake{animation:hda-deadbolts-wake 1.1s ease-out .2s both}
-@keyframes hda-deadbolts-wake{from{opacity:0}to{opacity:1}}
 .hda-anim .hda-deadbolts-pulse{animation:hda-deadbolts-pulse 3.2s ease-in-out infinite}
 @keyframes hda-deadbolts-pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .hda-anim .hda-deadbolts-breath{animation:hda-deadbolts-breath 2.8s ease-in-out infinite}

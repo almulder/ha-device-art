@@ -591,9 +591,7 @@ ${engr(92, Y + 5.6, 8 + (i * 5) % 14, 1)}${engr(92, Y + 8.6, 6 + (i * 3) % 9, 1)
     group: "More",
     kind: "light",
     intro: "Twenty wall switches, dimmers and keypads on painted walls. On flips each one to its ON position and lights its status LED in the LED color; dimmers fill their LED bar to the brightness. Plates come in white, ivory, almond, black, stainless, brass and glass by model. Gangs makes 1 to 4 of the same switch on one plate (each gang can follow its own entity), Role picks Main or Aux, and some dimmers let you pick the Control (paddle, rotary, slide or touch).",
-    css: `.hda-anim .hda-switch-in{animation:hda-switch-in .6s ease-out both}
-@keyframes hda-switch-in{from{opacity:0}}
-.hda-switch-pulse,.hda-switch-spin{transform-box:fill-box;transform-origin:center}
+    css: `.hda-switch-pulse,.hda-switch-spin{transform-box:fill-box;transform-origin:center}
 .hda-anim .hda-switch-pulse{animation:hda-switch-pulse 3.2s ease-in-out infinite}
 @keyframes hda-switch-pulse{50%{opacity:.6;transform:scale(.9)}}
 .hda-anim .hda-switch-blink{animation:hda-switch-blink 1.4s ease-in-out infinite}
