@@ -142,6 +142,8 @@ body.sheetmode { background: #140b3a !important; }
       manual card in your dashboard. Install the card with HACS (or add <code>ha-device-art.js</code> as a dashboard resource), then set <code>entity</code> to your own device.
       <br><b>Multi-function drawings</b> (the <b>N parts</b> badge) can follow one entity per part: tick only the parts your device has, open each door or drawer,
       pick a stage (cycle, mode, state) and set the readings. Switch <b>Mode</b> to <b>One device</b> for the classic single-entity look.
+      <br><b>New in 1.3.3:</b> chicken lamps (a ceramic hen, a rooster lamp, a chick globe and a hen with chicks) that glow like a bulb when on;
+      pick the chicken's color and the light color, and a base on three of them (pick <b>Show: New in 1.3.3</b>).
       <br><b>New in 1.3.1:</b> display cabinet lights (curio, corner curio, china hutch, glass tower, wall glass cabinet, wine bar and a bookcase with LED)
       with a light type, shelves, contents, light color and frame finish, and the glass tower lights each shelf on its own; six ceiling fans also take a Bowl, Bar or Drum
       light kit (pick <b>Show: New in 1.3.1</b>).
@@ -163,10 +165,10 @@ body.sheetmode { background: #140b3a !important; }
   const RM = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const P = new URLSearchParams(location.search);
   const view = { on: P.get("on") !== "0", scene: P.get("scene") !== "0", cat: P.get("cat") || "", sub: P.get("sub") || "", q: "",
-    mfOnly: P.get("filter") === "mf", newOnly: P.get("filter") === "new" ? "1.3.1" : P.get("filter") === "new130" ? "1.3.0" : "", mf: P.get("mode") !== "one" };
+    mfOnly: P.get("filter") === "mf", newOnly: P.get("filter") === "new" ? "1.3.3" : P.get("filter") === "new131" ? "1.3.1" : P.get("filter") === "new130" ? "1.3.0" : "", mf: P.get("mode") !== "one" };
   /* the drawings that are new in each version (the Show: New in filters) */
-  const NEW_SETS = { "1.3.1": ["cablights"], "1.3.0": ["relays", "covers2", "buttons", "lights9", "leaks", "smoke", "camdoorbells", "garagecfg", "doorcfg", "windowcfg"] };
-  const LATEST = "1.3.1";
+  const NEW_SETS = { "1.3.3": ["chickenlamp"], "1.3.1": ["cablights"], "1.3.0": ["relays", "covers2", "buttons", "lights9", "leaks", "smoke", "camdoorbells", "garagecfg", "doorcfg", "windowcfg"] };
+  const LATEST = "1.3.3";
   const isNew = (k, v) => { const it = DA.items[k]; return !!(it && it.set && NEW_SETS[v || LATEST].indexOf(it.set.id) >= 0); };
   const keep = (k) => (!view.mfOnly || hasParts(k)) && (!view.newOnly || isNew(k, view.newOnly));
   const LVL = { light: "Brightness", fan: "Speed", plant: "Water" };
@@ -347,7 +349,7 @@ body.sheetmode { background: #140b3a !important; }
   function renderSegs() {
     $("#f-on").innerHTML = [["1", "On"], ["0", "Off"]].map(([v, l]) => `<button type="button" data-on="${v}" aria-pressed="${(v === "1") === view.on}">${l}</button>`).join("");
     $("#f-scene").innerHTML = [["1", "Show"], ["0", "Hide"]].map(([v, l]) => `<button type="button" data-scene="${v}" aria-pressed="${(v === "1") === view.scene}">${l}</button>`).join("");
-    $("#f-filter").innerHTML = [["0", "All"], ["1", "Multi-function"], ["1.3.1", "New in 1.3.1"], ["1.3.0", "New in 1.3.0"]].map(([v, l]) => `<button type="button" data-filter="${v}" aria-pressed="${v === (view.mfOnly ? "1" : view.newOnly || "0")}">${l}</button>`).join("");
+    $("#f-filter").innerHTML = [["0", "All"], ["1", "Multi-function"], ["1.3.3", "New in 1.3.3"], ["1.3.1", "New in 1.3.1"], ["1.3.0", "New in 1.3.0"]].map(([v, l]) => `<button type="button" data-filter="${v}" aria-pressed="${v === (view.mfOnly ? "1" : view.newOnly || "0")}">${l}</button>`).join("");
     $("#f-mode").innerHTML = [["0", "One device"], ["1", "Multi-function"]].map(([v, l]) => `<button type="button" data-mode="${v}" aria-pressed="${(v === "1") === view.mf}">${l}</button>`).join("");
   }
   /* keep the open category and group valid for the current filter */

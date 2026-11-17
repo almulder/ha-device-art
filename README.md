@@ -1,12 +1,25 @@
 # Device Art Card
 
-**Animated, realistic device drawings for your Home Assistant dashboard.** **1,603 drawings** in **17 categories** and 113 groups:
+**Animated, realistic device drawings for your Home Assistant dashboard.** **1,607 drawings** in **17 categories** and 114 groups:
 lights, fans, appliances, locks, sensors, plants and more. Builder cards and plant/tree builders add thousands more combinations. Each one comes alive with your device's state: lamps glow in the bulb's color, fans spin with their speed, washers
 show their cycle and doors open. **429 of them are multi-function:** each door, light, reading or stage can follow its own entity.
 
 ![Fans](docs/images/anim-fans.gif)
 ![Lights and glow](docs/images/anim-lights.gif)
 ![Things that move](docs/images/anim-home.gif)
+
+## What's new in 1.3.3: chicken lamps
+
+![Chicken lamps](docs/images/new-133-chickens.png)
+
+**4 new drawings**, so there are **1,607 drawings** in all.
+
+- **Chicken lamps** (Lighting, **Chicken lamps**): a ceramic sitting hen, a rooster lamp, a round chick globe and a hen
+  with her chicks. Each one lights up from inside like a bulb when it's on, and follows the brightness. The first color
+  row is the light color; the second row is the **chicken's own color** (white, golden, brown, black, speckled, pastels).
+  The ceramic hen, rooster and chick globe also have a **Base** menu: none, wood, egg cup or metal.
+
+The **[gallery](https://almulder.github.io/ha-device-art/)** has a **Show: New in 1.3.3** filter.
 
 ## What's new in 1.3.2: fixes
 
@@ -164,6 +177,8 @@ How to set it up: see [Multi-function cards (parts)](#multi-function-cards-parts
 
 ## Version history
 
+- **1.3.3:** 4 chicken lamps that glow when on, with a chicken color and a light color. See above.
+- **1.3.2:** fixes: thermostat Automatic mode, plain lock names, unique ids on double doors, no fade-in on lights and locks.
 - **1.3.1:** 7 display cabinet lights (curio, corner curio, china hutch, glass tower, wall glass cabinet, wine bar,
   bookcase with LED) and Bowl, Bar and Drum light kits on six ceiling fans. See above.
 - **1.3.0:** 72 new drawings (relays, pergolas, buttons, grow/UV/emergency/pool lights, leak sensors) and builders for
@@ -240,7 +255,7 @@ Almost everything on a drawing can be set. The pictures below show only a few of
 
 **Getting updates:** HACS shows "Update available" for each new version. After updating, reload the page
 (Ctrl+F5, or in the phone app: Settings → Companion App → Debugging → Reset frontend cache). To check your version,
-open the browser console: it shows `DEVICE-ART-CARD v1.3.1`.
+open the browser console: it shows `DEVICE-ART-CARD v1.3.3`.
 
 **Manual**
 1. Copy `dist/ha-device-art.js` to `config/www/`.
@@ -474,7 +489,7 @@ Some cards are builders: pick the style, layout and extras from menus, and the d
 
 ## Every category
 
-A sample from each category, 1,603 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
+A sample from each category, 1,607 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
 
 | | |
 |---|---|

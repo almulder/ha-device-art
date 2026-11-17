@@ -150,6 +150,16 @@
     ]
    },
    {
+    "id": "chickenlamps",
+    "name": "Chicken lamps",
+    "items": [
+     "chickenlamp/ceramichen",
+     "chickenlamp/rooster",
+     "chickenlamp/chickglobe",
+     "chickenlamp/mamahen"
+    ]
+   },
+   {
     "id": "bulbs",
     "name": "Bulbs",
     "items": [
