@@ -8,6 +8,19 @@ show their cycle and doors open. **429 of them are multi-function:** each door, 
 ![Lights and glow](docs/images/anim-lights.gif)
 ![Things that move](docs/images/anim-home.gif)
 
+## What's new in 1.3.4: garage door windows, panels and texture
+
+![Garage door looks](docs/images/new-134-garage.png)
+
+New menus on the garage doors (Outdoor, **Garage doors & gates**). Every menu starts on the look you have now.
+
+- **Windows:** none, top row, bottom row, down the right, down the left or everywhere.
+- **Panels:** 4 or 5 (glass doors: glass rows).
+- **Window shape:** long narrow or square, and **Glass:** frosted white or clear (Flush modern and Cedar plank).
+- **Texture:** smooth, wood grain, stucco, brushed metal or ribbed, over any door color.
+- Long windows are taller and frosted white, and windows glow warm when the door is open. In multi-function mode
+  they glow when the **Light** part is on.
+
 ## What's new in 1.3.3: chicken lamps
 
 ![Chicken lamps](docs/images/new-133-chickens.png)
@@ -177,6 +190,7 @@ How to set it up: see [Multi-function cards (parts)](#multi-function-cards-parts
 
 ## Version history
 
+- **1.3.4:** garage doors get Windows, Panels, Window shape, Glass and Texture menus. See above.
 - **1.3.3:** 4 chicken lamps that glow when on, with a chicken color and a light color. See above.
 - **1.3.2:** fixes: thermostat Automatic mode, plain lock names, unique ids on double doors, no fade-in on lights and locks.
 - **1.3.1:** 7 display cabinet lights (curio, corner curio, china hutch, glass tower, wall glass cabinet, wine bar,
@@ -255,7 +269,7 @@ Almost everything on a drawing can be set. The pictures below show only a few of
 
 **Getting updates:** HACS shows "Update available" for each new version. After updating, reload the page
 (Ctrl+F5, or in the phone app: Settings → Companion App → Debugging → Reset frontend cache). To check your version,
-open the browser console: it shows `DEVICE-ART-CARD v1.3.3`.
+open the browser console: it shows `DEVICE-ART-CARD v1.3.4`.
 
 **Manual**
 1. Copy `dist/ha-device-art.js` to `config/www/`.

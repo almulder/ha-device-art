@@ -20739,7 +20739,7 @@ ${[[.12, "#f6f2ea"], [.36, "#e6a35c"], [.62, "#d94f4f"]].map(([a, col]) => `<rec
   function pal(c) { const h = N(); return { l: h.shade(c, .38), m: c, d: h.shade(c, -.28), k: h.shade(c, -.55) }; }
   function ctx(o) {
     const u = o.uid, on = !!o.on, lv = o.level == null ? 1 : o.level;
-    return { o, u, on, lv, op: on ? Math.max(.12, Math.min(1, lv)) : 0, c: o.color || WHT, p: pal(o.color || WHT),
+    return { o, u, on, lv, opt: o.opt || {}, op: on ? Math.max(.12, Math.min(1, lv)) : 0, c: o.color || WHT, p: pal(o.color || WHT),
       id: (s) => `${u}-${s}`, url: (s) => `url(#${u}-${s})`, n: 0, lt: on, mf: false };
   }
 
@@ -20775,7 +20775,7 @@ ${rg(id("vig"), [[0, "#000", 0], [.66, "#000", .06], [1, "#000", .48]], .5, .45,
 ${extra || ""}</defs>`;
   }
   function svg(x, body, extra) {
-    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x, extra)}<g clip-path="${x.url("wc")}">${body}<g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g></g><rect class="hda-bg" x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></svg>`;
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">${defs(x, (extra || "") + texDefs(x))}<g clip-path="${x.url("wc")}">${body}<g class="hda-bg"><rect x="8" y="8" width="184" height="184" fill="${x.url("vig")}"/></g></g><rect class="hda-bg" x="8.5" y="8.5" width="183" height="183" rx="15.5" fill="none" stroke="#fff" stroke-opacity=".08"/></svg>`;
   }
 
   function wall_(x, kind, c, y0, y1, seed) {
@@ -20915,9 +20915,28 @@ ${extra || ""}</defs>`;
     return o;
   }
 
+  // look menus (o.opt): panels (section count), win (where the windows go), shape (long narrow | square), tex (surface)
+  const opt = (x, k, d) => (x.opt && x.opt[k] != null && x.opt[k] !== "" ? String(x.opt[k]) : d);
+  const rowOn = (mode, r, rows) => mode === "all" || (mode === "top" && r === 0) || (mode === "bottom" && r === rows - 1);
+  const winOn = (mode, r, c, rows, cols) => rowOn(mode, r, rows) || (mode === "right" && c === cols - 1) || (mode === "left" && c === 0);
+  const TEXS = ["wood", "stucco", "brushed", "ribbed"];
+  function texDefs(x) {
+    const t = opt(x, "tex", ""), id = x.id("tx");
+    if (TEXS.indexOf(t) < 0 || x.texNative === t) return "";
+    if (t === "wood") return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="48" height="7"><path d="M0 1.5C12 .6 30 2.6 48 1.5" fill="none" stroke="#2a1606" stroke-opacity=".36" stroke-width=".7"/><path d="M0 2.3C12 1.5 30 3.4 48 2.3" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width=".5"/><path d="M6 3.6C14 3.1 22 4.1 30 3.5" fill="none" stroke="#2a1606" stroke-opacity=".26" stroke-width=".55"/><path d="M0 4.9C16 5.8 32 4 48 4.9" fill="none" stroke="#fff" stroke-opacity=".13" stroke-width=".6"/><path d="M28 6.2C36 5.9 42 6.5 47 6.1" fill="none" stroke="#2a1606" stroke-opacity=".22" stroke-width=".5"/></pattern>`;
+    if (t === "stucco") {
+      const r = rnd(31); let d = "";
+      for (let i = 0; i < 16; i++) d += `<circle cx="${f(r() * 12)}" cy="${f(r() * 12)}" r="${(.35 + r() * .55).toFixed(2)}" fill="${i % 2 ? "#000" : "#fff"}" fill-opacity="${(i % 2 ? .08 + r() * .1 : .04 + r() * .05).toFixed(2)}"/>`;
+      return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="12" height="12">${d}</pattern>`;
+    }
+    if (t === "brushed") return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="20" height="3.1"><path d="M0 .4H20" stroke="#fff" stroke-opacity=".15" stroke-width=".45"/><path d="M0 1.1H20" stroke="#000" stroke-opacity=".16" stroke-width=".4"/><path d="M0 1.8H20" stroke="#fff" stroke-opacity=".08" stroke-width=".4"/><path d="M0 2.5H20" stroke="#000" stroke-opacity=".1" stroke-width=".45"/></pattern>`;
+    return `<pattern id="${id}" patternUnits="userSpaceOnUse" width="10" height="3.6"><path d="M0 .6H10" stroke="#000" stroke-opacity=".3" stroke-width=".9"/><path d="M0 1.6H10" stroke="#fff" stroke-opacity=".15" stroke-width=".7"/></pattern>`;
+  }
+  const tex = (x, W, Hh) => { const t = opt(x, "tex", ""); return TEXS.indexOf(t) < 0 || x.texNative === t ? "" : `<rect width="${W}" height="${Hh}" fill="${x.url("tx")}"/>`; };
   function secBase(x, W, Hh, n, key) {
     let s = ""; const h = Hh / n, g = x.url(key || "sec");
     for (let i = 0; i < n; i++) s += `<rect x="0" y="${f(i * h)}" width="${W}" height="${f(h)}" fill="${g}"/>`;
+    s += key ? "" : tex(x, W, Hh);
     for (let i = 1; i < n; i++) s += `<path d="M0 ${f(i * h)}H${W}" stroke="#000" stroke-opacity=".5" stroke-width="1.3"/><path d="M0 ${f(i * h + 1.2)}H${W}" stroke="#fff" stroke-opacity=".3" stroke-width=".8"/>`;
     return s;
   }
@@ -20930,6 +20949,28 @@ ${extra || ""}</defs>`;
     return `<rect x="${f(px - 1)}" y="${f(py - 1)}" width="${f(pw + 2)}" height="${f(ph + 2)}" fill="#000" fill-opacity=".35"/><rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${x.url("gls")}"/>${lit ? `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${WARM}" opacity=".55"/>` : ""}
 <path d="M${f(px)} ${f(py + ph * .9)}L${f(px + pw * .55)} ${f(py)}H${f(px + pw * .8)}L${f(px)} ${f(py + ph)}Z" fill="#fff" opacity=".13"/><rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".7"/>`;
   }
+  // flush-style slot window (lit warm from the lit garage while the door is open)
+  // (n222 note) slot windows: Frosted white (default) or Clear; lit warm from the lit garage while the door is open
+  const slot = (x, px, py, pw, ph) => opt(x, "glass", "frost") === "clear" ? slotClear(x, px, py, pw, ph)
+    : `<rect x="${f(px - .6)}" y="${f(py - .6)}" width="${f(pw + 1.2)}" height="${f(ph + 1.2)}" fill="#000" fill-opacity=".45"/><rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="#e8edf0"/><rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph * .5)}" fill="#fff" fill-opacity=".45"/>${x.lt ? `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${WARM}" opacity=".6"/>` : ""}<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="none" stroke="#9aa3a8" stroke-opacity=".7" stroke-width=".6"/>`;
+  const slotClear = (x, px, py, pw, ph) => `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${x.url("gls")}"/>${x.lt ? `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${WARM}" opacity=".55"/>` : ""}<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="none" stroke="#000" stroke-opacity=".5"/><path d="M${f(px + pw * .025)} ${f(py + ph * .23)}H${f(px + pw * .5)}" stroke="#fff" stroke-opacity=".3"/>`;
+  // windows laid over a flat face (flush, plank): one row per section
+  function slotWins(x, W, Hh, n, mode, shape, hf) {
+    if (mode === "none") return "";
+    const sh = Hh / n, sq = shape === "square", q = sh * .46; let s = ""; const hk = (hf || .22) * 1.75;
+    for (let i = 0; i < n; i++) {
+      if (!rowOn(mode, i, n) && mode !== "right" && mode !== "left") continue;
+      const py = sq ? i * sh + (sh - q) / 2 : i * sh + sh * (.51 - hk / 2), ph = sq ? q : sh * hk;
+      if (mode === "right" || mode === "left") {
+        const pw = sq ? q : W * .32, px = mode === "right" ? W * .92 - pw : W * .08;
+        s += slot(x, px, py, pw, ph);
+      } else if (sq) {
+        const k = 5, gap = (W * .8 - k * q) / (k - 1);
+        for (let j = 0; j < k; j++) s += slot(x, W * .1 + j * (q + gap), py, q, q);
+      } else s += slot(x, W * .1, py, W * .8, ph);
+    }
+    return s;
+  }
   const sheen = (x, W, Hh) => `<rect width="${W}" height="${Hh}" fill="${x.url("sh")}"/><rect y="${Hh - 2.6}" width="${W}" height="2.6" fill="#131313"/>`;
   function grainH(seed, x0, y0, w, hh, step) {
     const r = rnd(seed); let d = "";
@@ -20941,42 +20982,54 @@ ${extra || ""}</defs>`;
     for (let xx = x0 + 1; xx < x0 + w; xx += step + r() * step) { const a = r() * 1.6 - .8; d += `M${f(xx)} ${f(y0)}C${f(xx + a)} ${f(y0 + hh * .3)} ${f(xx - a)} ${f(y0 + hh * .6)} ${f(xx + a * .5)} ${f(y0 + hh)}`; }
     return `<path d="${d}" fill="none" stroke="#2a1606" stroke-opacity=".22" stroke-width=".7"/>`;
   }
+  // win: false | true (top row) | "none" | "top" | "bottom" | "right" | "left" | "all"
   function doorRaised(x, W, Hh, cols, rows, win, key) {
+    const mode = win === true ? "top" : win || "none";
     let s = secBase(x, W, Hh, rows, key); const m = W * .05, gx = W * .028, pw = (W - 2 * m - (cols - 1) * gx) / cols, sh = Hh / rows, ph = sh * .6;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const px = m + c * (pw + gx), py = r * sh + sh * .2;
-      s += win && r === 0 ? pane(x, px, py, pw, ph, !!(x.mf && x.lt)) : rp(px, py, pw, ph);
+      s += winOn(mode, r, c, rows, cols) ? pane(x, px, py, pw, ph, x.lt) : rp(px, py, pw, ph);
     }
     return s + sheen(x, W, Hh);
   }
-  function doorLong(x, W, Hh) {
-    let s = secBase(x, W, Hh, 4); const m = W * .05, gx = W * .04, pw = (W - 2 * m - gx) / 2, sh = Hh / 4, ph = sh * .6;
-    for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) {
+  function doorLong(x, W, Hh, rows, mode, shape) {
+    rows = rows || 4; mode = mode || "top";
+    let s = secBase(x, W, Hh, rows); const m = W * .05, gx = W * .04, pw = (W - 2 * m - gx) / 2, sh = Hh / rows, ph = sh * .6, sq = shape === "square";
+    for (let r = 0; r < rows; r++) for (let c = 0; c < 2; c++) {
       const px = m + c * (pw + gx), py = r * sh + sh * .2;
-      if (r === 0) { const ww = (pw - 3) / 2; s += pane(x, px, py, ww, ph) + pane(x, px + ww + 3, py, ww, ph); } else s += rp(px, py, pw, ph, 2.4);
+      if ((mode === "right" && c === 1) || (mode === "left" && c === 0)) {
+        const ww = sq ? ph : pw * .48;
+        s += mode === "right" ? rp(px, py, pw - ww - 3, ph, 2.4) + pane(x, px + pw - ww, py, ww, ph, x.lt) : pane(x, px, py, ww, ph, x.lt) + rp(px + ww + 3, py, pw - ww - 3, ph, 2.4);
+      } else if (rowOn(mode, r, rows)) {
+        if (sq) { const k = Math.max(1, Math.floor((pw + 3) / (ph + 3))), gap = k > 1 ? (pw - k * ph) / (k - 1) : 0; for (let j = 0; j < k; j++) s += pane(x, px + (k > 1 ? j * (ph + gap) : (pw - ph) / 2), py, ph, ph, x.lt); }
+        else { const ww = (pw - 3) / 2; s += pane(x, px, py, ww, ph, x.lt) + pane(x, px + ww + 3, py, ww, ph, x.lt); }
+      } else s += rp(px, py, pw, ph, 2.4);
     }
     return s + sheen(x, W, Hh);
   }
-  function doorCarriage(x, W, Hh) {
-    let s = secBase(x, W, Hh, 4); const sh = Hh / 4, half = W / 2;
-    let g = "";
-    for (let xx = W / 16; xx < W; xx += W / 16) if (Math.abs(xx - half) > 1) g += `M${f(xx)} ${f(sh)}V${Hh}`;
+  function doorCarriage(x, W, Hh, n, win) {
+    n = n || 4; const glass = win !== "none", sh = Hh / n, half = W / 2, grain = opt(x, "tex", "wood") === "wood";
+    let s = secBase(x, W, Hh, n), g = "";
+    for (let xx = W / 16; xx < W; xx += W / 16) if (Math.abs(xx - half) > 1) g += `M${f(xx)} ${f(glass ? sh : 0)}V${Hh}`;
     s += `<path d="${g}" stroke="#000" stroke-opacity=".3"/><path d="${g.replace(/M([\d.]+)/g, (a, v) => "M" + f(+v + 1))}" stroke="#fff" stroke-opacity=".14"/>`;
-    s += grainV(7, 0, 0, W, Hh, 3);
+    if (grain) s += grainV(7, 0, 0, W, Hh, 3);
+    // leaf frames (stiles + center split)
     s += `<path d="M${f(half)} 0V${Hh}" stroke="#000" stroke-opacity=".6" stroke-width="1.6"/><rect x="2" y="2" width="${f(half - 4)}" height="${Hh - 6}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="3"/><rect x="${f(half + 2)}" y="2" width="${f(half - 4)}" height="${Hh - 6}" fill="none" stroke="#000" stroke-opacity=".3" stroke-width="3"/>`;
+    // arched windows: two per leaf
     const ww = (half - 16) / 2;
-    [0, 1, 2, 3].forEach((i) => {
+    if (glass) [0, 1, 2, 3].forEach((i) => {
       const px = (i < 2 ? 6 : half + 6) + (i % 2) * (ww + 4), py = sh * .16, ph = sh * .7;
       const d = `M${f(px)} ${f(py + ph)}V${f(py + ph * .4)}Q${f(px + ww / 2)} ${f(py - ph * .25)} ${f(px + ww)} ${f(py + ph * .4)}V${f(py + ph)}Z`;
-      s += `<path d="${d}" fill="#000" fill-opacity=".4" transform="translate(.8 .8)"/><path d="${d}" fill="${x.url("gls")}"/><path d="M${f(px + ww / 2)} ${f(py + ph * .1)}V${f(py + ph)}M${f(px)} ${f(py + ph * .55)}H${f(px + ww)}" stroke="${x.p.l}" stroke-width="1.2"/><path d="${d}" fill="none" stroke="${x.p.l}" stroke-width="1.2"/><path d="M${f(px + 1.5)} ${f(py + ph * .9)}L${f(px + ww * .45)} ${f(py + ph * .2)}" stroke="#fff" stroke-opacity=".25" stroke-width="1.5"/>`;
+      s += `<path d="${d}" fill="#000" fill-opacity=".4" transform="translate(.8 .8)"/><path d="${d}" fill="${x.url("gls")}"/>${x.lt ? `<path d="${d}" fill="${WARM}" opacity=".55"/>` : ""}<path d="M${f(px + ww / 2)} ${f(py + ph * .1)}V${f(py + ph)}M${f(px)} ${f(py + ph * .55)}H${f(px + ww)}" stroke="${x.p.l}" stroke-width="1.2"/><path d="${d}" fill="none" stroke="${x.p.l}" stroke-width="1.2"/><path d="M${f(px + 1.5)} ${f(py + ph * .9)}L${f(px + ww * .45)} ${f(py + ph * .2)}" stroke="#fff" stroke-opacity=".25" stroke-width="1.5"/>`;
     });
+    // strap hinges + pulls (black iron)
     const strap = (y, l) => `<path d="M2 ${f(y - 2.4)}H${f(l)}L${f(l + 4)} ${f(y)}L${f(l)} ${f(y + 2.4)}H2Z" fill="#1c1c1e"/><path d="M${f(W - 2)} ${f(y - 2.4)}H${f(W - l)}L${f(W - l - 4)} ${f(y)}L${f(W - l)} ${f(y + 2.4)}H${f(W - 2)}Z" fill="#1c1c1e"/><path d="M2 ${f(y - 1.8)}H${f(l)}M${f(W - 2)} ${f(y - 1.8)}H${f(W - l)}" stroke="#fff" stroke-opacity=".25" stroke-width=".6"/>`;
-    s += strap(sh * 1.5, W * .18) + strap(sh * 3.4, W * .18);
-    s += `<rect x="${f(half - 7)}" y="${f(sh * 2.2)}" width="2.6" height="${f(sh * .8)}" rx="1.2" fill="#1c1c1e"/><rect x="${f(half + 4.4)}" y="${f(sh * 2.2)}" width="2.6" height="${f(sh * .8)}" rx="1.2" fill="#1c1c1e"/>`;
+    s += strap(Hh * .375, W * .18) + strap(Hh * .85, W * .18);
+    s += `<rect x="${f(half - 7)}" y="${f(Hh * .55)}" width="2.6" height="${f(Hh * .2)}" rx="1.2" fill="#1c1c1e"/><rect x="${f(half + 4.4)}" y="${f(Hh * .55)}" width="2.6" height="${f(Hh * .2)}" rx="1.2" fill="#1c1c1e"/>`;
     return s + sheen(x, W, Hh);
   }
-  function doorGlass(x, W, Hh) {
-    let s = `<rect width="${W}" height="${Hh}" fill="${x.url("fin")}"/>`; const rows = 4, cols = 4, fw = 3.4, sh = Hh / rows, pw = (W - fw * (cols + 1)) / cols, ph = sh - fw * 2;
+  function doorGlass(x, W, Hh, rows) {
+    let s = `<rect width="${W}" height="${Hh}" fill="${x.url("fin")}"/>` + tex(x, W, Hh); rows = rows || 4; const cols = 4, fw = 3.4, sh = Hh / rows, pw = (W - fw * (cols + 1)) / cols, ph = sh - fw * 2;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const px = fw + c * (pw + fw), py = r * sh + fw;
       s += `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${x.url("fr")}"/>${x.lt ? `<rect x="${f(px)}" y="${f(py)}" width="${f(pw)}" height="${f(ph)}" fill="${WARM}" opacity=".45"/>` : ""}
@@ -20985,36 +21038,42 @@ ${extra || ""}</defs>`;
     for (let r = 1; r < rows; r++) s += `<path d="M0 ${f(r * sh)}H${W}" stroke="#000" stroke-opacity=".6"/>`;
     return s + sheen(x, W, Hh);
   }
-  function doorFlush(x, W, Hh) {
-    let s = secBase(x, W, Hh, 4); const sh = Hh / 4; let d = "";
-    for (let r = 0; r < 4; r++) for (let k = 1; k < 6; k++) d += `M0 ${f(r * sh + k * sh / 6)}H${W}`;
-    s += `<path d="${d}" stroke="#000" stroke-opacity=".1"/><path d="${d.replace(/H/g, "H").replace(/M0 ([\d.]+)/g, (a, v) => "M0 " + f(+v + .7))}" stroke="#fff" stroke-opacity=".07"/>`;
-    s += `<rect x="${f(W * .1)}" y="${f(sh * .4)}" width="${f(W * .8)}" height="${f(sh * .22)}" fill="${x.url("gls")}"/><rect x="${f(W * .1)}" y="${f(sh * .4)}" width="${f(W * .8)}" height="${f(sh * .22)}" fill="none" stroke="#000" stroke-opacity=".5"/><path d="M${f(W * .12)} ${f(sh * .45)}H${f(W * .5)}" stroke="#fff" stroke-opacity=".3"/>`;
+  function doorFlush(x, W, Hh, n, mode, shape) {
+    n = n || 4; let s = secBase(x, W, Hh, n); const sh = Hh / n; let d = "";
+    if (opt(x, "tex", "fine") === "fine") {
+      for (let r = 0; r < n; r++) for (let k = 1; k < 6; k++) d += `M0 ${f(r * sh + k * sh / 6)}H${W}`;
+      s += `<path d="${d}" stroke="#000" stroke-opacity=".1"/><path d="${d.replace(/M0 ([\d.]+)/g, (a, v) => "M0 " + f(+v + .7))}" stroke="#fff" stroke-opacity=".07"/>`;
+    }
+    s += slotWins(x, W, Hh, n, mode || "top", shape);
     return s + sheen(x, W, Hh);
   }
-  function doorPlank(x, W, Hh) {
-    const h = N(), n = 15, ph = Hh / n, r = rnd(23); let s = "";
-    for (let i = 0; i < n; i++) {
+  function doorPlank(x, W, Hh, n, mode, shape) {
+    const h = N(), np = 15, ph = Hh / np, r = rnd(23); let s = "";
+    for (let i = 0; i < np; i++) {
       const c = h.shade(x.c, r() * .24 - .12);
       s += `<rect x="0" y="${f(i * ph)}" width="${W}" height="${f(ph)}" fill="${c}"/><rect x="0" y="${f(i * ph)}" width="${W}" height="${f(ph * .35)}" fill="#fff" fill-opacity=".07"/><path d="M0 ${f(i * ph + ph - .4)}H${W}" stroke="#000" stroke-opacity=".55" stroke-width=".9"/>`;
     }
-    s += grainH(5, 0, 0, W, Hh, 1.4) + grainH(9, 0, 0, W, Hh, 2.2);
-    s += `<rect x="${f(W * .4)}" y="${f(Hh * .55)}" width="${f(W * .2)}" height="2.6" rx="1.2" fill="#18191b"/><path d="M${f(W * .4)} ${f(Hh * .55 + .5)}h${f(W * .2)}" stroke="#fff" stroke-opacity=".3" stroke-width=".6"/>`;
+    if (opt(x, "tex", "wood") === "wood") s += grainH(5, 0, 0, W, Hh, 1.4) + grainH(9, 0, 0, W, Hh, 2.2);
+    else s += tex(x, W, Hh);
+    if (n) for (let i = 1; i < n; i++) s += `<path d="M0 ${f(i * Hh / n)}H${W}" stroke="#000" stroke-opacity=".6" stroke-width="1.5"/><path d="M0 ${f(i * Hh / n + 1.3)}H${W}" stroke="#fff" stroke-opacity=".22" stroke-width=".8"/>`;
+    mode = mode || "none"; s += slotWins(x, W, Hh, n || 4, mode, shape, .3);
+    const hy = mode === "none" ? .55 : .935;
+    s += `<rect x="${f(W * .4)}" y="${f(Hh * hy)}" width="${f(W * .2)}" height="2.6" rx="1.2" fill="#18191b"/><path d="M${f(W * .4)} ${f(Hh * hy + .5)}h${f(W * .2)}" stroke="#fff" stroke-opacity=".3" stroke-width=".6"/>`;
     return s + sheen(x, W, Hh);
   }
   function doorRoll(x, W, Hh) {
-    let s = `<rect width="${W}" height="${Hh}" fill="${x.url("fin")}"/>`; let d = "", e = "";
+    let s = `<rect width="${W}" height="${Hh}" fill="${x.url("fin")}"/>` + tex(x, W, Hh); let d = "", e = "";
     for (let y = 2; y < Hh - 6; y += 4.4) { d += `M0 ${f(y)}H${W}`; e += `M0 ${f(y + 1.6)}H${W}`; }
     s += `<path d="${e}" stroke="#fff" stroke-opacity=".3" stroke-width="1.4"/><path d="${d}" stroke="#000" stroke-opacity=".35" stroke-width="1.2"/>`;
     s += `<rect y="${Hh - 8}" width="${W}" height="8" fill="${x.p.d}"/><path d="M0 ${Hh - 7.5}H${W}" stroke="#fff" stroke-opacity=".35"/><rect x="${f(W / 2 - 9)}" y="${Hh - 6.5}" width="18" height="3" rx="1.5" fill="${x.url("chr")}"/><rect x="${f(W * .82)}" y="${Hh - 7}" width="5" height="5" rx="1" fill="#2a2b2d"/>`;
     return s + sheen(x, W, Hh);
   }
-  function doorTilt(x, W, Hh) {
-    let s = `<rect width="${W}" height="${Hh}" fill="${x.url("fin")}"/>`; let d = "", e = "";
+  function doorTilt(x, W, Hh, win) {
+    let s = `<rect width="${W}" height="${Hh}" fill="${x.url("fin")}"/>` + tex(x, W, Hh); let d = "", e = "";
     for (let xx = W / 14; xx < W - 1; xx += W / 14) { d += `M${f(xx)} ${f(Hh * .22)}V${Hh}`; e += `M${f(xx + 1)} ${f(Hh * .22)}V${Hh}`; }
     s += `<path d="${d}" stroke="#000" stroke-opacity=".32" stroke-width="1.2"/><path d="${e}" stroke="#fff" stroke-opacity=".2"/>`;
     s += rp(3, 3, W - 6, Hh - 8, 2.4) + rp(8, Hh * .04, W - 16, Hh * .15, 1.6);
-    for (let i = 0; i < 4; i++) { const pw = (W - 40) / 4; s += pane(x, 14 + i * (pw + 4), Hh * .06, pw, Hh * .11); }
+    if (win !== "none") for (let i = 0; i < 4; i++) { const pw = (W - 40) / 4; s += pane(x, 14 + i * (pw + 4), Hh * .06, pw, Hh * .11, x.lt); }
     s += `<rect x="${f(W / 2 - 8)}" y="${f(Hh * .7)}" width="16" height="4" rx="2" fill="${x.url("chr")}"/><circle cx="${f(W / 2)}" cy="${f(Hh * .7 + 2)}" r="1.2" fill="#222"/>`;
     return s + sheen(x, W, Hh);
   }
@@ -21112,72 +21171,85 @@ ${extra || ""}</defs>`;
     if (p.d1 != null || p.d2 != null) { x.d1 = sub("d1", 100); x.d2 = sub("d2", 300); }
     return x;
   }
-  const G = (id, name, colors, colorLabel, fn) => icons.push({ id, name, colors, picker: true, colorLabel, render(o) { return fn(mfx(ctx(o), o)); } });
+  const G = (id, name, colors, colorLabel, fn, options) => icons.push(Object.assign({ id, name, colors, picker: true, colorLabel, render(o) { return fn(mfx(ctx(o), o)); } }, options ? { options } : {}));
   const DOOR = "Door", GATE = "Gate";
+
+  /* look menus for the doors (first value of each = the drawing as it was) */
+  const WIN_ALL = [["none", "None"], ["top", "Top row"], ["bottom", "Bottom row"], ["right", "Down the right"], ["left", "Down the left"], ["all", "Everywhere"]];
+  const panelsM = (drawn) => ({ id: "panels", name: "Panels", values: (drawn ? [["drawn", "As drawn"]] : []).concat([["4", "4 panels"], ["5", "5 panels"]]) });
+  const winM = (first, only) => ({ id: "win", name: "Windows", values: WIN_ALL.filter((v) => v[0] === first).concat(WIN_ALL.filter((v) => v[0] !== first && (!only || only.indexOf(v[0]) >= 0))) });
+  const shapeM = { id: "shape", name: "Window shape", values: [["long", "Long narrow"], ["square", "Square"]], when: { opt: "win", is: ["top", "bottom", "right", "left", "all"] } };
+  const TEX_ALL = [["smooth", "Smooth"], ["wood", "Wood grain"], ["stucco", "Stucco embossed"], ["brushed", "Brushed metal"], ["ribbed", "Ribbed"]];
+  const texM = (first) => ({ id: "tex", name: "Texture", values: (first[0] === "smooth" || first[0] === "wood" ? [] : [first]).concat(TEX_ALL.filter((v) => v[0] === first[0]), TEX_ALL.filter((v) => v[0] !== first[0])) });
+  const panelsN = (x, d) => { const v = opt(x, "panels", d || "4"); return v === "drawn" ? 0 : +v === 5 ? 5 : 4; };
+  const glassM = { id: "glass", name: "Glass", values: [["frost", "Frosted white"], ["clear", "Clear"]], when: { opt: "win", is: ["top", "bottom", "right", "left", "all"] } };
+  const TEX_SMOOTH = texM(["smooth", "Smooth"]);
 
   G("raised", "Raised panel", [WHT, ALM, SND, BRZ, BLK], DOOR, (x) => {
     const X = 42, Y = 62, W = 116, Hh = 96;
     return svg(x, wall(x, "siding", "#7c8a96") + eave(x, 34, "#e9e7e1") + drive(x, Y + Hh) +
-      bay(x, { X, Y, W, H: Hh, door: doorRaised(x, W, Hh, 4, 4), car: "sedan", carCol: "#8a2329" }) +
+      bay(x, { X, Y, W, H: Hh, door: doorRaised(x, W, Hh, 4, panelsN(x), opt(x, "win", "none")), car: "sedan", carCol: "#8a2329" }) +
       lantern(x, 24, 96, x.lt) + lantern(x, 176, 96, x.lt) + bush(x, 16, 184, 13) + bush(x, 186, 186, 12));
-  });
+  }, [panelsM(), winM("none"), TEX_SMOOTH]);
   G("double", "Two-car raised", [ALM, WHT, SND, BRZ, BLK], DOOR, (x) => {
     const X = 22, Y = 66, W = 156, Hh = 90;
     return svg(x, wall(x, "brick", "#83483a", 8, 192, 4) + eave(x, 36, "#efece4", "#2f2b2a") + drive(x, Y + Hh) +
-      bay(x, { X, Y, W, H: Hh, door: doorRaised(x, W, Hh, 8, 4), car: "suv", carCol: "#3d5568" }));
-  });
+      bay(x, { X, Y, W, H: Hh, door: doorRaised(x, W, Hh, 8, panelsN(x), opt(x, "win", "none")), car: "suv", carCol: "#3d5568" }));
+  }, [panelsM(), winM("none"), TEX_SMOOTH]);
   G("carriage", "Carriage house", [CDR, WAL, SND, BLK, WHT, "#3e5a4b"], DOOR, (x) => {
+    x.texNative = "wood";
     const X = 40, Y = 60, W = 120, Hh = 98;
     return svg(x, wall(x, "stucco", "#c8b79a") + eave(x, 32, "#5a3b26", "#3d3330") + drive(x, Y + Hh) +
-      bay(x, { X, Y, W, H: Hh, door: doorCarriage(x, W, Hh), car: "sedan", carCol: "#c9ccd0", trim: "#5c4130" }) +
+      bay(x, { X, Y, W, H: Hh, door: doorCarriage(x, W, Hh, panelsN(x), opt(x, "win", "top")), car: "sedan", carCol: "#c9ccd0", trim: "#5c4130" }) +
       lantern(x, 22, 94, x.lt) + lantern(x, 178, 94, x.lt) + bush(x, 18, 186, 12) + bush(x, 184, 185, 13));
-  });
+  }, [panelsM(), winM("top", ["none"]), texM(["wood", "Wood grain"])]);
   G("glass", "Frosted glass", [BLK, CHA, "#b9bec3", BRZ, WHT], DOOR, (x) => {
     const X = 34, Y = 54, W = 132, Hh = 104;
     let slats = ""; for (let xx = 8; xx < 192; xx += 5) slats += `<rect x="${xx}" y="8" width="3.6" height="22" fill="${xx % 10 ? "#9a6a43" : "#8a5c38"}"/>`;
     return svg(x, BGW(wall_(x, "panel", "#3b3f45") + slats + `<rect x="8" y="30" width="184" height="10" fill="${x.url("dn")}" opacity=".7"/>`) +
       (x.lt ? `<path d="M40 30L28 70H172L160 30Z" fill="${x.url("cone")}" opacity=".35"/>` : "") + `<path d="M38 29.5H162" stroke="${x.lt ? "#fff3d0" : "#5b5f66"}" stroke-width="2"/>` +
-      drive(x, Y + Hh) + bay(x, { X, Y, W, H: Hh, door: doorGlass(x, W, Hh), car: "sedan", carCol: "#e7e7e4", trim: "#2a2d31" }) + bush(x, 16, 184, 10) + bush(x, 186, 184, 10));
-  });
+      drive(x, Y + Hh) + bay(x, { X, Y, W, H: Hh, door: doorGlass(x, W, Hh, panelsN(x)), car: "sedan", carCol: "#e7e7e4", trim: "#2a2d31" }) + bush(x, 16, 184, 10) + bush(x, 186, 184, 10));
+  }, [{ id: "panels", name: "Glass rows", values: [["4", "4 rows"], ["5", "5 rows"]] }, TEX_SMOOTH]);
   G("flush", "Flush modern", [CHA, BLK, WHT, BRZ, SND], DOOR, (x) => {
     const X = 30, Y = 58, W = 124, Hh = 100;
     return svg(x, BGW(wall_(x, "stucco", "#e4e1da", 8, 192, 7) + `<rect x="8" y="8" width="184" height="18" fill="#2c2e33"/><rect x="8" y="26" width="184" height="12" fill="${x.url("dn")}" opacity=".5"/>` +
       `<rect x="164" y="40" width="22" height="118" fill="#8f6440"/>${grainV(3, 164, 40, 22, 118, 2)}<path d="M164 40v118" stroke="#000" stroke-opacity=".3"/>`) +
-      drive(x, Y + Hh) + bay(x, { X, Y, W, H: Hh, door: doorFlush(x, W, Hh), car: "sedan", carCol: "#1f5f9c", trim: "#dcd9d2" }) +
+      drive(x, Y + Hh) + bay(x, { X, Y, W, H: Hh, door: doorFlush(x, W, Hh, panelsN(x), opt(x, "win", "top"), opt(x, "shape", "long")), car: "sedan", carCol: "#1f5f9c", trim: "#dcd9d2" }) +
       BGW(`<rect x="168" y="78" width="14" height="4" rx="1" fill="#1b1c1e"/>${x.lt ? `<path d="M168 82L160 120H190L182 82Z" fill="${x.url("cone")}" opacity=".7"/>` : ""}`));
-  });
+  }, [panelsM(), winM("top"), shapeM, glassM, texM(["fine", "Fine lines"])]);
   G("longpanel", "Long panel", [WHT, ALM, SND, "#7c7f82", BRZ], DOOR, (x) => {
     const X = 38, Y = 60, W = 124, Hh = 98;
     return svg(x, wall(x, "siding", "#b9ab92", 8, 120) + wall(x, "stone", "#8b8070", 120, 192, 17) + eave(x, 34, "#f0eee8", "#3d3a36") + drive(x, Y + Hh) +
-      bay(x, { X, Y, W, H: Hh, door: doorLong(x, W, Hh), car: "suv", carCol: "#2d3136" }) + lantern(x, 22, 96, x.lt) + lantern(x, 178, 96, x.lt));
-  });
+      bay(x, { X, Y, W, H: Hh, door: doorLong(x, W, Hh, panelsN(x), opt(x, "win", "top"), opt(x, "shape", "long")), car: "suv", carCol: "#2d3136" }) + lantern(x, 22, 96, x.lt) + lantern(x, 178, 96, x.lt));
+  }, [panelsM(), winM("top"), shapeM, TEX_SMOOTH]);
   G("plank", "Cedar plank", [CDR, WAL, "#c79a6a", "#8b8b84", BLK], DOOR, (x) => {
+    x.texNative = "wood";
     const X = 40, Y = 60, W = 120, Hh = 98;
     return svg(x, wall(x, "batten", "#e3e2dd") + eave(x, 32, "#1f2023", "#26272a") + drive(x, Y + Hh) +
-      bay(x, { X, Y, W, H: Hh, door: doorPlank(x, W, Hh), car: "suv", carCol: "#6b7b5a", trim: "#1f2023" }) +
+      bay(x, { X, Y, W, H: Hh, door: doorPlank(x, W, Hh, panelsN(x, "drawn"), opt(x, "win", "none"), opt(x, "shape", "long")), car: "suv", carCol: "#6b7b5a", trim: "#1f2023" }) +
       BGW(`<rect x="20" y="70" width="5" height="18" rx="1" fill="#1b1c1e"/><rect x="175" y="70" width="5" height="18" rx="1" fill="#1b1c1e"/>${x.lt ? `<path d="M20 88L14 118H31L25 88ZM175 88L169 118H186L180 88Z" fill="${x.url("cone")}" opacity=".8"/><path d="M20 70L15 50H30L25 70ZM175 70L170 50H185L180 70Z" fill="${WARM}" opacity=".18"/>` : ""}`) +
       bush(x, 17, 186, 11) + bush(x, 184, 186, 11));
-  });
+  }, [panelsM(true), winM("none"), shapeM, glassM, texM(["wood", "Wood grain"])]);
   G("rollup", "Roll-up sheet", [GAL, WHT, "#3f6d8f", RED, BLK, ALM], DOOR, (x) => {
     const X = 44, Y = 72, W = 112, Hh = 88, h = N();
     const hood = `<rect x="${X - 8}" y="${Y - 22}" width="${W + 16}" height="18" rx="7" fill="${x.url("fin")}"/><rect x="${X - 8}" y="${Y - 22}" width="${W + 16}" height="18" rx="7" fill="${x.url("sh")}"/><path d="M${X - 4} ${Y - 19}H${X + W + 4}" stroke="#fff" stroke-opacity=".45"/><rect x="${X - 8}" y="${Y - 6}" width="${W + 16}" height="2" fill="#000" fill-opacity=".4"/>`;
     return svg(x, BGW(wall_(x, "metal", "#6c7c74") + `<rect x="8" y="8" width="184" height="12" fill="#c9ccc8"/><rect x="8" y="20" width="184" height="6" fill="${x.url("dn")}"/>`) +
       drive(x, Y + Hh) + bay(x, { X, Y, W, H: Hh, door: doorRoll(x, W, Hh), car: null, trim: h.shade("#6c7c74", -.35), beacon: false }) + hood + beacon(x, X + W + 18, Y - 14) +
       `<rect x="${X + W + 12}" y="${Y + 30}" width="9" height="14" rx="1.5" fill="#2b2d30"/><circle cx="${X + W + 16.5}" cy="${Y + 34}" r="1.6" fill="${x.on ? LEDG : "#c0392b"}"/><rect x="${X + W + 14}" y="${Y + 38}" width="5" height="3" rx="1" fill="#e9e9e9"/>`);
-  });
+  }, [{ id: "tex", name: "Texture", values: [["plain", "As drawn"]].concat(TEX_ALL.slice(1)) }]);
   G("tiltup", "One-piece tilt", [ALM, WHT, SND, "#5a6b4f", BRZ], DOOR, (x) => {
     const X = 36, Y = 64, W = 128, Hh = 92;
     return svg(x, wall(x, "brick", "#9c6a4c", 8, 192, 9) + eave(x, 40, "#d9d2c3", "#45403a") + drive(x, Y + Hh) +
-      bay(x, { X, Y, W, H: Hh, door: doorTilt(x, W, Hh), mode: "tilt", car: "sedan", carCol: "#a8742e", trim: "#eae4d6" }) +
+      bay(x, { X, Y, W, H: Hh, door: doorTilt(x, W, Hh, opt(x, "win", "top")), mode: "tilt", car: "sedan", carCol: "#a8742e", trim: "#eae4d6" }) +
       lantern(x, 21, 100, x.lt) + lantern(x, 179, 100, x.lt) + bush(x, 15, 186, 12) + bush(x, 186, 186, 12));
-  });
+  }, [winM("top", ["none"]), TEX_SMOOTH]);
   G("pair", "Side-by-side", [WHT, ALM, SND, "#6c7176", BLK], DOOR, (x) => {
-    const Y = 70, W = 74, Hh = 86;
+    const Y = 70, W = 74, Hh = 86, n = panelsN(x), w = opt(x, "win", "top");
     if (!x.d1) x.d1 = x.d2 = x;
     return svg(x, wall(x, "siding", "#56606a") + eave(x, 36, "#f2f1ec", "#2e2c2b") + drive(x, Y + Hh) +
-      bay(x.d1, { X: 18, Y, W, H: Hh, door: doorRaised(x.d1, W, Hh, 4, 4, true), car: "sedan", carCol: "#b8bec4" }) +
-      bay(x.d2, { X: 108, Y, W, H: Hh, door: doorRaised(x.d2, W, Hh, 4, 4, true), car: "suv", carCol: "#5a2430" }) + lantern(x, 100, 98, x.lt));
-  });
+      bay(x.d1, { X: 18, Y, W, H: Hh, door: doorRaised(x.d1, W, Hh, 4, n, w), car: "sedan", carCol: "#b8bec4" }) +
+      bay(x.d2, { X: 108, Y, W, H: Hh, door: doorRaised(x.d2, W, Hh, 4, n, w), car: "suv", carCol: "#5a2430" }) + lantern(x, 100, 98, x.lt));
+  }, [panelsM(), winM("top"), TEX_SMOOTH]);
 
   G("swing", "Swing gate", [BLK, BRZ, "#3f4b3f", WHT, GAL], GATE, (x) => {
     const hz = 104, gy = 168, W = 64, Hh = 60, th = x.op * 1.3, c = leafCols(x);
@@ -54078,7 +54150,7 @@ window.HDA_NAMES = {"consoles":"Consoles: block & classic","consoles2":"Consoles
   if (!customElements.get("device-art-card-editor")) customElements.define("device-art-card-editor", DeviceArtCardEditor);
 
   /* version line in the browser console, so anyone can check which release they are running */
-  const VERSION = "1.3.3";
+  const VERSION = "1.3.4";
   console.info("%c DEVICE-ART-CARD %c v" + VERSION + " · " + Object.keys(ITEMS).length + " drawings ", "background:#7c5cff;color:#fff;font-weight:700;border-radius:3px 0 0 3px", "background:#2a1f5c;color:#fff;border-radius:0 3px 3px 0");
   window.customCards = window.customCards || [];
   if (!window.customCards.some((c) => c.type === "device-art-card"))
