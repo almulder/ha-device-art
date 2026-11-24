@@ -1,12 +1,25 @@
 # Device Art Card
 
-**Animated, realistic device drawings for your Home Assistant dashboard.** **1,607 drawings** in **17 categories** and 114 groups:
+**Animated, realistic device drawings for your Home Assistant dashboard.** **1,619 drawings** in **17 categories** and 115 groups:
 lights, fans, appliances, locks, sensors, plants and more. Builder cards and plant/tree builders add thousands more combinations. Each one comes alive with your device's state: lamps glow in the bulb's color, fans spin with their speed, washers
 show their cycle and doors open. **429 of them are multi-function:** each door, light, reading or stage can follow its own entity.
 
 ![Fans](docs/images/anim-fans.gif)
 ![Lights and glow](docs/images/anim-lights.gif)
 ![Things that move](docs/images/anim-home.gif)
+
+## What's new in 1.3.5: map icons for people on the move
+
+![On the move](docs/images/new-135-onthemove.png)
+
+**12 new drawings**, so there are **1,619 drawings** in all.
+
+- **On the move** (People & pets, **On the move (map icons)**): car, sports car (fastback with a rear wing), pickup truck,
+  rugged SUV, off-road 4x4, family van, bike, semi truck and motorcycle, plus walking person, woman and child on a
+  colored disc. Pick any color for the body (or the disc) and **Facing** right or left. On means moving: wheels turn and
+  people walk. Each one has a white outline, so it reads small on a map too.
+
+The **[gallery](https://almulder.github.io/ha-device-art/)** has a **Show: New in 1.3.5** filter.
 
 ## What's new in 1.3.4: garage door windows, panels and texture
 
@@ -190,6 +203,7 @@ How to set it up: see [Multi-function cards (parts)](#multi-function-cards-parts
 
 ## Version history
 
+- **1.3.5:** 12 map icons for people on the move (9 vehicles, 3 walking figures). See above.
 - **1.3.4:** garage doors get Windows, Panels, Window shape, Glass and Texture menus. See above.
 - **1.3.3:** 4 chicken lamps that glow when on, with a chicken color and a light color. See above.
 - **1.3.2:** fixes: thermostat Automatic mode, plain lock names, unique ids on double doors, no fade-in on lights and locks.
@@ -269,7 +283,7 @@ Almost everything on a drawing can be set. The pictures below show only a few of
 
 **Getting updates:** HACS shows "Update available" for each new version. After updating, reload the page
 (Ctrl+F5, or in the phone app: Settings → Companion App → Debugging → Reset frontend cache). To check your version,
-open the browser console: it shows `DEVICE-ART-CARD v1.3.4`.
+open the browser console: it shows `DEVICE-ART-CARD v1.3.5`.
 
 **Manual**
 1. Copy `dist/ha-device-art.js` to `config/www/`.
@@ -503,7 +517,7 @@ Some cards are builders: pick the style, layout and extras from menus, and the d
 
 ## Every category
 
-A sample from each category, 1,607 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
+A sample from each category, 1,619 drawings in all. The [gallery](https://almulder.github.io/ha-device-art/) has all of them.
 
 | | |
 |---|---|

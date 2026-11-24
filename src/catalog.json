@@ -2346,6 +2346,24 @@
     ]
    },
    {
+    "id": "onthemove",
+    "name": "On the move (map icons)",
+    "items": [
+     "presence/car",
+     "presence/sports",
+     "presence/truck",
+     "presence/suv",
+     "presence/offroad",
+     "presence/van",
+     "presence/bike",
+     "presence/semi",
+     "presence/motorcycle",
+     "presence/person",
+     "presence/woman",
+     "presence/child"
+    ]
+   },
+   {
     "id": "dogscats",
     "name": "Dogs & cats",
     "items": [
